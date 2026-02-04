@@ -4,11 +4,11 @@ import Navigation from './Navigation';
 
 export default function Layout() {
     return (
-        <div className="bg-[var(--bg-dark)] min-h-screen pb-24">
-            <main className="page-container pt-6">
+        <>
+            <main className="page-content animate-in">
                 <Outlet />
             </main>
             <Navigation />
-        </div>
+        </>
     );
 }

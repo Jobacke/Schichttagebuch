@@ -1,34 +1,44 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { List, PlusCircle, BarChart2, Settings } from 'lucide-react';
+import { BookOpen, Plus, BarChart2, Settings } from 'lucide-react';
 
 export default function Navigation() {
     const navItems = [
-        { to: '/', icon: List, label: 'Journal' },
-        { to: '/add', icon: PlusCircle, label: 'Eintrag', highlight: true },
-        { to: '/stats', icon: BarChart2, label: 'Auswertung' },
+        { to: '/', icon: BookOpen, label: 'Journal' },
+        { to: '/add', icon: Plus, label: 'Neu', isFab: true }, // Special visuals for Add
+        { to: '/stats', icon: BarChart2, label: 'Ausw.' },
         { to: '/settings', icon: Settings, label: 'Einstellungen' }
     ];
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 h-[80px] glass-panel m-4 mb-2 flex justify-around items-center z-50">
-            {navItems.map(({ to, icon: Icon, label, highlight }) => (
+        <nav className="bottom-nav">
+            {navItems.map(({ to, icon: Icon, label, isFab }) => (
                 <NavLink
                     key={to}
                     to={to}
-                    className={({ isActive }) => `
-            flex flex-col items-center justify-center p-2 rounded-xl transition-all
-            ${isActive ? 'text-[var(--primary)]' : 'text-[var(--text-muted)]'}
-            ${highlight && isActive ? 'scale-110' : ''}
-          `}
-                    style={{ textDecoration: 'none' }}
+                    className={({ isActive }) =>
+                        `nav-item ${isActive ? 'active' : ''}`
+                    }
                 >
-                    {({ isActive }) => (
+                    {isFab ? (
+                        <div style={{
+                            backgroundColor: 'var(--primary)',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '48px',
+                            height: '48px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 10px rgba(249, 115, 22, 0.4)',
+                            transform: 'translateY(-10px)'
+                        }}>
+                            <Icon size={24} strokeWidth={3} />
+                        </div>
+                    ) : (
                         <>
-                            <div className={`p-2 rounded-full ${highlight ? 'bg-[rgba(255,255,255,0.05)]' : ''} ${isActive && highlight ? 'bg-[var(--primary-glow)]' : ''}`}>
-                                <Icon size={highlight ? 28 : 24} strokeWidth={isActive ? 2.5 : 2} />
-                            </div>
-                            <span className="text-xs mt-1 font-medium">{label}</span>
+                            <Icon size={22} strokeWidth={2} />
+                            <span className="nav-label">{label}</span>
                         </>
                     )}
                 </NavLink>

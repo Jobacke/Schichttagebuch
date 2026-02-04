@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
-import { Save, Clock, MapPin, Ticket, User, Ambulance, Radio } from 'lucide-react';
+import { Save, Clock, MapPin, Truck, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Entry() {
@@ -26,6 +26,10 @@ export default function Entry() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleChipSelect = (name, value) => {
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         const newShift = {
@@ -38,18 +42,22 @@ export default function Entry() {
     };
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h1 className="mb-6">Neue Schicht</h1>
+        <div className="animate-in slide-in-from-bottom-5">
+            <div className="flex items-center gap-2 mb-6">
+                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-secondary"><ChevronLeft /></button>
+                <h1 className="mb-0">Neue Schicht</h1>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Date & Time Section */}
-                <section className="glass-panel p-5 space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Clock className="text-[var(--primary)]" size={20} />
-                        <h2 className="m-0 text-lg font-semibold">Zeitraum</h2>
+
+                {/* Date & Time Card */}
+                <section className="card">
+                    <div className="flex items-center gap-2 mb-4 text-primary">
+                        <Clock size={18} />
+                        <h2 className="mb-0 text-base">Zeitraum</h2>
                     </div>
 
-                    <div>
+                    <div className="input-wrapper">
                         <label>Datum</label>
                         <input
                             type="date"
@@ -62,7 +70,7 @@ export default function Entry() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
+                        <div className="input-wrapper">
                             <label>Beginn</label>
                             <input
                                 type="time"
@@ -73,7 +81,7 @@ export default function Entry() {
                                 required
                             />
                         </div>
-                        <div>
+                        <div className="input-wrapper">
                             <label>Ende</label>
                             <input
                                 type="time"
@@ -87,83 +95,76 @@ export default function Entry() {
                     </div>
                 </section>
 
-                {/* Details Section */}
-                <section className="glass-panel p-5 space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Ticket className="text-[var(--accent)]" size={20} />
-                        <h2 className="m-0 text-lg font-semibold">Details</h2>
+                {/* Shift Type Chips */}
+                <section className="card">
+                    <label>Schichtart</label>
+                    <div className="chip-grid mb-4">
+                        {store.settings.shiftTypes.map(t => (
+                            <div
+                                key={t.id}
+                                className={`chip ${formData.typeId === t.id ? 'active' : ''}`}
+                                onClick={() => handleChipSelect('typeId', t.id)}
+                            >
+                                {t.name}
+                            </div>
+                        ))}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label>Schichtart</label>
-                            <select name="typeId" value={formData.typeId} onChange={handleChange} className="input-field">
-                                {store.settings.shiftTypes.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label>Kürzel (Soll)</label>
-                            <select name="codeId" value={formData.codeId} onChange={handleChange} className="input-field">
-                                {store.settings.shiftCodes.map(c => (
-                                    <option key={c.id} value={c.id}>{c.code} ({c.hours}h)</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="flex items-center gap-2"><MapPin size={14} /> Wache</label>
-                        <select name="station" value={formData.station} onChange={handleChange} className="input-field">
-                            {store.settings.stations.map((s, i) => (
-                                <option key={i} value={s}>{s}</option>
-                            ))}
-                            <option value="other">Andere...</option>
-                        </select>
+                    <label>Kürzel (Sollzeit)</label>
+                    <div className="chip-grid">
+                        {store.settings.shiftCodes.map(c => (
+                            <div
+                                key={c.id}
+                                className={`chip ${formData.codeId === c.id ? 'active' : ''}`}
+                                onClick={() => handleChipSelect('codeId', c.id)}
+                            >
+                                {c.code} <span className="opacity-60 text-xs">({c.hours}h)</span>
+                            </div>
+                        ))}
                     </div>
                 </section>
 
-                {/* Resources Section */}
-                <section className="glass-panel p-5 space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Ambulance className="text-[var(--danger)]" size={20} />
-                        <h2 className="m-0 text-lg font-semibold">Ressourcen</h2>
+                {/* Resources Card */}
+                <section className="card">
+                    <div className="flex items-center gap-2 mb-4 text-secondary">
+                        <Truck size={18} />
+                        <h2 className="mb-0 text-base">Einsatzmittel</h2>
                     </div>
 
-                    <div>
-                        <label className="flex items-center gap-2"><User size={14} /> TeampartnerIn</label>
+                    <div className="input-wrapper">
+                        <label>Wache</label>
+                        <select name="station" value={formData.station} onChange={handleChange} className="input-field">
+                            {store.settings.stations.map((s, i) => <option key={i} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="input-wrapper">
+                        <label>Fahrzeug & Kennzeichen</label>
+                        <select name="vehicle" value={formData.vehicle} onChange={handleChange} className="input-field mb-2">
+                            {store.settings.vehicles.map((v, i) => <option key={i} value={v}>{v}</option>)}
+                        </select>
+                        <select name="callSign" value={formData.callSign} onChange={handleChange} className="input-field">
+                            {store.settings.callSigns.map((c, i) => <option key={i} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="input-wrapper">
+                        <label>PartnerIn</label>
                         <input
                             type="text"
                             name="partner"
                             value={formData.partner}
                             onChange={handleChange}
-                            placeholder="Name eingeben"
+                            placeholder="Name..."
                             className="input-field"
                         />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="flex items-center gap-2"><Ambulance size={14} /> Kennzeichen</label>
-                            <select name="vehicle" value={formData.vehicle} onChange={handleChange} className="input-field">
-                                {store.settings.vehicles.map((v, i) => <option key={i} value={v}>{v}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="flex items-center gap-2"><Radio size={14} /> Funkrufname</label>
-                            <select name="callSign" value={formData.callSign} onChange={handleChange} className="input-field">
-                                {store.settings.callSigns.map((c, i) => <option key={i} value={c}>{c}</option>)}
-                            </select>
-                        </div>
-                    </div>
                 </section>
 
-                <button type="submit" className="btn btn-primary w-full mt-8">
+                <button type="submit" className="btn btn-primary mb-8">
                     <Save size={20} />
-                    Schicht speichern
+                    <span>Speichern</span>
                 </button>
-                <div className="h-8"></div>
             </form>
         </div>
     );

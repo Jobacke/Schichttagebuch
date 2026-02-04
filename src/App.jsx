@@ -1,44 +1,62 @@
 import React from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { StoreProvider } from './context/StoreContext';
 import Layout from './components/Layout';
 import Journal from './pages/Journal';
 import Entry from './pages/Entry';
 import Analysis from './pages/Analysis';
 import Settings from './pages/Settings';
+import Login from './pages/Login';
 
-function App() {
-  // Use HashRouter for GitHub Pages simplicity to avoid 404s on refresh 
-  // without complex server config, although the KI mentions CNAME fix.
-  // The KI suggests: <Router basename={import.meta.env.BASE_URL}> with BrowserRouter.
-  // I will follow the KI instruction for BrowserRouter + basename.
+// Setup Font
+import '@fontsource/outfit/300.css';
+import '@fontsource/outfit/400.css';
+import '@fontsource/outfit/500.css';
+import '@fontsource/outfit/600.css';
+import '@fontsource/outfit/700.css';
 
+// Guard Component
+function RequireAuth({ children }) {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-secondary">Lade App...</div>;
+
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+function AppRoutes() {
   return (
-    <StoreProvider>
-      {/* 
-         KI Recommendation: 
-         <Router basename={import.meta.env.BASE_URL}>
-         However, import { BrowserRouter as Router } ...
-      */}
-      <LayoutWrapper />
-    </StoreProvider>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+
+      <Route path="/" element={
+        <RequireAuth>
+          <Layout />
+        </RequireAuth>
+      }>
+        <Route index element={<Journal />} />
+        <Route path="add" element={<Entry />} />
+        <Route path="stats" element={<Analysis />} />
+        <Route path="settings" element={<Settings />} />
+      </Route>
+    </Routes>
   );
 }
 
-import { BrowserRouter } from 'react-router-dom';
-
-function LayoutWrapper() {
+function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Journal />} />
-          <Route path="add" element={<Entry />} />
-          <Route path="stats" element={<Analysis />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <StoreProvider>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <AppRoutes />
+        </BrowserRouter>
+      </StoreProvider>
+    </AuthProvider>
   );
 }
 

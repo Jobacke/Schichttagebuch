@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import { useNavigate } from 'react-router-dom';
 import { formatDate, getDaysInMonth, startOfMonth, getDay, isSameDay, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, MapPin, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Clock, PenSquare } from 'lucide-react';
 
 export default function Journal() {
     const { store } = useStore();
+    const navigate = useNavigate();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
 
@@ -76,19 +78,31 @@ export default function Journal() {
 
             {/* List View */}
             <div>
-                <h2 className="text-secondary text-sm mb-2 opacity-70">
-                    {selectedDate
-                        ? `Einträge am ${selectedDate.toLocaleDateString('de-DE')}`
-                        : 'Aktuelle Schichten'
-                    }
-                </h2>
+                <div className="flex-between mb-2">
+                    <h2 className="text-secondary text-sm opacity-70 mb-0">
+                        {selectedDate
+                            ? `Einträge am ${selectedDate.toLocaleDateString('de-DE')}`
+                            : 'Aktuelle Schichten'
+                        }
+                    </h2>
+                </div>
 
                 <div className="space-y-4" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {(selectedDate ? shiftsOnSelectedDate : monthShifts).sort((a, b) => new Date(b.date) - new Date(a.date)).map(shift => {
                         const code = store.settings.shiftCodes.find(c => c.id === shift.codeId);
 
                         return (
-                            <div key={shift.id} className="card" style={{ display: 'flex', alignItems: 'center', padding: '16px' }}>
+                            <div
+                                key={shift.id}
+                                onClick={() => navigate(`/add?id=${shift.id}`)}
+                                className="card relative group active:scale-[0.98] cursor-pointer"
+                                style={{ display: 'flex', alignItems: 'center', padding: '16px' }}
+                            >
+                                {/* Edit Hint Icon */}
+                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-secondary">
+                                    <PenSquare size={16} />
+                                </div>
+
                                 <div style={{
                                     backgroundColor: 'rgba(249, 115, 22, 0.15)',
                                     color: 'var(--primary)',

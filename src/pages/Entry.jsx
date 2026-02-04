@@ -1,25 +1,50 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
-import { Save, Clock, MapPin, Truck, ChevronLeft } from 'lucide-react';
+import { Save, Clock, MapPin, Truck, ChevronLeft, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Entry() {
     const navigate = useNavigate();
-    const { store, addShift } = useStore();
+    const [searchParams] = useSearchParams();
+    const editId = searchParams.get('id');
+    const { store, addShift, deleteShift } = useStore();
+
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const [formData, setFormData] = useState({
         date: today,
         startTime: '07:00',
         endTime: '19:00',
-        typeId: store.settings.shiftTypes[0]?.id || '',
-        codeId: store.settings.shiftCodes[0]?.id || '',
-        station: store.settings.stations[0] || '',
+        typeId: '',
+        codeId: '',
+        station: '',
         partner: '',
-        vehicle: store.settings.vehicles[0] || '',
-        callSign: store.settings.callSigns[0] || ''
+        vehicle: '',
+        callSign: ''
     });
+
+    // Load existing data if editing
+    useEffect(() => {
+        if (editId && store.shifts.length > 0) {
+            const shiftToEdit = store.shifts.find(s => s.id === editId);
+            if (shiftToEdit) {
+                setFormData(shiftToEdit);
+            }
+        } else {
+            // Set defaults only for new entries
+            if (store.settings.shiftTypes.length > 0 && !formData.typeId) {
+                setFormData(prev => ({
+                    ...prev,
+                    typeId: store.settings.shiftTypes[0]?.id,
+                    codeId: store.settings.shiftCodes[0]?.id,
+                    station: store.settings.stations[0],
+                    vehicle: store.settings.vehicles[0],
+                    callSign: store.settings.callSigns[0]
+                }));
+            }
+        }
+    }, [editId, store.shifts, store.settings]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -32,20 +57,34 @@ export default function Entry() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const newShift = {
-            id: crypto.randomUUID(),
-            timestamp: Date.now(),
-            ...formData
+        const shiftData = {
+            ...formData,
+            id: editId || crypto.randomUUID(), // Keep existing ID or create new
+            timestamp: editId ? formData.timestamp : Date.now()
         };
-        addShift(newShift);
+        addShift(shiftData); // addShift uses setDoc with merge/overwrite so it handles updates too
         navigate('/');
+    };
+
+    const handleDelete = () => {
+        if (confirm('Möchtest du diesen Eintrag wirklich unwiderruflich löschen?')) {
+            deleteShift(editId);
+            navigate('/');
+        }
     };
 
     return (
         <div className="animate-in slide-in-from-bottom-5">
-            <div className="flex items-center gap-2 mb-6">
-                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-secondary"><ChevronLeft /></button>
-                <h1 className="mb-0">Neue Schicht</h1>
+            <div className="flex-between mb-6">
+                <div className="flex items-center gap-2">
+                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-secondary"><ChevronLeft /></button>
+                    <h1 className="mb-0">{editId ? 'Eintrag bearbeiten' : 'Neue Schicht'}</h1>
+                </div>
+                {editId && (
+                    <button onClick={handleDelete} className="p-2 text-danger bg-danger/10 rounded-full hover:bg-danger/20 transition-colors">
+                        <Trash2 size={20} />
+                    </button>
+                )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -163,7 +202,7 @@ export default function Entry() {
 
                 <button type="submit" className="btn btn-primary mb-8">
                     <Save size={20} />
-                    <span>Speichern</span>
+                    <span>{editId ? 'Änderungen speichern' : 'Speichern'}</span>
                 </button>
             </form>
         </div>

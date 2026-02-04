@@ -1,174 +1,215 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Plus, Trash, Save, X } from 'lucide-react';
+import { Trash2, Plus, Save, Clock, Truck, Hash, MapPin, Tag } from 'lucide-react';
 
 export default function Settings() {
     const { store, addSettingItem, removeSettingItem } = useStore();
-    const [activeSection, setActiveSection] = useState(null);
 
-    // Helper forms state
+    // Local state for inputs
+    const [newCode, setNewCode] = useState({ code: '', hours: '' });
     const [newType, setNewType] = useState('');
-    const [newCode, setNewCode] = useState({ code: '', hours: 12 });
     const [newVehicle, setNewVehicle] = useState('');
     const [newCallSign, setNewCallSign] = useState('');
     const [newStation, setNewStation] = useState('');
 
-    const renderSection = (title, items, renderItem, renderForm) => (
-        <div className="glass-panel p-4 mb-6">
-            <h3 className="text-lg font-bold mb-4 flex justify-between items-center">
-                {title}
-                <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{items.length}</span>
-            </h3>
-            <div className="space-y-2 mb-4 max-h-[200px] overflow-y-auto">
-                {items.map((item, idx) => (
-                    <div key={item.id || item} className="flex justify-between items-center bg-[var(--bg-dark)]/50 p-3 rounded-lg">
-                        {renderItem(item)}
-                        <button
-                            onClick={() => {
-                                if (confirm('Wirklich löschen?')) {
-                                    // Determine proper ID or Value to delete
-                                    const idToRemove = item.id || item;
-                                    // Needs to map title to store key... actually I'll pass the key directly
-                                    // This is a bit tricky with the generic renderer, I'll hardcode the key in the call
-                                }
-                            }}
-                            className="text-[var(--danger)]/80 hover:text-[var(--danger)] p-1"
-                        >
-                            <Trash size={16} />
-                        </button>
-                    </div>
-                ))}
-            </div>
-            {renderForm}
-        </div>
-    );
+    // Generic Add Handler
+    const handleAddString = (category, value, setter) => {
+        if (!value.trim()) return;
+        addSettingItem(category, value.trim());
+        setter('');
+    };
+
+    const handleAddCode = () => {
+        if (!newCode.code.trim() || !newCode.hours) return;
+        addSettingItem('shiftCodes', {
+            id: crypto.randomUUID(),
+            code: newCode.code.trim(),
+            hours: parseFloat(newCode.hours)
+        });
+        setNewCode({ code: '', hours: '' });
+    };
+
+    const handleAddType = () => {
+        if (!newType.trim()) return;
+        addSettingItem('shiftTypes', {
+            id: crypto.randomUUID(),
+            name: newType.trim()
+        });
+        setNewType('');
+    };
 
     return (
-        <div className="animate-in fade-in slide-in-from-right-4 duration-500 pb-10">
+        <div className="animate-in slide-in-from-right-4">
             <h1 className="mb-6">Einstellungen</h1>
 
-            {/* Shift Codes (Complex) */}
-            <div className="glass-panel p-4 mb-6">
-                <h3 className="font-bold mb-4">Schichtkürzel & Sollzeit</h3>
-                <div className="space-y-2 mb-4">
-                    {store.settings.shiftCodes.map(c => (
-                        <div key={c.id} className="flex justify-between items-center bg-[color-mix(in_srgb,var(--bg-dark),transparent_50%)] p-3 rounded-lg">
-                            <div>
-                                <span className="font-bold text-[var(--primary)]">{c.code}</span>
-                                <span className="ml-2 text-sm text-[var(--text-muted)]">{c.hours}h</span>
+            {/* --- Schichtkürzel --- */}
+            <section className="card mb-6">
+                <div className="flex items-center gap-2 mb-4 text-primary">
+                    <Clock size={20} />
+                    <h2 className="mb-0 text-lg">Schichtkürzel & Zeiten</h2>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                    {store.settings.shiftCodes.map(item => (
+                        <div key={item.id} className="flex-between bg-app p-3 rounded-lg border border-surface-highlight">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-surface font-bold px-3 py-1 rounded text-primary">{item.code}</div>
+                                <span className="text-sm text-secondary">{item.hours} Std.</span>
                             </div>
-                            <button onClick={() => removeSettingItem('shiftCodes', c.id)} className="text-red-400"><Trash size={16} /></button>
+                            <button
+                                onClick={() => removeSettingItem('shiftCodes', item.id)}
+                                className="text-danger p-2 hover:bg-surface rounded-full transition-colors"
+                            >
+                                <Trash2 size={18} />
+                            </button>
                         </div>
                     ))}
                 </div>
-                <div className="flex gap-2">
-                    <input
-                        placeholder="Kürzel (z.B. T1)"
-                        value={newCode.code}
-                        onChange={e => setNewCode({ ...newCode, code: e.target.value })}
-                        className="input-field w-24"
-                    />
-                    <input
-                        type="number"
-                        placeholder="Std"
-                        value={newCode.hours}
-                        onChange={e => setNewCode({ ...newCode, hours: parseFloat(e.target.value) })}
-                        className="input-field w-20"
-                    />
-                    <button
-                        onClick={() => {
-                            if (newCode.code) {
-                                addSettingItem('shiftCodes', { id: crypto.randomUUID(), ...newCode });
-                                setNewCode({ code: '', hours: 12 });
-                            }
-                        }}
-                        className="btn btn-primary p-2"
-                    ><Plus size={20} /></button>
-                </div>
-            </div>
 
-            {/* Shift Types */}
-            <div className="glass-panel p-4 mb-6">
-                <h3 className="font-bold mb-4">Schichtarten</h3>
-                <div className="space-y-2 mb-4">
-                    {store.settings.shiftTypes.map(t => (
-                        <div key={t.id} className="flex justify-between items-center bg-[color-mix(in_srgb,var(--bg-dark),transparent_50%)] p-3 rounded-lg">
-                            <span>{t.name}</span>
-                            <button onClick={() => removeSettingItem('shiftTypes', t.id)} className="text-red-400"><Trash size={16} /></button>
+                <div className="flex gap-3 items-end">
+                    <div className="flex-1 input-wrapper mb-0">
+                        <label>Kürzel</label>
+                        <input
+                            placeholder="z.B. T1"
+                            value={newCode.code}
+                            onChange={e => setNewCode({ ...newCode, code: e.target.value })}
+                            className="input-field"
+                        />
+                    </div>
+                    <div className="w-24 input-wrapper mb-0">
+                        <label>Stunden</label>
+                        <input
+                            type="number"
+                            placeholder="12"
+                            value={newCode.hours}
+                            onChange={e => setNewCode({ ...newCode, hours: e.target.value })}
+                            className="input-field"
+                        />
+                    </div>
+                    <button onClick={handleAddCode} className="btn btn-primary w-auto aspect-square p-0 flex-center">
+                        <Plus size={24} />
+                    </button>
+                </div>
+            </section>
+
+            {/* --- Schichtarten --- */}
+            <section className="card mb-6">
+                <div className="flex items-center gap-2 mb-4 text-secondary">
+                    <Tag size={20} />
+                    <h2 className="mb-0 text-lg">Schichtarten</h2>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                    {store.settings.shiftTypes.map(item => (
+                        <div key={item.id} className="flex-between bg-app p-3 rounded-lg border border-surface-highlight">
+                            <span className="font-medium">{item.name}</span>
+                            <button
+                                onClick={() => removeSettingItem('shiftTypes', item.id)}
+                                className="text-danger p-2 hover:bg-surface rounded-full transition-colors"
+                            >
+                                <Trash2 size={18} />
+                            </button>
                         </div>
                     ))}
                 </div>
-                <div className="flex gap-2">
-                    <input
-                        placeholder="Neu (z.B. Tagdienst)"
-                        value={newType}
-                        onChange={e => setNewType(e.target.value)}
-                        className="input-field"
-                    />
-                    <button
-                        onClick={() => {
-                            if (newType) {
-                                addSettingItem('shiftTypes', { id: crypto.randomUUID(), name: newType });
-                                setNewType('');
-                            }
-                        }}
-                        className="btn btn-primary p-2"
-                    ><Plus size={20} /></button>
-                </div>
-            </div>
 
-            {/* Vehicles (String Array) */}
-            <SimpleStringList
+                <div className="flex gap-3 items-end">
+                    <div className="flex-1 input-wrapper mb-0">
+                        <label>Bezeichnung</label>
+                        <input
+                            placeholder="z.B. Tagdienst"
+                            value={newType}
+                            onChange={e => setNewType(e.target.value)}
+                            className="input-field"
+                        />
+                    </div>
+                    <button onClick={handleAddType} className="btn btn-primary w-auto aspect-square p-0 flex-center">
+                        <Plus size={24} />
+                    </button>
+                </div>
+            </section>
+
+            {/* --- Resources Wrapper --- */}
+            <h3 className="text-secondary text-sm font-bold uppercase tracking-wider mb-4 mt-8 px-2">Ressourcen</h3>
+
+            {/* Vehicles */}
+            <StringListSection
+                icon={Truck}
                 title="Fahrzeuge"
                 data={store.settings.vehicles}
-                onAdd={val => addSettingItem('vehicles', val)}
-                onRemove={val => removeSettingItem('vehicles', val)}
+                value={newVehicle}
+                setValue={setNewVehicle}
+                onAdd={() => handleAddString('vehicles', newVehicle, setNewVehicle)}
+                onRemove={(item) => removeSettingItem('vehicles', item)}
+                placeholder="z.B. R-RTW-1"
             />
 
-            {/* CallSigns (String Array) */}
-            <SimpleStringList
+            {/* Call Signs */}
+            <StringListSection
+                icon={Hash}
                 title="Funkrufnamen"
                 data={store.settings.callSigns}
-                onAdd={val => addSettingItem('callSigns', val)}
-                onRemove={val => removeSettingItem('callSigns', val)}
+                value={newCallSign}
+                setValue={setNewCallSign}
+                onAdd={() => handleAddString('callSigns', newCallSign, setNewCallSign)}
+                onRemove={(item) => removeSettingItem('callSigns', item)}
+                placeholder="z.B. Florian 1/83/1"
             />
 
-            {/* Stations (String Array) */}
-            <SimpleStringList
+            {/* Stations */}
+            <StringListSection
+                icon={MapPin}
                 title="Wachen"
                 data={store.settings.stations}
-                onAdd={val => addSettingItem('stations', val)}
-                onRemove={val => removeSettingItem('stations', val)}
+                value={newStation}
+                setValue={setNewStation}
+                onAdd={() => handleAddString('stations', newStation, setNewStation)}
+                onRemove={(item) => removeSettingItem('stations', item)}
+                placeholder="z.B. Hauptwache"
             />
+
+            <div className="h-20"></div>
         </div>
     );
 }
 
-function SimpleStringList({ title, data, onAdd, onRemove }) {
-    const [val, setVal] = useState('');
+// Sub-Component for simple string lists
+function StringListSection({ icon: Icon, title, data, value, setValue, onAdd, onRemove, placeholder }) {
     return (
-        <div className="glass-panel p-4 mb-6">
-            <h3 className="font-bold mb-4">{title}</h3>
-            <div className="space-y-2 mb-4 max-h-[150px] overflow-y-auto">
+        <section className="card mb-4">
+            <div className="flex items-center gap-2 mb-4 text-secondary">
+                <Icon size={18} />
+                <h2 className="mb-0 text-base">{title}</h2>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-6">
                 {data.map((item, i) => (
-                    <div key={i} className="flex justify-between items-center bg-[color-mix(in_srgb,var(--bg-dark),transparent_50%)] p-3 rounded-lg">
+                    <div key={i} className="flex items-center gap-2 bg-app px-3 py-2 rounded-lg border border-surface-highlight text-sm">
                         <span>{item}</span>
-                        <button onClick={() => onRemove(item)} className="text-red-400"><Trash size={16} /></button>
+                        <button
+                            onClick={() => onRemove(item)}
+                            className="text-white/40 hover:text-danger ml-1 transition-colors"
+                            title="Löschen"
+                        >
+                            <Trash2 size={14} />
+                        </button>
                     </div>
                 ))}
             </div>
-            <div className="flex gap-2">
-                <input
-                    placeholder="Neu..."
-                    value={val}
-                    onChange={e => setVal(e.target.value)}
-                    className="input-field"
-                />
-                <button
-                    onClick={() => { if (val) { onAdd(val); setVal(''); } }}
-                    className="btn btn-primary p-2"
-                ><Plus size={20} /></button>
+
+            <div className="flex gap-3 items-end">
+                <div className="flex-1 input-wrapper mb-0">
+                    <input
+                        placeholder={placeholder}
+                        value={value}
+                        onChange={e => setValue(e.target.value)}
+                        className="input-field"
+                    />
+                </div>
+                <button onClick={onAdd} className="btn btn-primary w-auto aspect-square p-0 flex-center">
+                    <Plus size={24} />
+                </button>
             </div>
-        </div>
+        </section>
     );
 }

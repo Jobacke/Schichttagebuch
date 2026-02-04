@@ -1,14 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Flame } from 'lucide-react';
 
 export default function Login() {
-    const { login, register } = useAuth();
+    const { login, register, currentUser } = useAuth();
+    const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Redirect if already logged in
+    useEffect(() => {
+        if (currentUser) {
+            navigate('/');
+        }
+    }, [currentUser, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -21,11 +30,12 @@ export default function Login() {
             } else {
                 await register(email, password);
             }
+            // Navigation happens automatically via the useEffect above when currentUser changes
         } catch (err) {
             console.error(err);
             setError(err.message.includes('auth/invalid-credential') ? 'Falsche Zugangsdaten.' : err.message);
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (

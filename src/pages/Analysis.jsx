@@ -8,9 +8,10 @@ import { de } from 'date-fns/locale';
 import {
     Filter, X, Check, TrendingUp, TrendingDown, PieChart as PieIcon, BarChart2
 } from 'lucide-react';
-import {
-    PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, Tooltip, ResponsiveContainer
-} from 'recharts';
+// Recharts import removed for debugging
+// import {
+//    PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, Tooltip, ResponsiveContainer
+// } from 'recharts';
 import { APP_VERSION } from '../version';
 
 const COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308', '#ef4444', '#a855f7'];

@@ -217,62 +217,8 @@ export default function Analysis() {
                 </div>
             ) : (
                 <>
-                    {/* Distribution */}
-                    {stats.distributionData.length > 0 && (
-                        <div className="card-premium">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                                <PieIcon size={16} color="var(--color-primary)" />
-                                <h3 className="text-label" style={{ margin: 0 }}>Verteilung</h3>
-                            </div>
-                            <div style={{ height: '200px', display: 'flex', alignItems: 'center' }}>
-                                <div style={{ flex: 1, height: '100%' }}>
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={stats.distributionData}
-                                                dataKey="value"
-                                                nameKey="name"
-                                                innerRadius={45}
-                                                outerRadius={65}
-                                                paddingAngle={4}
-                                                stroke="none"
-                                            >
-                                                {stats.distributionData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                            </Pie>
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                                <div style={{ width: '45%', paddingLeft: '12px', fontSize: '12px' }}>
-                                    {stats.distributionData.map((entry, index) => (
-                                        <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                                                <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', background: COLORS[index % COLORS.length] }}></div>
-                                                <span style={{ color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>
-                                            </div>
-                                            <span style={{ fontWeight: 'bold' }}>{entry.value}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Timeline */}
-                    <div className="card-premium">
-                        <div style={{ height: '200px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} />
-                                    <Tooltip
-                                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
-                                    />
-                                    <Bar dataKey="hours" fill="#f97316" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
+                    {/* CHARTS TEMPORARILY DISABLED FOR DEBUGGING */}
+                    <div style={{ padding: '20px', textAlign: 'center' }}>Charts disabled for debugging</div>
                 </>
             )}
 

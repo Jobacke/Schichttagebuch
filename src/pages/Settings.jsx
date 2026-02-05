@@ -4,6 +4,7 @@ import {
     Plus, Clock, Tag, Truck, Hash, MapPin,
     Database, ChevronLeft, ChevronRight, Trash2
 } from 'lucide-react';
+import { APP_VERSION } from '../version';
 
 export default function Settings() {
     const { store, addSettingItem, removeSettingItem } = useStore();
@@ -83,7 +84,7 @@ export default function Settings() {
 
             <div style={{ textAlign: 'center', marginTop: '40px', opacity: 0.4 }}>
                 <Database size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
-                <small>Cloud Sync Aktiv • v2.2</small>
+                <small>Cloud Sync Aktiv • v{APP_VERSION}</small>
             </div>
         </div>
     );

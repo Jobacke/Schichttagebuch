@@ -11,6 +11,7 @@ import {
 import {
     PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, Tooltip, ResponsiveContainer
 } from 'recharts';
+import { APP_VERSION } from '../version';
 
 const COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308', '#ef4444', '#a855f7'];
 
@@ -74,18 +75,17 @@ export default function Analysis() {
                 start = startOfMonth(baseDate);
                 end = endOfMonth(baseDate);
                 label = format(baseDate, 'MMMM yyyy', { locale: de });
-                target = (end.getDate() / 7) * 7.8;
+                const daysInMonth = end.getDate();
+                target = (daysInMonth / 7) * 7.8;
             } else if (mode === 'year') {
                 start = startOfYear(baseDate);
                 end = endOfYear(baseDate);
                 label = format(baseDate, 'yyyy');
                 target = 52.14 * 7.8;
             } else {
-                // Custom
                 start = parseISO(customStart);
                 end = parseISO(customEnd);
                 if (!isValid(start) || !isValid(end)) {
-                    // Fallback to current month if invalid
                     start = startOfMonth(new Date());
                     end = endOfMonth(new Date());
                     label = 'Ungültig';
@@ -108,13 +108,16 @@ export default function Analysis() {
         return store.shifts.filter(s => {
             if (!s.date) return false;
 
-            // 1. Date Check (Simplified for Month Mode to be Robust)
+            // 1. Date Check 
+            let shiftDate;
+            try {
+                shiftDate = parseISO(s.date);
+                if (!isValid(shiftDate)) return false;
+            } catch (e) { return false; }
+
             if (activeFilter.mode === 'month') {
-                const shiftDate = parseISO(s.date);
                 if (!isSameMonth(shiftDate, activeFilter.baseDate)) return false;
             } else {
-                // Standard Range Check
-                const shiftDate = new Date(s.date); // parseISO is better usually, but new Date(string) works for comparison often
                 if (shiftDate < dateRange.start || shiftDate > dateRange.end) return false;
             }
 
@@ -136,7 +139,6 @@ export default function Analysis() {
             const dur = calculateDuration(s.startTime, s.endTime);
             actual += dur;
 
-            // Safe Access to Type Name
             const typeObj = store.settings.shiftTypes.find(t => t.id === s.typeId);
             const tName = typeObj ? typeObj.name : 'Unbekannt';
 
@@ -152,7 +154,7 @@ export default function Analysis() {
 
         const distributionData = Object.entries(typeCounts)
             .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value); // Sort by most frequent
+            .sort((a, b) => b.value - a.value);
 
         return { actual, count: filteredData.length, chartData, distributionData };
     }, [filteredData, store.settings]);
@@ -173,8 +175,10 @@ export default function Analysis() {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <div>
-                    <h1>Auswertung</h1>
-                    <div className="subtitle">{rangeLabel}</div>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        Auswertung <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>v{APP_VERSION}</span>
+                    </h1>
+                    <div className="subtitle" style={{ margin: 0, marginTop: '4px' }}>{rangeLabel}</div>
                 </div>
                 <button onClick={() => { setTempFilter(activeFilter); setIsFilterOpen(true); }} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
                     <Filter size={16} /> Filter
@@ -204,52 +208,56 @@ export default function Analysis() {
                 </div>
             </div>
 
+            {/* Charts or Empty State */}
             {filteredData.length === 0 ? (
                 <div className="card-premium" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-text-muted)' }}>
                     <BarChart2 size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-                    <p style={{ margin: 0 }}>Keine Schichten im gewählten Zeitraum.</p>
+                    <p style={{ margin: 0, fontWeight: '500' }}>Keine Schichten gefunden.</p>
+                    <p style={{ fontSize: '12px', marginTop: '8px' }}>Prüfe den Filterzeitraum.</p>
                 </div>
             ) : (
                 <>
-                    {/* Distribution Chart */}
-                    <div className="card-premium">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <PieIcon size={16} color="var(--color-primary)" />
-                            <h3 className="text-label" style={{ margin: 0 }}>Verteilung</h3>
-                        </div>
-                        <div style={{ height: '200px', display: 'flex', alignItems: 'center' }}>
-                            <div style={{ flex: 1, height: '100%' }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={stats.distributionData}
-                                            dataKey="value"
-                                            nameKey="name"
-                                            innerRadius={45}
-                                            outerRadius={65}
-                                            paddingAngle={4}
-                                            stroke="none"
-                                        >
-                                            {stats.distributionData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                        </Pie>
-                                    </PieChart>
-                                </ResponsiveContainer>
+                    {/* Distribution */}
+                    {stats.distributionData.length > 0 && (
+                        <div className="card-premium">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                <PieIcon size={16} color="var(--color-primary)" />
+                                <h3 className="text-label" style={{ margin: 0 }}>Verteilung</h3>
                             </div>
-                            <div style={{ width: '45%', paddingLeft: '12px', fontSize: '12px' }}>
-                                {stats.distributionData.map((entry, index) => (
-                                    <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                                            <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', background: COLORS[index % COLORS.length] }}></div>
-                                            <span style={{ color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>
+                            <div style={{ height: '200px', display: 'flex', alignItems: 'center' }}>
+                                <div style={{ flex: 1, height: '100%' }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={stats.distributionData}
+                                                dataKey="value"
+                                                nameKey="name"
+                                                innerRadius={45}
+                                                outerRadius={65}
+                                                paddingAngle={4}
+                                                stroke="none"
+                                            >
+                                                {stats.distributionData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                            </Pie>
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div style={{ width: '45%', paddingLeft: '12px', fontSize: '12px' }}>
+                                    {stats.distributionData.map((entry, index) => (
+                                        <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                                                <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', background: COLORS[index % COLORS.length] }}></div>
+                                                <span style={{ color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>
+                                            </div>
+                                            <span style={{ fontWeight: 'bold' }}>{entry.value}</span>
                                         </div>
-                                        <span style={{ fontWeight: 'bold' }}>{entry.value}</span>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Timeline Chart */}
+                    {/* Timeline */}
                     <div className="card-premium">
                         <div style={{ height: '200px' }}>
                             <ResponsiveContainer width="100%" height="100%">
@@ -268,7 +276,7 @@ export default function Analysis() {
                 </>
             )}
 
-            {/* --- Filter Modal (Same as before) --- */}
+            {/* --- Filter Modal --- */}
             {isFilterOpen && (
                 <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsFilterOpen(false)}>
                     <div className="modal-content">
@@ -277,7 +285,6 @@ export default function Analysis() {
                             <button className="close-btn" onClick={() => setIsFilterOpen(false)}><X /></button>
                         </div>
                         <div className="modal-body">
-                            {/* Mode Selection */}
                             <div style={{ marginBottom: '24px' }}>
                                 <label className="text-label" style={{ marginBottom: '8px' }}>Zeitraum</label>
                                 <div style={{ display: 'flex', background: 'var(--color-surface-hover)', borderRadius: '8px', padding: '4px' }}>
@@ -299,7 +306,6 @@ export default function Analysis() {
                                 </div>
                             </div>
 
-                            {/* Dates */}
                             <div style={{ marginBottom: '24px' }}>
                                 {tempFilter.mode === 'month' && (
                                     <input type="month" className="input-premium" value={format(tempFilter.baseDate, 'yyyy-MM')} onChange={e => setTempFilter(p => ({ ...p, baseDate: parseISO(e.target.value) }))} />
@@ -319,7 +325,6 @@ export default function Analysis() {
                                 )}
                             </div>
 
-                            {/* Filters (Types, Stations) */}
                             <div style={{ marginBottom: '24px' }}>
                                 <label className="text-label" style={{ marginBottom: '8px' }}>Schichtarten</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>

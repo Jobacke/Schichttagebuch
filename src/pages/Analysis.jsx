@@ -46,7 +46,8 @@ export default function Analysis() {
         filterMode, setFilterMode, baseDate, setBaseDate,
         customStart, setCustomStart, customEnd, setCustomEnd,
         selectedTypes, setSelectedTypes,
-        stats, delta
+        selectedVehicles, setSelectedVehicles,
+        stats, delta, isInvalid
     } = logic;
 
     const isPositive = delta >= 0;
@@ -70,7 +71,7 @@ export default function Analysis() {
                     <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         Auswertung <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>v{APP_VERSION}</span>
                     </h1>
-                    <div className="subtitle" style={{ margin: 0, marginTop: '4px' }}>{label}</div>
+                    <div className="subtitle" style={{ margin: 0, marginTop: '4px', color: isInvalid ? 'var(--color-danger)' : 'inherit' }}>{label}</div>
                 </div>
                 <button onClick={() => setIsFilterOpen(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
                     Filter
@@ -181,7 +182,7 @@ export default function Analysis() {
                             </div>
 
                             {/* Types */}
-                            <div>
+                            <div style={{ marginBottom: '16px' }}>
                                 <label className="text-label" style={{ display: 'block', marginBottom: '8px' }}>Schichtarten</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                     {(store.settings?.shiftTypes || []).map(t => {
@@ -192,6 +193,24 @@ export default function Analysis() {
                                                 className={`filter-chip ${active ? 'active' : ''}`}
                                             >
                                                 {t.name} {active && '✓'}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Vehicles */}
+                            <div>
+                                <label className="text-label" style={{ display: 'block', marginBottom: '8px' }}>Fahrzeuge</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                    {(store.settings?.vehicles || []).map(v => {
+                                        const active = selectedVehicles.includes(v);
+                                        return (
+                                            <button key={v}
+                                                onClick={() => setSelectedVehicles(active ? selectedVehicles.filter(x => x !== v) : [...selectedVehicles, v])}
+                                                className={`filter-chip ${active ? 'active' : ''}`}
+                                            >
+                                                {v} {active && '✓'}
                                             </button>
                                         )
                                     })}

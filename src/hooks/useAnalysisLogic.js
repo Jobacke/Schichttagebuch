@@ -4,22 +4,24 @@ import { useStore } from '../context/StoreContext';
 // --- Native Helpers ---
 const formatDate = (date, options) => new Intl.DateTimeFormat('de-DE', options).format(date);
 
+// Helper to make "YYYY-MM-DD" into a local midnight Date
+const parseDateString = (str) => {
+    if (!str) return null;
+    const [y, m, d] = str.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d); // Local Midnight
+};
+
 const getMonthRange = (date) => {
     const start = new Date(date.getFullYear(), date.getMonth(), 1);
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
     return { start, end };
 };
 
 const getYearRange = (date) => {
     const start = new Date(date.getFullYear(), 0, 1);
-    const end = new Date(date.getFullYear(), 11, 31);
+    const end = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
     return { start, end };
-};
-
-const parseDate = (str) => {
-    if (!str) return null;
-    const d = new Date(str);
-    return isNaN(d.getTime()) ? null : d;
 };
 
 function calculateDuration(start, end) {
@@ -40,13 +42,18 @@ export function useAnalysisLogic() {
     // Default Filter State
     const [filterMode, setFilterMode] = useState('month'); // 'month', 'year', 'custom'
     const [baseDate, setBaseDate] = useState(new Date());
+
+    // Custom Range Inputs
     const [customStart, setCustomStart] = useState('');
     const [customEnd, setCustomEnd] = useState('');
+
+    // Filter Arrays
     const [selectedTypes, setSelectedTypes] = useState([]);
+    const [selectedVehicles, setSelectedVehicles] = useState([]);
 
     // Logic
-    const { start, end, label, target } = useMemo(() => {
-        let s, e, l, t;
+    const { start, end, label, target, isInvalid } = useMemo(() => {
+        let s, e, l, t, invalid = false;
         const now = baseDate;
 
         if (filterMode === 'month') {
@@ -62,29 +69,35 @@ export function useAnalysisLogic() {
             l = formatDate(now, { year: 'numeric' });
             t = 52.14 * 7.8;
         } else {
-            s = parseDate(customStart);
-            e = parseDate(customEnd);
-            if (!s || !e) {
-                const r = getMonthRange(new Date());
-                s = r.start; e = r.end;
-                l = 'Ungültig';
-            } else {
-                l = 'Zeitraum';
-            }
+            // Custom Mode
+            s = parseDateString(customStart);
+            e = parseDateString(customEnd);
+
             if (s && e) {
-                const diffDays = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24));
+                // Set end to end of day
+                e.setHours(23, 59, 59, 999);
+
+                l = `${formatDate(s, { day: '2-digit', month: '2-digit', year: '2-digit' })} - ${formatDate(e, { day: '2-digit', month: '2-digit', year: '2-digit' })}`;
+
+                const diffMs = Math.abs(e - s);
+                const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
                 t = (diffDays / 7) * 7.8;
             } else {
+                // Fallback / Invalid State
+                const r = getMonthRange(new Date());
+                s = r.start; e = r.end; // Fallback to current month internally to prevent null pointer
+                l = 'Bitte Zeitraum wählen';
                 t = 0;
+                invalid = true;
             }
         }
-        return { start: s, end: e, label: l, target: t };
+        return { start: s, end: e, label: l, target: t, isInvalid: invalid };
     }, [filterMode, baseDate, customStart, customEnd]);
 
     const filteredData = useMemo(() => {
         if (!store.shifts) return [];
         return store.shifts.filter(s => {
-            const d = parseDate(s.date);
+            const d = parseDateString(s.date);
             if (!d) return false;
 
             // Range Check
@@ -93,9 +106,12 @@ export function useAnalysisLogic() {
             // Type Check
             if (selectedTypes.length > 0 && !selectedTypes.includes(s.typeId)) return false;
 
+            // Vehicle Check
+            if (selectedVehicles.length > 0 && !selectedVehicles.includes(s.vehicle)) return false;
+
             return true;
         });
-    }, [store.shifts, start, end, selectedTypes]);
+    }, [store.shifts, start, end, selectedTypes, selectedVehicles]);
 
     const stats = useMemo(() => {
         let actual = 0;
@@ -114,11 +130,14 @@ export function useAnalysisLogic() {
 
         // Prepare simple arrays for UI
         const chartData = Object.entries(shiftsByDate)
-            .map(([d, h]) => ({
-                label: formatDate(new Date(d), { day: '2-digit' }) + '.',
-                hours: h,
-                date: d
-            }))
+            .map(([dStr, h]) => {
+                const d = parseDateString(dStr);
+                return {
+                    label: d ? formatDate(d, { day: '2-digit' }) + '.' : '??',
+                    hours: h,
+                    date: dStr
+                };
+            })
             .sort((a, b) => a.date.localeCompare(b.date));
 
         const distributionData = Object.entries(typeCounts)
@@ -130,12 +149,13 @@ export function useAnalysisLogic() {
 
     return {
         loading,
-        start, end, label, target,
+        start, end, label, target, isInvalid,
         filterMode, setFilterMode,
         baseDate, setBaseDate,
         customStart, setCustomStart,
         customEnd, setCustomEnd,
         selectedTypes, setSelectedTypes,
+        selectedVehicles, setSelectedVehicles,
         stats,
         delta: stats.actual - target
     };

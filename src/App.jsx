@@ -41,7 +41,7 @@ function AppRoutes() {
       }>
         <Route index element={<Journal />} />
         <Route path="add" element={<Entry />} />
-        <Route path="stats" element={<Analysis />} />
+        <Route path="analysis" element={<Analysis />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

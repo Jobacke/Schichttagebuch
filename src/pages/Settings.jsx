@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import {
-    Trash2, Plus, Clock, Tag, Truck, Hash, MapPin,
-    Database, ChevronLeft
+    Plus, Clock, Tag, Truck, Hash, MapPin,
+    Database, ChevronLeft, ChevronRight, Trash2
 } from 'lucide-react';
 
 export default function Settings() {
@@ -11,254 +11,182 @@ export default function Settings() {
 
     const goBack = () => setActiveScreen(null);
 
-    if (!activeScreen) {
+    if (activeScreen) {
         return (
-            <div className="animate-in slide-in-from-left-5 pb-24 px-4 pt-4">
-                <h1 className="text-3xl font-bold mb-6">Einstellungen</h1>
-
-                <h2 className="section-header">Dienstplan</h2>
-                <div className="settings-group">
-                    <MenuItem
-                        icon={Clock}
-                        iconColor="#f97316"
-                        label="Schichtkürzel & Zeiten"
-                        value={`${store.settings.shiftCodes.length} Definiert`}
-                        onClick={() => setActiveScreen('codes')}
-                    />
-                    <MenuItem
-                        icon={Tag}
-                        iconColor="#38bdf8"
-                        label="Schichtarten"
-                        value={`${store.settings.shiftTypes.length} Arten`}
-                        onClick={() => setActiveScreen('types')}
-                        last
-                    />
-                </div>
-
-                <h2 className="section-header mt-8">Ressourcen</h2>
-                <div className="settings-group">
-                    <MenuItem
-                        icon={MapPin}
-                        iconColor="#ef4444"
-                        label="Wachen"
-                        value={store.settings.stations.length}
-                        onClick={() => setActiveScreen('stations')}
-                    />
-                    <MenuItem
-                        icon={Truck}
-                        iconColor="#22c55e"
-                        label="Fahrzeuge"
-                        value={store.settings.vehicles.length}
-                        onClick={() => setActiveScreen('vehicles')}
-                    />
-                    <MenuItem
-                        icon={Hash}
-                        iconColor="#a855f7"
-                        label="Funkrufnamen"
-                        value={store.settings.callSigns.length}
-                        onClick={() => setActiveScreen('callSigns')}
-                        last
-                    />
-                </div>
-
-                <div className="mt-12 text-center opacity-30">
-                    <Database size={32} className="mx-auto mb-2 text-secondary" />
-                    <p className="text-xs">Version 2.1 <br /> Cloud Sync Aktiv</p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="animate-in slide-in-from-right-5 fixed inset-0 bg-app z-50 overflow-y-auto w-full h-full">
-            <div className="sticky top-0 bg-app backdrop-blur-md border-b flex items-center justify-between z-10 p-4" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)' }}>
-                <button onClick={goBack} className="text-primary font-medium flex items-center gap-1">
-                    <ChevronLeft size={24} /> Einstellungen
-                </button>
-                <span className="font-bold text-white pr-8">
-                    {activeScreen === 'codes' && 'Schichtkürzel'}
-                    {activeScreen === 'types' && 'Schichtarten'}
-                    {activeScreen === 'stations' && 'Wachen'}
-                    {activeScreen === 'vehicles' && 'Fahrzeuge'}
-                    {activeScreen === 'callSigns' && 'Funkrufnamen'}
-                </span>
-                <div className="w-4"></div>
-            </div>
-
-            <div className="p-4 safe-area-bottom">
+            <DetailScreen
+                title={
+                    activeScreen === 'codes' ? 'Schichtkürzel' :
+                        activeScreen === 'types' ? 'Schichtarten' :
+                            activeScreen === 'stations' ? 'Wachen' :
+                                activeScreen === 'vehicles' ? 'Fahrzeuge' : 'Funkrufnamen'
+                }
+                onBack={goBack}
+            >
                 {activeScreen === 'codes' && (
-                    <ShiftCodeManager
-                        codes={store.settings.shiftCodes}
-                        onAdd={(item) => addSettingItem('shiftCodes', item)}
+                    <CodeManager
+                        data={store.settings.shiftCodes}
+                        onAdd={(i) => addSettingItem('shiftCodes', i)}
                         onRemove={(id) => removeSettingItem('shiftCodes', id)}
                     />
                 )}
                 {activeScreen === 'types' && (
-                    <SimpleListManager
+                    <SimpleManager
                         data={store.settings.shiftTypes}
-                        placeholder="Neue Schichtart..."
-                        onAdd={(item) => addSettingItem('shiftTypes', item)}
+                        type="object"
+                        onAdd={(i) => addSettingItem('shiftTypes', i)}
                         onRemove={(id) => removeSettingItem('shiftTypes', id)}
-                        type="shiftTypes"
                     />
                 )}
                 {['stations', 'vehicles', 'callSigns'].includes(activeScreen) && (
-                    <SimpleStringListManager
+                    <SimpleManager
                         data={store.settings[activeScreen]}
-                        onAdd={(val) => addSettingItem(activeScreen, val)}
-                        onRemove={(val) => removeSettingItem(activeScreen, val)}
-                        placeholder="Neuer Eintrag..."
+                        type="string"
+                        onAdd={(v) => addSettingItem(activeScreen, v)}
+                        onRemove={(v) => removeSettingItem(activeScreen, v)}
                     />
                 )}
+            </DetailScreen>
+        );
+    }
+
+    return (
+        <div className="page-content">
+            <h1>Einstellungen</h1>
+
+            <h2>Dienstplan</h2>
+            <div className="settings-list">
+                <SettingsItem
+                    icon={Clock} color="#f97316" label="Schichtkürzel & Zeiten"
+                    value={store.settings.shiftCodes.length} onClick={() => setActiveScreen('codes')}
+                />
+                <SettingsItem
+                    icon={Tag} color="#38bdf8" label="Schichtarten"
+                    value={store.settings.shiftTypes.length} onClick={() => setActiveScreen('types')}
+                />
+            </div>
+
+            <h2 style={{ marginTop: '32px' }}>Ressourcen</h2>
+            <div className="settings-list">
+                <SettingsItem
+                    icon={MapPin} color="#ef4444" label="Wachen"
+                    value={store.settings.stations.length} onClick={() => setActiveScreen('stations')}
+                />
+                <SettingsItem
+                    icon={Truck} color="#22c55e" label="Fahrzeuge"
+                    value={store.settings.vehicles.length} onClick={() => setActiveScreen('vehicles')}
+                />
+                <SettingsItem
+                    icon={Hash} color="#a855f7" label="Funkrufnamen"
+                    value={store.settings.callSigns.length} onClick={() => setActiveScreen('callSigns')}
+                />
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '40px', opacity: 0.4 }}>
+                <Database size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
+                <small>Cloud Sync Aktiv • v2.2</small>
             </div>
         </div>
     );
 }
 
-function MenuItem({ icon: Icon, label, value, onClick, last, iconColor }) {
+// --- Sub-Components ---
+
+function SettingsItem({ icon: Icon, color, label, value, onClick }) {
     return (
-        <button
-            onClick={onClick}
-            className={`w-full flex items-center gap-4 p-4 bg-surface hover:bg-surface-highlight transition-colors
-        ${!last ? 'border-b' : ''}
-      `}
-        >
-            <div className="p-1.5 rounded-md bg-white/5" style={{ color: iconColor }}>
+        <button className="settings-item" onClick={onClick}>
+            <div className="settings-icon" style={{ color: color }}>
                 <Icon size={20} />
             </div>
-            <div className="flex-1 text-left">
-                <span className="block text-base font-medium text-white">{label}</span>
-            </div>
-            <div className="flex items-center gap-2 text-secondary">
-                <span className="text-sm">{value}</span>
-                <ChevronLeft size={16} className="opacity-50 rotate-180" />
+            <div style={{ flex: 1, fontWeight: 500 }}>{label}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-muted)' }}>
+                <span style={{ fontSize: '12px' }}>{value}</span>
+                <ChevronRight size={16} />
             </div>
         </button>
     );
 }
 
-function ShiftCodeManager({ codes, onAdd, onRemove }) {
-    const [isAdding, setIsAdding] = useState(false);
-    const [newCode, setNewCode] = useState('');
-    const [newHours, setNewHours] = useState('');
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!newCode.trim() || !newHours) return;
-        onAdd({ id: crypto.randomUUID(), code: newCode.trim(), hours: parseFloat(newHours) });
-        setNewCode('');
-        setNewHours('');
-        setIsAdding(false);
-    };
-
+function DetailScreen({ title, onBack, children }) {
     return (
-        <div className="space-y-4">
-            <div className="bg-surface rounded-xl overflow-hidden divide-y">
-                {codes.map(c => (
-                    <div key={c.id} className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <span className="bg-primary text-white font-bold px-3 py-1 rounded-md min-w-[3rem] text-center" style={{ backgroundColor: 'rgba(249, 115, 22, 0.2)', color: '#f97316' }}>{c.code}</span>
-                            <span className="text-white font-medium">{c.hours} Stunden</span>
-                        </div>
-                        <button onClick={() => onRemove(c.id)} className="text-danger p-2 rounded-full">
-                            <Trash2 size={18} />
-                        </button>
-                    </div>
-                ))}
-                {codes.length === 0 && <div className="p-8 text-center text-secondary">Keine Kürzel vorhanden.</div>}
-            </div>
-
-            {!isAdding ? (
-                <button onClick={() => setIsAdding(true)} className="w-full py-3 bg-primary rounded-xl text-white font-bold flex items-center justify-center gap-2 mt-4">
-                    <Plus size={20} /> Neues Kürzel
+        <div style={{
+            position: 'fixed', inset: 0, background: 'var(--color-bg)', zIndex: 2000,
+            display: 'flex', flexDirection: 'column'
+        }}>
+            <div style={{
+                height: '60px', borderBottom: '1px solid var(--color-border)',
+                display: 'flex', alignItems: 'center', padding: '0 16px',
+                background: 'rgba(15,23,42,0.9)', backdropFilter: 'blur(10px)'
+            }}>
+                <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', fontSize: '16px', padding: 0 }}>
+                    <ChevronLeft /> Zurück
                 </button>
-            ) : (
-                <form onSubmit={handleSubmit} className="bg-surface rounded-xl p-4 mt-4">
-                    <h3 className="text-sm font-bold mb-3">Neues Schichtkürzel</h3>
-                    <div className="flex gap-2 mb-3">
-                        <input autoFocus placeholder="Kürzel (z.B. T1)" value={newCode} onChange={e => setNewCode(e.target.value)} className="input-field flex-1" />
-                        <input type="number" placeholder="Std." value={newHours} onChange={e => setNewHours(e.target.value)} className="input-field w-24 text-center" />
-                    </div>
-                    <div className="flex gap-2">
-                        <button type="button" onClick={() => setIsAdding(false)} className="btn bg-surface-highlight text-secondary flex-1 py-2 rounded-lg">Abbrechen</button>
-                        <button type="submit" className="btn bg-primary text-white flex-1 py-2 rounded-lg">Hinzufügen</button>
-                    </div>
-                </form>
-            )}
+                <span style={{ fontWeight: 'bold', flex: 1, textAlign: 'center', marginRight: '60px' }}>{title}</span>
+            </div>
+            <div style={{ padding: '16px', overflowY: 'auto', paddingBottom: '100px' }}>
+                {children}
+            </div>
         </div>
     );
 }
 
-function SimpleListManager({ data, placeholder, onAdd, onRemove, type }) {
-    const [val, setVal] = useState('');
+function CodeManager({ data, onAdd, onRemove }) {
+    const [code, setCode] = useState('');
+    const [hours, setHours] = useState('');
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!val.trim()) return;
-        if (type === 'shiftTypes') onAdd({ id: crypto.randomUUID(), name: val.trim() });
-        setVal('');
+    const handleAdd = () => {
+        if (!code || !hours) return;
+        onAdd({ id: crypto.randomUUID(), code, hours: parseFloat(hours) });
+        setCode(''); setHours('');
     };
 
     return (
-        <div className="space-y-4">
-            <div className="bg-surface rounded-xl overflow-hidden divide-y">
+        <>
+            <div className="settings-list" style={{ marginBottom: '24px' }}>
                 {data.map(item => (
-                    <div key={item.id} className="p-4 flex items-center justify-between">
-                        <span className="text-white font-medium">{item.name}</span>
-                        <button onClick={() => onRemove(item.id)} className="text-danger p-2 rounded-full">
-                            <Trash2 size={18} />
-                        </button>
+                    <div key={item.id} className="settings-item" style={{ cursor: 'default' }}>
+                        <span style={{ background: 'var(--color-surface-hover)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', minWidth: '40px', textAlign: 'center', color: 'var(--color-primary)' }}>{item.code}</span>
+                        <span style={{ flex: 1, marginLeft: '12px' }}>{item.hours} Std</span>
+                        <button onClick={() => onRemove(item.id)} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
                     </div>
                 ))}
-                {data.length === 0 && <div className="p-8 text-center text-secondary">Liste leer.</div>}
+                {data.length === 0 && <div style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>Keine Kürzel</div>}
             </div>
 
-            <form onSubmit={handleSubmit} className="flex gap-2 mt-4">
-                <input
-                    value={val}
-                    onChange={e => setVal(e.target.value)}
-                    placeholder={placeholder}
-                    className="input-field flex-1"
-                />
-                <button type="submit" className="bg-primary text-white p-3 rounded-lg"><Plus size={20} /></button>
-            </form>
-        </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+                <input placeholder="Kürzel" value={code} onChange={e => setCode(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #334155', background: '#0f172a', color: 'white' }} />
+                <input placeholder="Std" type="number" value={hours} onChange={e => setHours(e.target.value)} style={{ width: '80px', padding: '12px', borderRadius: '12px', border: '1px solid #334155', background: '#0f172a', color: 'white' }} />
+                <button onClick={handleAdd} className="btn-primary" style={{ width: 'auto' }}><Plus /></button>
+            </div>
+        </>
     );
 }
 
-function SimpleStringListManager({ data, placeholder, onAdd, onRemove }) {
+function SimpleManager({ data, type, onAdd, onRemove }) {
     const [val, setVal] = useState('');
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!val.trim()) return;
-        onAdd(val.trim());
+    const handleAdd = () => {
+        if (!val) return;
+        if (type === 'object') onAdd({ id: crypto.randomUUID(), name: val });
+        else onAdd(val);
         setVal('');
     };
 
     return (
-        <div className="space-y-4">
-            <div className="bg-surface rounded-xl overflow-hidden divide-y">
+        <>
+            <div className="settings-list" style={{ marginBottom: '24px' }}>
                 {data.map((item, i) => (
-                    <div key={i} className="p-4 flex items-center justify-between">
-                        <span className="text-white font-medium">{item}</span>
-                        <button onClick={() => onRemove(item)} className="text-danger p-2 rounded-full">
-                            <Trash2 size={18} />
-                        </button>
+                    <div key={i} className="settings-item" style={{ cursor: 'default' }}>
+                        <span style={{ flex: 1 }}>{type === 'object' ? item.name : item}</span>
+                        <button onClick={() => onRemove(type === 'object' ? item.id : item)} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
                     </div>
                 ))}
-                {data.length === 0 && <div className="p-8 text-center text-secondary">Liste leer.</div>}
+                {data.length === 0 && <div style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>Liste leer</div>}
             </div>
 
-            <form onSubmit={handleSubmit} className="flex gap-2 mt-4">
-                <input
-                    value={val}
-                    onChange={e => setVal(e.target.value)}
-                    placeholder={placeholder}
-                    className="input-field flex-1"
-                />
-                <button type="submit" className="bg-primary text-white p-3 rounded-lg"><Plus size={20} /></button>
-            </form>
-        </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+                <input placeholder="Neuer Eintrag" value={val} onChange={e => setVal(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #334155', background: '#0f172a', color: 'white' }} />
+                <button onClick={handleAdd} className="btn-primary" style={{ width: 'auto' }}><Plus /></button>
+            </div>
+        </>
     );
 }

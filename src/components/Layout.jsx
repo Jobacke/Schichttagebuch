@@ -4,11 +4,11 @@ import Navigation from './Navigation';
 
 export default function Layout() {
     return (
-        <>
-            <main className="page-content animate-in">
+        <div className="app-container">
+            <main style={{ flex: 1, width: '100%', maxWidth: '600px', margin: '0 auto' }}>
                 <Outlet />
             </main>
             <Navigation />
-        </>
+        </div>
     );
 }

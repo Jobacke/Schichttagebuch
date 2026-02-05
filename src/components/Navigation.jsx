@@ -1,48 +1,47 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { BookOpen, Plus, BarChart2, Settings } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Settings, PieChart } from 'lucide-react';
 
 export default function Navigation() {
-    const navItems = [
-        { to: '/', icon: BookOpen, label: 'Journal' },
-        { to: '/add', icon: Plus, label: 'Neu', isFab: true }, // Special visuals for Add
-        { to: '/stats', icon: BarChart2, label: 'Ausw.' },
-        { to: '/settings', icon: Settings, label: 'Einstellungen' }
-    ];
+    return (
+        <nav className="nav-bar">
+            <NavItem to="/" icon={LayoutDashboard} label="Journal" />
+            <NavItem to="/analysis" icon={PieChart} label="Daten" />
+            <NavItem to="/add" icon={PlusCircle} label="Eintrag" isMain />
+            <NavItem to="/settings" icon={Settings} label="Optionen" />
+        </nav>
+    );
+}
+
+function NavItem({ to, icon: Icon, label, isMain }) {
+    if (isMain) {
+        return (
+            <NavLink
+                to={to}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                style={{ marginTop: '-20px' }} // Float effect
+            >
+                <div style={{
+                    background: 'var(--color-primary)',
+                    borderRadius: '50%',
+                    width: '56px',
+                    height: '56px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 15px rgba(249, 115, 22, 0.4)'
+                }}>
+                    <Icon size={28} color="white" />
+                </div>
+                <span style={{ fontSize: '11px', marginTop: '4px' }}>{label}</span>
+            </NavLink>
+        );
+    }
 
     return (
-        <nav className="bottom-nav">
-            {navItems.map(({ to, icon: Icon, label, isFab }) => (
-                <NavLink
-                    key={to}
-                    to={to}
-                    className={({ isActive }) =>
-                        `nav-item ${isActive ? 'active' : ''}`
-                    }
-                >
-                    {isFab ? (
-                        <div style={{
-                            backgroundColor: 'var(--primary)',
-                            color: 'white',
-                            borderRadius: '50%',
-                            width: '48px',
-                            height: '48px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 4px 10px rgba(249, 115, 22, 0.4)',
-                            transform: 'translateY(-10px)'
-                        }}>
-                            <Icon size={24} strokeWidth={3} />
-                        </div>
-                    ) : (
-                        <>
-                            <Icon size={22} strokeWidth={2} />
-                            <span className="nav-label">{label}</span>
-                        </>
-                    )}
-                </NavLink>
-            ))}
-        </nav>
+        <NavLink to={to} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Icon size={24} />
+            <span>{label}</span>
+        </NavLink>
     );
 }

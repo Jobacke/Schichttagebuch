@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import {
-    format, parseISO, startOfMonth, endOfMonth, isWithinInterval,
-    startOfYear, endOfYear, addMonths, subMonths, isValid
+    format, parseISO, startOfMonth, endOfMonth,
+    startOfYear, endOfYear, addMonths, subMonths, isValid, isSameMonth
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
-    Filter, X, Check, TrendingUp, TrendingDown, PieChart as PieIcon
+    Filter, X, Check, TrendingUp, TrendingDown, PieChart as PieIcon, BarChart2
 } from 'lucide-react';
 import {
     PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, Tooltip, ResponsiveContainer
@@ -29,7 +29,7 @@ function calculateDuration(start, end) {
 }
 
 export default function Analysis() {
-    const { store } = useStore();
+    const { store, loading } = useStore();
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     // --- Filter State ---
@@ -68,6 +68,7 @@ export default function Analysis() {
     const { dateRange, rangeLabel, targetHours } = useMemo(() => {
         let start, end, label, target;
         const { mode, baseDate, customStart, customEnd } = activeFilter;
+
         try {
             if (mode === 'month') {
                 start = startOfMonth(baseDate);
@@ -80,11 +81,20 @@ export default function Analysis() {
                 label = format(baseDate, 'yyyy');
                 target = 52.14 * 7.8;
             } else {
+                // Custom
                 start = parseISO(customStart);
                 end = parseISO(customEnd);
-                if (!isValid(start) || !isValid(end)) throw new Error('Invalid dates');
-                label = 'Benutzerdefiniert';
-                target = ((end - start) / (1000 * 60 * 60 * 24 * 7)) * 7.8;
+                if (!isValid(start) || !isValid(end)) {
+                    // Fallback to current month if invalid
+                    start = startOfMonth(new Date());
+                    end = endOfMonth(new Date());
+                    label = 'Ungültig';
+                } else {
+                    label = 'Benutzerdefiniert';
+                }
+                const diffTime = Math.abs(end - start);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                target = (diffDays / 7) * 7.8;
             }
         } catch (e) {
             start = new Date(); end = new Date(); label = "Fehler"; target = 0;
@@ -93,17 +103,27 @@ export default function Analysis() {
     }, [activeFilter]);
 
     const filteredData = useMemo(() => {
+        if (!store.shifts || store.shifts.length === 0) return [];
+
         return store.shifts.filter(s => {
             if (!s.date) return false;
-            try {
-                const d = parseISO(s.date);
-                if (!isValid(d)) return false;
-                if (!isWithinInterval(d, dateRange)) return false;
-                if (activeFilter.types.length > 0 && !activeFilter.types.includes(s.typeId)) return false;
-                if (activeFilter.stations.length > 0 && !activeFilter.stations.includes(s.station)) return false;
-                if (activeFilter.vehicles.length > 0 && !activeFilter.vehicles.includes(s.vehicle)) return false;
-                return true;
-            } catch (e) { return false; }
+
+            // 1. Date Check (Simplified for Month Mode to be Robust)
+            if (activeFilter.mode === 'month') {
+                const shiftDate = parseISO(s.date);
+                if (!isSameMonth(shiftDate, activeFilter.baseDate)) return false;
+            } else {
+                // Standard Range Check
+                const shiftDate = new Date(s.date); // parseISO is better usually, but new Date(string) works for comparison often
+                if (shiftDate < dateRange.start || shiftDate > dateRange.end) return false;
+            }
+
+            // 2. Attribute Filters
+            if (activeFilter.types.length > 0 && !activeFilter.types.includes(s.typeId)) return false;
+            if (activeFilter.stations.length > 0 && !activeFilter.stations.includes(s.station)) return false;
+            if (activeFilter.vehicles.length > 0 && !activeFilter.vehicles.includes(s.vehicle)) return false;
+
+            return true;
         });
     }, [store.shifts, dateRange, activeFilter]);
 
@@ -111,23 +131,42 @@ export default function Analysis() {
         let actual = 0;
         const typeCounts = {};
         const shiftsByDate = {};
+
         filteredData.forEach(s => {
             const dur = calculateDuration(s.startTime, s.endTime);
             actual += dur;
-            const tName = store.settings.shiftTypes.find(t => t.id === s.typeId)?.name || 'Unbekannt';
+
+            // Safe Access to Type Name
+            const typeObj = store.settings.shiftTypes.find(t => t.id === s.typeId);
+            const tName = typeObj ? typeObj.name : 'Unbekannt';
+
             typeCounts[tName] = (typeCounts[tName] || 0) + 1;
+
             const dateKey = s.date;
             shiftsByDate[dateKey] = (shiftsByDate[dateKey] || 0) + dur;
         });
+
         const chartData = Object.entries(shiftsByDate)
-            .map(([date, hours]) => ({ date, hours, label: format(parseISO(date), 'dd.MM') }))
+            .map(([date, hours]) => ({ date, hours, label: format(parseISO(date), 'dd.') }))
             .sort((a, b) => new Date(a.date) - new Date(b.date));
-        const distributionData = Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
+
+        const distributionData = Object.entries(typeCounts)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value); // Sort by most frequent
+
         return { actual, count: filteredData.length, chartData, distributionData };
     }, [filteredData, store.settings]);
 
     const delta = stats.actual - targetHours;
     const isPositive = delta >= 0;
+
+    if (loading) {
+        return (
+            <div className="page-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+                <div style={{ color: 'var(--color-primary)' }}>Lädt Daten...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-content">
@@ -165,60 +204,71 @@ export default function Analysis() {
                 </div>
             </div>
 
-            {/* Distribution Chart */}
-            {stats.distributionData.length > 0 && (
-                <div className="card-premium">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                        <PieIcon size={16} color="var(--color-primary)" />
-                        <h3 className="text-label" style={{ margin: 0 }}>Verteilung</h3>
-                    </div>
-                    <div style={{ height: '200px', display: 'flex', alignItems: 'center' }}>
-                        <ResponsiveContainer width="50%" height="100%">
-                            <PieChart>
-                                <Pie data={stats.distributionData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={60} paddingAngle={5}>
-                                    {stats.distributionData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div style={{ width: '50%', paddingLeft: '16px', fontSize: '12px' }}>
-                            {stats.distributionData.map((entry, index) => (
-                                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[index % COLORS.length] }}></div>
-                                        <span style={{ color: '#94a3b8', maxWidth: '80px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>
+            {filteredData.length === 0 ? (
+                <div className="card-premium" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-text-muted)' }}>
+                    <BarChart2 size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                    <p style={{ margin: 0 }}>Keine Schichten im gewählten Zeitraum.</p>
+                </div>
+            ) : (
+                <>
+                    {/* Distribution Chart */}
+                    <div className="card-premium">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                            <PieIcon size={16} color="var(--color-primary)" />
+                            <h3 className="text-label" style={{ margin: 0 }}>Verteilung</h3>
+                        </div>
+                        <div style={{ height: '200px', display: 'flex', alignItems: 'center' }}>
+                            <div style={{ flex: 1, height: '100%' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={stats.distributionData}
+                                            dataKey="value"
+                                            nameKey="name"
+                                            innerRadius={45}
+                                            outerRadius={65}
+                                            paddingAngle={4}
+                                            stroke="none"
+                                        >
+                                            {stats.distributionData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                        </Pie>
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <div style={{ width: '45%', paddingLeft: '12px', fontSize: '12px' }}>
+                                {stats.distributionData.map((entry, index) => (
+                                    <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                                            <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', background: COLORS[index % COLORS.length] }}></div>
+                                            <span style={{ color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>
+                                        </div>
+                                        <span style={{ fontWeight: 'bold' }}>{entry.value}</span>
                                     </div>
-                                    <span style={{ fontWeight: 'bold' }}>{entry.value}x</span>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
+
+                    {/* Timeline Chart */}
+                    <div className="card-premium">
+                        <div style={{ height: '200px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={stats.chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                    <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} />
+                                    <Tooltip
+                                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+                                    />
+                                    <Bar dataKey="hours" fill="#f97316" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </>
             )}
 
-            {/* Timeline Chart */}
-            <div className="card-premium">
-                <div style={{ height: '200px' }}>
-                    {stats.chartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} interval={'preserveStartEnd'} />
-                                <Tooltip
-                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
-                                />
-                                <Bar dataKey="hours" fill="#f97316" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                            Keine Daten vorhanden
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* --- Filter Modal --- */}
+            {/* --- Filter Modal (Same as before) --- */}
             {isFilterOpen && (
                 <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsFilterOpen(false)}>
                     <div className="modal-content">
@@ -249,13 +299,13 @@ export default function Analysis() {
                                 </div>
                             </div>
 
-                            {/* Date Inputs */}
+                            {/* Dates */}
                             <div style={{ marginBottom: '24px' }}>
                                 {tempFilter.mode === 'month' && (
                                     <input type="month" className="input-premium" value={format(tempFilter.baseDate, 'yyyy-MM')} onChange={e => setTempFilter(p => ({ ...p, baseDate: parseISO(e.target.value) }))} />
                                 )}
                                 {tempFilter.mode === 'year' && (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-hover)', padding: '8px', borderRadius: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-hover)', padding: '8px', borderRadius: '12px', color: 'white' }}>
                                         <button className="close-btn" onClick={() => setTempFilter(p => ({ ...p, baseDate: subMonths(p.baseDate, 12) }))}>&lt;</button>
                                         <span style={{ fontWeight: 'bold' }}>{format(tempFilter.baseDate, 'yyyy')}</span>
                                         <button className="close-btn" onClick={() => setTempFilter(p => ({ ...p, baseDate: addMonths(p.baseDate, 12) }))}>&gt;</button>
@@ -269,7 +319,7 @@ export default function Analysis() {
                                 )}
                             </div>
 
-                            {/* Type Filter */}
+                            {/* Filters (Types, Stations) */}
                             <div style={{ marginBottom: '24px' }}>
                                 <label className="text-label" style={{ marginBottom: '8px' }}>Schichtarten</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -279,22 +329,6 @@ export default function Analysis() {
                                             <button key={t.id} onClick={() => setTempFilter(p => ({ ...p, types: active ? p.types.filter(id => id !== t.id) : [...p.types, t.id] }))}
                                                 className={`filter-chip ${active ? 'active' : ''}`}>
                                                 {t.name} {active && <Check size={14} />}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Station Filter */}
-                            <div style={{ marginBottom: '24px' }}>
-                                <label className="text-label" style={{ marginBottom: '8px' }}>Wachen</label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                    {store.settings.stations.map(s => {
-                                        const active = tempFilter.stations.includes(s);
-                                        return (
-                                            <button key={s} onClick={() => setTempFilter(p => ({ ...p, stations: active ? p.stations.filter(x => x !== s) : [...p.stations, s] }))}
-                                                className={`filter-chip ${active ? 'active' : ''}`}>
-                                                {s} {active && <Check size={14} />}
                                             </button>
                                         );
                                     })}

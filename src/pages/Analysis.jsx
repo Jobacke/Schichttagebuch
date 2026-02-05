@@ -139,7 +139,7 @@ export default function Analysis() {
             const dur = calculateDuration(s.startTime, s.endTime);
             actual += dur;
 
-            const typeObj = store.settings.shiftTypes.find(t => t.id === s.typeId);
+            const typeObj = (store.settings?.shiftTypes || []).find(t => t.id === s.typeId);
             const tName = typeObj ? typeObj.name : 'Unbekannt';
 
             typeCounts[tName] = (typeCounts[tName] || 0) + 1;

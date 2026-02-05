@@ -10,6 +10,8 @@
   --color-primary: #f97316;
   /* Orange Brand Color */
   --color-primary-glow: rgba(249, 115, 22, 0.3);
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
   --color-text-main: #f8fafc;
   --color-text-muted: #94a3b8;
   --color-border: rgba(255, 255, 255, 0.08);
@@ -49,7 +51,6 @@ body {
   flex-direction: column;
   min-height: 100vh;
   padding-bottom: calc(var(--nav-height) + 20px);
-  /* Space for Fixed Nav */
 }
 
 .page-content {
@@ -57,21 +58,27 @@ body {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* --- Components: Typography --- */
+/* --- Typography --- */
 h1 {
   font-size: 28px;
   font-weight: 700;
-  margin: 0 0 24px 0;
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--color-primary);
+  font-weight: 500;
+  margin-bottom: 24px;
 }
 
 h2 {
-  font-size: 18px;
+  font-size: 12px;
   font-weight: 600;
   margin: 0 0 16px 0;
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-size: 12px;
 }
 
 .text-label {
@@ -79,15 +86,18 @@ h2 {
   color: var(--color-text-muted);
   font-weight: 600;
   text-transform: uppercase;
+  display: block;
+  margin-bottom: 4px;
 }
 
 .text-value {
   font-size: 24px;
   font-weight: 700;
   color: var(--color-text-main);
+  display: block;
 }
 
-/* --- Components: Cards --- */
+/* --- Cards --- */
 .card-premium {
   background: var(--color-surface);
   border-radius: var(--radius-card);
@@ -97,7 +107,47 @@ h2 {
   margin-bottom: 16px;
 }
 
-/* --- Components: Navigation (Fixed Bottom) --- */
+/* --- Analysis Grid & Stats --- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  border: var(--glass-border);
+}
+
+.stat-card.full-width {
+  grid-column: span 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trend-badge {
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trend-badge.positive {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--color-success);
+}
+
+.trend-badge.negative {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+/* --- Navigation --- */
 .nav-bar {
   position: fixed;
   bottom: 0;
@@ -110,7 +160,7 @@ h2 {
   border-top: var(--glass-border);
   display: flex;
   justify-content: space-around;
-  align-items: center;
+  alignItems: center;
   z-index: 1000;
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -118,13 +168,13 @@ h2 {
 .nav-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  alignItems: center;
   justify-content: center;
   gap: 4px;
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 500;
-  transition: all 0.2s;
+  text-decoration: none;
   background: none;
   border: none;
   width: 60px;
@@ -139,7 +189,7 @@ h2 {
   transform: scale(1.1);
 }
 
-/* --- Components: Calendar (CSS Grid) --- */
+/* --- Calendar --- */
 .calendar-wrapper {
   background: var(--color-surface);
   border-radius: var(--radius-card);
@@ -159,11 +209,10 @@ h2 {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
-  /* Spacing between days */
 }
 
 .day-cell {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1/1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -209,7 +258,128 @@ h2 {
   background: white;
 }
 
-/* --- Components: Settings Lists --- */
+/* --- Modals & Overlays --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+  background: var(--color-surface);
+  width: 100%;
+  max-width: 500px;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+}
+
+.modal-header {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: var(--glass-border);
+}
+
+.modal-body {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  padding: 16px;
+  border-top: var(--glass-border);
+  display: flex;
+  gap: 12px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+/* --- Forms & Inputs --- */
+.input-premium {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-button);
+  background: var(--color-bg);
+  border: 1px solid var(--color-surface-hover);
+  color: var(--color-text-main);
+  font-size: 16px;
+  outline: none;
+  margin-bottom: 8px;
+}
+
+.input-premium:focus {
+  border-color: var(--color-primary);
+}
+
+.filter-chip {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-surface-hover);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-chip.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+/* --- Buttons --- */
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: var(--radius-button);
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 15px var(--color-primary-glow);
+}
+
+.btn-secondary {
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  border: none;
+  padding: 12px 20px;
+  border-radius: var(--radius-button);
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+/* --- Settings Lists --- */
 .settings-list {
   background: var(--color-surface);
   border-radius: var(--radius-card);
@@ -234,10 +404,6 @@ h2 {
   border-bottom: none;
 }
 
-.settings-item:active {
-  background: var(--color-surface-hover);
-}
-
 .settings-icon {
   width: 36px;
   height: 36px;
@@ -249,42 +415,22 @@ h2 {
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* --- Components: Buttons & Inputs --- */
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  padding: 14px;
-  border-radius: var(--radius-button);
-  font-weight: 600;
-  font-size: 16px;
-  width: 100%;
-  cursor: pointer;
-  box-shadow: 0 4px 15px var(--color-primary-glow);
-}
-
-.btn-icon {
-  background: var(--color-surface-hover);
-  border: none;
-  color: var(--color-text-main);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-/* --- Animations --- */
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
   }
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
     transform: translateY(0);
   }
 }

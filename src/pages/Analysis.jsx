@@ -6,8 +6,7 @@ import {
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
-    Filter, X, Check,
-    TrendingUp, TrendingDown, PieChart as PieIcon
+    Filter, X, Check, TrendingUp, TrendingDown, PieChart as PieIcon
 } from 'lucide-react';
 import {
     PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, Tooltip, ResponsiveContainer
@@ -69,7 +68,6 @@ export default function Analysis() {
     const { dateRange, rangeLabel, targetHours } = useMemo(() => {
         let start, end, label, target;
         const { mode, baseDate, customStart, customEnd } = activeFilter;
-
         try {
             if (mode === 'month') {
                 start = startOfMonth(baseDate);
@@ -89,7 +87,6 @@ export default function Analysis() {
                 target = ((end - start) / (1000 * 60 * 60 * 24 * 7)) * 7.8;
             }
         } catch (e) {
-            // Fallback safety
             start = new Date(); end = new Date(); label = "Fehler"; target = 0;
         }
         return { dateRange: { start, end }, rangeLabel: label, targetHours };
@@ -114,7 +111,6 @@ export default function Analysis() {
         let actual = 0;
         const typeCounts = {};
         const shiftsByDate = {};
-
         filteredData.forEach(s => {
             const dur = calculateDuration(s.startTime, s.endTime);
             actual += dur;
@@ -123,13 +119,10 @@ export default function Analysis() {
             const dateKey = s.date;
             shiftsByDate[dateKey] = (shiftsByDate[dateKey] || 0) + dur;
         });
-
         const chartData = Object.entries(shiftsByDate)
             .map(([date, hours]) => ({ date, hours, label: format(parseISO(date), 'dd.MM') }))
             .sort((a, b) => new Date(a.date) - new Date(b.date));
-
         const distributionData = Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
-
         return { actual, count: filteredData.length, chartData, distributionData };
     }, [filteredData, store.settings]);
 
@@ -137,49 +130,49 @@ export default function Analysis() {
     const isPositive = delta >= 0;
 
     return (
-        <div className="animate-in fade-in pb-24">
+        <div className="page-content">
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <div>
-                    <h1 className="text-xl font-bold mb-0">Auswertung</h1>
-                    <p className="text-primary text-sm font-medium">{rangeLabel}</p>
+                    <h1>Auswertung</h1>
+                    <div className="subtitle">{rangeLabel}</div>
                 </div>
-                <button onClick={() => { setTempFilter(activeFilter); setIsFilterOpen(true); }} className="btn-primary px-4 py-2 rounded-full flex items-center gap-2 text-sm">
+                <button onClick={() => { setTempFilter(activeFilter); setIsFilterOpen(true); }} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
                     <Filter size={16} /> Filter
                 </button>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="card p-4">
-                    <span className="text-xs font-bold text-secondary uppercase block mb-1">Geleistet</span>
-                    <span className="text-2xl font-bold text-white block">{stats.actual.toFixed(1)} <span className="text-sm text-secondary">h</span></span>
+            {/* KPI Stats */}
+            <div className="stats-grid">
+                <div className="stat-card">
+                    <span className="text-label">Geleistet</span>
+                    <span className="text-value">{stats.actual.toFixed(1)} <span style={{ fontSize: '14px', color: '#94a3b8' }}>h</span></span>
                 </div>
-                <div className="card p-4">
-                    <span className="text-xs font-bold text-secondary uppercase block mb-1">Schichten</span>
-                    <span className="text-2xl font-bold text-white block">{stats.count}</span>
+                <div className="stat-card">
+                    <span className="text-label">Schichten</span>
+                    <span className="text-value">{stats.count}</span>
                 </div>
-                <div className={`card col-span-2 p-4 flex items-center justify-between border-l-4 ${isPositive ? 'border-l-success' : 'border-l-danger'}`}>
+                <div className="stat-card full-width" style={{ borderLeft: `4px solid ${isPositive ? 'var(--color-success)' : 'var(--color-danger)'}` }}>
                     <div>
-                        <span className="text-xs font-bold text-secondary uppercase block mb-1">Saldo (Plan: 7,8h/W)</span>
-                        <span className={`text-3xl font-bold ${isPositive ? 'text-success' : 'text-danger'}`}>
-                            {delta > 0 ? '+' : ''}{delta.toFixed(1)} <span className="text-sm opacity-60">h</span>
+                        <span className="text-label">Saldo (Plan: 7,8h)</span>
+                        <span className="text-value" style={{ color: isPositive ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                            {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
                         </span>
                     </div>
-                    <div className={`p-3 rounded-full ${isPositive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                    <div className={`trend-badge ${isPositive ? 'positive' : 'negative'}`}>
                         {isPositive ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
                     </div>
                 </div>
             </div>
 
-            {/* Charts */}
+            {/* Distribution Chart */}
             {stats.distributionData.length > 0 && (
-                <div className="card p-4 mb-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <PieIcon size={16} className="text-primary" />
-                        <h3 className="text-sm font-bold text-white mb-0">Verteilung</h3>
+                <div className="card-premium">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <PieIcon size={16} color="var(--color-primary)" />
+                        <h3 className="text-label" style={{ margin: 0 }}>Verteilung</h3>
                     </div>
-                    <div className="h-[200px] flex items-center">
+                    <div style={{ height: '200px', display: 'flex', alignItems: 'center' }}>
                         <ResponsiveContainer width="50%" height="100%">
                             <PieChart>
                                 <Pie data={stats.distributionData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={60} paddingAngle={5}>
@@ -187,14 +180,14 @@ export default function Analysis() {
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
-                        <div className="w-[50%] space-y-2 text-xs">
+                        <div style={{ width: '50%', paddingLeft: '16px', fontSize: '12px' }}>
                             {stats.distributionData.map((entry, index) => (
-                                <div key={index} className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                                        <span className="text-secondary truncate max-w-[80px]">{entry.name}</span>
+                                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[index % COLORS.length] }}></div>
+                                        <span style={{ color: '#94a3b8', maxWidth: '80px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>
                                     </div>
-                                    <span className="font-bold text-white">{entry.value}x</span>
+                                    <span style={{ fontWeight: 'bold' }}>{entry.value}x</span>
                                 </div>
                             ))}
                         </div>
@@ -202,9 +195,9 @@ export default function Analysis() {
                 </div>
             )}
 
-            {/* Timeline */}
-            <div className="card p-4 mb-6">
-                <div className="h-[200px] w-full">
+            {/* Timeline Chart */}
+            <div className="card-premium">
+                <div style={{ height: '200px' }}>
                     {stats.chartData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={stats.chartData}>
@@ -218,65 +211,73 @@ export default function Analysis() {
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="h-full flex items-center justify-center text-secondary text-sm">
-                            Keine Daten
+                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                            Keine Daten vorhanden
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* --- Filter Modal (Overlay) --- */}
+            {/* --- Filter Modal --- */}
             {isFilterOpen && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div className="bg-surface w-full max-w-md h-[85vh] sm:h-auto sm:rounded-2xl rounded-t-2xl flex flex-col animate-in slide-in-from-bottom-5 overflow-hidden border border-white/10">
-
-                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-surface">
-                            <h2 className="text-lg font-bold m-0">Filteroptionen</h2>
-                            <button onClick={() => setIsFilterOpen(false)}><X className="text-secondary" /></button>
+                <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsFilterOpen(false)}>
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h2 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Filteroptionen</h2>
+                            <button className="close-btn" onClick={() => setIsFilterOpen(false)}><X /></button>
                         </div>
-
-                        <div className="p-4 overflow-y-auto flex-1 space-y-6 bg-surface">
-
-                            <div>
-                                <label className="text-xs font-bold text-secondary uppercase mb-2 block">Zeitraum</label>
-                                <div className="flex bg-surface-highlight p-1 rounded-lg mb-3">
+                        <div className="modal-body">
+                            {/* Mode Selection */}
+                            <div style={{ marginBottom: '24px' }}>
+                                <label className="text-label" style={{ marginBottom: '8px' }}>Zeitraum</label>
+                                <div style={{ display: 'flex', background: 'var(--color-surface-hover)', borderRadius: '8px', padding: '4px' }}>
                                     {['month', 'year', 'custom'].map(m => (
                                         <button
                                             key={m}
                                             onClick={() => setTempFilter(p => ({ ...p, mode: m }))}
-                                            className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${tempFilter.mode === m ? 'bg-primary text-white shadow-md' : 'text-secondary'}`}
+                                            className="btn-secondary"
+                                            style={{
+                                                flex: 1, padding: '8px', borderRadius: '6px', fontSize: '13px',
+                                                background: tempFilter.mode === m ? 'var(--color-primary)' : 'transparent',
+                                                color: tempFilter.mode === m ? 'white' : '#94a3b8',
+                                                boxShadow: 'none'
+                                            }}
                                         >
-                                            {m === 'month' ? 'Monat' : m === 'year' ? 'Jahr' : 'Def.'}
+                                            {m === 'month' ? 'Monat' : m === 'year' ? 'Jahr' : 'Definiert'}
                                         </button>
                                     ))}
                                 </div>
+                            </div>
 
+                            {/* Date Inputs */}
+                            <div style={{ marginBottom: '24px' }}>
                                 {tempFilter.mode === 'month' && (
-                                    <input type="month" className="input-field w-full" value={format(tempFilter.baseDate, 'yyyy-MM')} onChange={e => setTempFilter(p => ({ ...p, baseDate: parseISO(e.target.value) }))} />
+                                    <input type="month" className="input-premium" value={format(tempFilter.baseDate, 'yyyy-MM')} onChange={e => setTempFilter(p => ({ ...p, baseDate: parseISO(e.target.value) }))} />
                                 )}
                                 {tempFilter.mode === 'year' && (
-                                    <div className="flex items-center justify-between bg-surface-highlight rounded-lg p-2">
-                                        <button onClick={() => setTempFilter(p => ({ ...p, baseDate: subMonths(p.baseDate, 12) }))} className="p-2"><ChevronDown className="rotate-90 text-secondary" /></button>
-                                        <span className="font-bold">{format(tempFilter.baseDate, 'yyyy')}</span>
-                                        <button onClick={() => setTempFilter(p => ({ ...p, baseDate: addMonths(p.baseDate, 12) }))} className="p-2"><ChevronDown className="-rotate-90 text-secondary" /></button>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-hover)', padding: '8px', borderRadius: '12px' }}>
+                                        <button className="close-btn" onClick={() => setTempFilter(p => ({ ...p, baseDate: subMonths(p.baseDate, 12) }))}>&lt;</button>
+                                        <span style={{ fontWeight: 'bold' }}>{format(tempFilter.baseDate, 'yyyy')}</span>
+                                        <button className="close-btn" onClick={() => setTempFilter(p => ({ ...p, baseDate: addMonths(p.baseDate, 12) }))}>&gt;</button>
                                     </div>
                                 )}
                                 {tempFilter.mode === 'custom' && (
-                                    <div className="flex gap-2">
-                                        <input type="date" className="input-field" value={tempFilter.customStart} onChange={e => setTempFilter(p => ({ ...p, customStart: e.target.value }))} />
-                                        <input type="date" className="input-field" value={tempFilter.customEnd} onChange={e => setTempFilter(p => ({ ...p, customEnd: e.target.value }))} />
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input type="date" className="input-premium" value={tempFilter.customStart} onChange={e => setTempFilter(p => ({ ...p, customStart: e.target.value }))} />
+                                        <input type="date" className="input-premium" value={tempFilter.customEnd} onChange={e => setTempFilter(p => ({ ...p, customEnd: e.target.value }))} />
                                     </div>
                                 )}
                             </div>
 
-                            <div>
-                                <label className="text-xs font-bold text-secondary uppercase mb-2 block">Schichtarten</label>
-                                <div className="flex flex-wrap gap-2">
+                            {/* Type Filter */}
+                            <div style={{ marginBottom: '24px' }}>
+                                <label className="text-label" style={{ marginBottom: '8px' }}>Schichtarten</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                     {store.settings.shiftTypes.map(t => {
                                         const active = tempFilter.types.includes(t.id);
                                         return (
                                             <button key={t.id} onClick={() => setTempFilter(p => ({ ...p, types: active ? p.types.filter(id => id !== t.id) : [...p.types, t.id] }))}
-                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors flex items-center gap-2 ${active ? 'bg-primary border-primary text-white' : 'bg-surface border-white/10 text-secondary'}`}>
+                                                className={`filter-chip ${active ? 'active' : ''}`}>
                                                 {t.name} {active && <Check size={14} />}
                                             </button>
                                         );
@@ -284,14 +285,15 @@ export default function Analysis() {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="text-xs font-bold text-secondary uppercase mb-2 block">Wachen</label>
-                                <div className="flex flex-wrap gap-2">
+                            {/* Station Filter */}
+                            <div style={{ marginBottom: '24px' }}>
+                                <label className="text-label" style={{ marginBottom: '8px' }}>Wachen</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                     {store.settings.stations.map(s => {
                                         const active = tempFilter.stations.includes(s);
                                         return (
                                             <button key={s} onClick={() => setTempFilter(p => ({ ...p, stations: active ? p.stations.filter(x => x !== s) : [...p.stations, s] }))}
-                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors flex items-center gap-2 ${active ? 'bg-primary border-primary text-white' : 'bg-surface border-white/10 text-secondary'}`}>
+                                                className={`filter-chip ${active ? 'active' : ''}`}>
                                                 {s} {active && <Check size={14} />}
                                             </button>
                                         );
@@ -299,10 +301,9 @@ export default function Analysis() {
                                 </div>
                             </div>
                         </div>
-
-                        <div className="p-4 border-t border-white/10 flex gap-3 bg-surface pb-8 sm:pb-4">
-                            <button onClick={handleReset} className="flex-1 py-3 font-bold text-secondary rounded-xl hover:bg-white/5 transition-colors">Zurücksetzen</button>
-                            <button onClick={handleApply} className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg shadow-primary/25">Anwenden</button>
+                        <div className="modal-footer">
+                            <button onClick={handleReset} className="btn-secondary" style={{ flex: 1 }}>Zurücksetzen</button>
+                            <button onClick={handleApply} className="btn-primary" style={{ flex: 1 }}>Anwenden</button>
                         </div>
                     </div>
                 </div>

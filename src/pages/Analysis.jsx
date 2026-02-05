@@ -210,7 +210,7 @@ export default function Analysis() {
                     <div className="subtitle" style={{ margin: 0, marginTop: '4px' }}>{rangeLabel}</div>
                 </div>
                 <button onClick={() => { setTempFilter(activeFilter); setIsFilterOpen(true); }} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
-                    <Filter size={16} /> Filter
+                    Filter
                 </button>
             </div>
 
@@ -232,7 +232,7 @@ export default function Analysis() {
                                 {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
                             </div>
                         </div>
-                        {isPositive ? <TrendingUp size={24} color="var(--color-success)" /> : <TrendingDown size={24} color="var(--color-danger)" />}
+                        {isPositive ? "📈" : "📉"}
                     </div>
                 </div>
             </div>
@@ -240,7 +240,7 @@ export default function Analysis() {
             {/* Content or Empty */}
             {filteredData.length === 0 ? (
                 <div className="card-premium" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-text-muted)' }}>
-                    <BarChart2 size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                    <div style={{ fontSize: '48px', opacity: 0.2, marginBottom: '16px' }}>📊</div>
                     <p style={{ margin: 0, fontWeight: '500' }}>Keine Schichten gefunden.</p>
                 </div>
             ) : (
@@ -249,7 +249,7 @@ export default function Analysis() {
                     {/* 1. Timeline Chart */}
                     <div className="card-premium">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <Calendar size={16} color="var(--color-primary)" />
+                            <span style={{ fontSize: '16px', color: 'var(--color-primary)' }}>📅</span>
                             <h3 className="text-label" style={{ margin: 0 }}>Verlauf</h3>
                         </div>
                         <SimpleBarChart data={stats.chartData} />
@@ -258,7 +258,7 @@ export default function Analysis() {
                     {/* 2. Distribution List */}
                     <div className="card-premium">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <PieIcon size={16} color="var(--color-primary)" />
+                            <span style={{ fontSize: '16px', color: 'var(--color-primary)' }}>🍰</span>
                             <h3 className="text-label" style={{ margin: 0 }}>Verteilung</h3>
                         </div>
                         {stats.distributionData.map((d, i) => (
@@ -286,7 +286,7 @@ export default function Analysis() {
                     <div className="modal-content">
                         <div className="modal-header">
                             <h2 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Filter</h2>
-                            <button className="close-btn" onClick={() => setIsFilterOpen(false)}><X /></button>
+                            <button className="close-btn" onClick={() => setIsFilterOpen(false)}>✕</button>
                         </div>
                         <div className="modal-body">
                             {/* Mode Selection */}

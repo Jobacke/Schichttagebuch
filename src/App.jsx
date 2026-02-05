@@ -15,6 +15,7 @@ import '@fontsource/outfit/400.css';
 import '@fontsource/outfit/500.css';
 import '@fontsource/outfit/600.css';
 import '@fontsource/outfit/700.css';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Guard Component
 function RequireAuth({ children }) {
@@ -48,7 +49,6 @@ function AppRoutes() {
   );
 }
 
-import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (

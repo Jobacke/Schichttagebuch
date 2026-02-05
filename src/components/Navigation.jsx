@@ -2,9 +2,17 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, PlusCircle, Settings, PieChart } from 'lucide-react';
 
+import { APP_VERSION } from '../version';
+
 export default function Navigation() {
     return (
         <nav className="nav-bar">
+            {/* Version Indicator */}
+            <div style={{ position: 'absolute', top: '-10px', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }}>
+                <span style={{ fontSize: '9px', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>
+                    v{APP_VERSION}
+                </span>
+            </div>
             <NavItem to="/" icon={LayoutDashboard} label="Journal" />
             <NavItem to="/analysis" icon={PieChart} label="Daten" />
             <NavItem to="/add" icon={PlusCircle} label="Eintrag" isMain />

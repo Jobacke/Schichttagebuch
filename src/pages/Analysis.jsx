@@ -1,203 +1,66 @@
-import React, { useState, useMemo } from 'react';
-import { useStore } from '../context/StoreContext';
+import React, { useState } from 'react';
 import { APP_VERSION } from '../version';
-import {
-    format, parseISO, startOfMonth, endOfMonth,
-    startOfYear, endOfYear, addMonths, subMonths, isValid, isSameMonth,
-    differenceInMinutes
-} from 'date-fns';
-import { de } from 'date-fns/locale';
-import {
-    Filter, X, Check, TrendingUp, TrendingDown,
-    PieChart as PieIcon, BarChart2, Calendar
-} from 'lucide-react';
+import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
+import { useStore } from '../context/StoreContext';
 
-const COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308', '#ef4444', '#a855f7'];
+// Helper for CSS Date controls
+const addMonths = (date, n) => {
+    const d = new Date(date);
+    d.setMonth(d.getMonth() + n);
+    return d;
+};
 
-// --- Helper: Duration Calculation ---
-// Helper to parse "HH:MM" and calculate duration in hours
-function calculateDuration(start, end) {
-    if (!start || !end) return 0;
-    try {
-        const [startH, startM] = start.split(':').map(Number);
-        const [endH, endM] = end.split(':').map(Number);
-
-        let startMinutes = startH * 60 + startM;
-        let endMinutes = endH * 60 + endM;
-
-        // Handle Night Shifts (crossing midnight)
-        if (endMinutes < startMinutes) {
-            endMinutes += 24 * 60;
-        }
-
-        return (endMinutes - startMinutes) / 60;
-    } catch (e) {
-        return 0;
-    }
-}
-
-// --- Component: CSS Bar Chart ---
-const SimpleBarChart = ({ data }) => {
+// Component: Simple CSS Bar Chart
+const CssBarChart = ({ data }) => {
     if (!data || data.length === 0) return null;
-    const maxVal = Math.max(...data.map(d => d.hours));
+    const maxVal = Math.max(...data.map(d => d.hours)) || 1;
 
     return (
-        <div style={{ display: 'flex', alignItems: 'flex-end', height: '180px', gap: '4px', paddingTop: '20px' }}>
-            {data.map((d, i) => {
-                const heightPercent = maxVal > 0 ? (d.hours / maxVal) * 100 : 0;
-                return (
-                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
-                            <div style={{
-                                width: '100%',
-                                height: `${heightPercent}%`,
-                                background: 'var(--color-primary)',
-                                borderTopLeftRadius: '4px',
-                                borderTopRightRadius: '4px',
-                                opacity: 0.8,
-                                minHeight: '4px'
-                            }} />
-                        </div>
-                        <span style={{ fontSize: '10px', color: '#94a3b8', marginTop: '6px', transform: 'rotate(-45deg)', whiteSpace: 'nowrap' }}>
-                            {d.label}
-                        </span>
+        <div style={{ display: 'flex', alignItems: 'flex-end', height: '150px', gap: '2px', paddingTop: '20px' }}>
+            {data.map((d, i) => (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', width: '100%', padding: '0 1px' }}>
+                        <div style={{
+                            width: '100%',
+                            height: `${(d.hours / maxVal) * 100}%`,
+                            background: '#f97316',
+                            borderTopLeftRadius: '2px',
+                            borderTopRightRadius: '2px',
+                            minHeight: '2px'
+                        }} />
                     </div>
-                );
-            })}
+                </div>
+            ))}
         </div>
     );
 };
 
 export default function Analysis() {
-    const { store, loading } = useStore();
+    const { store } = useStore();
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-    // --- Filter State ---
-    const [tempFilter, setTempFilter] = useState({
-        mode: 'month',
-        baseDate: new Date(),
-        customStart: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-        customEnd: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
-        types: [],
-    });
-    const [activeFilter, setActiveFilter] = useState(tempFilter);
+    // Use the decoupled logic hook
+    const logic = useAnalysisLogic();
+    const {
+        loading, label, target,
+        filterMode, setFilterMode, baseDate, setBaseDate,
+        customStart, setCustomStart, customEnd, setCustomEnd,
+        selectedTypes, setSelectedTypes,
+        stats, delta
+    } = logic;
 
-    // --- Actions ---
-    const handleApply = () => {
-        setActiveFilter(tempFilter);
-        setIsFilterOpen(false);
-    };
-
-    const handleReset = () => {
-        const resetState = {
-            mode: 'month',
-            baseDate: new Date(),
-            customStart: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-            customEnd: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
-            types: [],
-        };
-        setTempFilter(resetState);
-        setActiveFilter(resetState);
-        setIsFilterOpen(false);
-    };
-
-    // --- Logic: Date Range & Labels ---
-    const { dateRange, rangeLabel, targetHours } = useMemo(() => {
-        let start, end, label, target;
-        const { mode, baseDate, customStart, customEnd } = activeFilter;
-
-        try {
-            if (mode === 'month') {
-                start = startOfMonth(baseDate);
-                end = endOfMonth(baseDate);
-                label = format(baseDate, 'MMMM yyyy', { locale: de });
-                const daysInMonth = end.getDate();
-                target = (daysInMonth / 7) * 7.8;
-            } else if (mode === 'year') {
-                start = startOfYear(baseDate);
-                end = endOfYear(baseDate);
-                label = format(baseDate, 'yyyy');
-                target = 52.14 * 7.8;
-            } else {
-                start = parseISO(customStart);
-                end = parseISO(customEnd);
-                if (!isValid(start) || !isValid(end)) {
-                    start = startOfMonth(new Date());
-                    end = endOfMonth(new Date());
-                    label = 'Ungültig';
-                } else {
-                    label = 'Benutzerdefiniert';
-                }
-                const diffTime = Math.abs(end - start);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                target = (diffDays / 7) * 7.8;
-            }
-        } catch (e) {
-            start = new Date(); end = new Date(); label = "Fehler"; target = 0;
-        }
-
-        return { dateRange: { start, end }, rangeLabel, targetHours };
-    }, [activeFilter]);
-
-    // --- Logic: Filtering ---
-    const filteredData = useMemo(() => {
-        if (!store.shifts || store.shifts.length === 0) return [];
-
-        return store.shifts.filter(s => {
-            if (!s.date) return false;
-            let shiftDate;
-            try {
-                shiftDate = parseISO(s.date);
-                if (!isValid(shiftDate)) return false;
-            } catch (e) { return false; }
-
-            // Date Filter
-            if (activeFilter.mode === 'month') {
-                if (!isSameMonth(shiftDate, activeFilter.baseDate)) return false;
-            } else {
-                if (shiftDate < dateRange.start || shiftDate > dateRange.end) return false;
-            }
-
-            // Type Filter
-            if (activeFilter.types.length > 0 && !activeFilter.types.includes(s.typeId)) return false;
-
-            return true;
-        });
-    }, [store.shifts, dateRange, activeFilter]);
-
-    // --- Logic: Stats Calculation ---
-    const stats = useMemo(() => {
-        let actual = 0;
-        const typeCounts = {};
-        const shiftsByDate = {};
-
-        filteredData.forEach(s => {
-            const dur = calculateDuration(s.startTime, s.endTime);
-            actual += dur;
-
-            // Safe Access for Type Name
-            const typeObj = (store.settings?.shiftTypes || []).find(t => t.id === s.typeId);
-            const tName = typeObj ? typeObj.name : 'Unbekannt';
-
-            typeCounts[tName] = (typeCounts[tName] || 0) + 1;
-
-            const dateKey = s.date;
-            shiftsByDate[dateKey] = (shiftsByDate[dateKey] || 0) + dur;
-        });
-
-        const chartData = Object.entries(shiftsByDate)
-            .map(([date, hours]) => ({ date, hours, label: format(parseISO(date), 'dd.') }))
-            .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        const distributionData = Object.entries(typeCounts)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
-
-        return { actual, count: filteredData.length, chartData, distributionData };
-    }, [filteredData, store.settings]);
-
-    const delta = stats.actual - targetHours;
     const isPositive = delta >= 0;
+    const colorClass = isPositive ? 'var(--color-success)' : 'var(--color-danger)';
+
+    // Formatting Helpers
+    const formatDateInput = (d) => {
+        try { return d.toISOString().slice(0, 7); } catch { return ''; }
+    };
+    const handleMonthChange = (e) => {
+        if (e.target.value) setBaseDate(new Date(e.target.value));
+    };
+
+    if (loading) return <div className="page-content center">Lade Daten...</div>;
 
     return (
         <div className="page-content">
@@ -207,9 +70,9 @@ export default function Analysis() {
                     <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         Auswertung <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>v{APP_VERSION}</span>
                     </h1>
-                    <div className="subtitle" style={{ margin: 0, marginTop: '4px' }}>{rangeLabel}</div>
+                    <div className="subtitle" style={{ margin: 0, marginTop: '4px' }}>{label}</div>
                 </div>
-                <button onClick={() => { setTempFilter(activeFilter); setIsFilterOpen(true); }} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
+                <button onClick={() => setIsFilterOpen(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
                     Filter
                 </button>
             </div>
@@ -218,60 +81,51 @@ export default function Analysis() {
             <div className="stats-grid">
                 <div className="stat-card">
                     <span className="text-label">Geleistet</span>
-                    <span className="text-value">{stats.actual.toFixed(1)} <span style={{ fontSize: '14px', color: '#94a3b8' }}>h</span></span>
+                    <span className="text-value">{stats.actual.toFixed(1)} h</span>
                 </div>
                 <div className="stat-card">
                     <span className="text-label">Schichten</span>
                     <span className="text-value">{stats.count}</span>
                 </div>
-                <div className="stat-card full-width" style={{ borderLeft: `4px solid ${isPositive ? 'var(--color-success)' : 'var(--color-danger)'}` }}>
+                <div className="stat-card full-width" style={{ borderLeft: `4px solid ${colorClass}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <div>
-                            <span className="text-label">Saldo (Plan: {targetHours.toFixed(1)}h)</span>
-                            <div className="text-value" style={{ color: isPositive ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                            <span className="text-label">Saldo (Soll: {target.toFixed(1)}h)</span>
+                            <div className="text-value" style={{ color: colorClass }}>
                                 {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
                             </div>
                         </div>
-                        {isPositive ? "📈" : "📉"}
+                        <div style={{ fontSize: '24px' }}>{isPositive ? "📈" : "📉"}</div>
                     </div>
                 </div>
             </div>
 
-            {/* Content or Empty */}
-            {filteredData.length === 0 ? (
-                <div className="card-premium" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-text-muted)' }}>
-                    <div style={{ fontSize: '48px', opacity: 0.2, marginBottom: '16px' }}>📊</div>
-                    <p style={{ margin: 0, fontWeight: '500' }}>Keine Schichten gefunden.</p>
+            {/* Charts */}
+            {stats.count === 0 ? (
+                <div className="card-premium center" style={{ padding: '40px', color: '#64748b' }}>
+                    <div style={{ fontSize: '40px', marginBottom: '10px' }}>📊</div>
+                    Keine Daten für diesen Zeitraum.
                 </div>
             ) : (
                 <>
-                    {/* Native CSS Charts */}
-                    {/* 1. Timeline Chart */}
                     <div className="card-premium">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '16px', color: 'var(--color-primary)' }}>📅</span>
-                            <h3 className="text-label" style={{ margin: 0 }}>Verlauf</h3>
-                        </div>
-                        <SimpleBarChart data={stats.chartData} />
+                        <h3 className="text-label" style={{ margin: '0 0 10px 0' }}>📅 Verlauf (Tage)</h3>
+                        <CssBarChart data={stats.chartData} />
                     </div>
 
-                    {/* 2. Distribution List */}
                     <div className="card-premium">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <span style={{ fontSize: '16px', color: 'var(--color-primary)' }}>🍰</span>
-                            <h3 className="text-label" style={{ margin: 0 }}>Verteilung</h3>
-                        </div>
+                        <h3 className="text-label" style={{ margin: '0 0 10px 0' }}>🍰 Verteilung</h3>
                         {stats.distributionData.map((d, i) => (
-                            <div key={i} style={{ marginBottom: '12px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '4px' }}>
+                            <div key={i} style={{ marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                                     <span>{d.name}</span>
-                                    <span style={{ fontWeight: 'bold' }}>{d.value}</span>
+                                    <strong>{d.value}</strong>
                                 </div>
-                                <div style={{ height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ height: '6px', background: '#334155', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
                                     <div style={{
                                         width: `${(d.value / stats.count) * 100}%`,
                                         height: '100%',
-                                        background: COLORS[i % COLORS.length]
+                                        background: ['#f97316', '#38bdf8', '#22c55e'][i % 3]
                                     }} />
                                 </div>
                             </div>
@@ -280,58 +134,72 @@ export default function Analysis() {
                 </>
             )}
 
-            {/* --- Filter Modal --- */}
+            {/* Filter Modal */}
             {isFilterOpen && (
                 <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsFilterOpen(false)}>
                     <div className="modal-content">
                         <div className="modal-header">
-                            <h2 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Filter</h2>
+                            <h3>Filter</h3>
                             <button className="close-btn" onClick={() => setIsFilterOpen(false)}>✕</button>
                         </div>
                         <div className="modal-body">
-                            {/* Mode Selection */}
-                            <div style={{ display: 'flex', background: 'var(--color-surface-hover)', borderRadius: '8px', padding: '4px', marginBottom: '20px' }}>
+                            {/* Mode Toggle */}
+                            <div style={{ display: 'flex', background: '#1e293b', borderRadius: '8px', padding: '4px', marginBottom: '16px' }}>
                                 {['month', 'year', 'custom'].map(m => (
                                     <button
                                         key={m}
-                                        onClick={() => setTempFilter(p => ({ ...p, mode: m }))}
-                                        className="btn-secondary"
+                                        onClick={() => setFilterMode(m)}
                                         style={{
-                                            flex: 1, padding: '8px', borderRadius: '6px', fontSize: '13px',
-                                            background: tempFilter.mode === m ? 'var(--color-primary)' : 'transparent',
-                                            color: tempFilter.mode === m ? 'white' : '#94a3b8',
-                                            boxShadow: 'none',
-                                            border: 'none'
+                                            flex: 1, padding: '8px', borderRadius: '6px', border: 'none',
+                                            background: filterMode === m ? 'var(--color-primary)' : 'transparent',
+                                            color: filterMode === m ? 'white' : '#94a3b8'
                                         }}
                                     >
-                                        {m === 'month' ? 'Monat' : m === 'year' ? 'Jahr' : 'Zeitraum'}
+                                        {m === 'month' ? 'Monat' : m === 'year' ? 'Jahr' : 'Zeit'}
                                     </button>
                                 ))}
                             </div>
 
-                            {/* Date Inputs */}
-                            <div style={{ marginBottom: '24px' }}>
-                                {tempFilter.mode === 'month' && (
-                                    <input type="month" className="input-premium" style={{ width: '100%' }} value={format(tempFilter.baseDate, 'yyyy-MM')} onChange={e => setTempFilter(p => ({ ...p, baseDate: parseISO(e.target.value) }))} />
+                            {/* Controls */}
+                            <div style={{ marginBottom: '20px' }}>
+                                {filterMode === 'month' && (
+                                    <input type="month" className="input-premium" style={{ width: '100%' }} value={formatDateInput(baseDate)} onChange={handleMonthChange} />
                                 )}
-                                {tempFilter.mode === 'year' && (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-hover)', padding: '12px', borderRadius: '12px', color: 'white' }}>
-                                        <button className="close-btn" onClick={() => setTempFilter(p => ({ ...p, baseDate: subMonths(p.baseDate, 12) }))}>&lt;</button>
-                                        <span style={{ fontWeight: 'bold' }}>{format(tempFilter.baseDate, 'yyyy')}</span>
-                                        <button className="close-btn" onClick={() => setTempFilter(p => ({ ...p, baseDate: addMonths(p.baseDate, 12) }))}>&gt;</button>
+                                {filterMode === 'year' && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', padding: '10px', borderRadius: '8px' }}>
+                                        <button className="close-btn" onClick={() => setBaseDate(addMonths(baseDate, -12))}>&lt;</button>
+                                        <strong>{baseDate.getFullYear()}</strong>
+                                        <button className="close-btn" onClick={() => setBaseDate(addMonths(baseDate, 12))}>&gt;</button>
                                     </div>
                                 )}
-                                {tempFilter.mode === 'custom' && (
+                                {filterMode === 'custom' && (
                                     <div style={{ display: 'flex', gap: '8px' }}>
-                                        <input type="date" className="input-premium" value={tempFilter.customStart} onChange={e => setTempFilter(p => ({ ...p, customStart: e.target.value }))} />
-                                        <input type="date" className="input-premium" value={tempFilter.customEnd} onChange={e => setTempFilter(p => ({ ...p, customEnd: e.target.value }))} />
+                                        <input type="date" className="input-premium" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
+                                        <input type="date" className="input-premium" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
                                     </div>
                                 )}
                             </div>
+
+                            {/* Types */}
+                            <div>
+                                <label className="text-label" style={{ display: 'block', marginBottom: '8px' }}>Schichtarten</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                    {(store.settings?.shiftTypes || []).map(t => {
+                                        const active = selectedTypes.includes(t.id);
+                                        return (
+                                            <button key={t.id}
+                                                onClick={() => setSelectedTypes(active ? selectedTypes.filter(x => x !== t.id) : [...selectedTypes, t.id])}
+                                                className={`filter-chip ${active ? 'active' : ''}`}
+                                            >
+                                                {t.name} {active && '✓'}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
                         </div>
                         <div className="modal-footer">
-                            <button onClick={handleReset} className="btn-secondary" style={{ flex: 1 }}>Reset</button>
-                            <button onClick={handleApply} className="btn-primary" style={{ flex: 1 }}>Anzeigen</button>
+                            <button onClick={() => setIsFilterOpen(false)} className="btn-primary" style={{ width: '100%' }}>Fertig</button>
                         </div>
                     </div>
                 </div>

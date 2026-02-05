@@ -2,12 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import {
     format, parseISO, startOfMonth, endOfMonth, isWithinInterval,
-    startOfYear, endOfYear, addMonths, subMonths
+    startOfYear, endOfYear, addMonths, subMonths, isValid
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
-    BarChart2, Filter, X, Check,
-    TrendingUp, TrendingDown, PieChart as PieIcon, ChevronDown
+    Filter, X, Check,
+    TrendingUp, TrendingDown, PieChart as PieIcon
 } from 'lucide-react';
 import {
     PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, Tooltip, ResponsiveContainer
@@ -16,12 +16,17 @@ import {
 const COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308', '#ef4444', '#a855f7'];
 
 function calculateDuration(start, end) {
-    const [startH, startM] = start.split(':').map(Number);
-    const [endH, endM] = end.split(':').map(Number);
-    let startMinutes = startH * 60 + startM;
-    let endMinutes = endH * 60 + endM;
-    if (endMinutes < startMinutes) endMinutes += 24 * 60;
-    return (endMinutes - startMinutes) / 60;
+    if (!start || !end) return 0;
+    try {
+        const [startH, startM] = start.split(':').map(Number);
+        const [endH, endM] = end.split(':').map(Number);
+        let startMinutes = startH * 60 + startM;
+        let endMinutes = endH * 60 + endM;
+        if (endMinutes < startMinutes) endMinutes += 24 * 60;
+        return (endMinutes - startMinutes) / 60;
+    } catch (e) {
+        return 0;
+    }
 }
 
 export default function Analysis() {
@@ -30,7 +35,7 @@ export default function Analysis() {
 
     // --- Filter State ---
     const [tempFilter, setTempFilter] = useState({
-        mode: 'month', // 'month', 'year', 'custom'
+        mode: 'month',
         baseDate: new Date(),
         customStart: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
         customEnd: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
@@ -41,7 +46,6 @@ export default function Analysis() {
 
     const [activeFilter, setActiveFilter] = useState(tempFilter);
 
-    // Apply Filter Logic
     const handleApply = () => {
         setActiveFilter(tempFilter);
         setIsFilterOpen(false);
@@ -62,38 +66,47 @@ export default function Analysis() {
         setIsFilterOpen(false);
     };
 
-    // --- Logic Execution (based on activeFilter) ---
     const { dateRange, rangeLabel, targetHours } = useMemo(() => {
         let start, end, label, target;
         const { mode, baseDate, customStart, customEnd } = activeFilter;
 
-        if (mode === 'month') {
-            start = startOfMonth(baseDate);
-            end = endOfMonth(baseDate);
-            label = format(baseDate, 'MMMM yyyy', { locale: de });
-            target = (end.getDate() / 7) * 7.8; // Approx logic
-        } else if (mode === 'year') {
-            start = startOfYear(baseDate);
-            end = endOfYear(baseDate);
-            label = format(baseDate, 'yyyy');
-            target = 52.14 * 7.8;
-        } else {
-            start = parseISO(customStart);
-            end = parseISO(customEnd);
-            label = 'Benutzerdefiniert';
-            target = ((end - start) / (1000 * 60 * 60 * 24 * 7)) * 7.8;
+        try {
+            if (mode === 'month') {
+                start = startOfMonth(baseDate);
+                end = endOfMonth(baseDate);
+                label = format(baseDate, 'MMMM yyyy', { locale: de });
+                target = (end.getDate() / 7) * 7.8;
+            } else if (mode === 'year') {
+                start = startOfYear(baseDate);
+                end = endOfYear(baseDate);
+                label = format(baseDate, 'yyyy');
+                target = 52.14 * 7.8;
+            } else {
+                start = parseISO(customStart);
+                end = parseISO(customEnd);
+                if (!isValid(start) || !isValid(end)) throw new Error('Invalid dates');
+                label = 'Benutzerdefiniert';
+                target = ((end - start) / (1000 * 60 * 60 * 24 * 7)) * 7.8;
+            }
+        } catch (e) {
+            // Fallback safety
+            start = new Date(); end = new Date(); label = "Fehler"; target = 0;
         }
         return { dateRange: { start, end }, rangeLabel: label, targetHours };
     }, [activeFilter]);
 
     const filteredData = useMemo(() => {
         return store.shifts.filter(s => {
-            const d = parseISO(s.date);
-            if (!isWithinInterval(d, dateRange)) return false;
-            if (activeFilter.types.length > 0 && !activeFilter.types.includes(s.typeId)) return false;
-            if (activeFilter.stations.length > 0 && !activeFilter.stations.includes(s.station)) return false;
-            if (activeFilter.vehicles.length > 0 && !activeFilter.vehicles.includes(s.vehicle)) return false;
-            return true;
+            if (!s.date) return false;
+            try {
+                const d = parseISO(s.date);
+                if (!isValid(d)) return false;
+                if (!isWithinInterval(d, dateRange)) return false;
+                if (activeFilter.types.length > 0 && !activeFilter.types.includes(s.typeId)) return false;
+                if (activeFilter.stations.length > 0 && !activeFilter.stations.includes(s.station)) return false;
+                if (activeFilter.vehicles.length > 0 && !activeFilter.vehicles.includes(s.vehicle)) return false;
+                return true;
+            } catch (e) { return false; }
         });
     }, [store.shifts, dateRange, activeFilter]);
 
@@ -189,21 +202,41 @@ export default function Analysis() {
                 </div>
             )}
 
+            {/* Timeline */}
+            <div className="card p-4 mb-6">
+                <div className="h-[200px] w-full">
+                    {stats.chartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.chartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} interval={'preserveStartEnd'} />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                />
+                                <Bar dataKey="hours" fill="#f97316" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-secondary text-sm">
+                            Keine Daten
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* --- Filter Modal (Overlay) --- */}
             {isFilterOpen && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div className="bg-surface w-full max-w-md h-[85vh] sm:h-auto sm:rounded-2xl rounded-t-2xl flex flex-col animate-in slide-in-from-bottom-10 overflow-hidden">
+                    <div className="bg-surface w-full max-w-md h-[85vh] sm:h-auto sm:rounded-2xl rounded-t-2xl flex flex-col animate-in slide-in-from-bottom-5 overflow-hidden border border-white/10">
 
-                        {/* Modal Header */}
-                        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-surface">
                             <h2 className="text-lg font-bold m-0">Filteroptionen</h2>
                             <button onClick={() => setIsFilterOpen(false)}><X className="text-secondary" /></button>
                         </div>
 
-                        {/* Modal Body */}
-                        <div className="p-4 overflow-y-auto flex-1 space-y-6">
+                        <div className="p-4 overflow-y-auto flex-1 space-y-6 bg-surface">
 
-                            {/* 1. Zeitraum */}
                             <div>
                                 <label className="text-xs font-bold text-secondary uppercase mb-2 block">Zeitraum</label>
                                 <div className="flex bg-surface-highlight p-1 rounded-lg mb-3">
@@ -213,7 +246,7 @@ export default function Analysis() {
                                             onClick={() => setTempFilter(p => ({ ...p, mode: m }))}
                                             className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${tempFilter.mode === m ? 'bg-primary text-white shadow-md' : 'text-secondary'}`}
                                         >
-                                            {m === 'month' ? 'Monat' : m === 'year' ? 'Jahr' : 'Definiert'}
+                                            {m === 'month' ? 'Monat' : m === 'year' ? 'Jahr' : 'Def.'}
                                         </button>
                                     ))}
                                 </div>
@@ -236,7 +269,6 @@ export default function Analysis() {
                                 )}
                             </div>
 
-                            {/* 2. Schichtarten */}
                             <div>
                                 <label className="text-xs font-bold text-secondary uppercase mb-2 block">Schichtarten</label>
                                 <div className="flex flex-wrap gap-2">
@@ -252,7 +284,6 @@ export default function Analysis() {
                                 </div>
                             </div>
 
-                            {/* 3. Wachen */}
                             <div>
                                 <label className="text-xs font-bold text-secondary uppercase mb-2 block">Wachen</label>
                                 <div className="flex flex-wrap gap-2">
@@ -269,7 +300,6 @@ export default function Analysis() {
                             </div>
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="p-4 border-t border-white/10 flex gap-3 bg-surface pb-8 sm:pb-4">
                             <button onClick={handleReset} className="flex-1 py-3 font-bold text-secondary rounded-xl hover:bg-white/5 transition-colors">Zurücksetzen</button>
                             <button onClick={handleApply} className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg shadow-primary/25">Anwenden</button>

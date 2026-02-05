@@ -349,14 +349,17 @@ export default function Analysis() {
             )}
 
             {/* DEBUG SECTION */}
-            <div style={{ marginTop: '40px', padding: '16px', background: '#000', borderRadius: '8px', opacity: 0.8, fontSize: '10px', fontFamily: 'monospace', color: '#0f0' }}>
-                <h3>DEBUG MODE v{APP_VERSION}</h3>
-                <p>Status: {loading ? 'LOADING' : 'READY'}</p>
-                <p>Shifts (Total): {store.shifts ? store.shifts.length : 'undefined'}</p>
-                <p>Shifts (Filtered): {filteredData.length}</p>
-                <p>Filter Mode: {activeFilter.mode}</p>
-                <p>Date Range: {format(dateRange.start, 'yyyy-MM-dd')} - {format(dateRange.end, 'yyyy-MM-dd')}</p>
-                <p>Current Date: {new Date().toISOString()}</p>
+            <div style={{
+                position: 'fixed', bottom: '100px', left: '10px', right: '10px',
+                padding: '16px', background: 'red', color: 'white', zIndex: 9999,
+                borderRadius: '8px', fontWeight: 'bold', fontSize: '12px',
+                boxShadow: '0 0 20px rgba(0,0,0,0.5)'
+            }}>
+                <h3>⚠️ DEBUG MODE v{APP_VERSION}</h3>
+                <p>Status: {loading ? 'LOADING...' : 'READY'}</p>
+                <p>Total Shifts: {store.shifts ? store.shifts.length : 'NULL'}</p>
+                <p>Current Filtered: {filteredData.length}</p>
+                <p>Build Time: {new Date().toLocaleTimeString()}</p>
             </div>
         </div>
     );

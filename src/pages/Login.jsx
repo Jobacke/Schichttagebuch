@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Flame } from 'lucide-react';
+import { Flame, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function Login() {
     const { login, register, currentUser } = useAuth();
@@ -12,7 +12,6 @@ export default function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Redirect if already logged in
     useEffect(() => {
         if (currentUser) {
             navigate('/');
@@ -30,7 +29,6 @@ export default function Login() {
             } else {
                 await register(email, password);
             }
-            // Navigation happens automatically via the useEffect above when currentUser changes
         } catch (err) {
             console.error(err);
             setError(err.message.includes('auth/invalid-credential') ? 'Falsche Zugangsdaten.' : err.message);
@@ -39,59 +37,117 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 animate-in fade-in">
-            <div className="mb-8 flex flex-col items-center">
-                <div className="w-20 h-20 bg-primary/20 rounded-2xl flex items-center justify-center mb-4 text-primary">
-                    <Flame size={40} />
+        <div style={{
+            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            background: 'radial-gradient(circle at top center, #1e293b 0%, #0f172a 100%)'
+        }}>
+            {/* Hero Section */}
+            <div style={{ textAlign: 'center', marginBottom: '40px' }} className="animate-in">
+                <div style={{
+                    width: '80px',
+                    height: '80px',
+                    background: 'rgba(249, 115, 22, 0.1)',
+                    borderRadius: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 24px',
+                    boxShadow: '0 0 40px rgba(249, 115, 22, 0.1)'
+                }}>
+                    <Flame size={40} color="#f97316" strokeWidth={2.5} />
                 </div>
-                <h1 className="text-3xl font-bold mb-1">Schichttagebuch</h1>
-                <p className="text-secondary">Deine Schichten. Überall.</p>
+                <h1 style={{ fontSize: '32px', marginBottom: '8px', letterSpacing: '-0.5px' }}>Schichttagebuch</h1>
+                <p style={{ color: '#94a3b8', fontSize: '16px' }}>Deine Schichten. Einfach. Überall.</p>
             </div>
 
-            <div className="card w-full max-w-sm">
-                <h2 className="mb-6 text-center">{isLogin ? 'Anmelden' : 'Registrieren'}</h2>
+            {/* Card */}
+            <div className="card-premium" style={{ width: '100%', maxWidth: '400px', padding: '32px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <h2 style={{ fontSize: '20px', color: 'white', marginBottom: '4px' }}>
+                        {isLogin ? 'Willkommen zurück' : 'Konto erstellen'}
+                    </h2>
+                    <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
+                        {isLogin ? 'Melde dich an, um fortzufahren' : 'Starte jetzt mit deiner Planung'}
+                    </p>
+                </div>
 
-                {error && <div className="bg-danger/20 text-danger p-3 rounded-lg mb-4 text-sm font-bold text-center">{error}</div>}
+                {error && (
+                    <div style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        color: '#ef4444',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        marginBottom: '20px',
+                        fontSize: '14px',
+                        textAlign: 'center',
+                        border: '1px solid rgba(239, 68, 68, 0.2)'
+                    }}>
+                        {error}
+                    </div>
+                )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="input-wrapper mb-2">
-                        <label>Email</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={e => setEmail(e.target.value)}
-                            className="input-field"
-                            required
-                        />
+                <form onSubmit={handleSubmit}>
+                    <div style={{ marginBottom: '16px' }}>
+                        <label className="text-label" style={{ marginBottom: '8px', display: 'block' }}>Email Adresse</label>
+                        <div style={{ position: 'relative' }}>
+                            <Mail size={20} style={{ position: 'absolute', left: '12px', top: '12px', color: '#64748b' }} />
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                className="input-premium"
+                                style={{ paddingLeft: '44px' }}
+                                placeholder="name@beispiel.de"
+                                required
+                            />
+                        </div>
                     </div>
-                    <div className="input-wrapper mb-4">
-                        <label>Passwort</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            className="input-field"
-                            required
-                            minLength={6}
-                        />
+
+                    <div style={{ marginBottom: '24px' }}>
+                        <label className="text-label" style={{ marginBottom: '8px', display: 'block' }}>Passwort</label>
+                        <div style={{ position: 'relative' }}>
+                            <Lock size={20} style={{ position: 'absolute', left: '12px', top: '12px', color: '#64748b' }} />
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="input-premium"
+                                style={{ paddingLeft: '44px' }}
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
                     </div>
-                    <button disabled={loading} className="btn btn-primary w-full">
-                        {loading ? 'Lade...' : (isLogin ? 'Einloggen' : 'Konto erstellen')}
+
+                    <button disabled={loading} className="btn-primary" style={{ height: '48px' }}>
+                        {loading ? 'Lade...' : (isLogin ? 'Anmelden' : 'Registrieren')}
+                        {!loading && <ArrowRight size={20} />}
                     </button>
                 </form>
 
-                <div className="mt-6 text-center">
+                <div style={{ marginTop: '24px', textAlign: 'center' }}>
                     <button
                         onClick={() => setIsLogin(!isLogin)}
-                        className="text-secondary text-sm hover:text-white transition-colors"
+                        style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '14px', cursor: 'pointer' }}
                     >
-                        {isLogin ? 'Noch kein Konto? Hier registrieren.' : 'Bereits ein Konto? Hier anmelden.'}
+                        {isLogin ? 'Noch kein Konto? ' : 'Bereits registriert? '}
+                        <span style={{ color: '#f97316', fontWeight: 600 }}>
+                            {isLogin ? 'Jetzt registrieren' : 'Hier anmelden'}
+                        </span>
                     </button>
                 </div>
             </div>
 
-            <div className="mt-8 text-xs text-secondary/40 text-center max-w-xs">
-                Hinweis: Du benötigst eine Internetverbindung für die Anmeldung. Deine Daten werden sicher in der Cloud gespeichert.
+            {/* Footer Information */}
+            <div style={{ marginTop: '40px', maxWidth: '300px', textAlign: 'center', opacity: 0.5 }}>
+                <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5' }}>
+                    Sichere Cloud-Synchronisation.<br />Deine Daten gehören dir.
+                </p>
             </div>
         </div>
     );

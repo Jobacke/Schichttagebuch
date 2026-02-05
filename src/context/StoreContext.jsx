@@ -125,10 +125,14 @@ export function StoreProvider({ children }) {
     _updateSettingsDoc(newSettings);
   };
 
-  const store = { shifts, settings };
+  // Ensure store always has valid objects
+  const safeStore = {
+    shifts: shifts || [],
+    settings: settings || INITIAL_SETTINGS
+  };
 
   return (
-    <StoreContext.Provider value={{ store, addShift, deleteShift, updateSettings, addSettingItem, removeSettingItem, loading }}>
+    <StoreContext.Provider value={{ store: safeStore, addShift, deleteShift, updateSettings, addSettingItem, removeSettingItem, loading }}>
       {children}
     </StoreContext.Provider>
   );

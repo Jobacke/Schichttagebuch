@@ -160,7 +160,7 @@ h2 {
   border-top: var(--glass-border);
   display: flex;
   justify-content: space-around;
-  alignItems: center;
+  align-items: center;
   z-index: 1000;
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -168,7 +168,7 @@ h2 {
 .nav-item {
   display: flex;
   flex-direction: column;
-  alignItems: center;
+  align-items: center;
   justify-content: center;
   gap: 4px;
   color: var(--color-text-muted);

@@ -2,20 +2,17 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import {
     format, parseISO, startOfMonth, endOfMonth, isWithinInterval,
-    eachMonthOfInterval, subMonths, getDaysInMonth, startOfYear,
-    endOfYear, differenceInCalendarWeeks
+    startOfYear, endOfYear, addMonths, subMonths
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 import {
-    BarChart2, Filter, Calendar as CalIcon, ChevronDown, Check,
-    TrendingUp, TrendingDown, Clock, PieChart as PieIcon, X
+    BarChart2, Filter, X, Check,
+    TrendingUp, TrendingDown, PieChart as PieIcon, ChevronDown
 } from 'lucide-react';
 import {
-    AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, BarChart, Bar
+    PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, Tooltip, ResponsiveContainer
 } from 'recharts';
 
-// --- Colors ---
 const COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308', '#ef4444', '#a855f7'];
 
 function calculateDuration(start, end) {
@@ -29,212 +26,126 @@ function calculateDuration(start, end) {
 
 export default function Analysis() {
     const { store } = useStore();
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     // --- Filter State ---
-    const [filterMode, setFilterMode] = useState('month'); // 'month', 'year', 'custom'
-    const [baseDate, setBaseDate] = useState(new Date());
+    const [tempFilter, setTempFilter] = useState({
+        mode: 'month', // 'month', 'year', 'custom'
+        baseDate: new Date(),
+        customStart: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+        customEnd: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+        types: [],
+        stations: [],
+        vehicles: []
+    });
 
-    // Custom Date Range
-    const [customStart, setCustomStart] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-    const [customEnd, setCustomEnd] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+    const [activeFilter, setActiveFilter] = useState(tempFilter);
 
-    // Detail Filters
-    const [selectedTypes, setSelectedTypes] = useState([]); // IDs
-    const [showFilters, setShowFilters] = useState(false);
+    // Apply Filter Logic
+    const handleApply = () => {
+        setActiveFilter(tempFilter);
+        setIsFilterOpen(false);
+    };
 
-    // --- Logic ---
+    const handleReset = () => {
+        const resetState = {
+            mode: 'month',
+            baseDate: new Date(),
+            customStart: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+            customEnd: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+            types: [],
+            stations: [],
+            vehicles: []
+        };
+        setTempFilter(resetState);
+        setActiveFilter(resetState);
+        setIsFilterOpen(false);
+    };
 
-    // 1. Determine active date range based on mode
+    // --- Logic Execution (based on activeFilter) ---
     const { dateRange, rangeLabel, targetHours } = useMemo(() => {
         let start, end, label, target;
+        const { mode, baseDate, customStart, customEnd } = activeFilter;
 
-        if (filterMode === 'month') {
+        if (mode === 'month') {
             start = startOfMonth(baseDate);
             end = endOfMonth(baseDate);
             label = format(baseDate, 'MMMM yyyy', { locale: de });
-
-            const weeks = getDaysInMonth(baseDate) / 7;
-            target = weeks * 7.8;
-
-        } else if (filterMode === 'year') {
+            target = (end.getDate() / 7) * 7.8; // Approx logic
+        } else if (mode === 'year') {
             start = startOfYear(baseDate);
             end = endOfYear(baseDate);
             label = format(baseDate, 'yyyy');
-
-            // Rough approximation for year
             target = 52.14 * 7.8;
-
         } else {
-            // Custom
             start = parseISO(customStart);
             end = parseISO(customEnd);
             label = 'Benutzerdefiniert';
-
-            const diffDays = (end - start) / (1000 * 60 * 60 * 24) + 1;
-            const weeks = diffDays / 7;
-            target = weeks * 7.8;
+            target = ((end - start) / (1000 * 60 * 60 * 24 * 7)) * 7.8;
         }
+        return { dateRange: { start, end }, rangeLabel: label, targetHours };
+    }, [activeFilter]);
 
-        return { dateRange: { start, end }, rangeLabel: label, targetHours: target };
-    }, [filterMode, baseDate, customStart, customEnd]);
-
-    // 2. Filter Data
     const filteredData = useMemo(() => {
         return store.shifts.filter(s => {
             const d = parseISO(s.date);
-            // Date Check
             if (!isWithinInterval(d, dateRange)) return false;
-
-            // Type ID Check (if specific types are selected)
-            if (selectedTypes.length > 0 && !selectedTypes.includes(s.typeId)) return false;
-
+            if (activeFilter.types.length > 0 && !activeFilter.types.includes(s.typeId)) return false;
+            if (activeFilter.stations.length > 0 && !activeFilter.stations.includes(s.station)) return false;
+            if (activeFilter.vehicles.length > 0 && !activeFilter.vehicles.includes(s.vehicle)) return false;
             return true;
         });
-    }, [store.shifts, dateRange, selectedTypes]);
+    }, [store.shifts, dateRange, activeFilter]);
 
-    // 3. Calculate Stats
     const stats = useMemo(() => {
         let actual = 0;
         const typeCounts = {};
-        const shiftsByDate = {}; // For Chart
+        const shiftsByDate = {};
 
         filteredData.forEach(s => {
             const dur = calculateDuration(s.startTime, s.endTime);
             actual += dur;
-
-            // Type Count
             const tName = store.settings.shiftTypes.find(t => t.id === s.typeId)?.name || 'Unbekannt';
             typeCounts[tName] = (typeCounts[tName] || 0) + 1;
-
-            // Chart Data Aggregation
             const dateKey = s.date;
             shiftsByDate[dateKey] = (shiftsByDate[dateKey] || 0) + dur;
         });
 
-        // Chart Data Preparation
         const chartData = Object.entries(shiftsByDate)
             .map(([date, hours]) => ({ date, hours, label: format(parseISO(date), 'dd.MM') }))
             .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        // Distribution Data
         const distributionData = Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
 
-        return {
-            actual,
-            count: filteredData.length,
-            chartData,
-            distributionData
-        };
-
+        return { actual, count: filteredData.length, chartData, distributionData };
     }, [filteredData, store.settings]);
 
     const delta = stats.actual - targetHours;
     const isPositive = delta >= 0;
 
-    // --- Handlers ---
-    const handleTypeToggle = (id) => {
-        if (selectedTypes.includes(id)) {
-            setSelectedTypes(prev => prev.filter(t => t !== id));
-        } else {
-            setSelectedTypes(prev => [...prev, id]);
-        }
-    };
-
     return (
         <div className="animate-in fade-in pb-24">
-
-            {/* --- Filter / Header Section --- */}
-            <div className="mb-6 sticky top-0 bg-app/95 backdrop-blur-md z-10 py-2 -mx-5 px-5 border-b border-white/5">
-                <div className="flex justify-between items-center mb-2">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-6">
+                <div>
                     <h1 className="text-xl font-bold mb-0">Auswertung</h1>
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={`p-2 rounded-full border ${showFilters ? 'bg-primary border-primary text-white' : 'bg-surface border-surface-highlight text-secondary'}`}
-                    >
-                        <Filter size={20} />
-                    </button>
+                    <p className="text-primary text-sm font-medium">{rangeLabel}</p>
                 </div>
-
-                {/* Collapsible Filter Panel */}
-                {showFilters && (
-                    <div className="bg-surface rounded-xl p-4 mb-4 animate-in slide-in-from-top-2">
-                        <div className="grid grid-cols-3 gap-2 mb-4">
-                            <button onClick={() => setFilterMode('month')} className={`p-2 rounded-lg text-sm font-bold ${filterMode === 'month' ? 'bg-primary text-white' : 'bg-surface-highlight text-secondary'}`}>Monat</button>
-                            <button onClick={() => setFilterMode('year')} className={`p-2 rounded-lg text-sm font-bold ${filterMode === 'year' ? 'bg-primary text-white' : 'bg-surface-highlight text-secondary'}`}>Jahr</button>
-                            <button onClick={() => setFilterMode('custom')} className={`p-2 rounded-lg text-sm font-bold ${filterMode === 'custom' ? 'bg-primary text-white' : 'bg-surface-highlight text-secondary'}`}>Zeitraum</button>
-                        </div>
-
-                        {/* Sub-Controls based on Mode */}
-                        {filterMode === 'month' && (
-                            <input
-                                type="month"
-                                className="input-field mb-4"
-                                value={format(baseDate, 'yyyy-MM')}
-                                onChange={(e) => setBaseDate(parseISO(e.target.value))}
-                            />
-                        )}
-
-                        {filterMode === 'year' && (
-                            <div className="flex items-center justify-between bg-surface-highlight rounded-lg p-2 mb-4">
-                                <button onClick={() => setBaseDate(subMonths(baseDate, 12))} className="p-2"><ChevronDown className="rotate-90" /></button>
-                                <span className="font-bold">{format(baseDate, 'yyyy')}</span>
-                                <button onClick={() => setBaseDate(addMonths(baseDate, 12))} className="p-2"><ChevronDown className="-rotate-90" /></button>
-                            </div>
-                        )}
-
-                        {filterMode === 'custom' && (
-                            <div className="flex gap-2 mb-4">
-                                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="input-field" />
-                                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="input-field" />
-                            </div>
-                        )}
-
-                        {/* Type Filters */}
-                        <h3 className="text-xs font-bold text-secondary uppercase tracking-wider mb-2">Schichtarten filtern</h3>
-                        <div className="flex flex-wrap gap-2">
-                            {store.settings.shiftTypes.map(t => (
-                                <button
-                                    key={t.id}
-                                    onClick={() => handleTypeToggle(t.id)}
-                                    className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors flex items-center gap-1
-                    ${selectedTypes.includes(t.id)
-                                            ? 'bg-primary border-primary text-white'
-                                            : 'bg-transparent border-surface-highlight text-secondary'}`
-                                    }
-                                >
-                                    {t.name}
-                                    {selectedTypes.includes(t.id) && <Check size={12} />}
-                                </button>
-                            ))}
-                            {selectedTypes.length > 0 && (
-                                <button onClick={() => setSelectedTypes([])} className="px-2 py-1 text-xs text-danger">Reset</button>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Create summary label when filters hidden */}
-                {!showFilters && (
-                    <div className="flex justify-between items-end">
-                        <span className="text-primary font-bold text-lg">{rangeLabel}</span>
-                        {selectedTypes.length > 0 && <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">{selectedTypes.length} Filter aktiv</span>}
-                    </div>
-                )}
+                <button onClick={() => { setTempFilter(activeFilter); setIsFilterOpen(true); }} className="btn-primary px-4 py-2 rounded-full flex items-center gap-2 text-sm">
+                    <Filter size={16} /> Filter
+                </button>
             </div>
 
-            {/* --- KPI Grid --- */}
+            {/* KPI Cards */}
             <div className="grid grid-cols-2 gap-3 mb-6">
-                {/* Actual */}
                 <div className="card p-4">
                     <span className="text-xs font-bold text-secondary uppercase block mb-1">Geleistet</span>
                     <span className="text-2xl font-bold text-white block">{stats.actual.toFixed(1)} <span className="text-sm text-secondary">h</span></span>
                 </div>
-                {/* Count */}
                 <div className="card p-4">
                     <span className="text-xs font-bold text-secondary uppercase block mb-1">Schichten</span>
                     <span className="text-2xl font-bold text-white block">{stats.count}</span>
                 </div>
-                {/* Balance */}
                 <div className={`card col-span-2 p-4 flex items-center justify-between border-l-4 ${isPositive ? 'border-l-success' : 'border-l-danger'}`}>
                     <div>
                         <span className="text-xs font-bold text-secondary uppercase block mb-1">Saldo (Plan: 7,8h/W)</span>
@@ -248,27 +159,18 @@ export default function Analysis() {
                 </div>
             </div>
 
-            {/* --- Distribution Chart --- */}
+            {/* Charts */}
             {stats.distributionData.length > 0 && (
                 <div className="card p-4 mb-6">
                     <div className="flex items-center gap-2 mb-4">
                         <PieIcon size={16} className="text-primary" />
-                        <h3 className="text-sm font-bold text-white mb-0">Verteilung Schichtarten</h3>
+                        <h3 className="text-sm font-bold text-white mb-0">Verteilung</h3>
                     </div>
                     <div className="h-[200px] flex items-center">
                         <ResponsiveContainer width="50%" height="100%">
                             <PieChart>
-                                <Pie
-                                    data={stats.distributionData}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    innerRadius={40}
-                                    outerRadius={60}
-                                    paddingAngle={5}
-                                >
-                                    {stats.distributionData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
+                                <Pie data={stats.distributionData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={60} paddingAngle={5}>
+                                    {stats.distributionData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
@@ -287,33 +189,94 @@ export default function Analysis() {
                 </div>
             )}
 
-            {/* --- Timeline Chart --- */}
-            <div className="card p-4 mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                    <BarChart2 size={16} className="text-primary" />
-                    <h3 className="text-sm font-bold text-white mb-0">Verlauf im Zeitraum</h3>
-                </div>
-                <div className="h-[200px] w-full">
-                    {stats.chartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} interval={'preserveStartEnd'} />
-                                <Tooltip
-                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
-                                />
-                                <Bar dataKey="hours" fill="#f97316" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="h-full flex items-center justify-center text-secondary text-sm">
-                            Keine Daten für diesen Zeitraum
-                        </div>
-                    )}
-                </div>
-            </div>
+            {/* --- Filter Modal (Overlay) --- */}
+            {isFilterOpen && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div className="bg-surface w-full max-w-md h-[85vh] sm:h-auto sm:rounded-2xl rounded-t-2xl flex flex-col animate-in slide-in-from-bottom-10 overflow-hidden">
 
+                        {/* Modal Header */}
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                            <h2 className="text-lg font-bold m-0">Filteroptionen</h2>
+                            <button onClick={() => setIsFilterOpen(false)}><X className="text-secondary" /></button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-4 overflow-y-auto flex-1 space-y-6">
+
+                            {/* 1. Zeitraum */}
+                            <div>
+                                <label className="text-xs font-bold text-secondary uppercase mb-2 block">Zeitraum</label>
+                                <div className="flex bg-surface-highlight p-1 rounded-lg mb-3">
+                                    {['month', 'year', 'custom'].map(m => (
+                                        <button
+                                            key={m}
+                                            onClick={() => setTempFilter(p => ({ ...p, mode: m }))}
+                                            className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${tempFilter.mode === m ? 'bg-primary text-white shadow-md' : 'text-secondary'}`}
+                                        >
+                                            {m === 'month' ? 'Monat' : m === 'year' ? 'Jahr' : 'Definiert'}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {tempFilter.mode === 'month' && (
+                                    <input type="month" className="input-field w-full" value={format(tempFilter.baseDate, 'yyyy-MM')} onChange={e => setTempFilter(p => ({ ...p, baseDate: parseISO(e.target.value) }))} />
+                                )}
+                                {tempFilter.mode === 'year' && (
+                                    <div className="flex items-center justify-between bg-surface-highlight rounded-lg p-2">
+                                        <button onClick={() => setTempFilter(p => ({ ...p, baseDate: subMonths(p.baseDate, 12) }))} className="p-2"><ChevronDown className="rotate-90 text-secondary" /></button>
+                                        <span className="font-bold">{format(tempFilter.baseDate, 'yyyy')}</span>
+                                        <button onClick={() => setTempFilter(p => ({ ...p, baseDate: addMonths(p.baseDate, 12) }))} className="p-2"><ChevronDown className="-rotate-90 text-secondary" /></button>
+                                    </div>
+                                )}
+                                {tempFilter.mode === 'custom' && (
+                                    <div className="flex gap-2">
+                                        <input type="date" className="input-field" value={tempFilter.customStart} onChange={e => setTempFilter(p => ({ ...p, customStart: e.target.value }))} />
+                                        <input type="date" className="input-field" value={tempFilter.customEnd} onChange={e => setTempFilter(p => ({ ...p, customEnd: e.target.value }))} />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 2. Schichtarten */}
+                            <div>
+                                <label className="text-xs font-bold text-secondary uppercase mb-2 block">Schichtarten</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {store.settings.shiftTypes.map(t => {
+                                        const active = tempFilter.types.includes(t.id);
+                                        return (
+                                            <button key={t.id} onClick={() => setTempFilter(p => ({ ...p, types: active ? p.types.filter(id => id !== t.id) : [...p.types, t.id] }))}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors flex items-center gap-2 ${active ? 'bg-primary border-primary text-white' : 'bg-surface border-white/10 text-secondary'}`}>
+                                                {t.name} {active && <Check size={14} />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* 3. Wachen */}
+                            <div>
+                                <label className="text-xs font-bold text-secondary uppercase mb-2 block">Wachen</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {store.settings.stations.map(s => {
+                                        const active = tempFilter.stations.includes(s);
+                                        return (
+                                            <button key={s} onClick={() => setTempFilter(p => ({ ...p, stations: active ? p.stations.filter(x => x !== s) : [...p.stations, s] }))}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors flex items-center gap-2 ${active ? 'bg-primary border-primary text-white' : 'bg-surface border-white/10 text-secondary'}`}>
+                                                {s} {active && <Check size={14} />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-white/10 flex gap-3 bg-surface pb-8 sm:pb-4">
+                            <button onClick={handleReset} className="flex-1 py-3 font-bold text-secondary rounded-xl hover:bg-white/5 transition-colors">Zurücksetzen</button>
+                            <button onClick={handleApply} className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg shadow-primary/25">Anwenden</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
-import { Save, Clock, MapPin, Truck, ChevronLeft, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { APP_VERSION } from '../version';
 
 export default function Entry() {
     const navigate = useNavigate();
@@ -10,7 +9,7 @@ export default function Entry() {
     const editId = searchParams.get('id');
     const { store, addShift, deleteShift } = useStore();
 
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = new Date().toISOString().split('T')[0];
 
     const [formData, setFormData] = useState({
         date: today,
@@ -59,10 +58,10 @@ export default function Entry() {
         e.preventDefault();
         const shiftData = {
             ...formData,
-            id: editId || crypto.randomUUID(), // Keep existing ID or create new
+            id: editId || crypto.randomUUID(),
             timestamp: editId ? formData.timestamp : Date.now()
         };
-        addShift(shiftData); // addShift uses setDoc with merge/overwrite so it handles updates too
+        addShift(shiftData);
         navigate('/');
     };
 
@@ -74,135 +73,179 @@ export default function Entry() {
     };
 
     return (
-        <div className="animate-in slide-in-from-bottom-5">
-            <div className="flex-between mb-6">
-                <div className="flex items-center gap-2">
-                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-secondary"><ChevronLeft /></button>
-                    <h1 className="mb-0">{editId ? 'Eintrag bearbeiten' : 'Neue Schicht'}</h1>
+        <div className="page-content">
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        {editId ? 'Eintrag bearbeiten' : 'Neue Schicht'}
+                        <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>v{APP_VERSION}</span>
+                    </h1>
+                    <div className="subtitle" style={{ margin: '4px 0 0 0' }}>
+                        {editId ? 'Änderungen vornehmen' : 'Dienst erfassen'}
+                    </div>
                 </div>
                 {editId && (
-                    <button onClick={handleDelete} className="p-2 text-danger bg-danger/10 rounded-full hover:bg-danger/20 transition-colors">
-                        <Trash2 size={20} />
+                    <button
+                        onClick={handleDelete}
+                        style={{
+                            padding: '10px',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            color: 'var(--color-danger)',
+                            border: 'none',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            fontSize: '24px'
+                        }}
+                    >
+                        🗑️
                     </button>
                 )}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                 {/* Date & Time Card */}
-                <section className="card">
-                    <div className="flex items-center gap-2 mb-4 text-primary">
-                        <Clock size={18} />
-                        <h2 className="mb-0 text-base">Zeitraum</h2>
+                <div className="card-premium">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <span style={{ fontSize: '18px' }}>🕐</span>
+                        <h3 className="text-label" style={{ margin: 0 }}>Zeitraum</h3>
                     </div>
 
-                    <div className="input-wrapper">
-                        <label>Datum</label>
+                    <div style={{ marginBottom: '16px' }}>
+                        <label className="text-label" style={{ marginBottom: '8px' }}>Datum</label>
                         <input
                             type="date"
                             name="date"
                             value={formData.date}
                             onChange={handleChange}
-                            className="input-field"
+                            className="input-premium"
+                            style={{ width: '100%' }}
                             required
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="input-wrapper">
-                            <label>Beginn</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                            <label className="text-label" style={{ marginBottom: '8px' }}>Beginn</label>
                             <input
                                 type="time"
                                 name="startTime"
                                 value={formData.startTime}
                                 onChange={handleChange}
-                                className="input-field"
+                                className="input-premium"
+                                style={{ width: '100%' }}
                                 required
                             />
                         </div>
-                        <div className="input-wrapper">
-                            <label>Ende</label>
+                        <div>
+                            <label className="text-label" style={{ marginBottom: '8px' }}>Ende</label>
                             <input
                                 type="time"
                                 name="endTime"
                                 value={formData.endTime}
                                 onChange={handleChange}
-                                className="input-field"
+                                className="input-premium"
+                                style={{ width: '100%' }}
                                 required
                             />
                         </div>
                     </div>
-                </section>
+                </div>
 
-                {/* Shift Type Chips */}
-                <section className="card">
-                    <label>Schichtart</label>
-                    <div className="chip-grid mb-4">
-                        {store.settings.shiftTypes.map(t => (
-                            <div
-                                key={t.id}
-                                className={`chip ${formData.typeId === t.id ? 'active' : ''}`}
-                                onClick={() => handleChipSelect('typeId', t.id)}
-                            >
-                                {t.name}
-                            </div>
-                        ))}
+                {/* Shift Type Card */}
+                <div className="card-premium">
+                    <div style={{ marginBottom: '16px' }}>
+                        <label className="text-label" style={{ marginBottom: '8px' }}>Schichtart</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {store.settings.shiftTypes.map(t => (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => handleChipSelect('typeId', t.id)}
+                                    className={`filter-chip ${formData.typeId === t.id ? 'active' : ''}`}
+                                >
+                                    {t.name}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
-                    <label>Kürzel (Sollzeit)</label>
-                    <div className="chip-grid">
-                        {store.settings.shiftCodes.map(c => (
-                            <div
-                                key={c.id}
-                                className={`chip ${formData.codeId === c.id ? 'active' : ''}`}
-                                onClick={() => handleChipSelect('codeId', c.id)}
-                            >
-                                {c.code} <span className="opacity-60 text-xs">({c.hours}h)</span>
-                            </div>
-                        ))}
+                    <div>
+                        <label className="text-label" style={{ marginBottom: '8px' }}>Kürzel (Sollzeit)</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {store.settings.shiftCodes.map(c => (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => handleChipSelect('codeId', c.id)}
+                                    className={`filter-chip ${formData.codeId === c.id ? 'active' : ''}`}
+                                >
+                                    {c.code} <span style={{ opacity: 0.6, fontSize: '11px' }}>({c.hours}h)</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </section>
+                </div>
 
                 {/* Resources Card */}
-                <section className="card">
-                    <div className="flex items-center gap-2 mb-4 text-secondary">
-                        <Truck size={18} />
-                        <h2 className="mb-0 text-base">Einsatzmittel</h2>
+                <div className="card-premium">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <span style={{ fontSize: '18px' }}>🚑</span>
+                        <h3 className="text-label" style={{ margin: 0 }}>Einsatzmittel</h3>
                     </div>
 
-                    <div className="input-wrapper">
-                        <label>Wache</label>
-                        <select name="station" value={formData.station} onChange={handleChange} className="input-field">
+                    <div style={{ marginBottom: '16px' }}>
+                        <label className="text-label" style={{ marginBottom: '8px' }}>Wache</label>
+                        <select
+                            name="station"
+                            value={formData.station}
+                            onChange={handleChange}
+                            className="input-premium"
+                            style={{ width: '100%' }}
+                        >
                             {store.settings.stations.map((s, i) => <option key={i} value={s}>{s}</option>)}
                         </select>
                     </div>
 
-                    <div className="input-wrapper">
-                        <label>Fahrzeug & Kennzeichen</label>
-                        <select name="vehicle" value={formData.vehicle} onChange={handleChange} className="input-field mb-2">
+                    <div style={{ marginBottom: '16px' }}>
+                        <label className="text-label" style={{ marginBottom: '8px' }}>Fahrzeug & Kennzeichen</label>
+                        <select
+                            name="vehicle"
+                            value={formData.vehicle}
+                            onChange={handleChange}
+                            className="input-premium"
+                            style={{ width: '100%', marginBottom: '8px' }}
+                        >
                             {store.settings.vehicles.map((v, i) => <option key={i} value={v}>{v}</option>)}
                         </select>
-                        <select name="callSign" value={formData.callSign} onChange={handleChange} className="input-field">
+                        <select
+                            name="callSign"
+                            value={formData.callSign}
+                            onChange={handleChange}
+                            className="input-premium"
+                            style={{ width: '100%' }}
+                        >
                             {store.settings.callSigns.map((c, i) => <option key={i} value={c}>{c}</option>)}
                         </select>
                     </div>
 
-                    <div className="input-wrapper">
-                        <label>PartnerIn</label>
+                    <div>
+                        <label className="text-label" style={{ marginBottom: '8px' }}>PartnerIn</label>
                         <input
                             type="text"
                             name="partner"
                             value={formData.partner}
                             onChange={handleChange}
                             placeholder="Name..."
-                            className="input-field"
+                            className="input-premium"
+                            style={{ width: '100%' }}
                         />
                     </div>
-                </section>
+                </div>
 
-                <button type="submit" className="btn btn-primary mb-8">
-                    <Save size={20} />
-                    <span>{editId ? 'Änderungen speichern' : 'Speichern'}</span>
+                <button type="submit" className="btn-primary" style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: '600', marginTop: '8px' }}>
+                    💾 {editId ? 'Änderungen speichern' : 'Speichern'}
                 </button>
             </form>
         </div>

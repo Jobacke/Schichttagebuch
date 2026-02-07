@@ -31,7 +31,6 @@ jobs:
             console.log(`🗑️ Lösche Runs älter als ${days} Tage (vor ${daysAgo.toISOString()})`);
             console.log(`📊 Behalte mindestens ${keepMinimum} Runs pro Workflow`);
             
-            // Alle Workflows abrufen
             const workflows = await github.rest.actions.listRepoWorkflows({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -39,11 +38,9 @@ jobs:
             
             let totalDeleted = 0;
             
-            // Für jeden Workflow
             for (const workflow of workflows.data.workflows) {
               console.log(`\n📋 Workflow: ${workflow.name}`);
               
-              // Alle Runs abrufen
               const runs = await github.rest.actions.listWorkflowRuns({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -51,21 +48,40 @@ jobs:
                 per_page: 100,
               });
               
-              // Sortiere nach Datum (neueste zuerst)
               const sortedRuns = runs.data.workflow_runs.sort((a, b) => 
                 new Date(b.created_at) - new Date(a.created_at)
               );
               
               let deleted = 0;
               
-              // Lösche alte Runs (aber behalte mindestens keepMinimum)
               for (let i = 0; i < sortedRuns.length; i++) {
                 const run = sortedRuns[i];
                 const runDate = new Date(run.created_at);
                 
-                // Behalte mindestens die neuesten X Runs
                 if (i < keepMinimum) {
                   console.log(`  ✅ Behalten: Run #${run.run_number} (${runDate.toISOString()}) - Top ${keepMinimum}`);
                   continue;
                 }
                 
+                if (runDate < daysAgo) {
+                  try {
+                    await github.rest.actions.deleteWorkflowRun({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      run_id: run.id,
+                    });
+                    console.log(`  🗑️ Gelöscht: Run #${run.run_number} (${runDate.toISOString()})`);
+                    deleted++;
+                    totalDeleted++;
+                  } catch (error) {
+                    console.log(`  ❌ Fehler beim Löschen von Run #${run.run_number}: ${error.message}`);
+                  }
+                } else {
+                  console.log(`  ⏭️ Übersprungen: Run #${run.run_number} (${runDate.toISOString()}) - Zu neu`);
+                }
+              }
+              
+              console.log(`  📊 ${deleted} Runs gelöscht`);
+            }
+            
+            console.log(`\n🎉 FERTIG! Insgesamt ${totalDeleted} Runs gelöscht.`);

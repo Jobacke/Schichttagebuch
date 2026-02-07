@@ -169,9 +169,15 @@ export function exportToPDF(data) {
             const typeName = shiftType?.name || 'Unbekannt';
             const duration = calculateDuration(shift.startTime, shift.endTime);
 
-            // Process vehicle name - remove "RTW Akkon" prefix
+            // Process vehicle name - remove "RTW Akkon" prefix and hours suffix
             let vehicleName = shift.vehicle || '-';
+            // Remove "RTW Akkon" prefix
             vehicleName = vehicleName.replace(/^RTW Akkon\s*/i, '');
+            // Remove hours pattern like "/18.2 h" or "/8.2h" at the end
+            vehicleName = vehicleName.replace(/\/[\d.]+\s*h?\s*$/i, '');
+            // Trim whitespace
+            vehicleName = vehicleName.trim();
+
             if (vehicleName.length > 25) {
                 vehicleName = vehicleName.substring(0, 22) + '...';
             }

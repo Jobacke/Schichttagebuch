@@ -173,8 +173,12 @@ export function exportToPDF(data) {
             let vehicleName = shift.vehicle || '-';
             // Remove "RTW Akkon" prefix
             vehicleName = vehicleName.replace(/^RTW Akkon\s*/i, '');
-            // Remove hours pattern like "/18.2 h" or "/8.2h" at the end
-            vehicleName = vehicleName.replace(/\/[\d.]+\s*h?\s*$/i, '');
+
+            // Extract vehicle ID correctly (e.g., "HBN 71/18.2 h" -> "HBN 71/1")
+            // Pattern: Keep everything up to and including /[single digit], remove rest
+            // Match pattern like "71/18.2 h" and keep only "71/1"
+            vehicleName = vehicleName.replace(/(\d+)\/(\d)[\d.]*\s*h?\s*$/i, '$1/$2');
+
             // Trim whitespace
             vehicleName = vehicleName.trim();
 

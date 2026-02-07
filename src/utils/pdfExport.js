@@ -169,21 +169,22 @@ export function exportToPDF(data) {
             const typeName = shiftType?.name || 'Unbekannt';
             const duration = calculateDuration(shift.startTime, shift.endTime);
 
-            // Process vehicle name - remove "RTW Akkon" prefix and hours suffix
+            // Process vehicle name - extract only "71/X" format
             let vehicleName = shift.vehicle || '-';
-            // Remove "RTW Akkon" prefix
-            vehicleName = vehicleName.replace(/^RTW Akkon\s*/i, '');
 
-            // Extract vehicle ID correctly (e.g., "HBN 71/18.2 h" -> "HBN 71/1")
-            // Pattern: Keep everything up to and including /[single digit], remove rest
-            // Match pattern like "71/18.2 h" and keep only "71/1"
-            vehicleName = vehicleName.replace(/(\d+)\/(\d)[\d.]*\s*h?\s*$/i, '$1/$2');
-
-            // Trim whitespace
-            vehicleName = vehicleName.trim();
-
-            if (vehicleName.length > 25) {
-                vehicleName = vehicleName.substring(0, 22) + '...';
+            // Extract vehicle ID in format "71/1" or "71/2"
+            // Match pattern: 71 followed by / and a single digit
+            const vehicleMatch = vehicleName.match(/71\/(\d)/);
+            if (vehicleMatch) {
+                vehicleName = `71/${vehicleMatch[1]}`;
+            } else {
+                // Fallback: remove "RTW Akkon" and station name, keep what's left
+                vehicleName = vehicleName.replace(/^RTW Akkon\s*/i, '');
+                vehicleName = vehicleName.replace(/^(HBN|Sendling|Hauptwache|Nordwache|Südwache)\s*/i, '');
+                vehicleName = vehicleName.trim();
+                if (vehicleName.length > 25) {
+                    vehicleName = vehicleName.substring(0, 22) + '...';
+                }
             }
 
             // Station name

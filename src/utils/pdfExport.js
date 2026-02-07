@@ -127,13 +127,14 @@ export function exportToPDF(data) {
         doc.text('Schichten im Detail', margin, yPos);
         yPos += 10;
 
-        // Table header - optimized for landscape
+        // Table header - optimized for landscape with station column
         // Column positions for landscape (297mm width)
         const colDatum = margin + 3;
         const colSchichtart = margin + 35;
-        const colZeit = margin + 85;
-        const colFahrzeug = margin + 145;
-        const colStunden = margin + 230;
+        const colZeit = margin + 80;
+        const colWache = margin + 125;
+        const colFahrzeug = margin + 175;
+        const colStunden = margin + 235;
 
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
@@ -144,6 +145,7 @@ export function exportToPDF(data) {
         doc.text('Datum', colDatum, yPos);
         doc.text('Schichtart', colSchichtart, yPos);
         doc.text('Zeit', colZeit, yPos);
+        doc.text('Wache', colWache, yPos);
         doc.text('Fahrzeug', colFahrzeug, yPos);
         doc.text('Stunden', colStunden, yPos);
         yPos += 8;
@@ -167,15 +169,20 @@ export function exportToPDF(data) {
             const typeName = shiftType?.name || 'Unbekannt';
             const duration = calculateDuration(shift.startTime, shift.endTime);
 
-            // Truncate vehicle name if too long
+            // Process vehicle name - remove "RTW Akkon" prefix
             let vehicleName = shift.vehicle || '-';
-            if (vehicleName.length > 35) {
-                vehicleName = vehicleName.substring(0, 32) + '...';
+            vehicleName = vehicleName.replace(/^RTW Akkon\s*/i, '');
+            if (vehicleName.length > 25) {
+                vehicleName = vehicleName.substring(0, 22) + '...';
             }
+
+            // Station name
+            const stationName = shift.station || '-';
 
             doc.text(formatDate(shift.date), colDatum, yPos);
             doc.text(typeName, colSchichtart, yPos);
             doc.text(`${shift.startTime} - ${shift.endTime}`, colZeit, yPos);
+            doc.text(stationName, colWache, yPos);
             doc.text(vehicleName, colFahrzeug, yPos);
             doc.text(`${duration.toFixed(1)} h`, colStunden, yPos);
 

@@ -25,7 +25,12 @@ const formatDate = (dateStr) => {
 export function exportToPDF(data) {
     const { label, stats, delta, target, filteredData, shiftTypes } = data;
 
-    const doc = new jsPDF();
+    // Use landscape orientation for better table display
+    const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+    });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     let yPos = 20;
@@ -122,18 +127,25 @@ export function exportToPDF(data) {
         doc.text('Schichten im Detail', margin, yPos);
         yPos += 10;
 
-        // Table header
+        // Table header - optimized for landscape
+        // Column positions for landscape (297mm width)
+        const colDatum = margin + 3;
+        const colSchichtart = margin + 35;
+        const colZeit = margin + 85;
+        const colFahrzeug = margin + 145;
+        const colStunden = margin + 230;
+
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
         doc.setFillColor(249, 115, 22); // Orange
         doc.setTextColor(255, 255, 255);
         doc.roundedRect(margin, yPos - 5, pageWidth - 2 * margin, 8, 2, 2, 'F');
 
-        doc.text('Datum', margin + 3, yPos);
-        doc.text('Schichtart', margin + 35, yPos);
-        doc.text('Zeit', margin + 80, yPos);
-        doc.text('Fahrzeug', margin + 115, yPos);
-        doc.text('Stunden', margin + 150, yPos);
+        doc.text('Datum', colDatum, yPos);
+        doc.text('Schichtart', colSchichtart, yPos);
+        doc.text('Zeit', colZeit, yPos);
+        doc.text('Fahrzeug', colFahrzeug, yPos);
+        doc.text('Stunden', colStunden, yPos);
         yPos += 8;
 
         doc.setTextColor(0, 0, 0);
@@ -155,11 +167,17 @@ export function exportToPDF(data) {
             const typeName = shiftType?.name || 'Unbekannt';
             const duration = calculateDuration(shift.startTime, shift.endTime);
 
-            doc.text(formatDate(shift.date), margin + 3, yPos);
-            doc.text(typeName, margin + 35, yPos);
-            doc.text(`${shift.startTime} - ${shift.endTime}`, margin + 80, yPos);
-            doc.text(shift.vehicle || '-', margin + 115, yPos);
-            doc.text(`${duration.toFixed(1)} h`, margin + 150, yPos);
+            // Truncate vehicle name if too long
+            let vehicleName = shift.vehicle || '-';
+            if (vehicleName.length > 35) {
+                vehicleName = vehicleName.substring(0, 32) + '...';
+            }
+
+            doc.text(formatDate(shift.date), colDatum, yPos);
+            doc.text(typeName, colSchichtart, yPos);
+            doc.text(`${shift.startTime} - ${shift.endTime}`, colZeit, yPos);
+            doc.text(vehicleName, colFahrzeug, yPos);
+            doc.text(`${duration.toFixed(1)} h`, colStunden, yPos);
 
             yPos += 7;
         });

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { APP_VERSION } from '../version';
 import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
 import { useStore } from '../context/StoreContext';
+import { exportToPDF } from '../utils/pdfExport';
 
 // Helper for CSS Date controls
 const addMonths = (date, n) => {
@@ -47,7 +48,7 @@ export default function Analysis() {
         customStart, setCustomStart, customEnd, setCustomEnd,
         selectedTypes, setSelectedTypes,
         selectedVehicles, setSelectedVehicles,
-        stats, delta, isInvalid
+        stats, delta, isInvalid, filteredData
     } = logic;
 
     const isPositive = delta >= 0;
@@ -57,8 +58,15 @@ export default function Analysis() {
     const formatDateInput = (d) => {
         try { return d.toISOString().slice(0, 7); } catch { return ''; }
     };
-    const handleMonthChange = (e) => {
-        if (e.target.value) setBaseDate(new Date(e.target.value));
+    const handleExportPDF = () => {
+        exportToPDF({
+            label,
+            stats,
+            delta,
+            target,
+            filteredData,
+            shiftTypes: store.settings?.shiftTypes || []
+        });
     };
 
     if (loading) return <div className="page-content center">Lade Daten...</div>;
@@ -73,9 +81,14 @@ export default function Analysis() {
                     </h1>
                     <div className="subtitle" style={{ margin: 0, marginTop: '4px', color: isInvalid ? 'var(--color-danger)' : 'inherit' }}>{label}</div>
                 </div>
-                <button onClick={() => setIsFilterOpen(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
-                    Filter
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={handleExportPDF} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }} title="Als PDF exportieren">
+                        📄
+                    </button>
+                    <button onClick={() => setIsFilterOpen(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
+                        Filter
+                    </button>
+                </div>
             </div>
 
             {/* KPI Cards */}
@@ -164,7 +177,11 @@ export default function Analysis() {
                             {/* Controls */}
                             <div style={{ marginBottom: '20px' }}>
                                 {filterMode === 'month' && (
-                                    <input type="month" className="input-premium" style={{ width: '100%' }} value={formatDateInput(baseDate)} onChange={handleMonthChange} />
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', padding: '10px', borderRadius: '8px' }}>
+                                        <button className="close-btn" onClick={() => setBaseDate(addMonths(baseDate, -1))}>&lt;</button>
+                                        <strong>{baseDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</strong>
+                                        <button className="close-btn" onClick={() => setBaseDate(addMonths(baseDate, 1))}>&gt;</button>
+                                    </div>
                                 )}
                                 {filterMode === 'year' && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', padding: '10px', borderRadius: '8px' }}>

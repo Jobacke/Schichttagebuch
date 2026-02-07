@@ -157,6 +157,7 @@ export function useAnalysisLogic() {
         selectedTypes, setSelectedTypes,
         selectedVehicles, setSelectedVehicles,
         stats,
-        delta: stats.actual - target
+        delta: stats.actual - target,
+        filteredData
     };
 }

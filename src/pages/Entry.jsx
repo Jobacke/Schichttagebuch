@@ -11,6 +11,118 @@ export default function Entry() {
 
     const today = new Date().toISOString().split('T')[0];
 
+    // Schicht-Presets: Definiert automatische Werte für bestimmte Schicht-Kürzel
+    const shiftPresets = {
+        // Hohenbrunn Schichten
+        'RFH': {
+            startTime: '06:54',
+            endTime: '15:06',
+            station: 'Wache Hohenbrunn',
+            vehicle: 'RTW Akkon Hohenbrunn 71/1',
+            callSign: 'Akkon Hohenbrunn 71/1'
+        },
+        'RTH': {
+            startTime: '08:54',
+            endTime: '19:06',
+            station: 'Wache Hohenbrunn',
+            vehicle: 'RTW Akkon HBN 71/2',
+            callSign: 'Akkon HBN 71/2'
+        },
+        'RT1H': {
+            startTime: '08:54',
+            endTime: '15:06',
+            station: 'Wache Hohenbrunn',
+            vehicle: 'RTW Akkon HBN 71/2',
+            callSign: 'Akkon HBN 71/2'
+        },
+        'RT2H': {
+            startTime: '14:54',
+            endTime: '21:06',
+            station: 'Wache Hohenbrunn',
+            vehicle: 'RTW Akkon HBN 71/2',
+            callSign: 'Akkon HBN 71/2'
+        },
+        'RSH': {
+            startTime: '14:54',
+            endTime: '23:06',
+            station: 'Wache Hohenbrunn',
+            vehicle: 'RTW Akkon HBN 71/1',
+            callSign: 'Akkon HBN 71/1'
+        },
+        'RNH': {
+            startTime: '22:54',
+            endTime: '07:06',
+            station: 'Wache Hohenbrunn',
+            vehicle: 'RTW Akkon HBN 71/1',
+            callSign: 'Akkon HBN 71/1'
+        },
+        // Sendling Schichten
+        'RFM': {
+            startTime: '06:54',
+            endTime: '15:06',
+            station: 'Wache Sendling',
+            vehicle: 'RTW Akkon Sendling 71/1',
+            callSign: 'Akkon Sendling 71/1'
+        },
+        'RSM': {
+            startTime: '14:54',
+            endTime: '23:06',
+            station: 'Wache Sendling',
+            vehicle: 'RTW Akkon Sendling 71/1',
+            callSign: 'Akkon Sendling 71/1'
+        },
+        'RNM': {
+            startTime: '22:54',
+            endTime: '07:06',
+            station: 'Wache Sendling',
+            vehicle: 'RTW Akkon Sendling 71/1',
+            callSign: 'Akkon Sendling 71/1'
+        },
+        'RT1M': {
+            startTime: '06:54',
+            endTime: '15:06',
+            station: 'Wache Sendling',
+            vehicle: 'RTW Akkon Sendling 71/2',
+            callSign: 'Akkon Sendling 71/2'
+        },
+        'RT2M': {
+            startTime: '14:54',
+            endTime: '23:06',
+            station: 'Wache Sendling',
+            vehicle: 'RTW Akkon Sendling 71/2',
+            callSign: 'Akkon Sendling 71/2'
+        },
+        'RT3M': {
+            startTime: '06:54',
+            endTime: '15:36',
+            station: 'Wache Sendling',
+            vehicle: 'RTW Akkon Sendling 71/2',
+            callSign: 'Akkon Sendling 71/2'
+        },
+        'RT4M': {
+            startTime: '15:24',
+            endTime: '00:06',
+            station: 'Wache Sendling',
+            vehicle: 'RTW Akkon Sendling 71/2',
+            callSign: 'Akkon Sendling 71/2'
+        },
+        // Obersendling Schichten
+        'RFO': {
+            startTime: '07:54',
+            endTime: '16:06',
+            station: 'Wache Obersendling',
+            vehicle: 'RTW Akkon Obersendling 71/1',
+            callSign: 'Akkon Obersendling 71/1'
+        },
+        'RSO': {
+            startTime: '15:54',
+            endTime: '00:06',
+            station: 'Wache Obersendling',
+            vehicle: 'RTW Akkon Obersendling 71/1',
+            callSign: 'Akkon Obersendling 71/1'
+        }
+    };
+
     const [formData, setFormData] = useState({
         date: today,
         startTime: '07:00',
@@ -51,6 +163,25 @@ export default function Entry() {
     };
 
     const handleChipSelect = (name, value) => {
+        // Wenn ein Schicht-Kürzel ausgewählt wird, prüfe ob es ein Preset gibt
+        if (name === 'codeId') {
+            const selectedCode = store.settings.shiftCodes.find(c => c.id === value);
+            if (selectedCode && shiftPresets[selectedCode.code]) {
+                const preset = shiftPresets[selectedCode.code];
+                // Setze alle Preset-Werte zusammen mit dem ausgewählten Kürzel
+                setFormData(prev => ({
+                    ...prev,
+                    codeId: value,
+                    startTime: preset.startTime,
+                    endTime: preset.endTime,
+                    station: preset.station,
+                    vehicle: preset.vehicle,
+                    callSign: preset.callSign
+                }));
+                return; // Beende die Funktion hier, da wir bereits alles gesetzt haben
+            }
+        }
+        // Standard-Verhalten für andere Chips oder wenn kein Preset existiert
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 

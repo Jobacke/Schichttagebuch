@@ -15,6 +15,7 @@ export default function Entry() {
     const shiftPresets = {
         // Hohenbrunn Schichten
         'RFH': {
+            shiftTypeName: 'Frühschicht',
             startTime: '06:54',
             endTime: '15:06',
             station: 'Wache Hohenbrunn',
@@ -22,6 +23,7 @@ export default function Entry() {
             callSign: 'Akkon Hohenbrunn 71/1'
         },
         'RTH': {
+            shiftTypeName: 'Tagschicht',
             startTime: '08:54',
             endTime: '19:06',
             station: 'Wache Hohenbrunn',
@@ -29,6 +31,7 @@ export default function Entry() {
             callSign: 'Akkon HBN 71/2'
         },
         'RT1H': {
+            shiftTypeName: 'Tagschicht',
             startTime: '08:54',
             endTime: '15:06',
             station: 'Wache Hohenbrunn',
@@ -36,6 +39,7 @@ export default function Entry() {
             callSign: 'Akkon HBN 71/2'
         },
         'RT2H': {
+            shiftTypeName: 'Tagschicht',
             startTime: '14:54',
             endTime: '21:06',
             station: 'Wache Hohenbrunn',
@@ -43,6 +47,7 @@ export default function Entry() {
             callSign: 'Akkon HBN 71/2'
         },
         'RSH': {
+            shiftTypeName: 'Spätschicht',
             startTime: '14:54',
             endTime: '23:06',
             station: 'Wache Hohenbrunn',
@@ -50,6 +55,7 @@ export default function Entry() {
             callSign: 'Akkon HBN 71/1'
         },
         'RNH': {
+            shiftTypeName: 'Nachtschicht',
             startTime: '22:54',
             endTime: '07:06',
             station: 'Wache Hohenbrunn',
@@ -58,6 +64,7 @@ export default function Entry() {
         },
         // Sendling Schichten
         'RFM': {
+            shiftTypeName: 'Frühschicht',
             startTime: '06:54',
             endTime: '15:06',
             station: 'Wache Sendling',
@@ -65,6 +72,7 @@ export default function Entry() {
             callSign: 'Akkon Sendling 71/1'
         },
         'RSM': {
+            shiftTypeName: 'Spätschicht',
             startTime: '14:54',
             endTime: '23:06',
             station: 'Wache Sendling',
@@ -72,6 +80,7 @@ export default function Entry() {
             callSign: 'Akkon Sendling 71/1'
         },
         'RNM': {
+            shiftTypeName: 'Nachtschicht',
             startTime: '22:54',
             endTime: '07:06',
             station: 'Wache Sendling',
@@ -79,6 +88,7 @@ export default function Entry() {
             callSign: 'Akkon Sendling 71/1'
         },
         'RT1M': {
+            shiftTypeName: 'Frühschicht',
             startTime: '06:54',
             endTime: '15:06',
             station: 'Wache Sendling',
@@ -86,6 +96,7 @@ export default function Entry() {
             callSign: 'Akkon Sendling 71/2'
         },
         'RT2M': {
+            shiftTypeName: 'Spätschicht',
             startTime: '14:54',
             endTime: '23:06',
             station: 'Wache Sendling',
@@ -93,6 +104,7 @@ export default function Entry() {
             callSign: 'Akkon Sendling 71/2'
         },
         'RT3M': {
+            shiftTypeName: 'Frühschicht',
             startTime: '06:54',
             endTime: '15:36',
             station: 'Wache Sendling',
@@ -100,6 +112,7 @@ export default function Entry() {
             callSign: 'Akkon Sendling 71/2'
         },
         'RT4M': {
+            shiftTypeName: 'Spätschicht',
             startTime: '15:24',
             endTime: '00:06',
             station: 'Wache Sendling',
@@ -108,6 +121,7 @@ export default function Entry() {
         },
         // Obersendling Schichten
         'RFO': {
+            shiftTypeName: 'Frühschicht',
             startTime: '07:54',
             endTime: '16:06',
             station: 'Wache Obersendling',
@@ -115,6 +129,7 @@ export default function Entry() {
             callSign: 'Akkon Obersendling 71/1'
         },
         'RSO': {
+            shiftTypeName: 'Spätschicht',
             startTime: '15:54',
             endTime: '00:06',
             station: 'Wache Obersendling',
@@ -122,6 +137,7 @@ export default function Entry() {
             callSign: 'Akkon Obersendling 71/1'
         }
     };
+
 
     const [formData, setFormData] = useState({
         date: today,
@@ -134,6 +150,9 @@ export default function Entry() {
         vehicle: '',
         callSign: ''
     });
+
+    // Track whether a preset is active (to disable certain fields)
+    const [isPresetActive, setIsPresetActive] = useState(false);
 
     // Load existing data if editing
     useEffect(() => {
@@ -168,17 +187,36 @@ export default function Entry() {
             const selectedCode = store.settings.shiftCodes.find(c => c.id === value);
             if (selectedCode && shiftPresets[selectedCode.code]) {
                 const preset = shiftPresets[selectedCode.code];
+
+                // Finde die passende Schichtart-ID anhand des Namens
+                let typeId = formData.typeId; // Fallback: behalte aktuelle typeId
+                if (preset.shiftTypeName) {
+                    const matchingType = store.settings.shiftTypes.find(
+                        t => t.name === preset.shiftTypeName
+                    );
+                    if (matchingType) {
+                        typeId = matchingType.id;
+                    }
+                }
+
                 // Setze alle Preset-Werte zusammen mit dem ausgewählten Kürzel
                 setFormData(prev => ({
                     ...prev,
                     codeId: value,
+                    typeId: typeId,
                     startTime: preset.startTime,
                     endTime: preset.endTime,
                     station: preset.station,
                     vehicle: preset.vehicle,
                     callSign: preset.callSign
                 }));
+
+                // Aktiviere Preset-Modus (sperrt bestimmte Felder)
+                setIsPresetActive(true);
                 return; // Beende die Funktion hier, da wir bereits alles gesetzt haben
+            } else {
+                // Kein Preset gefunden - deaktiviere Preset-Modus
+                setIsPresetActive(false);
             }
         }
         // Standard-Verhalten für andere Chips oder wenn kein Preset existiert
@@ -266,6 +304,7 @@ export default function Entry() {
                                 onChange={handleChange}
                                 className="input-premium"
                                 style={{ width: '100%' }}
+                                disabled={isPresetActive}
                                 required
                             />
                         </div>
@@ -278,6 +317,7 @@ export default function Entry() {
                                 onChange={handleChange}
                                 className="input-premium"
                                 style={{ width: '100%' }}
+                                disabled={isPresetActive}
                                 required
                             />
                         </div>
@@ -295,6 +335,7 @@ export default function Entry() {
                                     type="button"
                                     onClick={() => handleChipSelect('typeId', t.id)}
                                     className={`filter-chip ${formData.typeId === t.id ? 'active' : ''}`}
+                                    disabled={isPresetActive}
                                 >
                                     {t.name}
                                 </button>
@@ -334,6 +375,7 @@ export default function Entry() {
                             onChange={handleChange}
                             className="input-premium"
                             style={{ width: '100%' }}
+                            disabled={isPresetActive}
                         >
                             {store.settings.stations.map((s, i) => <option key={i} value={s}>{s}</option>)}
                         </select>
@@ -347,6 +389,7 @@ export default function Entry() {
                             onChange={handleChange}
                             className="input-premium"
                             style={{ width: '100%', marginBottom: '8px' }}
+                            disabled={isPresetActive}
                         >
                             {store.settings.vehicles.map((v, i) => <option key={i} value={v}>{v}</option>)}
                         </select>
@@ -356,6 +399,7 @@ export default function Entry() {
                             onChange={handleChange}
                             className="input-premium"
                             style={{ width: '100%' }}
+                            disabled={isPresetActive}
                         >
                             {store.settings.callSigns.map((c, i) => <option key={i} value={c}>{c}</option>)}
                         </select>

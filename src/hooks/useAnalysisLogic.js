@@ -36,6 +36,17 @@ function calculateDuration(start, end) {
     } catch { return 0; }
 }
 
+export const getMonthlyTarget = (year, monthIndex0, settings) => {
+    const yearMonth = `${year}-${String(monthIndex0 + 1).padStart(2, '0')}`;
+    const monthlyTargets = settings?.monthlyTargets || {};
+    if (monthlyTargets[yearMonth] !== undefined && monthlyTargets[yearMonth] !== '' && !isNaN(Number(monthlyTargets[yearMonth]))) {
+        return Number(monthlyTargets[yearMonth]);
+    }
+    const weeklyHours = Number(settings?.defaultWeeklyHours ?? 20);
+    const daysInMonth = new Date(year, monthIndex0 + 1, 0).getDate();
+    return (daysInMonth / 7) * weeklyHours;
+};
+
 export function useAnalysisLogic() {
     const { store, loading } = useStore();
 
@@ -61,13 +72,18 @@ export function useAnalysisLogic() {
             s = range.start;
             e = range.end;
             l = formatDate(now, { month: 'long', year: 'numeric' });
-            t = (e.getDate() / 7) * 7.8;
+            t = getMonthlyTarget(now.getFullYear(), now.getMonth(), store.settings);
         } else if (filterMode === 'year') {
             const range = getYearRange(now);
             s = range.start;
             e = range.end;
             l = formatDate(now, { year: 'numeric' });
-            t = 52.14 * 7.8;
+            const y = now.getFullYear();
+            let yearTotal = 0;
+            for (let m = 0; m < 12; m++) {
+                yearTotal += getMonthlyTarget(y, m, store.settings);
+            }
+            t = yearTotal;
         } else {
             // Custom Mode
             s = parseDateString(customStart);
@@ -81,7 +97,8 @@ export function useAnalysisLogic() {
 
                 const diffMs = Math.abs(e - s);
                 const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-                t = (diffDays / 7) * 7.8;
+                const weeklyHours = Number(store.settings?.defaultWeeklyHours ?? 20);
+                t = (diffDays / 7) * weeklyHours;
             } else {
                 // Fallback / Invalid State
                 const r = getMonthRange(new Date());
@@ -92,7 +109,7 @@ export function useAnalysisLogic() {
             }
         }
         return { start: s, end: e, label: l, target: t, isInvalid: invalid };
-    }, [filterMode, baseDate, customStart, customEnd]);
+    }, [filterMode, baseDate, customStart, customEnd, store.settings]);
 
     const filteredData = useMemo(() => {
         if (!store.shifts) return [];

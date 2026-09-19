@@ -18,7 +18,9 @@ const INITIAL_SETTINGS = {
   ],
   vehicles: ['R-RTW-1', 'R-NEF-1', 'R-KdoW-1'],
   callSigns: ['Florian 1/83/1', 'Florian 1/76/1', 'Florian 1/10/1'],
-  stations: ['Hauptwache', 'Nordwache', 'Südwache']
+  stations: ['Hauptwache', 'Nordwache', 'Südwache'],
+  defaultWeeklyHours: 20,
+  monthlyTargets: {}
 };
 
 export function StoreProvider({ children }) {
@@ -119,8 +121,32 @@ export function StoreProvider({ children }) {
   };
 
   const removeSettingItem = (category, id) => {
-    const newCategory = settings[category].filter(i => (i.id ? i.id !== id : i !== id));
+    const newCategory = (settings[category] || []).filter(i => (i.id ? i.id !== id : i !== id));
     const newSettings = { ...settings, [category]: newCategory };
+    setSettings(newSettings);
+    _updateSettingsDoc(newSettings);
+  };
+
+  const updateWeeklyHours = (hours) => {
+    const num = parseFloat(hours);
+    const newSettings = { ...settings, defaultWeeklyHours: isNaN(num) ? 0 : num };
+    setSettings(newSettings);
+    _updateSettingsDoc(newSettings);
+  };
+
+  const setMonthlyTarget = (yearMonth, hours) => {
+    const num = parseFloat(hours);
+    const currentTargets = settings?.monthlyTargets || {};
+    const updated = { ...currentTargets, [yearMonth]: isNaN(num) ? 0 : num };
+    const newSettings = { ...settings, monthlyTargets: updated };
+    setSettings(newSettings);
+    _updateSettingsDoc(newSettings);
+  };
+
+  const removeMonthlyTarget = (yearMonth) => {
+    const currentTargets = { ...(settings?.monthlyTargets || {}) };
+    delete currentTargets[yearMonth];
+    const newSettings = { ...settings, monthlyTargets: currentTargets };
     setSettings(newSettings);
     _updateSettingsDoc(newSettings);
   };
@@ -128,11 +154,27 @@ export function StoreProvider({ children }) {
   // Ensure store always has valid objects
   const safeStore = {
     shifts: shifts || [],
-    settings: settings || INITIAL_SETTINGS
+    settings: {
+      ...INITIAL_SETTINGS,
+      ...(settings || {}),
+      defaultWeeklyHours: settings?.defaultWeeklyHours !== undefined ? settings.defaultWeeklyHours : INITIAL_SETTINGS.defaultWeeklyHours,
+      monthlyTargets: settings?.monthlyTargets || INITIAL_SETTINGS.monthlyTargets
+    }
   };
 
   return (
-    <StoreContext.Provider value={{ store: safeStore, addShift, deleteShift, updateSettings, addSettingItem, removeSettingItem, loading }}>
+    <StoreContext.Provider value={{
+      store: safeStore,
+      addShift,
+      deleteShift,
+      updateSettings,
+      addSettingItem,
+      removeSettingItem,
+      updateWeeklyHours,
+      setMonthlyTarget,
+      removeMonthlyTarget,
+      loading
+    }}>
       {children}
     </StoreContext.Provider>
   );

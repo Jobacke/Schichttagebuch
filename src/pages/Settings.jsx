@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import {
     Plus, Clock, Tag, Truck, Hash, MapPin,
-    Database, ChevronLeft, ChevronRight, Trash2
+    Database, ChevronLeft, ChevronRight, Trash2, RotateCcw, Check, CalendarDays
 } from 'lucide-react';
 import { APP_VERSION } from '../version';
 
 export default function Settings() {
-    const { store, addSettingItem, removeSettingItem } = useStore();
+    const {
+        store,
+        addSettingItem,
+        removeSettingItem,
+        updateWeeklyHours,
+        setMonthlyTarget,
+        removeMonthlyTarget
+    } = useStore();
     const [activeScreen, setActiveScreen] = useState(null);
 
     const goBack = () => setActiveScreen(null);
@@ -16,13 +23,23 @@ export default function Settings() {
         return (
             <DetailScreen
                 title={
-                    activeScreen === 'codes' ? 'Schichtkürzel' :
-                        activeScreen === 'types' ? 'Schichtarten' :
-                            activeScreen === 'stations' ? 'Wachen' :
-                                activeScreen === 'vehicles' ? 'Fahrzeuge' : 'Funkrufnamen'
+                    activeScreen === 'targetHours' ? 'Sollstunden & Arbeitszeit' :
+                        activeScreen === 'codes' ? 'Schichtkürzel' :
+                            activeScreen === 'types' ? 'Schichtarten' :
+                                activeScreen === 'stations' ? 'Wachen' :
+                                    activeScreen === 'vehicles' ? 'Fahrzeuge' : 'Funkrufnamen'
                 }
                 onBack={goBack}
             >
+                {activeScreen === 'targetHours' && (
+                    <TargetHoursManager
+                        defaultWeeklyHours={store.settings?.defaultWeeklyHours ?? 20}
+                        monthlyTargets={store.settings?.monthlyTargets || {}}
+                        onUpdateWeeklyHours={updateWeeklyHours}
+                        onSetMonthlyTarget={setMonthlyTarget}
+                        onRemoveMonthlyTarget={removeMonthlyTarget}
+                    />
+                )}
                 {activeScreen === 'codes' && (
                     <CodeManager
                         data={store.settings.shiftCodes}
@@ -56,6 +73,10 @@ export default function Settings() {
 
             <h2>Dienstplan</h2>
             <div className="settings-list">
+                <SettingsItem
+                    icon={CalendarDays} color="#eab308" label="Sollstunden & Arbeitszeit"
+                    value={`${store.settings?.defaultWeeklyHours ?? 20} h/Woche`} onClick={() => setActiveScreen('targetHours')}
+                />
                 <SettingsItem
                     icon={Clock} color="#f97316" label="Schichtkürzel & Zeiten"
                     value={store.settings.shiftCodes.length} onClick={() => setActiveScreen('codes')}
@@ -189,5 +210,227 @@ function SimpleManager({ data, type, onAdd, onRemove }) {
                 <button onClick={handleAdd} className="btn-primary" style={{ width: 'auto' }}><Plus /></button>
             </div>
         </>
+    );
+}
+
+function TargetHoursManager({ defaultWeeklyHours, monthlyTargets, onUpdateWeeklyHours, onSetMonthlyTarget, onRemoveMonthlyTarget }) {
+    const [weeklyHours, setWeeklyHours] = useState(defaultWeeklyHours.toString());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [savedNotice, setSavedNotice] = useState(false);
+
+    // Sync input if external defaultWeeklyHours changes
+    useEffect(() => {
+        setWeeklyHours(defaultWeeklyHours.toString());
+    }, [defaultWeeklyHours]);
+
+    const handleWeeklySave = (val) => {
+        const num = parseFloat(val);
+        if (!isNaN(num) && num >= 0) {
+            onUpdateWeeklyHours(num);
+            setSavedNotice(true);
+            setTimeout(() => setSavedNotice(false), 2000);
+        }
+    };
+
+    const currentWeekly = parseFloat(weeklyHours) || 0;
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* 1. Default Weekly Target Card */}
+            <div style={{ background: 'var(--color-surface)', padding: '16px', borderRadius: '16px', border: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <Clock size={18} color="var(--color-primary)" />
+                    <strong style={{ fontSize: '15px' }}>Standard-Wochenarbeitszeit</strong>
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 16px 0', lineHeight: 1.4 }}>
+                    Dient als Berechnungsgrundlage für alle Monate. Das Monatssoll wird automatisch anhand der tatsächlichen Kalendertage des jeweiligen Monats hochgerechnet.
+                </p>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                        <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            value={weeklyHours}
+                            onChange={(e) => setWeeklyHours(e.target.value)}
+                            onBlur={() => handleWeeklySave(weeklyHours)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleWeeklySave(weeklyHours); }}
+                            style={{
+                                width: '100%',
+                                padding: '12px 85px 12px 14px',
+                                borderRadius: '12px',
+                                border: '1px solid #334155',
+                                background: '#0f172a',
+                                color: 'white',
+                                fontSize: '16px',
+                                fontWeight: 600
+                            }}
+                            placeholder="z.B. 20"
+                        />
+                        <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', fontSize: '13px', pointerEvents: 'none' }}>
+                            Std./Woche
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => handleWeeklySave(weeklyHours)}
+                        className="btn-primary"
+                        style={{ width: 'auto', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        {savedNotice ? <Check size={18} /> : 'Speichern'}
+                    </button>
+                </div>
+            </div>
+
+            {/* 2. Monthly Override Section */}
+            <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Monatskontingente ({selectedYear})</h3>
+                        <small style={{ color: 'var(--color-text-muted)' }}>Automatisch berechnet oder manuell anpassbar</small>
+                    </div>
+                    {/* Year Selector */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#1e293b', padding: '4px 8px', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
+                        <button
+                            onClick={() => setSelectedYear(y => y - 1)}
+                            style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                            title="Vorheriges Jahr"
+                        >
+                            <ChevronLeft size={18} />
+                        </button>
+                        <span style={{ fontWeight: 700, fontSize: '14px', minWidth: '42px', textAlign: 'center' }}>
+                            {selectedYear}
+                        </span>
+                        <button
+                            onClick={() => setSelectedYear(y => y + 1)}
+                            style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                            title="Nächstes Jahr"
+                        >
+                            <ChevronRight size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="settings-list" style={{ gap: '8px' }}>
+                    {Array.from({ length: 12 }).map((_, monthIndex) => {
+                        const monthName = new Date(selectedYear, monthIndex, 1).toLocaleDateString('de-DE', { month: 'long' });
+                        const yearMonth = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}`;
+                        const daysInMonth = new Date(selectedYear, monthIndex + 1, 0).getDate();
+                        const autoHours = ((daysInMonth / 7) * currentWeekly).toFixed(1);
+
+                        const hasCustom = monthlyTargets[yearMonth] !== undefined && monthlyTargets[yearMonth] !== '' && !isNaN(Number(monthlyTargets[yearMonth]));
+
+                        return (
+                            <MonthTargetRow
+                                key={yearMonth}
+                                monthName={monthName}
+                                daysInMonth={daysInMonth}
+                                autoHours={autoHours}
+                                hasCustom={hasCustom}
+                                customValue={hasCustom ? monthlyTargets[yearMonth] : ''}
+                                onSave={(val) => onSetMonthlyTarget(yearMonth, val)}
+                                onReset={() => onRemoveMonthlyTarget(yearMonth)}
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function MonthTargetRow({ monthName, daysInMonth, autoHours, hasCustom, customValue, onSave, onReset }) {
+    const [val, setVal] = useState(hasCustom ? customValue.toString() : '');
+    const [isEditing, setIsEditing] = useState(false);
+
+    useEffect(() => {
+        setVal(hasCustom ? customValue.toString() : '');
+    }, [hasCustom, customValue]);
+
+    const handleBlurOrSave = () => {
+        setIsEditing(false);
+        if (val === '' || val === null) {
+            if (hasCustom) onReset();
+        } else {
+            const num = parseFloat(val);
+            if (!isNaN(num) && num >= 0) {
+                onSave(num);
+            } else if (hasCustom) {
+                onReset();
+            }
+        }
+    };
+
+    return (
+        <div className="settings-item" style={{ cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+            <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '15px' }}>{monthName}</span>
+                    {hasCustom ? (
+                        <span style={{ fontSize: '11px', background: 'rgba(249, 115, 22, 0.15)', color: 'var(--color-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                            Manuell
+                        </span>
+                    ) : (
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                            {daysInMonth} Tage
+                        </span>
+                    )}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                    {hasCustom ? `Auto-Berechnung wäre: ${autoHours} h` : `Auto: ${daysInMonth} Tage / 7 × Wochensoll`}
+                </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ position: 'relative', width: '100px' }}>
+                    <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={isEditing ? val : (hasCustom ? customValue : autoHours)}
+                        onFocus={() => {
+                            setIsEditing(true);
+                            if (!hasCustom) setVal(autoHours);
+                        }}
+                        onChange={(e) => setVal(e.target.value)}
+                        onBlur={handleBlurOrSave}
+                        onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                        style={{
+                            width: '100%',
+                            padding: '8px 24px 8px 10px',
+                            borderRadius: '8px',
+                            border: hasCustom ? '1px solid var(--color-primary)' : '1px solid #334155',
+                            background: '#0f172a',
+                            color: hasCustom ? 'var(--color-primary)' : 'white',
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            textAlign: 'right'
+                        }}
+                    />
+                    <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', fontSize: '12px', pointerEvents: 'none' }}>
+                        h
+                    </span>
+                </div>
+
+                {hasCustom && (
+                    <button
+                        onClick={onReset}
+                        title="Auf automatische Hochrechnung zurücksetzen"
+                        style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            color: 'var(--color-danger)',
+                            borderRadius: '8px',
+                            padding: '6px 8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center'
+                        }}
+                    >
+                        <RotateCcw size={16} />
+                    </button>
+                )}
+            </div>
+        </div>
     );
 }

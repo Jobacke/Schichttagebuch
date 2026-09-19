@@ -43,7 +43,7 @@ export default function Analysis() {
     // Use the decoupled logic hook
     const logic = useAnalysisLogic();
     const {
-        loading, label, target,
+        loading, label, target, weeklyRate,
         filterMode, setFilterMode, baseDate, setBaseDate,
         customStart, setCustomStart, customEnd, setCustomEnd,
         selectedTypes, setSelectedTypes,
@@ -104,7 +104,7 @@ export default function Analysis() {
                 <div className="stat-card full-width" style={{ borderLeft: `4px solid ${colorClass}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <div>
-                            <span className="text-label">Saldo (Soll: {target.toFixed(1)}h)</span>
+                            <span className="text-label">Saldo (Soll: {target.toFixed(1)}h{filterMode === 'month' ? ` • ${weeklyRate}h/Woche` : ''})</span>
                             <div className="text-value" style={{ color: colorClass }}>
                                 {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
                             </div>

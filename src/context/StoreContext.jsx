@@ -20,7 +20,7 @@ const INITIAL_SETTINGS = {
   callSigns: ['Florian 1/83/1', 'Florian 1/76/1', 'Florian 1/10/1'],
   stations: ['Hauptwache', 'Nordwache', 'Südwache'],
   defaultWeeklyHours: 20,
-  monthlyTargets: {}
+  monthlyWeeklyHours: {}
 };
 
 export function StoreProvider({ children }) {
@@ -134,19 +134,19 @@ export function StoreProvider({ children }) {
     _updateSettingsDoc(newSettings);
   };
 
-  const setMonthlyTarget = (yearMonth, hours) => {
+  const setMonthlyWeeklyHours = (yearMonth, hours) => {
     const num = parseFloat(hours);
-    const currentTargets = settings?.monthlyTargets || {};
-    const updated = { ...currentTargets, [yearMonth]: isNaN(num) ? 0 : num };
-    const newSettings = { ...settings, monthlyTargets: updated };
+    const currentMap = settings?.monthlyWeeklyHours || {};
+    const updated = { ...currentMap, [yearMonth]: isNaN(num) ? 0 : num };
+    const newSettings = { ...settings, monthlyWeeklyHours: updated };
     setSettings(newSettings);
     _updateSettingsDoc(newSettings);
   };
 
-  const removeMonthlyTarget = (yearMonth) => {
-    const currentTargets = { ...(settings?.monthlyTargets || {}) };
-    delete currentTargets[yearMonth];
-    const newSettings = { ...settings, monthlyTargets: currentTargets };
+  const removeMonthlyWeeklyHours = (yearMonth) => {
+    const currentMap = { ...(settings?.monthlyWeeklyHours || {}) };
+    delete currentMap[yearMonth];
+    const newSettings = { ...settings, monthlyWeeklyHours: currentMap };
     setSettings(newSettings);
     _updateSettingsDoc(newSettings);
   };
@@ -158,7 +158,7 @@ export function StoreProvider({ children }) {
       ...INITIAL_SETTINGS,
       ...(settings || {}),
       defaultWeeklyHours: settings?.defaultWeeklyHours !== undefined ? settings.defaultWeeklyHours : INITIAL_SETTINGS.defaultWeeklyHours,
-      monthlyTargets: settings?.monthlyTargets || INITIAL_SETTINGS.monthlyTargets
+      monthlyWeeklyHours: settings?.monthlyWeeklyHours || settings?.monthlyTargets || INITIAL_SETTINGS.monthlyWeeklyHours
     }
   };
 
@@ -171,8 +171,11 @@ export function StoreProvider({ children }) {
       addSettingItem,
       removeSettingItem,
       updateWeeklyHours,
-      setMonthlyTarget,
-      removeMonthlyTarget,
+      setMonthlyWeeklyHours,
+      removeMonthlyWeeklyHours,
+      // Backward compatibility aliases
+      setMonthlyTarget: setMonthlyWeeklyHours,
+      removeMonthlyTarget: removeMonthlyWeeklyHours,
       loading
     }}>
       {children}

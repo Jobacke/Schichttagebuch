@@ -36,13 +36,17 @@ function calculateDuration(start, end) {
     } catch { return 0; }
 }
 
-export const getMonthlyTarget = (year, monthIndex0, settings) => {
+export const getMonthlyWeeklyHours = (year, monthIndex0, settings) => {
     const yearMonth = `${year}-${String(monthIndex0 + 1).padStart(2, '0')}`;
-    const monthlyTargets = settings?.monthlyTargets || {};
-    if (monthlyTargets[yearMonth] !== undefined && monthlyTargets[yearMonth] !== '' && !isNaN(Number(monthlyTargets[yearMonth]))) {
-        return Number(monthlyTargets[yearMonth]);
+    const monthlyWeeklyHours = settings?.monthlyWeeklyHours || {};
+    if (monthlyWeeklyHours[yearMonth] !== undefined && monthlyWeeklyHours[yearMonth] !== '' && !isNaN(Number(monthlyWeeklyHours[yearMonth]))) {
+        return Number(monthlyWeeklyHours[yearMonth]);
     }
-    const weeklyHours = Number(settings?.defaultWeeklyHours ?? 20);
+    return Number(settings?.defaultWeeklyHours ?? 20);
+};
+
+export const getMonthlyTarget = (year, monthIndex0, settings) => {
+    const weeklyHours = getMonthlyWeeklyHours(year, monthIndex0, settings);
     const daysInMonth = new Date(year, monthIndex0 + 1, 0).getDate();
     return (daysInMonth / 7) * weeklyHours;
 };
@@ -175,6 +179,9 @@ export function useAnalysisLogic() {
         selectedVehicles, setSelectedVehicles,
         stats,
         delta: stats.actual - target,
+        weeklyRate: filterMode === 'month'
+            ? getMonthlyWeeklyHours(baseDate.getFullYear(), baseDate.getMonth(), store.settings)
+            : Number(store.settings?.defaultWeeklyHours ?? 20),
         filteredData
     };
 }

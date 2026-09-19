@@ -12,8 +12,8 @@ export default function Settings() {
         addSettingItem,
         removeSettingItem,
         updateWeeklyHours,
-        setMonthlyTarget,
-        removeMonthlyTarget
+        setMonthlyWeeklyHours,
+        removeMonthlyWeeklyHours
     } = useStore();
     const [activeScreen, setActiveScreen] = useState(null);
 
@@ -34,10 +34,10 @@ export default function Settings() {
                 {activeScreen === 'targetHours' && (
                     <TargetHoursManager
                         defaultWeeklyHours={store.settings?.defaultWeeklyHours ?? 20}
-                        monthlyTargets={store.settings?.monthlyTargets || {}}
+                        monthlyWeeklyHours={store.settings?.monthlyWeeklyHours || {}}
                         onUpdateWeeklyHours={updateWeeklyHours}
-                        onSetMonthlyTarget={setMonthlyTarget}
-                        onRemoveMonthlyTarget={removeMonthlyTarget}
+                        onSetMonthlyWeeklyHours={setMonthlyWeeklyHours}
+                        onRemoveMonthlyWeeklyHours={removeMonthlyWeeklyHours}
                     />
                 )}
                 {activeScreen === 'codes' && (
@@ -213,7 +213,7 @@ function SimpleManager({ data, type, onAdd, onRemove }) {
     );
 }
 
-function TargetHoursManager({ defaultWeeklyHours, monthlyTargets, onUpdateWeeklyHours, onSetMonthlyTarget, onRemoveMonthlyTarget }) {
+function TargetHoursManager({ defaultWeeklyHours, monthlyWeeklyHours, onUpdateWeeklyHours, onSetMonthlyWeeklyHours, onRemoveMonthlyWeeklyHours }) {
     const [weeklyHours, setWeeklyHours] = useState(defaultWeeklyHours.toString());
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [savedNotice, setSavedNotice] = useState(false);
@@ -232,7 +232,7 @@ function TargetHoursManager({ defaultWeeklyHours, monthlyTargets, onUpdateWeekly
         }
     };
 
-    const currentWeekly = parseFloat(weeklyHours) || 0;
+    const currentDefaultWeekly = parseFloat(weeklyHours) || 0;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -240,10 +240,10 @@ function TargetHoursManager({ defaultWeeklyHours, monthlyTargets, onUpdateWeekly
             <div style={{ background: 'var(--color-surface)', padding: '16px', borderRadius: '16px', border: '1px solid var(--color-border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <Clock size={18} color="var(--color-primary)" />
-                    <strong style={{ fontSize: '15px' }}>Standard-Wochenarbeitszeit</strong>
+                    <strong style={{ fontSize: '15px' }}>Standard-Wochenarbeitszeit (Default)</strong>
                 </div>
                 <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-                    Dient als Berechnungsgrundlage für alle Monate. Das Monatssoll wird automatisch anhand der tatsächlichen Kalendertage des jeweiligen Monats hochgerechnet.
+                    Gilt für alle Monate, für die keine abweichende Wochenarbeitszeit festgelegt wurde. Das Monatssoll wird für jeden Monat automatisch auf Basis der Kalendertage hochgerechnet.
                 </p>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -287,7 +287,7 @@ function TargetHoursManager({ defaultWeeklyHours, monthlyTargets, onUpdateWeekly
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <div>
                         <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Monatskontingente ({selectedYear})</h3>
-                        <small style={{ color: 'var(--color-text-muted)' }}>Automatisch berechnet oder manuell anpassbar</small>
+                        <small style={{ color: 'var(--color-text-muted)' }}>Wochenstunden pro Monat individuell einstellbar</small>
                     </div>
                     {/* Year Selector */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#1e293b', padding: '4px 8px', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
@@ -316,20 +316,20 @@ function TargetHoursManager({ defaultWeeklyHours, monthlyTargets, onUpdateWeekly
                         const monthName = new Date(selectedYear, monthIndex, 1).toLocaleDateString('de-DE', { month: 'long' });
                         const yearMonth = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}`;
                         const daysInMonth = new Date(selectedYear, monthIndex + 1, 0).getDate();
-                        const autoHours = ((daysInMonth / 7) * currentWeekly).toFixed(1);
 
-                        const hasCustom = monthlyTargets[yearMonth] !== undefined && monthlyTargets[yearMonth] !== '' && !isNaN(Number(monthlyTargets[yearMonth]));
+                        const customVal = monthlyWeeklyHours?.[yearMonth];
+                        const hasCustom = customVal !== undefined && customVal !== '' && !isNaN(Number(customVal));
 
                         return (
                             <MonthTargetRow
                                 key={yearMonth}
                                 monthName={monthName}
                                 daysInMonth={daysInMonth}
-                                autoHours={autoHours}
+                                defaultWeekly={currentDefaultWeekly}
                                 hasCustom={hasCustom}
-                                customValue={hasCustom ? monthlyTargets[yearMonth] : ''}
-                                onSave={(val) => onSetMonthlyTarget(yearMonth, val)}
-                                onReset={() => onRemoveMonthlyTarget(yearMonth)}
+                                customWeekly={hasCustom ? Number(customVal) : null}
+                                onSave={(val) => onSetMonthlyWeeklyHours(yearMonth, val)}
+                                onReset={() => onRemoveMonthlyWeeklyHours(yearMonth)}
                             />
                         );
                     })}
@@ -339,13 +339,16 @@ function TargetHoursManager({ defaultWeeklyHours, monthlyTargets, onUpdateWeekly
     );
 }
 
-function MonthTargetRow({ monthName, daysInMonth, autoHours, hasCustom, customValue, onSave, onReset }) {
-    const [val, setVal] = useState(hasCustom ? customValue.toString() : '');
+function MonthTargetRow({ monthName, daysInMonth, defaultWeekly, hasCustom, customWeekly, onSave, onReset }) {
+    const activeWeekly = hasCustom ? customWeekly : defaultWeekly;
+    const monthlyTotal = ((daysInMonth / 7) * activeWeekly).toFixed(1);
+
+    const [val, setVal] = useState(hasCustom ? customWeekly.toString() : '');
     const [isEditing, setIsEditing] = useState(false);
 
     useEffect(() => {
-        setVal(hasCustom ? customValue.toString() : '');
-    }, [hasCustom, customValue]);
+        setVal(hasCustom ? customWeekly.toString() : '');
+    }, [hasCustom, customWeekly]);
 
     const handleBlurOrSave = () => {
         setIsEditing(false);
@@ -362,42 +365,48 @@ function MonthTargetRow({ monthName, daysInMonth, autoHours, hasCustom, customVa
     };
 
     return (
-        <div className="settings-item" style={{ cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
-            <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="settings-item" style={{ cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', gap: '12px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 600, fontSize: '15px' }}>{monthName}</span>
                     {hasCustom ? (
                         <span style={{ fontSize: '11px', background: 'rgba(249, 115, 22, 0.15)', color: 'var(--color-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                            Manuell
+                            {activeWeekly} h/Woche
                         </span>
                     ) : (
                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                            {daysInMonth} Tage
+                            Standard ({defaultWeekly} h/W)
                         </span>
                     )}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                    {hasCustom ? `Auto-Berechnung wäre: ${autoHours} h` : `Auto: ${daysInMonth} Tage / 7 × Wochensoll`}
+                <div style={{ marginTop: '3px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 700, color: hasCustom ? 'var(--color-primary)' : 'var(--color-text-main)' }}>
+                        {monthlyTotal} h
+                    </span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        Soll ({daysInMonth} Tage / 7 × {activeWeekly}h)
+                    </span>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ position: 'relative', width: '100px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <div style={{ position: 'relative', width: '110px' }}>
                     <input
                         type="number"
                         step="0.5"
                         min="0"
-                        value={isEditing ? val : (hasCustom ? customValue : autoHours)}
+                        placeholder={`${defaultWeekly}`}
+                        value={isEditing ? val : (hasCustom ? customWeekly : '')}
                         onFocus={() => {
                             setIsEditing(true);
-                            if (!hasCustom) setVal(autoHours);
+                            if (!hasCustom) setVal(defaultWeekly.toString());
                         }}
                         onChange={(e) => setVal(e.target.value)}
                         onBlur={handleBlurOrSave}
                         onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
                         style={{
                             width: '100%',
-                            padding: '8px 24px 8px 10px',
+                            padding: '8px 46px 8px 10px',
                             borderRadius: '8px',
                             border: hasCustom ? '1px solid var(--color-primary)' : '1px solid #334155',
                             background: '#0f172a',
@@ -407,15 +416,15 @@ function MonthTargetRow({ monthName, daysInMonth, autoHours, hasCustom, customVa
                             textAlign: 'right'
                         }}
                     />
-                    <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', fontSize: '12px', pointerEvents: 'none' }}>
-                        h
+                    <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', fontSize: '11px', pointerEvents: 'none' }}>
+                        h/W
                     </span>
                 </div>
 
                 {hasCustom && (
                     <button
                         onClick={onReset}
-                        title="Auf automatische Hochrechnung zurücksetzen"
+                        title="Auf Standard-Wochenstunden zurücksetzen"
                         style={{
                             background: 'rgba(239, 68, 68, 0.1)',
                             border: '1px solid rgba(239, 68, 68, 0.2)',

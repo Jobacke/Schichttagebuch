@@ -500,18 +500,23 @@ export default function Journal() {
                                             {shift.startTime} - {shift.endTime}
                                         </span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#94a3b8', flexWrap: 'wrap' }}>
-                                        <MapPin size={12} />
-                                        <span>{shift.station}</span>
-                                        <span>•</span>
-                                        <span>{shift.vehicle}</span>
-                                        {shift.partner && (
-                                            <>
-                                                <span>•</span>
-                                                <span style={{ color: '#38bdf8', fontWeight: 500 }}>👤 {shift.partner}</span>
-                                            </>
-                                        )}
-                                    </div>
+                                    {(shift.station || shift.vehicle) && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                                            {shift.station && (
+                                                <>
+                                                    <MapPin size={12} />
+                                                    <span>{shift.station}</span>
+                                                </>
+                                            )}
+                                            {shift.station && shift.vehicle && <span>•</span>}
+                                            {shift.vehicle && <span>{shift.vehicle}</span>}
+                                        </div>
+                                    )}
+                                    {shift.partner && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#38bdf8', fontWeight: 500, marginTop: '3px' }}>
+                                            <span>👤 {shift.partner}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Single Delete or Edit Icon */}

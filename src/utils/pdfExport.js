@@ -312,22 +312,24 @@ export function exportToPDF(data) {
                 // Station / Vehicle
                 const stText = s.station || s.vehicle || '';
                 if (stText) {
-                    doc.setFontSize(6.5);
+                    doc.setFontSize(6.2);
                     doc.setFont(undefined, 'normal');
                     doc.setTextColor(100, 116, 139);
-                    const truncSt = doc.splitTextToSize(stText, dayColW - 5)[0] || '';
-                    doc.text(truncSt, cellX + 2.5, cellY + 19.3);
+                    const truncSt = doc.splitTextToSize(stText, dayColW - 4.5)[0] || '';
+                    doc.text(truncSt, cellX + 2.2, cellY + 18.5);
                 }
 
-                // Partner (Dedicated Line)
+                // Partner (Complete display, multi-line support)
                 if (s.partner) {
                     const partnerClean = s.partner.trim().startsWith('mit ') ? s.partner.trim() : `mit ${s.partner.trim()}`;
-                    doc.setFontSize(6.8);
+                    doc.setFontSize(6.2);
                     doc.setFont(undefined, 'bold');
                     doc.setTextColor(2, 132, 199); // cyan-600
-                    const pY = dayRowH > 28 ? cellY + 23.5 : cellY + 22.5;
-                    const truncP = doc.splitTextToSize(partnerClean, dayColW - 5)[0] || '';
-                    doc.text(truncP, cellX + 2.5, pY);
+                    const partnerLines = doc.splitTextToSize(partnerClean, dayColW - 4.5);
+                    const pY = stText ? cellY + 21.8 : cellY + 19.2;
+                    partnerLines.slice(0, 2).forEach((line, pIdx) => {
+                        doc.text(line, cellX + 2.2, pY + pIdx * 2.8);
+                    });
                 }
             }
         }

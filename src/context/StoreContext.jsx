@@ -230,6 +230,19 @@ export function StoreProvider({ children }) {
     _updateSettingsDoc(newSettings);
   };
 
+  const updateSettingItem = (category, updatedItem) => {
+    const list = settings[category] || [];
+    const newCategory = list.map(item => {
+      if (item && item.id && updatedItem && updatedItem.id && item.id === updatedItem.id) {
+        return { ...item, ...updatedItem };
+      }
+      return item;
+    });
+    const newSettings = { ...settings, [category]: newCategory };
+    setSettings(newSettings);
+    _updateSettingsDoc(newSettings);
+  };
+
   const removeSettingItem = (category, id) => {
     const newCategory = (settings[category] || []).filter(i => (i.id ? i.id !== id : i !== id));
     const newSettings = { ...settings, [category]: newCategory };
@@ -281,6 +294,7 @@ export function StoreProvider({ children }) {
       deleteShift,
       deleteShifts,
       updateSettings,
+      updateSettingItem,
       addSettingItem,
       removeSettingItem,
       updateWeeklyHours,

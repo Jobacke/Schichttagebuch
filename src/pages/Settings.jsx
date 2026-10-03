@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import {
     Plus, Clock, Tag, Truck, Hash, MapPin,
-    Database, ChevronLeft, ChevronRight, Trash2, RotateCcw, Check, CalendarDays
+    Database, ChevronLeft, ChevronRight, Trash2, RotateCcw, Check, CalendarDays,
+    PenSquare, X
 } from 'lucide-react';
+import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { APP_VERSION } from '../version';
 
 export default function Settings() {
     const {
         store,
         addSettingItem,
+        updateSettingItem,
         removeSettingItem,
         updateWeeklyHours,
         setMonthlyWeeklyHours,
@@ -43,7 +46,9 @@ export default function Settings() {
                 {activeScreen === 'codes' && (
                     <CodeManager
                         data={store.settings.shiftCodes}
+                        storeSettings={store.settings}
                         onAdd={(i) => addSettingItem('shiftCodes', i)}
+                        onUpdate={(i) => updateSettingItem('shiftCodes', i)}
                         onRemove={(id) => removeSettingItem('shiftCodes', id)}
                     />
                 )}
@@ -151,35 +156,485 @@ function DetailScreen({ title, onBack, children }) {
     );
 }
 
-function CodeManager({ data, onAdd, onRemove }) {
-    const [code, setCode] = useState('');
-    const [hours, setHours] = useState('');
+function CodeEditModal({ isOpen, initialData, onClose, onSave, storeSettings }) {
+    if (!isOpen) return null;
 
-    const handleAdd = () => {
-        if (!code || !hours) return;
-        onAdd({ id: crypto.randomUUID(), code, hours: parseFloat(hours) });
-        setCode(''); setHours('');
+    const isNew = !initialData?.code;
+
+    const [formData, setFormData] = useState(() => {
+        const preset = initialData?.code ? (SHIFT_PRESETS[initialData.code] || {}) : {};
+        return {
+            id: initialData?.id || crypto.randomUUID(),
+            code: initialData?.code || '',
+            hours: initialData?.hours !== undefined && initialData?.hours !== null ? initialData.hours : (preset.hours ?? 8.2),
+            startTime: initialData?.startTime || preset.startTime || '07:00',
+            endTime: initialData?.endTime || preset.endTime || '19:00',
+            typeId: initialData?.typeId || '',
+            shiftTypeName: initialData?.shiftTypeName || preset.shiftTypeName || '',
+            station: initialData?.station || preset.station || '',
+            vehicle: initialData?.vehicle || preset.vehicle || '',
+            callSign: initialData?.callSign || preset.callSign || ''
+        };
+    });
+
+    // Helper to calculate hours between startTime and endTime
+    const calculateHours = (start, end) => {
+        if (!start || !end) return 0;
+        try {
+            const [sH, sM] = start.split(':').map(Number);
+            const [eH, eM] = end.split(':').map(Number);
+            let startMin = sH * 60 + sM;
+            let endMin = eH * 60 + eM;
+            if (endMin < startMin) endMin += 24 * 60;
+            return Math.round(((endMin - startMin) / 60) * 10) / 10;
+        } catch {
+            return 0;
+        }
+    };
+
+    const handleApplyCalculatedHours = () => {
+        const calc = calculateHours(formData.startTime, formData.endTime);
+        if (calc > 0) {
+            setFormData(prev => ({ ...prev, hours: calc }));
+        }
+    };
+
+    const handleSave = (e) => {
+        e.preventDefault();
+        if (!formData.code.trim()) return;
+
+        // Find shiftTypeName if typeId chosen
+        let typeName = formData.shiftTypeName;
+        if (formData.typeId) {
+            const matched = (storeSettings.shiftTypes || []).find(t => t.id === formData.typeId);
+            if (matched) typeName = matched.name;
+        }
+
+        onSave({
+            ...formData,
+            code: formData.code.trim().toUpperCase(),
+            hours: parseFloat(formData.hours) || 0,
+            shiftTypeName: typeName
+        });
+        onClose();
     };
 
     return (
-        <>
-            <div className="settings-list" style={{ marginBottom: '24px' }}>
-                {data.map(item => (
-                    <div key={item.id} className="settings-item" style={{ cursor: 'default' }}>
-                        <span style={{ background: 'var(--color-surface-hover)', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', minWidth: '40px', textAlign: 'center', color: 'var(--color-primary)' }}>{item.code}</span>
-                        <span style={{ flex: 1, marginLeft: '12px' }}>{item.hours} Std</span>
-                        <button onClick={() => onRemove(item.id)} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
+        <div className="modal-overlay" style={{ alignItems: 'center', zIndex: 3000 }}>
+            <div className="modal-content" style={{ maxWidth: '520px', borderRadius: '20px', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+                <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                            background: 'rgba(249, 115, 22, 0.15)',
+                            color: 'var(--color-primary)',
+                            padding: '8px',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <Clock size={20} />
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--color-text-main)' }}>
+                            {isNew ? 'Neues Schichtkürzel anlegen' : `Kürzel bearbeiten: ${formData.code}`}
+                        </h3>
                     </div>
-                ))}
-                {data.length === 0 && <div style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>Keine Kürzel</div>}
+                    <button className="close-btn" onClick={onClose} type="button">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSave} style={{ overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Kürzel & Schichtart */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                            <label className="text-label" style={{ display: 'block', marginBottom: '6px' }}>
+                                Schichtkürzel *
+                            </label>
+                            <input
+                                className="input-premium"
+                                style={{ marginBottom: 0, textTransform: 'uppercase', fontWeight: 'bold' }}
+                                value={formData.code}
+                                onChange={e => setFormData({ ...formData, code: e.target.value })}
+                                placeholder="z.B. RFO, T1, N"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="text-label" style={{ display: 'block', marginBottom: '6px' }}>
+                                Schichtart
+                            </label>
+                            <select
+                                className="input-premium"
+                                style={{ marginBottom: 0 }}
+                                value={formData.typeId || (storeSettings.shiftTypes || []).find(t => t.name === formData.shiftTypeName)?.id || ''}
+                                onChange={e => {
+                                    const tId = e.target.value;
+                                    const tObj = (storeSettings.shiftTypes || []).find(t => t.id === tId);
+                                    setFormData({
+                                        ...formData,
+                                        typeId: tId,
+                                        shiftTypeName: tObj ? tObj.name : formData.shiftTypeName
+                                    });
+                                }}
+                            >
+                                <option value="">-- Schichtart wählen --</option>
+                                {(storeSettings.shiftTypes || []).map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Dienstzeiten: Start & Ende */}
+                    <div>
+                        <label className="text-label" style={{ display: 'block', marginBottom: '6px' }}>
+                            Dienstzeiten (Beginn & Ende)
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div>
+                                <input
+                                    type="time"
+                                    className="input-premium"
+                                    style={{ marginBottom: 0 }}
+                                    value={formData.startTime}
+                                    onChange={e => setFormData({ ...formData, startTime: e.target.value })}
+                                    required
+                                />
+                                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px', display: 'block' }}>Beginn</span>
+                            </div>
+                            <div>
+                                <input
+                                    type="time"
+                                    className="input-premium"
+                                    style={{ marginBottom: 0 }}
+                                    value={formData.endTime}
+                                    onChange={e => setFormData({ ...formData, endTime: e.target.value })}
+                                    required
+                                />
+                                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px', display: 'block' }}>Ende</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Arbeitszeit (Stunden) */}
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <label className="text-label" style={{ margin: 0 }}>
+                                Arbeitszeit (Stunden) *
+                            </label>
+                            <button
+                                type="button"
+                                onClick={handleApplyCalculatedHours}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--color-primary)',
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    fontWeight: 500,
+                                    padding: 0
+                                }}
+                            >
+                                Aus Zeiten berechnen ({calculateHours(formData.startTime, formData.endTime)} h)
+                            </button>
+                        </div>
+                        <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="48"
+                            className="input-premium"
+                            style={{ marginBottom: 0 }}
+                            value={formData.hours}
+                            onChange={e => setFormData({ ...formData, hours: e.target.value })}
+                            placeholder="z.B. 8.2 oder 12.0"
+                            required
+                        />
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
+                            Wird für die Soll/Ist-Arbeitszeitberechnung im Monat herangezogen.
+                        </span>
+                    </div>
+
+                    {/* Standard-Wache & Fahrzeug (optional) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                            <label className="text-label" style={{ display: 'block', marginBottom: '6px' }}>
+                                Standard-Wache (opt.)
+                            </label>
+                            <select
+                                className="input-premium"
+                                style={{ marginBottom: 0 }}
+                                value={formData.station}
+                                onChange={e => setFormData({ ...formData, station: e.target.value })}
+                            >
+                                <option value="">-- Keine Wache --</option>
+                                {(storeSettings.stations || []).map((st, i) => (
+                                    <option key={i} value={st}>{st}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-label" style={{ display: 'block', marginBottom: '6px' }}>
+                                Standard-Fahrzeug (opt.)
+                            </label>
+                            <select
+                                className="input-premium"
+                                style={{ marginBottom: 0 }}
+                                value={formData.vehicle}
+                                onChange={e => setFormData({ ...formData, vehicle: e.target.value })}
+                            >
+                                <option value="">-- Kein Fahrzeug --</option>
+                                {(storeSettings.vehicles || []).map((v, i) => (
+                                    <option key={i} value={v}>{v}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={onClose}
+                            style={{ flex: 1 }}
+                        >
+                            Abbrechen
+                        </button>
+                        <button
+                            type="submit"
+                            className="btn-primary"
+                            style={{ flex: 1, gap: '6px' }}
+                        >
+                            <Check size={18} />
+                            Speichern
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function CodeManager({ data = [], storeSettings = {}, onAdd, onUpdate, onRemove }) {
+    const [editingItem, setEditingItem] = useState(null);
+    const [isCreatingNew, setIsCreatingNew] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredList = data.filter(item => {
+        if (!searchTerm.trim()) return true;
+        const q = searchTerm.toLowerCase();
+        const preset = SHIFT_PRESETS[item.code] || {};
+        const code = (item.code || '').toLowerCase();
+        const type = (item.shiftTypeName || preset.shiftTypeName || '').toLowerCase();
+        const station = (item.station || preset.station || '').toLowerCase();
+        return code.includes(q) || type.includes(q) || station.includes(q);
+    });
+
+    const handleSaveItem = (itemData) => {
+        if (isCreatingNew) {
+            onAdd(itemData);
+            setIsCreatingNew(false);
+        } else {
+            onUpdate(itemData);
+            setEditingItem(null);
+        }
+    };
+
+    return (
+        <div>
+            {/* Top Toolbar: Search & Add Button */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <input
+                    type="text"
+                    placeholder="Kürzel oder Schichtart suchen..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="input-premium"
+                    style={{ flex: 1, minWidth: '180px', marginBottom: 0 }}
+                />
+                <button
+                    type="button"
+                    onClick={() => setIsCreatingNew(true)}
+                    className="btn-primary"
+                    style={{
+                        padding: '10px 16px',
+                        fontSize: '13px',
+                        borderRadius: '12px',
+                        gap: '6px',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    <Plus size={16} />
+                    Neues Kürzel
+                </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-                <input placeholder="Kürzel" value={code} onChange={e => setCode(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #334155', background: '#0f172a', color: 'white' }} />
-                <input placeholder="Std" type="number" value={hours} onChange={e => setHours(e.target.value)} style={{ width: '80px', padding: '12px', borderRadius: '12px', border: '1px solid #334155', background: '#0f172a', color: 'white' }} />
-                <button onClick={handleAdd} className="btn-primary" style={{ width: 'auto' }}><Plus /></button>
+            {/* Shift Codes List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+                {filteredList.map(item => {
+                    const preset = SHIFT_PRESETS[item.code] || {};
+                    const effectiveCode = item.code || '';
+                    const effectiveHours = item.hours !== undefined && item.hours !== null ? item.hours : (preset.hours ?? 8.2);
+                    const effectiveStart = item.startTime || preset.startTime || '';
+                    const effectiveEnd = item.endTime || preset.endTime || '';
+                    const effectiveType = item.shiftTypeName || preset.shiftTypeName || '';
+                    const effectiveStation = item.station || preset.station || '';
+                    const effectiveVehicle = item.vehicle || preset.vehicle || '';
+
+                    return (
+                        <div
+                            key={item.id}
+                            className="card-premium"
+                            onClick={() => setEditingItem(item)}
+                            style={{
+                                padding: '12px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '12px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                border: '1px solid #334155',
+                                background: '#1e293b'
+                            }}
+                        >
+                            {/* Code Badge */}
+                            <div style={{
+                                background: 'rgba(249, 115, 22, 0.15)',
+                                color: '#f97316',
+                                border: '1px solid rgba(249, 115, 22, 0.35)',
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                fontWeight: 'bold',
+                                fontSize: '15px',
+                                minWidth: '55px',
+                                textAlign: 'center',
+                                flexShrink: 0
+                            }}>
+                                {effectiveCode}
+                            </div>
+
+                            {/* Details */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>
+                                        {effectiveType || 'Schicht'}
+                                    </span>
+                                    <span style={{
+                                        background: '#334155',
+                                        color: '#facc15',
+                                        padding: '1px 6px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        fontWeight: 600
+                                    }}>
+                                        {effectiveHours} Std
+                                    </span>
+                                </div>
+
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    color: '#94a3b8',
+                                    fontSize: '12px',
+                                    marginTop: '3px',
+                                    flexWrap: 'wrap'
+                                }}>
+                                    {effectiveStart && effectiveEnd ? (
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#cbd5e1' }}>
+                                            <Clock size={12} style={{ color: '#f97316' }} />
+                                            {effectiveStart} - {effectiveEnd} Uhr
+                                        </span>
+                                    ) : (
+                                        <span style={{ color: '#64748b', fontStyle: 'italic' }}>Keine festen Zeiten</span>
+                                    )}
+
+                                    {effectiveStation && (
+                                        <span>• {effectiveStation}</span>
+                                    )}
+
+                                    {effectiveVehicle && (
+                                        <span>• {effectiveVehicle}</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingItem(item)}
+                                    style={{
+                                        background: 'rgba(56, 189, 248, 0.12)',
+                                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                                        color: '#38bdf8',
+                                        padding: '7px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    title="Schichtkürzel bearbeiten"
+                                >
+                                    <PenSquare size={16} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onRemove(item.id)}
+                                    style={{
+                                        background: 'rgba(239, 68, 68, 0.12)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        color: '#ef4444',
+                                        padding: '7px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    title="Schichtkürzel löschen"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {filteredList.length === 0 && (
+                    <div style={{
+                        padding: '32px 16px',
+                        textAlign: 'center',
+                        color: '#64748b',
+                        background: '#1e293b',
+                        borderRadius: '12px'
+                    }}>
+                        Keine Schichtkürzel gefunden.
+                    </div>
+                )}
             </div>
-        </>
+
+            {/* Edit / Create Modal */}
+            {(editingItem || isCreatingNew) && (
+                <CodeEditModal
+                    isOpen={true}
+                    initialData={editingItem}
+                    onClose={() => {
+                        setEditingItem(null);
+                        setIsCreatingNew(false);
+                    }}
+                    onSave={handleSaveItem}
+                    storeSettings={storeSettings}
+                />
+            )}
+        </div>
     );
 }
 

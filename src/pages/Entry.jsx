@@ -64,38 +64,43 @@ export default function Entry() {
         // Wenn ein Schicht-Kürzel ausgewählt wird, prüfe ob es ein Preset gibt
         if (name === 'codeId') {
             const selectedCode = store.settings.shiftCodes.find(c => c.id === value);
-            if (selectedCode && shiftPresets[selectedCode.code]) {
-                const preset = shiftPresets[selectedCode.code];
+            if (selectedCode) {
+                const preset = shiftPresets[selectedCode.code] || {};
+                const startTime = selectedCode.startTime || preset.startTime;
+                const endTime = selectedCode.endTime || preset.endTime;
+                const station = selectedCode.station || preset.station;
+                const vehicle = selectedCode.vehicle || preset.vehicle;
+                const callSign = selectedCode.callSign || preset.callSign;
+                const typeName = selectedCode.shiftTypeName || preset.shiftTypeName;
 
-                // Finde die passende Schichtart-ID anhand des Namens
-                let typeId = formData.typeId; // Fallback: behalte aktuelle typeId
-                if (preset.shiftTypeName) {
+                let typeId = formData.typeId;
+                if (selectedCode.typeId) {
+                    typeId = selectedCode.typeId;
+                } else if (typeName) {
                     const matchingType = store.settings.shiftTypes.find(
-                        t => t.name === preset.shiftTypeName
+                        t => t.name.toLowerCase() === typeName.toLowerCase()
                     );
                     if (matchingType) {
                         typeId = matchingType.id;
                     }
                 }
 
-                // Setze alle Preset-Werte zusammen mit dem ausgewählten Kürzel
-                setFormData(prev => ({
-                    ...prev,
-                    codeId: value,
-                    typeId: typeId,
-                    startTime: preset.startTime,
-                    endTime: preset.endTime,
-                    station: preset.station,
-                    vehicle: preset.vehicle,
-                    callSign: preset.callSign
-                }));
-
-                // Aktiviere Preset-Modus (sperrt bestimmte Felder)
-                setIsPresetActive(true);
-                return; // Beende die Funktion hier, da wir bereits alles gesetzt haben
-            } else {
-                // Kein Preset gefunden - deaktiviere Preset-Modus
-                setIsPresetActive(false);
+                if (startTime || endTime || station || vehicle) {
+                    setFormData(prev => ({
+                        ...prev,
+                        codeId: value,
+                        typeId: typeId || prev.typeId,
+                        startTime: startTime || prev.startTime,
+                        endTime: endTime || prev.endTime,
+                        station: station || prev.station,
+                        vehicle: vehicle || prev.vehicle,
+                        callSign: callSign || prev.callSign
+                    }));
+                    setIsPresetActive(true);
+                    return;
+                } else {
+                    setIsPresetActive(false);
+                }
             }
         }
         // Standard-Verhalten für andere Chips oder wenn kein Preset existiert

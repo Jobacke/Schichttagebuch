@@ -145,12 +145,25 @@ export default function Journal() {
             )}
 
             {/* Header */}
-            <div className="calendar-header" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                <div>
-                    <h1 style={{ margin: 0 }}>Übersicht</h1>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'} im Monat
-                    </span>
+            <div className="calendar-header" style={{ alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <img
+                        src="/icon.png"
+                        alt="Schichttagebuch Logo"
+                        style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '11px',
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+                            flexShrink: 0
+                        }}
+                    />
+                    <div>
+                        <h1 style={{ margin: 0, fontSize: '24px', lineHeight: 1.15 }}>Übersicht</h1>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                            {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'} im Monat
+                        </span>
+                    </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     {monthShifts.length > 0 && (

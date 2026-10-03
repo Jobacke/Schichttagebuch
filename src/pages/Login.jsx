@@ -48,19 +48,18 @@ export default function Login() {
         }}>
             {/* Hero Section */}
             <div style={{ textAlign: 'center', marginBottom: '40px' }} className="animate-in">
-                <div style={{
-                    width: '80px',
-                    height: '80px',
-                    background: 'rgba(249, 115, 22, 0.1)',
-                    borderRadius: '24px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 24px',
-                    boxShadow: '0 0 40px rgba(249, 115, 22, 0.1)'
-                }}>
-                    <Flame size={40} color="#f97316" strokeWidth={2.5} />
-                </div>
+                <img
+                    src="/icon.png"
+                    alt="Schichttagebuch Logo"
+                    style={{
+                        width: '84px',
+                        height: '84px',
+                        borderRadius: '24px',
+                        margin: '0 auto 24px',
+                        display: 'block',
+                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)'
+                    }}
+                />
                 <h1 style={{ fontSize: '32px', marginBottom: '8px', letterSpacing: '-0.5px' }}>Schichttagebuch</h1>
                 <p style={{ color: '#94a3b8', fontSize: '16px' }}>Deine Schichten. Einfach. Überall.</p>
             </div>

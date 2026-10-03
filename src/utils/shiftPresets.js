@@ -155,19 +155,26 @@ export const SHIFT_PRESETS = {
   }
 };
 
-// CareMan Monatsdienstplan aus Screenshot: November 2026 für "Backhaus, Johannes"
+// CareMan Monatsdienstplan aus Screenshot (Istplan): November 2026 für "Backhaus, Johannes"
 export const CAREMAN_NOVEMBER_2026_BACKHAUS = [
-  { day: 4, code: 'RFM', weekday: 'Mi' },
-  { day: 5, code: 'RT2M', weekday: 'Do' },
-  { day: 6, code: 'RT4M', weekday: 'Fr' },
-  { day: 9, code: 'RT2M', weekday: 'Mo' },
-  { day: 10, code: 'RT2M', weekday: 'Di' },
-  { day: 11, code: 'RT2M', weekday: 'Mi' },
-  { day: 19, code: 'RT3M', weekday: 'Do' },
-  { day: 23, code: 'RSM', weekday: 'Mo' },
-  { day: 24, code: 'RNM', weekday: 'Di' },
-  { day: 25, code: 'RNM', weekday: 'Mi' },
-  { day: 30, code: 'RT1M', weekday: 'Mo' }
+  { day: 4, code: 'RFM', weekday: 'Mi', startTime: '06:54', endTime: '15:06' },
+  { day: 5, code: 'RT2M', weekday: 'Do', startTime: '14:54', endTime: '23:06' },
+  { day: 6, code: 'RT4M', weekday: 'Fr', startTime: '15:24', endTime: '00:06' },
+  { day: 9, code: 'RT2M', weekday: 'Mo', startTime: '14:54', endTime: '23:06' },
+  { day: 10, code: 'RT2M', weekday: 'Di', startTime: '14:54', endTime: '23:06' },
+  { day: 11, code: 'RT2M', weekday: 'Mi', startTime: '14:54', endTime: '23:06' },
+  { day: 20, code: 'RT3M', weekday: 'Fr', startTime: '06:54', endTime: '15:36' },
+  { day: 24, code: 'RSM', weekday: 'Di', startTime: '14:54', endTime: '23:06' },
+  { day: 25, code: 'RNM', weekday: 'Mi', startTime: '22:54', endTime: '07:06' },
+  { day: 26, code: 'RNM', weekday: 'Do', startTime: '22:54', endTime: '07:06' },
+  { day: 30, code: 'RT1M', weekday: 'Mo', startTime: '06:54', endTime: '15:06' }
+];
+
+// Dienste am Monatsanfang / Ende Vormonat (Oktober 2026) aus Istplan
+export const CAREMAN_OCTOBER_2026_EXTRA = [
+  { date: '2026-10-29', day: 29, code: 'RFM', weekday: 'Do', startTime: '06:54', endTime: '15:06' },
+  { date: '2026-10-30', day: 30, code: 'RFM', weekday: 'Fr', startTime: '06:54', endTime: '15:06' },
+  { date: '2026-10-31', day: 31, code: 'RNM', weekday: 'Sa', startTime: '22:54', endTime: '07:06' }
 ];
 
 export function getPresetForCode(rawCode) {

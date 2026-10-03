@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { SHIFT_PRESETS } from './shiftPresets';
+import { getShiftColorRGB, STATION_THEMES } from './shiftColors';
 
 // Helper to calculate duration (in hours)
 function calculateDuration(start, end) {
@@ -13,49 +14,6 @@ function calculateDuration(start, end) {
         return (endMinutes - startMinutes) / 60;
     } catch { return 0; }
 }
-
-// Unified Shift Color Palette for High-Quality Print
-const getShiftColorRGB = (typeName = '', code = '') => {
-    const text = `${typeName} ${code}`.toLowerCase();
-    if (text.includes('früh') || text.includes('rf') || text.includes('fm') || text.includes('fh') || text.includes('fo')) {
-        return {
-            r: 2, g: 132, b: 199,         // #0284c7 (darker sky for crisp print)
-            bgR: 240, bgG: 249, bgB: 255, // sky-50
-            borderR: 125, borderG: 211, borderB: 252, // sky-300
-            label: 'Frühschicht'
-        };
-    }
-    if (text.includes('spät') || text.includes('rs') || text.includes('sm') || text.includes('sh') || text.includes('so')) {
-        return {
-            r: 234, g: 88, b: 12,          // #ea580c (deep orange for print)
-            bgR: 255, bgG: 247, bgB: 237,  // orange-50
-            borderR: 253, borderG: 186, borderB: 116, // orange-300
-            label: 'Spätschicht'
-        };
-    }
-    if (text.includes('nacht') || text.includes('rn') || text.includes('nm') || text.includes('nh')) {
-        return {
-            r: 147, g: 51, b: 234,         // #9333ea (deep purple for print)
-            bgR: 250, bgG: 245, bgB: 255,  // purple-50
-            borderR: 216, borderG: 180, borderB: 254, // purple-300
-            label: 'Nachtschicht'
-        };
-    }
-    if (text.includes('tag') || text.includes('rt') || text.includes('t1') || text.includes('t2') || text.includes('t3') || text.includes('t4')) {
-        return {
-            r: 202, g: 138, b: 4,          // #ca8a04 (deep yellow/amber for print)
-            bgR: 254, bgG: 252, bgB: 232,  // yellow-50
-            borderR: 253, borderG: 224, borderB: 71,  // yellow-300
-            label: 'Tagschicht'
-        };
-    }
-    return {
-        r: 22, g: 163, b: 74,          // #16a34a (green for print)
-        bgR: 240, bgG: 253, bgB: 244,  // green-50
-        borderR: 134, borderG: 239, borderB: 172, // green-300
-        label: typeName || 'Sonstige'
-    };
-};
 
 const resolveShiftDetails = (s, storeSettings, shiftCodes = [], shiftTypes = []) => {
     if (!s) return { code: '', rawCode: '', typeName: 'Dienst' };
@@ -73,6 +31,8 @@ const resolveShiftDetails = (s, storeSettings, shiftCodes = [], shiftTypes = [])
 
     const preset = rawCode ? (SHIFT_PRESETS[rawCode] || {}) : {};
     const rawType = s.shiftTypeName || typeObj?.name || codeObj?.shiftTypeName || preset.shiftTypeName || '';
+    const station = s.station || preset.station || '';
+    const vehicle = s.vehicle || preset.vehicle || '';
 
     let displayCode = rawCode;
     if (!displayCode) {
@@ -83,10 +43,15 @@ const resolveShiftDetails = (s, storeSettings, shiftCodes = [], shiftTypes = [])
         else displayCode = rawType ? rawType.slice(0, 4) : 'Schicht';
     }
 
+    const colRGB = getShiftColorRGB(rawType, rawCode, station, vehicle);
+
     return {
         code: displayCode,
         rawCode,
-        typeName: rawType || 'Dienst'
+        typeName: rawType || 'Dienst',
+        station: station || colRGB.stationName,
+        stationShort: colRGB.stationShort,
+        colRGB
     };
 };
 
@@ -270,7 +235,7 @@ export function exportToPDF(data) {
                 // Shift Day
                 const s = dayShifts[0];
                 const resolved = resolveShiftDetails(s, storeSettings, shiftCodes, shiftTypes);
-                const colRGB = getShiftColorRGB(resolved.typeName, resolved.code);
+                const colRGB = resolved.colRGB;
 
                 // Background tint & border
                 doc.setFillColor(colRGB.bgR, colRGB.bgG, colRGB.bgB);
@@ -309,12 +274,12 @@ export function exportToPDF(data) {
                 doc.setTextColor(51, 65, 85);
                 doc.text(`${s.startTime || '07:00'} - ${s.endTime || '19:00'} (${dur.toFixed(1)}h)`, cellX + 2.5, cellY + 15.5);
 
-                // Station / Vehicle
+                // Station / Vehicle in station color
                 const stText = s.station || s.vehicle || '';
                 if (stText) {
                     doc.setFontSize(6.2);
-                    doc.setFont(undefined, 'normal');
-                    doc.setTextColor(100, 116, 139);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(colRGB.r, colRGB.g, colRGB.b);
                     const truncSt = doc.splitTextToSize(stText, dayColW - 4.5)[0] || '';
                     doc.text(truncSt, cellX + 2.2, cellY + 18.5);
                 }
@@ -324,7 +289,7 @@ export function exportToPDF(data) {
                     const partnerClean = s.partner.trim().startsWith('mit ') ? s.partner.trim() : `mit ${s.partner.trim()}`;
                     doc.setFontSize(6.2);
                     doc.setFont(undefined, 'bold');
-                    doc.setTextColor(2, 132, 199); // cyan-600
+                    doc.setTextColor(51, 65, 85); // slate-700
                     const partnerLines = doc.splitTextToSize(partnerClean, dayColW - 4.5);
                     const pY = stText ? cellY + 21.8 : cellY + 19.2;
                     partnerLines.slice(0, 2).forEach((line, pIdx) => {
@@ -341,12 +306,11 @@ export function exportToPDF(data) {
     doc.setLineWidth(0.2);
     doc.line(margin, footerY - 4.5, pageWidth - margin, footerY - 4.5);
 
-    // Legend items
+    // Legend items representing the independent station color structures
     const legendItems = [
-        { label: 'Frühschicht', rgb: [2, 132, 199] },
-        { label: 'Spätschicht', rgb: [234, 88, 12] },
-        { label: 'Nachtschicht', rgb: [147, 51, 234] },
-        { label: 'Tagschicht', rgb: [202, 138, 4] },
+        { label: 'Wache Sendling (Blau)', rgb: STATION_THEMES.Sendling.primaryRGB },
+        { label: 'Wache Hohenbrunn (Grün)', rgb: STATION_THEMES.Hohenbrunn.primaryRGB },
+        { label: 'Wache Obersendling (Orange)', rgb: STATION_THEMES.Obersendling.primaryRGB },
         { label: 'Dienstfrei', rgb: [148, 163, 184] }
     ];
 

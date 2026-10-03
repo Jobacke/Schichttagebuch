@@ -4,6 +4,7 @@ import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
 import { useStore } from '../context/StoreContext';
 import { exportToPDF } from '../utils/pdfExport';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
+import { getShiftColor, STATION_THEMES, detectStation } from '../utils/shiftColors';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 // Helper for CSS Date controls
@@ -26,25 +27,7 @@ const calcDuration = (start, end) => {
     } catch { return ''; }
 };
 
-// Color mapper for shift types & codes (Unified across Calendar, Legend & Verteilung)
-const getShiftColor = (typeName = '', code = '') => {
-    const text = `${typeName} ${code}`.toLowerCase();
-    if (text.includes('früh') || text.includes('rf') || text.includes('fm') || text.includes('fh') || text.includes('fo')) {
-        return { color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.18)', border: 'rgba(56, 189, 248, 0.5)', label: 'Früh' };
-    }
-    if (text.includes('spät') || text.includes('rs') || text.includes('sm') || text.includes('sh') || text.includes('so')) {
-        return { color: '#f97316', bg: 'rgba(249, 115, 22, 0.18)', border: 'rgba(249, 115, 22, 0.5)', label: 'Spät' };
-    }
-    if (text.includes('nacht') || text.includes('rn') || text.includes('nm') || text.includes('nh')) {
-        return { color: '#a855f7', bg: 'rgba(168, 85, 247, 0.18)', border: 'rgba(168, 85, 247, 0.5)', label: 'Nacht' };
-    }
-    if (text.includes('tag') || text.includes('rt') || text.includes('t1') || text.includes('t2') || text.includes('t3') || text.includes('t4')) {
-        return { color: '#facc15', bg: 'rgba(250, 204, 21, 0.18)', border: 'rgba(250, 204, 21, 0.5)', label: 'Tag' };
-    }
-    return { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.5)', label: typeName || 'Sonstige' };
-};
-
-// Helper: Resolve shift code, type name and color consistently
+// Helper: Resolve shift code, type name and color consistently with station awareness
 const resolveShiftDetails = (s, storeSettings) => {
     if (!s) return { code: '', rawCode: '', typeName: 'Dienst', colorInfo: getShiftColor('', '') };
 
@@ -58,8 +41,10 @@ const resolveShiftDetails = (s, storeSettings) => {
 
     const preset = rawCode ? (SHIFT_PRESETS[rawCode] || {}) : {};
     const rawType = s.shiftTypeName || typeObj?.name || codeObj?.shiftTypeName || preset.shiftTypeName || '';
+    const station = s.station || preset.station || '';
+    const vehicle = s.vehicle || preset.vehicle || '';
 
-    const colorInfo = getShiftColor(rawType, rawCode);
+    const colorInfo = getShiftColor(rawType, rawCode, station, vehicle);
 
     // Derive concise display code (never 'DST')
     let displayCode = rawCode;
@@ -75,6 +60,8 @@ const resolveShiftDetails = (s, storeSettings) => {
         code: displayCode,
         rawCode,
         typeName: rawType || 'Dienst',
+        station: station || colorInfo.stationName,
+        stationShort: colorInfo.stationShort,
         colorInfo
     };
 };
@@ -274,15 +261,30 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                             }}
                             title={hasShift ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})` : `Tag ${item.dayNum}: Frei`}
                         >
-                            {/* Day Number */}
-                            <span style={{
-                                fontSize: '11px',
-                                fontWeight: hasShift ? 800 : (item.isWeekend ? 600 : 500),
-                                color: hasShift ? '#f8fafc' : (item.isWeekend ? '#94a3b8' : '#475569'),
-                                lineHeight: 1
-                            }}>
-                                {item.dayNum}
-                            </span>
+                            {/* Day Number & Station Badge */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 2px' }}>
+                                <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: hasShift ? 800 : (item.isWeekend ? 600 : 500),
+                                    color: hasShift ? '#f8fafc' : (item.isWeekend ? '#94a3b8' : '#475569'),
+                                    lineHeight: 1
+                                }}>
+                                    {item.dayNum}
+                                </span>
+                                {hasShift && (
+                                    <span style={{
+                                        fontSize: '8px',
+                                        fontWeight: 800,
+                                        color: shiftColor.stationColor,
+                                        background: shiftColor.stationBg,
+                                        padding: '1px 3px',
+                                        borderRadius: '3px',
+                                        lineHeight: 1
+                                    }}>
+                                        {resolved.stationShort}
+                                    </span>
+                                )}
+                            </div>
 
                             {/* Shift Badge or Free Dot */}
                             {hasShift ? (
@@ -366,10 +368,21 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                         <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                                             🕒 {s.startTime} – {s.endTime} Uhr {dur ? `(${dur} Std)` : ''}
                                         </span>
+                                        <span style={{
+                                            background: shiftCol.stationBg,
+                                            color: shiftCol.stationColor,
+                                            border: `1px solid ${shiftCol.stationBorder}`,
+                                            padding: '1px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 700
+                                        }}>
+                                            📍 {resolvedShift.station}
+                                        </span>
                                     </div>
-                                    {(s.station || s.vehicle) && (
+                                    {s.vehicle && (
                                         <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-                                            📍 {s.station} {s.vehicle ? `• ${s.vehicle}` : ''}
+                                            🚑 {s.vehicle}
                                         </div>
                                     )}
                                     {s.partner && (
@@ -384,12 +397,12 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                 </div>
             )}
 
-            {/* Legend */}
+            {/* Legend: Wachen Farbstruktur */}
             <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '12px',
+                gap: '14px',
                 flexWrap: 'wrap',
                 marginTop: '14px',
                 paddingTop: '10px',
@@ -397,20 +410,22 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                 fontSize: '11px',
                 color: '#94a3b8'
             }}>
+                <span style={{ fontWeight: 600, color: '#64748b' }}>Farbstruktur:</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#38bdf8' }} /> Früh
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Sendling.primaryHex }} />
+                    <span>Sendling (Blau)</span>
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#f97316' }} /> Spät
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Hohenbrunn.primaryHex }} />
+                    <span>Hohenbrunn (Grün)</span>
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#c084fc' }} /> Nacht
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Obersendling.primaryHex }} />
+                    <span>Obersendling (Orange)</span>
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#facc15' }} /> Tag
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#334155' }} /> Frei
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#334155' }} />
+                    <span>Dienstfrei</span>
                 </span>
             </div>
         </div>
@@ -427,6 +442,7 @@ export default function Analysis() {
         customStart, setCustomStart, customEnd, setCustomEnd,
         selectedTypes, setSelectedTypes,
         selectedVehicles, setSelectedVehicles,
+        selectedStations, setSelectedStations,
         stats, delta, isInvalid, filteredData
     } = logic;
 
@@ -442,6 +458,26 @@ export default function Analysis() {
         const now = new Date();
         return baseDate.getFullYear() === now.getFullYear();
     }, [baseDate]);
+
+    const stationDistribution = useMemo(() => {
+        const counts = { Sendling: 0, Hohenbrunn: 0, Obersendling: 0 };
+        const hours = { Sendling: 0, Hohenbrunn: 0, Obersendling: 0 };
+        (filteredData || []).forEach(s => {
+            const st = detectStation(s);
+            const dur = parseFloat(calcDuration(s.startTime, s.endTime)) || 0;
+            counts[st] = (counts[st] || 0) + 1;
+            hours[st] = (hours[st] || 0) + dur;
+        });
+        return Object.entries(counts)
+            .filter(([_, count]) => count > 0)
+            .map(([st, count]) => ({
+                station: st,
+                count,
+                hours: hours[st],
+                theme: STATION_THEMES[st] || STATION_THEMES.Sendling
+            }))
+            .sort((a, b) => b.count - a.count);
+    }, [filteredData]);
 
     const handleExportPDF = () => {
         exportToPDF({
@@ -460,7 +496,7 @@ export default function Analysis() {
 
     if (loading) return <div className="page-content center">Lade Daten...</div>;
 
-    const hasActiveFilters = selectedTypes.length > 0 || selectedVehicles.length > 0;
+    const hasActiveFilters = selectedTypes.length > 0 || selectedVehicles.length > 0 || selectedStations.length > 0;
 
     return (
         <div className="page-content">
@@ -724,7 +760,7 @@ export default function Analysis() {
                         {/* "Alle" Chip */}
                         <button
                             type="button"
-                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); }}
+                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); }}
                             style={{
                                 padding: '4px 10px',
                                 borderRadius: '20px',
@@ -739,6 +775,40 @@ export default function Analysis() {
                         >
                             Alle
                         </button>
+
+                        {/* Wachen Chips */}
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Wachen:</span>
+                            {['Sendling', 'Hohenbrunn', 'Obersendling'].map(stName => {
+                                const theme = STATION_THEMES[stName];
+                                const active = selectedStations.includes(stName);
+                                return (
+                                    <button
+                                        key={stName}
+                                        type="button"
+                                        onClick={() => setSelectedStations(active ? selectedStations.filter(x => x !== stName) : [...selectedStations, stName])}
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            padding: '3px 8px',
+                                            borderRadius: '16px',
+                                            fontSize: '11px',
+                                            fontWeight: active ? 700 : 500,
+                                            background: active ? theme.badgeBg : 'transparent',
+                                            border: active ? `1px solid ${theme.primaryHex}` : '1px solid #334155',
+                                            color: active ? theme.primaryHex : '#94a3b8',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease'
+                                        }}
+                                    >
+                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.primaryHex }} />
+                                        <span>{stName}</span>
+                                        {active && <span style={{ fontSize: '10px' }}>✓</span>}
+                                    </button>
+                                );
+                            })}
+                        </div>
 
                         {/* Shift Type Chips */}
                         {(store.settings?.shiftTypes || []).map(t => {
@@ -774,7 +844,7 @@ export default function Analysis() {
 
                         {/* Vehicles if configured */}
                         {(store.settings?.vehicles || []).length > 0 && (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Fahrzeuge:</span>
                                 {(store.settings?.vehicles || []).map(v => {
                                     const active = selectedVehicles.includes(v);
@@ -806,7 +876,7 @@ export default function Analysis() {
                     {hasActiveFilters && (
                         <button
                             type="button"
-                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); }}
+                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); }}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -822,7 +892,7 @@ export default function Analysis() {
                             title="Alle Filter zurücksetzen"
                         >
                             <X size={12} />
-                            <span>Filter aufheben ({selectedTypes.length + selectedVehicles.length})</span>
+                            <span>Filter aufheben ({selectedTypes.length + selectedVehicles.length + selectedStations.length})</span>
                         </button>
                     )}
                 </div>
@@ -870,28 +940,68 @@ export default function Analysis() {
 
                     <div className="card-premium">
                         <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>🍰 Verteilung</h3>
-                        {stats.distributionData.map((d, i) => {
-                            const shiftCol = getShiftColor(d.name, '');
-                            return (
-                                <div key={i} style={{ marginBottom: '10px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: shiftCol.color }} />
-                                            <span>{d.name}</span>
-                                        </span>
-                                        <strong style={{ color: shiftCol.color }}>{d.value}</strong>
+
+                        {/* Wachen-Verteilung (Eigenständige Farbstruktur) */}
+                        {stationDistribution.length > 0 && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                                    Einsätze nach Wachen:
+                                </span>
+                                {stationDistribution.map((st) => (
+                                    <div key={st.station} style={{ marginBottom: '8px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.theme.primaryHex }} />
+                                                <span style={{ fontWeight: 600 }}>{st.theme.name}</span>
+                                            </span>
+                                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                                <strong style={{ color: st.theme.primaryHex, fontSize: '13px', marginRight: '4px' }}>
+                                                    {st.count} {st.count === 1 ? 'Schicht' : 'Schichten'}
+                                                </strong>
+                                                ({st.hours.toFixed(1)} h)
+                                            </span>
+                                        </div>
+                                        <div style={{ height: '6px', background: '#334155', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                            <div style={{
+                                                width: `${(st.count / stats.count) * 100}%`,
+                                                height: '100%',
+                                                background: st.theme.primaryHex,
+                                                borderRadius: '3px'
+                                            }} />
+                                        </div>
                                     </div>
-                                    <div style={{ height: '6px', background: '#334155', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
-                                        <div style={{
-                                            width: `${(d.value / stats.count) * 100}%`,
-                                            height: '100%',
-                                            background: shiftCol.color,
-                                            borderRadius: '3px'
-                                        }} />
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Schichtarten-Verteilung */}
+                        <div>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                                Schichtarten:
+                            </span>
+                            {stats.distributionData.map((d, i) => {
+                                const shiftCol = getShiftColor(d.name, '');
+                                return (
+                                    <div key={i} style={{ marginBottom: '10px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: shiftCol.color }} />
+                                                <span>{d.name}</span>
+                                            </span>
+                                            <strong style={{ color: shiftCol.color }}>{d.value}</strong>
+                                        </div>
+                                        <div style={{ height: '6px', background: '#334155', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                            <div style={{
+                                                width: `${(d.value / stats.count) * 100}%`,
+                                                height: '100%',
+                                                background: shiftCol.color,
+                                                borderRadius: '3px'
+                                            }} />
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
 
                     <div className="card-premium">
@@ -935,6 +1045,22 @@ export default function Analysis() {
                                                 )}
                                                 <span style={{ color: '#f1f5f9' }}>{resolvedShift.typeName}</span>
                                                 <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 'normal' }}>({s.startTime} - {s.endTime})</span>
+                                                <span style={{
+                                                    background: resolvedShift.colorInfo.stationBg,
+                                                    color: resolvedShift.colorInfo.stationColor,
+                                                    border: `1px solid ${resolvedShift.colorInfo.stationBorder}`,
+                                                    padding: '1px 6px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 700
+                                                }}>
+                                                    📍 {resolvedShift.station}
+                                                </span>
+                                                {s.vehicle && (
+                                                    <span style={{ color: '#94a3b8', fontSize: '11.5px', fontWeight: 'normal' }}>
+                                                        🚑 {s.vehicle}
+                                                    </span>
+                                                )}
                                             </div>
                                             {s.partner && (
                                                 <div style={{ color: '#38bdf8', fontSize: '12.5px', marginTop: '3px', fontWeight: 500 }}>

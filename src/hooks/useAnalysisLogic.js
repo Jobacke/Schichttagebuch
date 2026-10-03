@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
+import { detectStation } from '../utils/shiftColors';
 
 // --- Native Helpers ---
 const formatDate = (date, options) => new Intl.DateTimeFormat('de-DE', options).format(date);
@@ -65,6 +66,7 @@ export function useAnalysisLogic() {
     // Filter Arrays
     const [selectedTypes, setSelectedTypes] = useState([]);
     const [selectedVehicles, setSelectedVehicles] = useState([]);
+    const [selectedStations, setSelectedStations] = useState([]);
 
     // Logic
     const { start, end, label, target, isInvalid } = useMemo(() => {
@@ -130,9 +132,15 @@ export function useAnalysisLogic() {
             // Vehicle Check
             if (selectedVehicles.length > 0 && !selectedVehicles.includes(s.vehicle)) return false;
 
+            // Station Check
+            if (selectedStations.length > 0) {
+                const st = detectStation(s);
+                if (!selectedStations.includes(st)) return false;
+            }
+
             return true;
         });
-    }, [store.shifts, start, end, selectedTypes, selectedVehicles]);
+    }, [store.shifts, start, end, selectedTypes, selectedVehicles, selectedStations]);
 
     const stats = useMemo(() => {
         let actual = 0;
@@ -177,6 +185,7 @@ export function useAnalysisLogic() {
         customEnd, setCustomEnd,
         selectedTypes, setSelectedTypes,
         selectedVehicles, setSelectedVehicles,
+        selectedStations, setSelectedStations,
         stats,
         delta: stats.actual - target,
         weeklyRate: filterMode === 'month'

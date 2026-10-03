@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
+import { getShiftColor } from '../utils/shiftColors';
 
 export default function Journal() {
     const { store, addShifts, ensureCodesAndTypes, deleteShifts } = useStore();
@@ -428,6 +429,7 @@ export default function Journal() {
                         const dayName = new Date(shift.date).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
                         const dayNum = new Date(shift.date).getDate();
                         const isSelected = selectedShiftIds.has(shift.id);
+                        const shiftCol = getShiftColor(shift.shiftTypeName || '', displayCode, shift.station, shift.vehicle);
 
                         return (
                             <div
@@ -473,10 +475,11 @@ export default function Journal() {
                                     </div>
                                 )}
 
-                                {/* Date Box */}
+                                {/* Date Box in station colors */}
                                 <div style={{
-                                    background: 'rgba(249, 115, 22, 0.15)',
-                                    color: 'var(--color-primary)',
+                                    background: shiftCol.stationBg,
+                                    color: shiftCol.stationColor,
+                                    border: `1px solid ${shiftCol.stationBorder}`,
                                     borderRadius: '12px',
                                     minWidth: '50px',
                                     height: '50px',
@@ -493,7 +496,7 @@ export default function Journal() {
                                 {/* Details */}
                                 <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: shiftCol.color }}>
                                             {displayCode}
                                         </span>
                                         <span style={{ fontSize: '12px', background: '#334155', padding: '2px 8px', borderRadius: '4px', color: '#cbd5e1' }}>
@@ -504,8 +507,8 @@ export default function Journal() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#94a3b8', flexWrap: 'wrap' }}>
                                             {shift.station && (
                                                 <>
-                                                    <MapPin size={12} />
-                                                    <span>{shift.station}</span>
+                                                    <MapPin size={12} color={shiftCol.stationColor} />
+                                                    <span style={{ color: shiftCol.stationColor, fontWeight: 600 }}>{shift.station}</span>
                                                 </>
                                             )}
                                             {shift.station && shift.vehicle && <span>•</span>}

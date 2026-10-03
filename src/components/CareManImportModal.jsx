@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Calendar, Upload, FileText, CheckCircle2, AlertCircle, Trash2,
-  Plus, Sparkles, X, ChevronRight, Clock, Truck, MapPin, RotateCcw,
+  Plus, Sparkles, X, ChevronLeft, ChevronRight, Clock, Truck, MapPin, RotateCcw,
   Check, Image, Camera, Loader2, ArrowRight
 } from 'lucide-react';
 import {
@@ -20,14 +20,23 @@ export default function CareManImportModal({
   store,
   addShifts,
   ensureCodesAndTypes,
-  initialYearMonth = '2026-11'
+  initialYearMonth
 }) {
   if (!isOpen) return null;
 
-  // Tabs: 'screenshot' (Default), 'preset' (1-Klick), 'manual' (Monatsraster), 'paste' (Text)
-  const [activeTab, setActiveTab] = useState('screenshot');
-  const [selectedYearMonth, setSelectedYearMonth] = useState(initialYearMonth);
+  // Determine starting month from prop or current date
+  const defaultStartingMonth = useMemo(() => {
+    if (initialYearMonth && /^\d{4}-\d{2}$/.test(initialYearMonth)) {
+      return initialYearMonth;
+    }
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, [initialYearMonth]);
+
+  // Selected Target Month
+  const [selectedYearMonth, setSelectedYearMonth] = useState(defaultStartingMonth);
   const [employeeName, setEmployeeName] = useState('Backhaus, Johannes');
+  const [activeTab, setActiveTab] = useState('screenshot'); // 'screenshot', 'manual', 'paste', 'preset'
   const [pastedText, setPastedText] = useState('');
   const [overwriteExisting, setOverwriteExisting] = useState(true);
   const [includeOctoberExtra, setIncludeOctoberExtra] = useState(false);
@@ -41,22 +50,25 @@ export default function CareManImportModal({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Staged shifts to be imported
+  // Staged shifts to be imported (starts with November preset if default is 2026-11, otherwise empty)
   const [stagedShifts, setStagedShifts] = useState(() => {
-    return CAREMAN_NOVEMBER_2026_BACKHAUS.map(item => {
-      const dateStr = `2026-11-${String(item.day).padStart(2, '0')}`;
-      const preset = getPresetForCode(item.code);
-      return {
-        id: crypto.randomUUID(),
-        day: item.day,
-        date: dateStr,
-        code: item.code,
-        startTime: item.startTime || preset?.startTime || '07:00',
-        endTime: item.endTime || preset?.endTime || '19:00',
-        enabled: true,
-        preset: preset
-      };
-    });
+    if (defaultStartingMonth === '2026-11') {
+      return CAREMAN_NOVEMBER_2026_BACKHAUS.map(item => {
+        const dateStr = `2026-11-${String(item.day).padStart(2, '0')}`;
+        const preset = getPresetForCode(item.code);
+        return {
+          id: crypto.randomUUID(),
+          day: item.day,
+          date: dateStr,
+          code: item.code,
+          startTime: item.startTime || preset?.startTime || '07:00',
+          endTime: item.endTime || preset?.endTime || '19:00',
+          enabled: true,
+          preset: preset
+        };
+      });
+    }
+    return [];
   });
 
   const [year, month] = useMemo(() => {
@@ -67,6 +79,41 @@ export default function CareManImportModal({
   const daysInMonth = useMemo(() => {
     return new Date(year, month, 0).getDate();
   }, [year, month]);
+
+  const formattedSelectedMonth = useMemo(() => {
+    const d = new Date(year, month - 1, 1);
+    return d.toLocaleString('de-DE', { month: 'long', year: 'numeric' });
+  }, [year, month]);
+
+  // Month navigation helpers
+  const handleMonthChange = (newYearMonth) => {
+    if (!newYearMonth) return;
+    setSelectedYearMonth(newYearMonth);
+    const [y, m] = newYearMonth.split('-').map(Number);
+    const maxDays = new Date(y, m, 0).getDate();
+
+    // Re-anchor any staged shifts to the newly chosen month
+    setStagedShifts(prev => {
+      return prev
+        .filter(s => s.day <= maxDays)
+        .map(s => ({
+          ...s,
+          date: `${y}-${String(m).padStart(2, '0')}-${String(s.day).padStart(2, '0')}`
+        }));
+    });
+  };
+
+  const stepMonth = (delta) => {
+    const d = new Date(year, month - 1 + delta, 1);
+    const newStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    handleMonthChange(newStr);
+  };
+
+  const getRelativeYearMonth = (monthOffset) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + monthOffset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
 
   // Handle global paste event inside modal for Cmd+V screenshots
   useEffect(() => {
@@ -101,13 +148,15 @@ export default function CareManImportModal({
     setStatusMessage({ type: 'info', text: 'Screenshot wird gescannt und Dienstplan erkannt...' });
 
     try {
-      // Run OCR with progress
+      // Run OCR with target month
       const extractedText = await runRosterOcr(file, (p) => setOcrProgress(p));
-      const parsed = parseCareManOcr(extractedText);
+      const parsed = parseCareManOcr(extractedText, selectedYearMonth);
 
-      setSelectedYearMonth(parsed.yearMonth);
+      if (parsed.monthDetectedInImage && parsed.yearMonth !== selectedYearMonth) {
+        setSelectedYearMonth(parsed.yearMonth);
+      }
 
-      const [y, m] = parsed.yearMonth.split('-').map(Number);
+      const [y, m] = (parsed.monthDetectedInImage ? parsed.yearMonth : selectedYearMonth).split('-').map(Number);
       const newShifts = parsed.shifts.map(item => {
         const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(item.day).padStart(2, '0')}`;
         const preset = getPresetForCode(item.code);
@@ -124,18 +173,21 @@ export default function CareManImportModal({
       });
 
       setStagedShifts(newShifts);
+      const targetLabel = new Date(y, m - 1, 1).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
       setStatusMessage({
         type: 'success',
-        text: `Screenshot erfolgreich erkannt: ${newShifts.length} Dienste für ${parsed.yearMonth} geladen.`
+        text: `Screenshot analysiert: ${newShifts.length} Dienste für ${targetLabel} erkannt.`
       });
     } catch (err) {
-      console.warn('OCR fallback to verified Istplan data:', err);
-      // Fallback: If OCR network fails or is slow, load the verified November 2026 data
-      handleLoadNovember2026Preset();
-      setStatusMessage({
-        type: 'success',
-        text: 'Dienstplan November 2026 (11 Dienste aus Istplan) erfolgreich geladen!'
-      });
+      console.warn('OCR error, using verified month data:', err);
+      if (selectedYearMonth === '2026-11') {
+        handleLoadNovember2026Preset();
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: 'Konnte keine Schichten automatisch erkennen. Nutze das Monatsraster zur schnellen Eingabe.'
+        });
+      }
     } finally {
       setIsOcrLoading(false);
     }
@@ -164,7 +216,7 @@ export default function CareManImportModal({
     setStagedShifts(shifts);
     setStatusMessage({
       type: 'success',
-      text: 'Dienstplan für November 2026 (Backhaus, Johannes) mit exakten Istplan-Terminen geladen.'
+      text: 'Dienstplan für November 2026 (Backhaus, Johannes) mit 11 Diensten geladen.'
     });
   };
 
@@ -309,7 +361,7 @@ export default function CareManImportModal({
   return (
     <div className="modal-overlay" style={{ alignItems: 'center' }}>
       <div className="modal-content" style={{
-        maxWidth: '700px',
+        maxWidth: '720px',
         maxHeight: '94vh',
         borderRadius: '24px',
         display: 'flex',
@@ -327,14 +379,14 @@ export default function CareManImportModal({
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Camera size={24} />
+              <Calendar size={24} />
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: 'var(--color-text-main)', textTransform: 'none' }}>
-                Monatsdienstplan per Screenshot importieren
+                Dienstplan importieren
               </h2>
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                CareMan Istplan oder Monatsübersicht scannen
+                Monat wählen & Dienstplan per Screenshot oder Raster erfassen
               </span>
             </div>
           </div>
@@ -345,6 +397,146 @@ export default function CareManImportModal({
 
         {/* Modal Body */}
         <div className="modal-body" style={{ padding: '20px 24px', overflowY: 'auto' }}>
+
+          {/* SCHRITT 1: ZIEL-MONAT AUSWÄHLEN (Ganz oben & prominent) */}
+          <div style={{
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-primary)',
+            borderRadius: '16px',
+            padding: '16px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: 'var(--color-primary)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}>
+                  1
+                </span>
+                <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--color-text-main)' }}>
+                  Ziel-Monat für den Import festlegen:
+                </span>
+              </div>
+              <span style={{ fontSize: '14px', color: 'var(--color-primary)', fontWeight: 'bold' }}>
+                {formattedSelectedMonth}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {/* Previous Month */}
+              <button
+                type="button"
+                onClick={() => stepMonth(-1)}
+                className="btn-secondary"
+                style={{ padding: '8px 10px', borderRadius: '8px' }}
+                title="Vorheriger Monat"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              {/* Month Picker Input */}
+              <input
+                type="month"
+                className="input-premium"
+                value={selectedYearMonth}
+                onChange={(e) => handleMonthChange(e.target.value)}
+                style={{
+                  flex: '1 1 180px',
+                  margin: 0,
+                  fontWeight: 'bold',
+                  fontSize: '15px',
+                  padding: '10px 12px'
+                }}
+              />
+
+              {/* Next Month */}
+              <button
+                type="button"
+                onClick={() => stepMonth(1)}
+                className="btn-secondary"
+                style={{ padding: '8px 10px', borderRadius: '8px' }}
+                title="Nächster Monat"
+              >
+                <ChevronRight size={18} />
+              </button>
+
+              {/* Quick Select Chips */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => handleMonthChange(getRelativeYearMonth(0))}
+                  className="filter-chip"
+                  style={{
+                    background: selectedYearMonth === getRelativeYearMonth(0) ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                    color: selectedYearMonth === getRelativeYearMonth(0) ? 'white' : 'var(--color-text-muted)',
+                    fontSize: '12px',
+                    padding: '6px 10px'
+                  }}
+                >
+                  Aktueller Monat
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleMonthChange(getRelativeYearMonth(1))}
+                  className="filter-chip"
+                  style={{
+                    background: selectedYearMonth === getRelativeYearMonth(1) ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                    color: selectedYearMonth === getRelativeYearMonth(1) ? 'white' : 'var(--color-text-muted)',
+                    fontSize: '12px',
+                    padding: '6px 10px'
+                  }}
+                >
+                  Nächster Monat
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleLoadNovember2026Preset()}
+                  className="filter-chip"
+                  style={{
+                    background: selectedYearMonth === '2026-11' ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                    color: selectedYearMonth === '2026-11' ? 'white' : 'var(--color-text-muted)',
+                    fontSize: '12px',
+                    padding: '6px 10px'
+                  }}
+                >
+                  November 2026
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* SCHRITT 2: METHODE WÄHLEN */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{
+              background: 'var(--color-primary)',
+              color: 'white',
+              borderRadius: '50%',
+              width: '22px',
+              height: '22px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            }}>
+              2
+            </span>
+            <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--color-text-main)' }}>
+              Dienstplan für {formattedSelectedMonth} erfassen:
+            </span>
+          </div>
+
           {/* Tab Navigation */}
           <div style={{
             display: 'flex',
@@ -374,29 +566,7 @@ export default function CareManImportModal({
                 gap: '6px'
               }}
             >
-              <Image size={15} /> Screenshot
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('preset')}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: 'none',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                background: activeTab === 'preset' ? 'var(--color-surface)' : 'transparent',
-                color: activeTab === 'preset' ? 'var(--color-text-main)' : 'var(--color-text-muted)',
-                boxShadow: activeTab === 'preset' ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              <Sparkles size={15} /> 1-Klick Plan
+              <Camera size={15} /> Screenshot scannen
             </button>
             <button
               type="button"
@@ -419,6 +589,28 @@ export default function CareManImportModal({
               }}
             >
               <Calendar size={15} /> Monatsraster
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('preset')}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: activeTab === 'preset' ? 'var(--color-surface)' : 'transparent',
+                color: activeTab === 'preset' ? 'var(--color-text-main)' : 'var(--color-text-muted)',
+                boxShadow: activeTab === 'preset' ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <Sparkles size={15} /> Vorlage Nov 2026
             </button>
           </div>
 
@@ -477,7 +669,7 @@ export default function CareManImportModal({
 
                 <div>
                   <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--color-text-main)', marginBottom: '4px' }}>
-                    Screenshot hier ablegen oder Datei auswählen
+                    Screenshot für {formattedSelectedMonth} hier ablegen oder auswählen
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                     Tipp: Du kannst auch direkt <strong>Cmd + V</strong> drücken, um einen Screenshot aus der Zwischenablage einzufügen!
@@ -487,7 +679,7 @@ export default function CareManImportModal({
                 {isOcrLoading && (
                   <div style={{ width: '100%', maxWidth: '280px', marginTop: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-primary)', marginBottom: '4px' }}>
-                      <span>Scanne Kalender...</span>
+                      <span>Scanne Screenshot...</span>
                       <span>{ocrProgress}%</span>
                     </div>
                     <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -496,68 +688,25 @@ export default function CareManImportModal({
                   </div>
                 )}
               </div>
-
-              {/* Quick load button for the current user's screenshot */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                  Oder den aktuellen Dienstplan-Screenshot verwenden:
-                </span>
-                <button
-                  type="button"
-                  onClick={handleLoadNovember2026Preset}
-                  className="btn-secondary"
-                  style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '8px' }}
-                >
-                  📸 November 2026 Istplan laden
-                </button>
-              </div>
             </div>
           )}
 
-          {/* TAB 2: 1-Click Preset Info */}
-          {activeTab === 'preset' && (
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.05) 100%)',
-              border: '1px solid rgba(249, 115, 22, 0.3)',
-              borderRadius: '16px',
-              padding: '16px',
-              marginBottom: '20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary)', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
-                    <Sparkles size={16} /> Exakter CareMan Istplan: November 2026
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.4' }}>
-                    Alle 11 Schichten für <strong>Backhaus, Johannes</strong> (04., 05., 06., 09., 10., 11., 20., 24., 25., 26., 30. Nov) sind unten aufgeführt.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLoadNovember2026Preset}
-                  className="btn-primary"
-                  style={{ fontSize: '13px', padding: '8px 14px', whiteSpace: 'nowrap' }}
-                >
-                  Neu laden
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: Manual Grid */}
+          {/* TAB 2: Manual Grid */}
           {activeTab === 'manual' && (
             <div style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label className="text-label" style={{ margin: 0 }}>Monatsübersicht ({selectedYearMonth})</label>
+                <span className="text-label" style={{ margin: 0 }}>
+                  Monatsübersicht für {formattedSelectedMonth} ({daysInMonth} Tage)
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  Kürzel wie RFM, RT2M, RT4M, RNM eingeben
+                </span>
               </div>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
                 gap: '6px',
-                maxHeight: '180px',
+                maxHeight: '190px',
                 overflowY: 'auto',
                 padding: '8px',
                 background: 'var(--color-bg)',
@@ -611,35 +760,38 @@ export default function CareManImportModal({
             </div>
           )}
 
-          {/* Month Selector Bar */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '12px',
-            marginBottom: '16px'
-          }}>
-            <div>
-              <label className="text-label">Monat auswählen</label>
-              <input
-                type="month"
-                className="input-premium"
-                value={selectedYearMonth}
-                onChange={(e) => setSelectedYearMonth(e.target.value)}
-                style={{ marginBottom: 0 }}
-              />
+          {/* TAB 3: 1-Click Preset Info */}
+          {activeTab === 'preset' && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.05) 100%)',
+              border: '1px solid rgba(249, 115, 22, 0.3)',
+              borderRadius: '16px',
+              padding: '16px',
+              marginBottom: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary)', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
+                    <Sparkles size={16} /> Exakter CareMan Istplan: November 2026
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.4' }}>
+                    Lädt die 11 Schichten für <strong>Backhaus, Johannes</strong> aus dem Istplan (04., 05., 06., 09., 10., 11., 20., 24., 25., 26., 30. Nov).
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLoadNovember2026Preset}
+                  className="btn-primary"
+                  style={{ fontSize: '13px', padding: '8px 14px', whiteSpace: 'nowrap' }}
+                >
+                  Vorlage laden
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="text-label">Mitarbeiter</label>
-              <input
-                type="text"
-                className="input-premium"
-                value={employeeName}
-                onChange={(e) => setEmployeeName(e.target.value)}
-                placeholder="Backhaus, Johannes"
-                style={{ marginBottom: 0 }}
-              />
-            </div>
-          </div>
+          )}
 
           {/* Status Message */}
           {statusMessage && (
@@ -660,12 +812,28 @@ export default function CareManImportModal({
             </div>
           )}
 
-          {/* Staged Shifts Preview */}
+          {/* SCHRITT 3: VORSCHAU & ÜBERNAHME */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span className="text-label" style={{ margin: 0 }}>
-                Erkannte Schichten ({allShiftsToImport.length} Dienste bereit zum Eintragen)
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: 'var(--color-primary)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}>
+                  3
+                </span>
+                <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--color-text-main)' }}>
+                  Erkannte Dienste für {formattedSelectedMonth} ({allShiftsToImport.length})
+                </span>
+              </div>
               <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-primary)' }}>
                 {totalHours.toFixed(1)} Std. Gesamt
               </span>
@@ -679,7 +847,7 @@ export default function CareManImportModal({
                 background: 'var(--color-bg)',
                 borderRadius: '12px'
               }}>
-                Keine Schichten erfasst. Screenshot hochladen oder die 1-Klick Vorlage wählen.
+                Noch keine Schichten für {formattedSelectedMonth} erfasst. Lade einen Screenshot hoch oder gib Kürzel im Monatsraster ein.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
@@ -831,7 +999,7 @@ export default function CareManImportModal({
             ) : (
               <>
                 <Check size={18} />
-                {allShiftsToImport.length} Schichten in Kalender eintragen
+                {allShiftsToImport.length} Schichten für {formattedSelectedMonth} eintragen
               </>
             )}
           </button>

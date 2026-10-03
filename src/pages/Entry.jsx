@@ -358,7 +358,7 @@ export default function Entry() {
                 store={store}
                 addShifts={addShifts}
                 ensureCodesAndTypes={ensureCodesAndTypes}
-                initialYearMonth="2026-11"
+                initialYearMonth={formData.date?.slice(0, 7) || new Date().toISOString().slice(0, 7)}
             />
         </div>
     );

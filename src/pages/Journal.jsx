@@ -593,7 +593,7 @@ export default function Journal() {
                 store={store}
                 addShifts={addShifts}
                 ensureCodesAndTypes={ensureCodesAndTypes}
-                initialYearMonth={currentYearMonthStr.startsWith('2026-11') ? '2026-11' : currentYearMonthStr}
+                initialYearMonth={currentYearMonthStr}
             />
         </div>
     );

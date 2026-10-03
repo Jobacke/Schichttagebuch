@@ -30,13 +30,24 @@ export async function runRosterOcr(imageSource, onProgress) {
 
 /**
  * Parses OCR extracted text from a CareMan Monatsdienstplan / Istplan screenshot
+ * @param {string} text - OCR text
+ * @param {string} [fallbackYearMonth='2026-11'] - User-selected target month (e.g. '2026-12')
  */
-export function parseCareManOcr(text) {
-  if (!text) return { yearMonth: '2026-11', shifts: CAREMAN_NOVEMBER_2026_BACKHAUS };
+export function parseCareManOcr(text, fallbackYearMonth = '2026-11') {
+  if (!text) {
+    const [defY, defM] = fallbackYearMonth.split('-').map(Number);
+    if (defY === 2026 && defM === 11) {
+      return { yearMonth: '2026-11', shifts: CAREMAN_NOVEMBER_2026_BACKHAUS, extraShifts: CAREMAN_OCTOBER_2026_EXTRA };
+    }
+    return { yearMonth: fallbackYearMonth, shifts: [], extraShifts: [] };
+  }
 
-  // Detect month & year
-  let year = 2026;
-  let month = 11;
+  // Detect month & year from text
+  const [fYear, fMonth] = fallbackYearMonth.split('-').map(Number);
+  let year = fYear || 2026;
+  let month = fMonth || 11;
+  let monthDetectedInImage = false;
+
   const monthNames = [
     'januar', 'februar', 'märz', 'april', 'mai', 'juni',
     'juli', 'august', 'september', 'oktober', 'november', 'dezember'
@@ -45,8 +56,11 @@ export function parseCareManOcr(text) {
   const monthMatch = text.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+(\d{4})/i);
   if (monthMatch) {
     const mIdx = monthNames.indexOf(monthMatch[1].toLowerCase());
-    if (mIdx !== -1) month = mIdx + 1;
-    year = parseInt(monthMatch[2], 10);
+    if (mIdx !== -1) {
+      month = mIdx + 1;
+      year = parseInt(monthMatch[2], 10);
+      monthDetectedInImage = true;
+    }
   }
 
   const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
@@ -60,32 +74,46 @@ export function parseCareManOcr(text) {
       yearMonth: '2026-11',
       shifts: CAREMAN_NOVEMBER_2026_BACKHAUS,
       extraShifts: CAREMAN_OCTOBER_2026_EXTRA,
-      isHighConfidence: true
+      isHighConfidence: true,
+      monthDetectedInImage
     };
   }
 
-  // Generic fallback extraction based on time patterns and known codes
+  // Generic extraction for any other month
   const shifts = [];
-  const lines = text.split('\n');
-
-  // Regex patterns
-  const timePatterns = [
-    { regex: /06:?54\s*[-–]\s*15:?06/, defaultCode: 'RFM' },
-    { regex: /14:?5[46]\s*[-–]\s*23:?06/, defaultCode: 'RT2M' },
-    { regex: /15:?24\s*[-–]\s*00:?06/, defaultCode: 'RT4M' },
-    { regex: /06:?54\s*[-–]\s*15:?36/, defaultCode: 'RT3M' },
-    { regex: /22:?54\s*[-–]\s*07:?06/, defaultCode: 'RNM' }
-  ];
+  const daysInTargetMonth = new Date(year, month, 0).getDate();
 
   // Try extracting days with codes
-  const dayTokens = text.match(/\b([0-2]?[0-9]|3[01])\b/g) || [];
-  const codeTokens = Object.keys(SHIFT_PRESETS);
+  const validCodes = Object.keys(SHIFT_PRESETS);
 
-  // Return best matched shifts
+  // Scan lines for day numbers followed by or near known codes
+  const lines = text.split('\n');
+  lines.forEach(line => {
+    const dayMatch = line.match(/\b([0-2]?[0-9]|3[01])\b/);
+    if (dayMatch) {
+      const dNum = parseInt(dayMatch[1], 10);
+      if (dNum >= 1 && dNum <= daysInTargetMonth) {
+        for (const code of validCodes) {
+          if (line.toUpperCase().includes(code)) {
+            const preset = getPresetForCode(code);
+            shifts.push({
+              day: dNum,
+              code: code,
+              startTime: preset?.startTime || '07:00',
+              endTime: preset?.endTime || '19:00'
+            });
+            break;
+          }
+        }
+      }
+    }
+  });
+
   return {
     yearMonth,
-    shifts: shifts.length > 0 ? shifts : CAREMAN_NOVEMBER_2026_BACKHAUS,
-    extraShifts: isNov2026 ? CAREMAN_OCTOBER_2026_EXTRA : [],
-    isHighConfidence: isNov2026
+    shifts: shifts,
+    extraShifts: [],
+    isHighConfidence: false,
+    monthDetectedInImage
   };
 }

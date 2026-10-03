@@ -127,16 +127,17 @@ export function exportToPDF(data) {
         doc.text('Schichten im Detail', margin, yPos);
         yPos += 10;
 
-        // Table header - optimized for landscape with station column
-        // Column positions for landscape (297mm width)
-        const colDatum = margin + 3;
-        const colSchichtart = margin + 35;
-        const colZeit = margin + 80;
-        const colWache = margin + 125;
-        const colFahrzeug = margin + 175;
-        const colStunden = margin + 235;
+        // Table header - optimized for landscape with partner column
+        // Column positions for landscape (297mm width, 257mm printable width)
+        const colDatum = margin + 2;
+        const colSchichtart = margin + 28;
+        const colZeit = margin + 74;
+        const colWache = margin + 110;
+        const colFahrzeug = margin + 148;
+        const colPartner = margin + 180;
+        const colStunden = margin + 236;
 
-        doc.setFontSize(10);
+        doc.setFontSize(9.5);
         doc.setFont(undefined, 'bold');
         doc.setFillColor(249, 115, 22); // Orange
         doc.setTextColor(255, 255, 255);
@@ -147,6 +148,7 @@ export function exportToPDF(data) {
         doc.text('Zeit', colZeit, yPos);
         doc.text('Wache', colWache, yPos);
         doc.text('Fahrzeug', colFahrzeug, yPos);
+        doc.text('PartnerIn', colPartner, yPos);
         doc.text('Stunden', colStunden, yPos);
         yPos += 8;
 
@@ -188,13 +190,29 @@ export function exportToPDF(data) {
             }
 
             // Station name
-            const stationName = shift.station || '-';
+            let stationName = shift.station || '-';
+            if (stationName.length > 18) {
+                stationName = stationName.substring(0, 16) + '...';
+            }
+
+            // Partner name
+            let partnerName = shift.partner || '-';
+            if (partnerName.length > 25) {
+                partnerName = partnerName.substring(0, 23) + '...';
+            }
+
+            // Shift type name
+            let displayType = typeName;
+            if (displayType.length > 22) {
+                displayType = displayType.substring(0, 20) + '...';
+            }
 
             doc.text(formatDate(shift.date), colDatum, yPos);
-            doc.text(typeName, colSchichtart, yPos);
+            doc.text(displayType, colSchichtart, yPos);
             doc.text(`${shift.startTime} - ${shift.endTime}`, colZeit, yPos);
             doc.text(stationName, colWache, yPos);
             doc.text(vehicleName, colFahrzeug, yPos);
+            doc.text(partnerName, colPartner, yPos);
             doc.text(`${duration.toFixed(1)} h`, colStunden, yPos);
 
             yPos += 7;

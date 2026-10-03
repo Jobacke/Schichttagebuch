@@ -500,11 +500,17 @@ export default function Journal() {
                                             {shift.startTime} - {shift.endTime}
                                         </span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#94a3b8' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#94a3b8', flexWrap: 'wrap' }}>
                                         <MapPin size={12} />
                                         <span>{shift.station}</span>
                                         <span>•</span>
                                         <span>{shift.vehicle}</span>
+                                        {shift.partner && (
+                                            <>
+                                                <span>•</span>
+                                                <span style={{ color: '#38bdf8', fontWeight: 500 }}>👤 {shift.partner}</span>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 

@@ -145,6 +145,50 @@ export default function Analysis() {
                             </div>
                         ))}
                     </div>
+
+                    <div className="card-premium">
+                        <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>📋 Schichten im Detail ({filteredData.length})</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {[...filteredData].sort((a, b) => a.date.localeCompare(b.date)).map(s => {
+                                const typeObj = (store.settings?.shiftTypes || []).find(t => t.id === s.typeId);
+                                const typeName = s.shiftTypeName || typeObj?.name || 'Dienst';
+                                const d = new Date(s.date);
+                                const dateFormatted = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                                return (
+                                    <div
+                                        key={s.id}
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '10px 12px',
+                                            background: '#1e293b',
+                                            borderRadius: '8px',
+                                            fontSize: '13px',
+                                            flexWrap: 'wrap',
+                                            gap: '6px'
+                                        }}
+                                    >
+                                        <div style={{ flex: 1, minWidth: '180px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                                                <span style={{ color: 'var(--color-primary)' }}>{dateFormatted}</span>
+                                                <span>•</span>
+                                                <span style={{ color: '#f1f5f9' }}>{s.code ? `${s.code} (${typeName})` : typeName}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', fontSize: '12px', marginTop: '3px', flexWrap: 'wrap' }}>
+                                                <span>{s.startTime} - {s.endTime}</span>
+                                                {s.station && <span>• {s.station}</span>}
+                                                {s.vehicle && <span>• {s.vehicle}</span>}
+                                                {s.partner && (
+                                                    <span style={{ color: '#38bdf8', fontWeight: 500 }}>• 👤 {s.partner}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </>
             )}
 

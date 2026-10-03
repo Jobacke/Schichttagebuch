@@ -3,6 +3,7 @@ import { APP_VERSION } from '../version';
 import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
 import { useStore } from '../context/StoreContext';
 import { exportToPDF } from '../utils/pdfExport';
+import { SHIFT_PRESETS } from '../utils/shiftPresets';
 
 // Helper for CSS Date controls
 const addMonths = (date, n) => {
@@ -24,9 +25,9 @@ const calcDuration = (start, end) => {
     } catch { return ''; }
 };
 
-// Color mapper for shift types & codes
-const getShiftColor = (typeName, code) => {
-    const text = `${typeName || ''} ${code || ''}`.toLowerCase();
+// Color mapper for shift types & codes (Unified across Calendar, Legend & Verteilung)
+const getShiftColor = (typeName = '', code = '') => {
+    const text = `${typeName} ${code}`.toLowerCase();
     if (text.includes('früh') || text.includes('rf') || text.includes('fm') || text.includes('fh') || text.includes('fo')) {
         return { color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.18)', border: 'rgba(56, 189, 248, 0.5)', label: 'Früh' };
     }
@@ -34,12 +35,47 @@ const getShiftColor = (typeName, code) => {
         return { color: '#f97316', bg: 'rgba(249, 115, 22, 0.18)', border: 'rgba(249, 115, 22, 0.5)', label: 'Spät' };
     }
     if (text.includes('nacht') || text.includes('rn') || text.includes('nm') || text.includes('nh')) {
-        return { color: '#c084fc', bg: 'rgba(192, 132, 252, 0.18)', border: 'rgba(192, 132, 252, 0.5)', label: 'Nacht' };
+        return { color: '#a855f7', bg: 'rgba(168, 85, 247, 0.18)', border: 'rgba(168, 85, 247, 0.5)', label: 'Nacht' };
     }
     if (text.includes('tag') || text.includes('rt') || text.includes('t1') || text.includes('t2') || text.includes('t3') || text.includes('t4')) {
         return { color: '#facc15', bg: 'rgba(250, 204, 21, 0.18)', border: 'rgba(250, 204, 21, 0.5)', label: 'Tag' };
     }
-    return { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.5)', label: typeName || 'Dienst' };
+    return { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.5)', label: typeName || 'Sonstige' };
+};
+
+// Helper: Resolve shift code, type name and color consistently
+const resolveShiftDetails = (s, storeSettings) => {
+    if (!s) return { code: '', rawCode: '', typeName: 'Dienst', colorInfo: getShiftColor('', '') };
+
+    const codeObj = (storeSettings?.shiftCodes || []).find(c => c.id === s.codeId || (s.code && c.code === s.code));
+    const typeObj = (storeSettings?.shiftTypes || []).find(t => t.id === s.typeId);
+
+    let rawCode = s.code || codeObj?.code || '';
+    if (!rawCode && s.codeId && typeof s.codeId === 'string' && s.codeId.startsWith('preset_')) {
+        rawCode = s.codeId.replace('preset_', '');
+    }
+
+    const preset = rawCode ? (SHIFT_PRESETS[rawCode] || {}) : {};
+    const rawType = s.shiftTypeName || typeObj?.name || codeObj?.shiftTypeName || preset.shiftTypeName || '';
+
+    const colorInfo = getShiftColor(rawType, rawCode);
+
+    // Derive concise display code (never 'DST')
+    let displayCode = rawCode;
+    if (!displayCode) {
+        if (rawType.toLowerCase().includes('spät')) displayCode = 'Spät';
+        else if (rawType.toLowerCase().includes('früh')) displayCode = 'Früh';
+        else if (rawType.toLowerCase().includes('nacht')) displayCode = 'Nacht';
+        else if (rawType.toLowerCase().includes('tag')) displayCode = 'Tag';
+        else displayCode = rawType ? rawType.slice(0, 4) : 'Schicht';
+    }
+
+    return {
+        code: displayCode,
+        rawCode,
+        typeName: rawType || 'Dienst',
+        colorInfo
+    };
 };
 
 // Component: Modern Month Calendar & Shift Rhythm Grid
@@ -211,9 +247,8 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
 
                     const hasShift = item.shifts && item.shifts.length > 0;
                     const firstShift = hasShift ? item.shifts[0] : null;
-                    const shiftColor = hasShift
-                        ? getShiftColor(firstShift.shiftTypeName, firstShift.code)
-                        : null;
+                    const resolved = hasShift ? resolveShiftDetails(firstShift, storeSettings) : null;
+                    const shiftColor = resolved?.colorInfo;
                     const isSelected = selectedDateStr === item.dateStr;
 
                     return (
@@ -236,7 +271,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                     : (hasShift ? `1px solid ${shiftColor.border}` : '1px solid #1e293b'),
                                 boxShadow: isSelected ? '0 0 10px rgba(56, 189, 248, 0.35)' : 'none'
                             }}
-                            title={hasShift ? `${firstShift.code} (${firstShift.startTime} - ${firstShift.endTime})` : `Tag ${item.dayNum}: Frei`}
+                            title={hasShift ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})` : `Tag ${item.dayNum}: Frei`}
                         >
                             {/* Day Number */}
                             <span style={{
@@ -262,7 +297,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                     whiteSpace: 'nowrap',
                                     textAlign: 'center'
                                 }}>
-                                    {firstShift.code || 'DST'}
+                                    {resolved.code}
                                 </div>
                             ) : (
                                 <div style={{
@@ -308,7 +343,8 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                     ) : (
                         selectedDayInfo.shifts.map((s, idx) => {
                             const dur = calcDuration(s.startTime, s.endTime);
-                            const shiftCol = getShiftColor(s.shiftTypeName, s.code);
+                            const resolvedShift = resolveShiftDetails(s, storeSettings);
+                            const shiftCol = resolvedShift.colorInfo;
                             return (
                                 <div key={s.id || idx} style={{ marginTop: idx > 0 ? '10px' : 0, borderTop: idx > 0 ? '1px solid #334155' : 'none', paddingTop: idx > 0 ? '8px' : 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -321,10 +357,10 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                             fontSize: '12px',
                                             fontWeight: 800
                                         }}>
-                                            {s.code || 'Dienst'}
+                                            {resolvedShift.code}
                                         </span>
                                         <span style={{ fontWeight: 600, fontSize: '13px', color: '#f1f5f9' }}>
-                                            {s.shiftTypeName || 'Schicht'}
+                                            {resolvedShift.typeName}
                                         </span>
                                         <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                                             🕒 {s.startTime} – {s.endTime} Uhr {dur ? `(${dur} Std)` : ''}
@@ -477,32 +513,36 @@ export default function Analysis() {
                     </div>
 
                     <div className="card-premium">
-                        <h3 className="text-label" style={{ margin: '0 0 10px 0' }}>🍰 Verteilung</h3>
-                        {stats.distributionData.map((d, i) => (
-                            <div key={i} style={{ marginBottom: '8px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                                    <span>{d.name}</span>
-                                    <strong>{d.value}</strong>
+                        <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>🍰 Verteilung</h3>
+                        {stats.distributionData.map((d, i) => {
+                            const shiftCol = getShiftColor(d.name, '');
+                            return (
+                                <div key={i} style={{ marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: shiftCol.color }} />
+                                            <span>{d.name}</span>
+                                        </span>
+                                        <strong style={{ color: shiftCol.color }}>{d.value}</strong>
+                                    </div>
+                                    <div style={{ height: '6px', background: '#334155', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                        <div style={{
+                                            width: `${(d.value / stats.count) * 100}%`,
+                                            height: '100%',
+                                            background: shiftCol.color,
+                                            borderRadius: '3px'
+                                        }} />
+                                    </div>
                                 </div>
-                                <div style={{ height: '6px', background: '#334155', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
-                                    <div style={{
-                                        width: `${(d.value / stats.count) * 100}%`,
-                                        height: '100%',
-                                        background: ['#f97316', '#38bdf8', '#22c55e'][i % 3]
-                                    }} />
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="card-premium">
                         <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>📋 Schichten im Detail ({filteredData.length})</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {[...filteredData].sort((a, b) => a.date.localeCompare(b.date)).map((s, index) => {
-                                const typeObj = (store.settings?.shiftTypes || []).find(t => t.id === s.typeId);
-                                const typeName = s.shiftTypeName || typeObj?.name || 'Dienst';
-                                const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
-                                const displayCode = s.code || codeObj?.code || '-';
+                                const resolvedShift = resolveShiftDetails(s, store.settings);
                                 const d = new Date(s.date);
                                 const dateFormatted = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                                 return (
@@ -524,12 +564,20 @@ export default function Analysis() {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, flexWrap: 'wrap' }}>
                                                 <span style={{ color: '#64748b', fontSize: '11px', minWidth: '16px' }}>#{index + 1}</span>
                                                 <span style={{ color: 'var(--color-primary)' }}>{dateFormatted}</span>
-                                                {displayCode !== '-' && (
-                                                    <span style={{ background: '#334155', color: '#facc15', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>
-                                                        {displayCode}
+                                                {resolvedShift.code && (
+                                                    <span style={{
+                                                        background: resolvedShift.colorInfo.bg,
+                                                        color: resolvedShift.colorInfo.color,
+                                                        border: `1px solid ${resolvedShift.colorInfo.border}`,
+                                                        padding: '1px 6px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700
+                                                    }}>
+                                                        {resolvedShift.code}
                                                     </span>
                                                 )}
-                                                <span style={{ color: '#f1f5f9' }}>{typeName}</span>
+                                                <span style={{ color: '#f1f5f9' }}>{resolvedShift.typeName}</span>
                                                 <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 'normal' }}>({s.startTime} - {s.endTime})</span>
                                             </div>
                                             {s.partner && (

@@ -4,6 +4,7 @@ import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
 import { useStore } from '../context/StoreContext';
 import { exportToPDF } from '../utils/pdfExport';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 // Helper for CSS Date controls
 const addMonths = (date, n) => {
@@ -418,8 +419,6 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
 
 export default function Analysis() {
     const { store } = useStore();
-    const [isFilterOpen, setIsFilterOpen] = useState(false);
-
     // Use the decoupled logic hook
     const logic = useAnalysisLogic();
     const {
@@ -434,10 +433,16 @@ export default function Analysis() {
     const isPositive = delta >= 0;
     const colorClass = isPositive ? 'var(--color-success)' : 'var(--color-danger)';
 
-    // Formatting Helpers
-    const formatDateInput = (d) => {
-        try { return d.toISOString().slice(0, 7); } catch { return ''; }
-    };
+    const isCurrentMonth = useMemo(() => {
+        const now = new Date();
+        return baseDate.getFullYear() === now.getFullYear() && baseDate.getMonth() === now.getMonth();
+    }, [baseDate]);
+
+    const isCurrentYear = useMemo(() => {
+        const now = new Date();
+        return baseDate.getFullYear() === now.getFullYear();
+    }, [baseDate]);
+
     const handleExportPDF = () => {
         exportToPDF({
             label,
@@ -455,23 +460,371 @@ export default function Analysis() {
 
     if (loading) return <div className="page-content center">Lade Daten...</div>;
 
+    const hasActiveFilters = selectedTypes.length > 0 || selectedVehicles.length > 0;
+
     return (
         <div className="page-content">
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div>
                     <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         Auswertung <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>v{APP_VERSION}</span>
                     </h1>
-                    <div className="subtitle" style={{ margin: 0, marginTop: '4px', color: isInvalid ? 'var(--color-danger)' : 'inherit' }}>{label}</div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={handleExportPDF} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }} title="Als PDF exportieren">
-                        📄
-                    </button>
-                    <button onClick={() => setIsFilterOpen(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px', width: 'auto' }}>
-                        Filter
-                    </button>
+                <button
+                    onClick={handleExportPDF}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        color: '#38bdf8',
+                        padding: '8px 14px',
+                        borderRadius: '10px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                    }}
+                    title="Monatsdienstplan als PDF exportieren"
+                >
+                    <span>📄</span>
+                    <span>Dienstplan PDF</span>
+                </button>
+            </div>
+
+            {/* Modern Inline Period & Filter Command Bar */}
+            <div className="card-premium" style={{ padding: '14px 16px', marginBottom: '18px' }}>
+                {/* Row 1: Mode Switcher & Direct Date Navigation */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                    
+                    {/* Segmented Mode Selector: Monat | Jahr | Zeitraum */}
+                    <div style={{
+                        display: 'inline-flex',
+                        background: '#0f172a',
+                        padding: '3px',
+                        borderRadius: '10px',
+                        border: '1px solid #334155'
+                    }}>
+                        {[
+                            { id: 'month', label: 'Monat' },
+                            { id: 'year', label: 'Jahr' },
+                            { id: 'custom', label: 'Zeitraum' }
+                        ].map(m => (
+                            <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setFilterMode(m.id)}
+                                style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '7px',
+                                    border: 'none',
+                                    background: filterMode === m.id ? 'var(--color-primary)' : 'transparent',
+                                    color: filterMode === m.id ? '#ffffff' : '#94a3b8',
+                                    fontWeight: filterMode === m.id ? 700 : 500,
+                                    fontSize: '13px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                {m.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Period Navigation Controls */}
+                    {filterMode === 'month' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                type="button"
+                                onClick={() => setBaseDate(addMonths(baseDate, -1))}
+                                style={{
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#cbd5e1',
+                                    borderRadius: '8px',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}
+                                title="Vorheriger Monat"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+
+                            <div style={{
+                                fontWeight: 700,
+                                fontSize: '15px',
+                                color: '#f8fafc',
+                                minWidth: '130px',
+                                textAlign: 'center'
+                            }}>
+                                {baseDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setBaseDate(addMonths(baseDate, 1))}
+                                style={{
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#cbd5e1',
+                                    borderRadius: '8px',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}
+                                title="Nächster Monat"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+
+                            {!isCurrentMonth && (
+                                <button
+                                    type="button"
+                                    onClick={() => setBaseDate(new Date())}
+                                    style={{
+                                        background: 'rgba(249, 115, 22, 0.12)',
+                                        border: '1px solid rgba(249, 115, 22, 0.3)',
+                                        color: '#f97316',
+                                        borderRadius: '8px',
+                                        padding: '5px 9px',
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        cursor: 'pointer'
+                                    }}
+                                    title="Zum aktuellen Monat springen"
+                                >
+                                    Heute
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {filterMode === 'year' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                type="button"
+                                onClick={() => setBaseDate(addMonths(baseDate, -12))}
+                                style={{
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#cbd5e1',
+                                    borderRadius: '8px',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}
+                                title="Vorheriges Jahr"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+
+                            <div style={{
+                                fontWeight: 700,
+                                fontSize: '15px',
+                                color: '#f8fafc',
+                                minWidth: '70px',
+                                textAlign: 'center'
+                            }}>
+                                {baseDate.getFullYear()}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setBaseDate(addMonths(baseDate, 12))}
+                                style={{
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#cbd5e1',
+                                    borderRadius: '8px',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}
+                                title="Nächstes Jahr"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+
+                            {!isCurrentYear && (
+                                <button
+                                    type="button"
+                                    onClick={() => setBaseDate(new Date())}
+                                    style={{
+                                        background: 'rgba(249, 115, 22, 0.12)',
+                                        border: '1px solid rgba(249, 115, 22, 0.3)',
+                                        color: '#f97316',
+                                        borderRadius: '8px',
+                                        padding: '5px 9px',
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Dieses Jahr
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {filterMode === 'custom' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <input
+                                type="date"
+                                value={customStart}
+                                onChange={(e) => setCustomStart(e.target.value)}
+                                style={{
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#fff',
+                                    borderRadius: '8px',
+                                    padding: '6px 10px',
+                                    fontSize: '12px'
+                                }}
+                            />
+                            <span style={{ color: '#64748b' }}>bis</span>
+                            <input
+                                type="date"
+                                value={customEnd}
+                                onChange={(e) => setCustomEnd(e.target.value)}
+                                style={{
+                                    background: '#0f172a',
+                                    border: '1px solid #334155',
+                                    color: '#fff',
+                                    borderRadius: '8px',
+                                    padding: '6px 10px',
+                                    fontSize: '12px'
+                                }}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* Row 2: Instant Filter Chips Bar (Shift Types & Vehicles) */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    paddingTop: '10px',
+                    borderTop: '1px solid #334155'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginRight: '2px' }}>
+                            Schichten:
+                        </span>
+
+                        {/* "Alle" Chip */}
+                        <button
+                            type="button"
+                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); }}
+                            style={{
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                fontWeight: !hasActiveFilters ? 700 : 500,
+                                background: !hasActiveFilters ? '#334155' : 'transparent',
+                                border: !hasActiveFilters ? '1px solid #475569' : '1px solid #334155',
+                                color: !hasActiveFilters ? '#f8fafc' : '#94a3b8',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                            }}
+                        >
+                            Alle
+                        </button>
+
+                        {/* Shift Type Chips */}
+                        {(store.settings?.shiftTypes || []).map(t => {
+                            const active = selectedTypes.includes(t.id);
+                            const shiftCol = getShiftColor(t.name, '');
+                            return (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => setSelectedTypes(active ? selectedTypes.filter(x => x !== t.id) : [...selectedTypes, t.id])}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        padding: '4px 10px',
+                                        borderRadius: '20px',
+                                        fontSize: '12px',
+                                        fontWeight: active ? 700 : 500,
+                                        background: active ? shiftCol.bg : 'transparent',
+                                        border: active ? `1px solid ${shiftCol.border}` : '1px solid #334155',
+                                        color: active ? shiftCol.color : '#94a3b8',
+                                        boxShadow: active ? `0 0 8px ${shiftCol.border}` : 'none',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: shiftCol.color }} />
+                                    <span>{t.name}</span>
+                                    {active && <span style={{ fontSize: '10px' }}>✓</span>}
+                                </button>
+                            );
+                        })}
+
+                        {/* Vehicles if configured */}
+                        {(store.settings?.vehicles || []).length > 0 && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Fahrzeuge:</span>
+                                {(store.settings?.vehicles || []).map(v => {
+                                    const active = selectedVehicles.includes(v);
+                                    return (
+                                        <button
+                                            key={v}
+                                            type="button"
+                                            onClick={() => setSelectedVehicles(active ? selectedVehicles.filter(x => x !== v) : [...selectedVehicles, v])}
+                                            style={{
+                                                padding: '3px 8px',
+                                                borderRadius: '16px',
+                                                fontSize: '11px',
+                                                fontWeight: active ? 700 : 500,
+                                                background: active ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
+                                                border: active ? '1px solid #22c55e' : '1px solid #334155',
+                                                color: active ? '#22c55e' : '#64748b',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {v} {active && '✓'}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Reset Button (Visible when filters are active) */}
+                    {hasActiveFilters && (
+                        <button
+                            type="button"
+                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                color: '#ef4444',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                cursor: 'pointer'
+                            }}
+                            title="Alle Filter zurücksetzen"
+                        >
+                            <X size={12} />
+                            <span>Filter aufheben ({selectedTypes.length + selectedVehicles.length})</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -597,98 +950,6 @@ export default function Analysis() {
                 </>
             )}
 
-            {/* Filter Modal */}
-            {isFilterOpen && (
-                <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsFilterOpen(false)}>
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>Filter</h3>
-                            <button className="close-btn" onClick={() => setIsFilterOpen(false)}>✕</button>
-                        </div>
-                        <div className="modal-body">
-                            {/* Mode Toggle */}
-                            <div style={{ display: 'flex', background: '#1e293b', borderRadius: '8px', padding: '4px', marginBottom: '16px' }}>
-                                {['month', 'year', 'custom'].map(m => (
-                                    <button
-                                        key={m}
-                                        onClick={() => setFilterMode(m)}
-                                        style={{
-                                            flex: 1, padding: '8px', borderRadius: '6px', border: 'none',
-                                            background: filterMode === m ? 'var(--color-primary)' : 'transparent',
-                                            color: filterMode === m ? 'white' : '#94a3b8'
-                                        }}
-                                    >
-                                        {m === 'month' ? 'Monat' : m === 'year' ? 'Jahr' : 'Zeit'}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Controls */}
-                            <div style={{ marginBottom: '20px' }}>
-                                {filterMode === 'month' && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', padding: '10px', borderRadius: '8px' }}>
-                                        <button className="close-btn" onClick={() => setBaseDate(addMonths(baseDate, -1))}>&lt;</button>
-                                        <strong>{baseDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</strong>
-                                        <button className="close-btn" onClick={() => setBaseDate(addMonths(baseDate, 1))}>&gt;</button>
-                                    </div>
-                                )}
-                                {filterMode === 'year' && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', padding: '10px', borderRadius: '8px' }}>
-                                        <button className="close-btn" onClick={() => setBaseDate(addMonths(baseDate, -12))}>&lt;</button>
-                                        <strong>{baseDate.getFullYear()}</strong>
-                                        <button className="close-btn" onClick={() => setBaseDate(addMonths(baseDate, 12))}>&gt;</button>
-                                    </div>
-                                )}
-                                {filterMode === 'custom' && (
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <input type="date" className="input-premium" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
-                                        <input type="date" className="input-premium" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Types */}
-                            <div style={{ marginBottom: '16px' }}>
-                                <label className="text-label" style={{ display: 'block', marginBottom: '8px' }}>Schichtarten</label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                    {(store.settings?.shiftTypes || []).map(t => {
-                                        const active = selectedTypes.includes(t.id);
-                                        return (
-                                            <button key={t.id}
-                                                onClick={() => setSelectedTypes(active ? selectedTypes.filter(x => x !== t.id) : [...selectedTypes, t.id])}
-                                                className={`filter-chip ${active ? 'active' : ''}`}
-                                            >
-                                                {t.name} {active && '✓'}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Vehicles */}
-                            <div>
-                                <label className="text-label" style={{ display: 'block', marginBottom: '8px' }}>Fahrzeuge</label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                    {(store.settings?.vehicles || []).map(v => {
-                                        const active = selectedVehicles.includes(v);
-                                        return (
-                                            <button key={v}
-                                                onClick={() => setSelectedVehicles(active ? selectedVehicles.filter(x => x !== v) : [...selectedVehicles, v])}
-                                                className={`filter-chip ${active ? 'active' : ''}`}
-                                            >
-                                                {v} {active && '✓'}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button onClick={() => setIsFilterOpen(false)} className="btn-primary" style={{ width: '100%' }}>Fertig</button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

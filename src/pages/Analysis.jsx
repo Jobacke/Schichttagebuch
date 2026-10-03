@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { APP_VERSION } from '../version';
 import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
 import { useStore } from '../context/StoreContext';
@@ -11,30 +11,374 @@ const addMonths = (date, n) => {
     return d;
 };
 
-// Component: Simple CSS Bar Chart
-const CssBarChart = ({ data }) => {
-    if (!data || data.length === 0) return null;
-    const maxVal = Math.max(...data.map(d => d.hours)) || 1;
+// Helper: Duration between HH:MM and HH:MM
+const calcDuration = (start, end) => {
+    if (!start || !end) return '';
+    try {
+        const [sh, sm] = start.split(':').map(Number);
+        const [eh, em] = end.split(':').map(Number);
+        let sMin = sh * 60 + sm;
+        let eMin = eh * 60 + em;
+        if (eMin < sMin) eMin += 24 * 60;
+        return ((eMin - sMin) / 60).toFixed(1);
+    } catch { return ''; }
+};
+
+// Color mapper for shift types & codes
+const getShiftColor = (typeName, code) => {
+    const text = `${typeName || ''} ${code || ''}`.toLowerCase();
+    if (text.includes('früh') || text.includes('rf') || text.includes('fm') || text.includes('fh') || text.includes('fo')) {
+        return { color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.18)', border: 'rgba(56, 189, 248, 0.5)', label: 'Früh' };
+    }
+    if (text.includes('spät') || text.includes('rs') || text.includes('sm') || text.includes('sh') || text.includes('so')) {
+        return { color: '#f97316', bg: 'rgba(249, 115, 22, 0.18)', border: 'rgba(249, 115, 22, 0.5)', label: 'Spät' };
+    }
+    if (text.includes('nacht') || text.includes('rn') || text.includes('nm') || text.includes('nh')) {
+        return { color: '#c084fc', bg: 'rgba(192, 132, 252, 0.18)', border: 'rgba(192, 132, 252, 0.5)', label: 'Nacht' };
+    }
+    if (text.includes('tag') || text.includes('rt') || text.includes('t1') || text.includes('t2') || text.includes('t3') || text.includes('t4')) {
+        return { color: '#facc15', bg: 'rgba(250, 204, 21, 0.18)', border: 'rgba(250, 204, 21, 0.5)', label: 'Tag' };
+    }
+    return { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(34, 197, 94, 0.5)', label: typeName || 'Dienst' };
+};
+
+// Component: Modern Month Calendar & Shift Rhythm Grid
+function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings }) {
+    const [selectedDateStr, setSelectedDateStr] = useState(null);
+
+    // Group shifts by date string YYYY-MM-DD
+    const shiftsByDate = useMemo(() => {
+        const map = {};
+        (filteredData || []).forEach(s => {
+            if (!s.date) return;
+            if (!map[s.date]) map[s.date] = [];
+            map[s.date].push(s);
+        });
+        return map;
+    }, [filteredData]);
+
+    // Handle YEAR mode
+    if (filterMode === 'year') {
+        const year = baseDate.getFullYear();
+        const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        return (
+            <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '13px', color: '#94a3b8' }}>Jahresübersicht {year}</span>
+                    <span style={{ fontSize: '12px', background: 'rgba(249, 115, 22, 0.15)', color: '#f97316', padding: '2px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                        {filteredData.length} Schichten gesamt
+                    </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                    {monthNames.map((mName, mIdx) => {
+                        const mStr = String(mIdx + 1).padStart(2, '0');
+                        const prefix = `${year}-${mStr}`;
+                        const monthShifts = filteredData.filter(s => s.date?.startsWith(prefix));
+                        let mHours = 0;
+                        monthShifts.forEach(s => {
+                            const dur = parseFloat(calcDuration(s.startTime, s.endTime)) || 0;
+                            mHours += dur;
+                        });
+                        const daysInM = new Date(year, mIdx + 1, 0).getDate();
+                        const monthlyWeekly = storeSettings?.monthlyWeeklyHours?.[prefix] ?? storeSettings?.defaultWeeklyHours ?? 20;
+                        const mTarget = (daysInM / 7) * Number(monthlyWeekly);
+                        const hasShifts = monthShifts.length > 0;
+
+                        return (
+                            <div
+                                key={mName}
+                                style={{
+                                    background: hasShifts ? '#1e293b' : '#0f172a',
+                                    border: hasShifts ? '1px solid #334155' : '1px solid rgba(255,255,255,0.03)',
+                                    borderRadius: '8px',
+                                    padding: '8px 10px'
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '13px', color: hasShifts ? '#f8fafc' : '#64748b' }}>{mName}</span>
+                                    {hasShifts && (
+                                        <span style={{ fontSize: '11px', background: '#334155', color: '#facc15', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                            {monthShifts.length} {monthShifts.length === 1 ? 'Dst' : 'Dste'}
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={{ fontSize: '12px', fontWeight: 600, color: hasShifts ? '#38bdf8' : '#475569' }}>
+                                    {mHours.toFixed(1)} h
+                                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal', marginLeft: '4px' }}>
+                                        / {mTarget.toFixed(0)}h
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    }
+
+    // MONTH mode (standard view)
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // Monday-first weekday: Monday=0 ... Sunday=6
+    const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
+
+    const days = [];
+    for (let i = 0; i < firstDay; i++) {
+        days.push({ empty: true, key: `empty-${i}` });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dayShifts = shiftsByDate[dateStr] || [];
+        const isWeekend = ((firstDay + d - 1) % 7) >= 5;
+        days.push({
+            empty: false,
+            dayNum: d,
+            dateStr,
+            shifts: dayShifts,
+            isWeekend,
+            key: dateStr
+        });
+    }
+
+    const shiftDaysCount = Object.keys(shiftsByDate).length;
+    const freeDaysCount = Math.max(0, daysInMonth - shiftDaysCount);
+
+    const selectedDayData = selectedDateStr ? days.find(d => !d.empty && d.dateStr === selectedDateStr) : null;
+    let selectedDayInfo = null;
+    if (selectedDayData) {
+        const dObj = new Date(selectedDayData.dateStr);
+        selectedDayInfo = {
+            dateStr: selectedDayData.dateStr,
+            dateFormatted: dObj.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }),
+            shifts: selectedDayData.shifts
+        };
+    }
 
     return (
-        <div style={{ display: 'flex', alignItems: 'flex-end', height: '150px', gap: '2px', paddingTop: '20px' }}>
-            {data.map((d, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', width: '100%', padding: '0 1px' }}>
-                        <div style={{
-                            width: '100%',
-                            height: `${(d.hours / maxVal) * 100}%`,
-                            background: '#f97316',
-                            borderTopLeftRadius: '2px',
-                            borderTopRightRadius: '2px',
-                            minHeight: '2px'
-                        }} />
-                    </div>
+        <div>
+            {/* Header: Title & Counter Pills */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                <h3 className="text-label" style={{ margin: 0 }}>📅 Schicht-Rhythmus</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{
+                        background: 'rgba(249, 115, 22, 0.15)',
+                        color: '#f97316',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 700
+                    }}>
+                        {filteredData.length} {filteredData.length === 1 ? 'Schicht' : 'Schichten'}
+                    </span>
+                    <span style={{
+                        background: 'rgba(148, 163, 184, 0.12)',
+                        color: '#94a3b8',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600
+                    }}>
+                        {freeDaysCount} Tage frei
+                    </span>
                 </div>
-            ))}
+            </div>
+
+            {/* Weekday Labels Header */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '6px' }}>
+                {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((wd, i) => (
+                    <div
+                        key={wd}
+                        style={{
+                            textAlign: 'center',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: i >= 5 ? '#f97316' : '#64748b',
+                            padding: '2px 0'
+                        }}
+                    >
+                        {wd}
+                    </div>
+                ))}
+            </div>
+
+            {/* Calendar Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                {days.map(item => {
+                    if (item.empty) {
+                        return <div key={item.key} style={{ minHeight: '46px', opacity: 0 }} />;
+                    }
+
+                    const hasShift = item.shifts && item.shifts.length > 0;
+                    const firstShift = hasShift ? item.shifts[0] : null;
+                    const shiftColor = hasShift
+                        ? getShiftColor(firstShift.shiftTypeName, firstShift.code)
+                        : null;
+                    const isSelected = selectedDateStr === item.dateStr;
+
+                    return (
+                        <div
+                            key={item.key}
+                            onClick={() => setSelectedDateStr(isSelected ? null : item.dateStr)}
+                            style={{
+                                minHeight: '46px',
+                                padding: '4px 2px',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                background: hasShift ? shiftColor.bg : (item.isWeekend ? 'rgba(30, 41, 59, 0.4)' : '#0f172a'),
+                                border: isSelected
+                                    ? '2px solid #38bdf8'
+                                    : (hasShift ? `1px solid ${shiftColor.border}` : '1px solid #1e293b'),
+                                boxShadow: isSelected ? '0 0 10px rgba(56, 189, 248, 0.35)' : 'none'
+                            }}
+                            title={hasShift ? `${firstShift.code} (${firstShift.startTime} - ${firstShift.endTime})` : `Tag ${item.dayNum}: Frei`}
+                        >
+                            {/* Day Number */}
+                            <span style={{
+                                fontSize: '11px',
+                                fontWeight: hasShift ? 800 : (item.isWeekend ? 600 : 500),
+                                color: hasShift ? '#f8fafc' : (item.isWeekend ? '#94a3b8' : '#475569'),
+                                lineHeight: 1
+                            }}>
+                                {item.dayNum}
+                            </span>
+
+                            {/* Shift Badge or Free Dot */}
+                            {hasShift ? (
+                                <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 800,
+                                    color: shiftColor.color,
+                                    lineHeight: 1,
+                                    marginTop: '2px',
+                                    maxWidth: '100%',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    textAlign: 'center'
+                                }}>
+                                    {firstShift.code || 'DST'}
+                                </div>
+                            ) : (
+                                <div style={{
+                                    width: '4px',
+                                    height: '4px',
+                                    borderRadius: '50%',
+                                    background: '#1e293b',
+                                    marginBottom: '2px'
+                                }} />
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Selected Day Inspector */}
+            {selectedDayInfo && (
+                <div style={{
+                    marginTop: '12px',
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    background: selectedDayInfo.shifts.length > 0 ? '#1e293b' : 'rgba(15, 23, 42, 0.6)',
+                    border: selectedDayInfo.shifts.length > 0 ? '1px solid #334155' : '1px dashed #334155'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: selectedDayInfo.shifts.length > 0 ? '8px' : 0 }}>
+                        <span style={{ fontWeight: 700, fontSize: '13px', color: '#f8fafc' }}>
+                            📅 {selectedDayInfo.dateFormatted}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setSelectedDateStr(null)}
+                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 6px', fontSize: '14px' }}
+                            title="Schließen"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    {selectedDayInfo.shifts.length === 0 ? (
+                        <div style={{ fontSize: '12.5px', color: '#94a3b8', fontStyle: 'italic', paddingTop: '4px' }}>
+                            🌴 Dienstfrei – kein Einsatz an diesem Tag
+                        </div>
+                    ) : (
+                        selectedDayInfo.shifts.map((s, idx) => {
+                            const dur = calcDuration(s.startTime, s.endTime);
+                            const shiftCol = getShiftColor(s.shiftTypeName, s.code);
+                            return (
+                                <div key={s.id || idx} style={{ marginTop: idx > 0 ? '10px' : 0, borderTop: idx > 0 ? '1px solid #334155' : 'none', paddingTop: idx > 0 ? '8px' : 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span style={{
+                                            background: shiftCol.bg,
+                                            color: shiftCol.color,
+                                            border: `1px solid ${shiftCol.border}`,
+                                            padding: '2px 7px',
+                                            borderRadius: '5px',
+                                            fontSize: '12px',
+                                            fontWeight: 800
+                                        }}>
+                                            {s.code || 'Dienst'}
+                                        </span>
+                                        <span style={{ fontWeight: 600, fontSize: '13px', color: '#f1f5f9' }}>
+                                            {s.shiftTypeName || 'Schicht'}
+                                        </span>
+                                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                            🕒 {s.startTime} – {s.endTime} Uhr {dur ? `(${dur} Std)` : ''}
+                                        </span>
+                                    </div>
+                                    {(s.station || s.vehicle) && (
+                                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                                            📍 {s.station} {s.vehicle ? `• ${s.vehicle}` : ''}
+                                        </div>
+                                    )}
+                                    {s.partner && (
+                                        <div style={{ fontSize: '12px', color: '#38bdf8', marginTop: '3px', fontWeight: 500 }}>
+                                            👤 {s.partner}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            )}
+
+            {/* Legend */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                flexWrap: 'wrap',
+                marginTop: '14px',
+                paddingTop: '10px',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+                fontSize: '11px',
+                color: '#94a3b8'
+            }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#38bdf8' }} /> Früh
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#f97316' }} /> Spät
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#c084fc' }} /> Nacht
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#facc15' }} /> Tag
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#334155' }} /> Frei
+                </span>
+            </div>
         </div>
     );
-};
+}
 
 export default function Analysis() {
     const { store } = useStore();
@@ -124,8 +468,12 @@ export default function Analysis() {
             ) : (
                 <>
                     <div className="card-premium">
-                        <h3 className="text-label" style={{ margin: '0 0 10px 0' }}>📅 Verlauf (Tage)</h3>
-                        <CssBarChart data={stats.chartData} />
+                        <ShiftRhythmCalendar
+                            baseDate={baseDate}
+                            filterMode={filterMode}
+                            filteredData={filteredData}
+                            storeSettings={store.settings}
+                        />
                     </div>
 
                     <div className="card-premium">

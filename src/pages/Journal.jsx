@@ -2,13 +2,16 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { getDaysInMonth, startOfMonth, getDay, isSameDay, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, PenSquare, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PenSquare, MapPin, Sparkles, CheckCircle2 } from 'lucide-react';
+import CareManImportModal from '../components/CareManImportModal';
 
 export default function Journal() {
-    const { store } = useStore();
+    const { store, addShifts, ensureCodesAndTypes } = useStore();
     const navigate = useNavigate();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [toastMessage, setToastMessage] = useState(null);
 
     // --- Calendar Logic ---
     const daysInMonth = getDaysInMonth(currentDate);
@@ -33,18 +36,87 @@ export default function Journal() {
         setSelectedDate(null);
     };
 
+    const handleImportSuccess = (yearMonth, count) => {
+        const [y, m] = yearMonth.split('-').map(Number);
+        setCurrentDate(new Date(y, m - 1, 1));
+        setSelectedDate(null);
+        const monthLabel = new Date(y, m - 1, 1).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
+        setToastMessage(`${count} Schichten für ${monthLabel} erfolgreich eingetragen!`);
+        setTimeout(() => setToastMessage(null), 6000);
+    };
+
+    const currentYearMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+
     return (
         <div className="page-content">
-            {/* Header */}
-            <div className="calendar-header">
-                <h1>Übersicht</h1>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <button className="btn-icon" onClick={() => changeMonth(-1)}><ChevronLeft size={20} /></button>
-                    <span style={{ fontWeight: 'bold', minWidth: '120px', textAlign: 'center' }}>
-                        {currentDate.toLocaleString('de-DE', { month: 'long', year: 'numeric' })}
-                    </span>
-                    <button className="btn-icon" onClick={() => changeMonth(1)}><ChevronRight size={20} /></button>
+            {/* Toast Notification */}
+            {toastMessage && (
+                <div style={{
+                    background: 'rgba(34, 197, 94, 0.15)',
+                    border: '1px solid rgba(34, 197, 94, 0.4)',
+                    color: 'var(--color-success)',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <CheckCircle2 size={18} />
+                    <span>{toastMessage}</span>
                 </div>
+            )}
+
+            {/* Header */}
+            <div className="calendar-header" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                    <h1 style={{ margin: 0 }}>Übersicht</h1>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'} im Monat
+                    </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                        type="button"
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="btn-primary"
+                        style={{
+                            fontSize: '13px',
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            gap: '6px'
+                        }}
+                        title="Dienstplan aus CareMan oder Screenshot importieren"
+                    >
+                        <Sparkles size={16} />
+                        Dienstplan importieren
+                    </button>
+                </div>
+            </div>
+
+            {/* Month Switcher Bar */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'var(--color-surface)',
+                borderRadius: '12px',
+                padding: '8px 12px',
+                marginBottom: '16px',
+                border: 'var(--glass-border)'
+            }}>
+                <button className="btn-icon" onClick={() => changeMonth(-1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
+                    <ChevronLeft size={20} />
+                </button>
+                <span style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                    {currentDate.toLocaleString('de-DE', { month: 'long', year: 'numeric' })}
+                </span>
+                <button className="btn-icon" onClick={() => changeMonth(1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
+                    <ChevronRight size={20} />
+                </button>
             </div>
 
             {/* Calendar Grid */}
@@ -80,18 +152,36 @@ export default function Journal() {
             </div>
 
             {/* Shift List */}
-            <h2 style={{ marginTop: '24px' }}>
-                {selectedDate
-                    ? `Dienste am ${selectedDate.toLocaleDateString('de-DE')}`
-                    : 'Alle Dienste im Monat'
-                }
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', marginBottom: '12px' }}>
+                <h2 style={{ margin: 0 }}>
+                    {selectedDate
+                        ? `Dienste am ${selectedDate.toLocaleDateString('de-DE')}`
+                        : 'Alle Dienste im Monat'
+                    }
+                </h2>
+                {selectedDate && (
+                    <button
+                        onClick={() => setSelectedDate(null)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-primary)',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: 500
+                        }}
+                    >
+                        Alle anzeigen
+                    </button>
+                )}
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {(selectedDate ? shiftsOnSelectedDate : monthShifts)
                     .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort newest first
                     .map(shift => {
-                        const code = store.settings.shiftCodes.find(c => c.id === shift.codeId);
+                        const code = store.settings.shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
+                        const displayCode = code ? code.code : (shift.code || 'Schicht');
                         const dayName = new Date(shift.date).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
                         const dayNum = new Date(shift.date).getDate();
 
@@ -122,7 +212,9 @@ export default function Journal() {
                                 {/* Details */}
                                 <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                        <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{code ? code.code : 'Schicht'}</span>
+                                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                                            {displayCode}
+                                        </span>
                                         <span style={{ fontSize: '12px', background: '#334155', padding: '2px 8px', borderRadius: '4px', color: '#cbd5e1' }}>
                                             {shift.startTime} - {shift.endTime}
                                         </span>
@@ -142,11 +234,38 @@ export default function Journal() {
                     })}
 
                 {(selectedDate ? shiftsOnSelectedDate : monthShifts).length === 0 && (
-                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                        Keine Einträge vorhanden.
+                    <div style={{
+                        padding: '30px 20px',
+                        textAlign: 'center',
+                        color: 'var(--color-text-muted)',
+                        background: 'var(--color-surface)',
+                        borderRadius: '16px',
+                        border: 'var(--glass-border)'
+                    }}>
+                        <div style={{ marginBottom: '12px', fontSize: '14px' }}>Keine Einträge für diesen Monat vorhanden.</div>
+                        <button
+                            type="button"
+                            className="btn-primary"
+                            onClick={() => setIsImportModalOpen(true)}
+                            style={{ margin: '0 auto', fontSize: '13px', padding: '8px 16px' }}
+                        >
+                            <Sparkles size={16} />
+                            Dienstplan für diesen Monat importieren
+                        </button>
                     </div>
                 )}
             </div>
+
+            {/* CareMan Import Modal */}
+            <CareManImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onImportSuccess={handleImportSuccess}
+                store={store}
+                addShifts={addShifts}
+                ensureCodesAndTypes={ensureCodesAndTypes}
+                initialYearMonth={currentYearMonthStr.startsWith('2026-11') ? '2026-11' : currentYearMonthStr}
+            />
         </div>
     );
 }

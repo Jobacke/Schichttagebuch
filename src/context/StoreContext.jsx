@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
-import { collection, doc, setDoc, onSnapshot, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, query, orderBy, deleteDoc, writeBatch } from 'firebase/firestore';
 
 const StoreContext = createContext();
 
@@ -87,6 +87,92 @@ export function StoreProvider({ children }) {
     }
   };
 
+  const addShifts = async (shiftsArray, overwriteExistingDates = false) => {
+    if (!currentUser || !shiftsArray || shiftsArray.length === 0) return true;
+    try {
+      const batch = writeBatch(db);
+
+      if (overwriteExistingDates) {
+        const datesToOverwrite = new Set(shiftsArray.map(s => s.date));
+        const existingToDelete = (shifts || []).filter(s => datesToOverwrite.has(s.date));
+        existingToDelete.forEach(s => {
+          batch.delete(doc(db, `users/${currentUser.uid}/shifts`, s.id));
+        });
+      }
+
+      shiftsArray.forEach(shift => {
+        const id = shift.id || crypto.randomUUID();
+        const ref = doc(db, `users/${currentUser.uid}/shifts`, id);
+        batch.set(ref, {
+          ...shift,
+          id,
+          timestamp: shift.timestamp || Date.now()
+        });
+      });
+
+      await batch.commit();
+      return true;
+    } catch (e) {
+      console.warn("Batch failed, attempting fallback:", e);
+      try {
+        await Promise.all(shiftsArray.map(shift => {
+          const id = shift.id || crypto.randomUUID();
+          return setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), {
+            ...shift,
+            id,
+            timestamp: shift.timestamp || Date.now()
+          });
+        }));
+        return true;
+      } catch (err) {
+        console.error("Batch Add Shifts Failed", err);
+        alert("Fehler beim Speichern der Schichten: " + err.message);
+        return false;
+      }
+    }
+  };
+
+  const ensureCodesAndTypes = async (requiredCodes = [], requiredTypes = []) => {
+    if (!currentUser) return;
+    let settingsUpdated = false;
+    let currentCodes = [...(settings?.shiftCodes || [])];
+    let currentTypes = [...(settings?.shiftTypes || [])];
+
+    requiredCodes.forEach(rc => {
+      const codeStr = typeof rc === 'string' ? rc : rc.code;
+      const hoursNum = typeof rc === 'object' && rc.hours ? rc.hours : 8.2;
+      if (codeStr && !currentCodes.some(c => c.code.toLowerCase() === codeStr.toLowerCase())) {
+        currentCodes.push({
+          id: crypto.randomUUID(),
+          code: codeStr.toUpperCase(),
+          hours: hoursNum
+        });
+        settingsUpdated = true;
+      }
+    });
+
+    requiredTypes.forEach(rt => {
+      const nameStr = typeof rt === 'string' ? rt : rt.name;
+      if (nameStr && !currentTypes.some(t => t.name.toLowerCase() === nameStr.toLowerCase())) {
+        currentTypes.push({
+          id: crypto.randomUUID(),
+          name: nameStr
+        });
+        settingsUpdated = true;
+      }
+    });
+
+    if (settingsUpdated) {
+      const newSettings = {
+        ...settings,
+        shiftCodes: currentCodes,
+        shiftTypes: currentTypes
+      };
+      setSettings(newSettings);
+      await _updateSettingsDoc(newSettings);
+    }
+  };
+
   const deleteShift = async (id) => {
     if (!currentUser) return;
     try {
@@ -166,6 +252,8 @@ export function StoreProvider({ children }) {
     <StoreContext.Provider value={{
       store: safeStore,
       addShift,
+      addShifts,
+      ensureCodesAndTypes,
       deleteShift,
       updateSettings,
       addSettingItem,

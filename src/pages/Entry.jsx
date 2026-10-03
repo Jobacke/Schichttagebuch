@@ -2,141 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { APP_VERSION } from '../version';
+import { SHIFT_PRESETS } from '../utils/shiftPresets';
+import CareManImportModal from '../components/CareManImportModal';
+import { Sparkles } from 'lucide-react';
 
 export default function Entry() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const editId = searchParams.get('id');
-    const { store, addShift, deleteShift } = useStore();
+    const { store, addShift, deleteShift, addShifts, ensureCodesAndTypes } = useStore();
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     const today = new Date().toISOString().split('T')[0];
 
-    // Schicht-Presets: Definiert automatische Werte für bestimmte Schicht-Kürzel
-    const shiftPresets = {
-        // Hohenbrunn Schichten
-        'RFH': {
-            shiftTypeName: 'Frühschicht',
-            startTime: '06:54',
-            endTime: '15:06',
-            station: 'Wache Hohenbrunn',
-            vehicle: 'RTW Akkon Hohenbrunn 71/1',
-            callSign: 'Akkon Hohenbrunn 71/1'
-        },
-        'RTH': {
-            shiftTypeName: 'Tagschicht',
-            startTime: '08:54',
-            endTime: '19:06',
-            station: 'Wache Hohenbrunn',
-            vehicle: 'RTW Akkon HBN 71/2',
-            callSign: 'Akkon HBN 71/2'
-        },
-        'RT1H': {
-            shiftTypeName: 'Tagschicht',
-            startTime: '08:54',
-            endTime: '15:06',
-            station: 'Wache Hohenbrunn',
-            vehicle: 'RTW Akkon HBN 71/2',
-            callSign: 'Akkon HBN 71/2'
-        },
-        'RT2H': {
-            shiftTypeName: 'Tagschicht',
-            startTime: '14:54',
-            endTime: '21:06',
-            station: 'Wache Hohenbrunn',
-            vehicle: 'RTW Akkon HBN 71/2',
-            callSign: 'Akkon HBN 71/2'
-        },
-        'RSH': {
-            shiftTypeName: 'Spätschicht',
-            startTime: '14:54',
-            endTime: '23:06',
-            station: 'Wache Hohenbrunn',
-            vehicle: 'RTW Akkon HBN 71/1',
-            callSign: 'Akkon HBN 71/1'
-        },
-        'RNH': {
-            shiftTypeName: 'Nachtschicht',
-            startTime: '22:54',
-            endTime: '07:06',
-            station: 'Wache Hohenbrunn',
-            vehicle: 'RTW Akkon HBN 71/1',
-            callSign: 'Akkon HBN 71/1'
-        },
-        // Sendling Schichten
-        'RFM': {
-            shiftTypeName: 'Frühschicht',
-            startTime: '06:54',
-            endTime: '15:06',
-            station: 'Wache Sendling',
-            vehicle: 'RTW Akkon Sendling 71/1',
-            callSign: 'Akkon Sendling 71/1'
-        },
-        'RSM': {
-            shiftTypeName: 'Spätschicht',
-            startTime: '14:54',
-            endTime: '23:06',
-            station: 'Wache Sendling',
-            vehicle: 'RTW Akkon Sendling 71/1',
-            callSign: 'Akkon Sendling 71/1'
-        },
-        'RNM': {
-            shiftTypeName: 'Nachtschicht',
-            startTime: '22:54',
-            endTime: '07:06',
-            station: 'Wache Sendling',
-            vehicle: 'RTW Akkon Sendling 71/1',
-            callSign: 'Akkon Sendling 71/1'
-        },
-        'RT1M': {
-            shiftTypeName: 'Frühschicht',
-            startTime: '06:54',
-            endTime: '15:06',
-            station: 'Wache Sendling',
-            vehicle: 'RTW Akkon Sendling 71/2',
-            callSign: 'Akkon Sendling 71/2'
-        },
-        'RT2M': {
-            shiftTypeName: 'Spätschicht',
-            startTime: '14:54',
-            endTime: '23:06',
-            station: 'Wache Sendling',
-            vehicle: 'RTW Akkon Sendling 71/2',
-            callSign: 'Akkon Sendling 71/2'
-        },
-        'RT3M': {
-            shiftTypeName: 'Frühschicht',
-            startTime: '06:54',
-            endTime: '15:36',
-            station: 'Wache Sendling',
-            vehicle: 'RTW Akkon Sendling 71/2',
-            callSign: 'Akkon Sendling 71/2'
-        },
-        'RT4M': {
-            shiftTypeName: 'Spätschicht',
-            startTime: '15:24',
-            endTime: '00:06',
-            station: 'Wache Sendling',
-            vehicle: 'RTW Akkon Sendling 71/2',
-            callSign: 'Akkon Sendling 71/2'
-        },
-        // Obersendling Schichten
-        'RFO': {
-            shiftTypeName: 'Frühschicht',
-            startTime: '07:54',
-            endTime: '16:06',
-            station: 'Wache Obersendling',
-            vehicle: 'RTW Akkon Obersendling 71/1',
-            callSign: 'Akkon Obersendling 71/1'
-        },
-        'RSO': {
-            shiftTypeName: 'Spätschicht',
-            startTime: '15:54',
-            endTime: '00:06',
-            station: 'Wache Obersendling',
-            vehicle: 'RTW Akkon Obersendling 71/1',
-            callSign: 'Akkon Obersendling 71/1'
-        }
-    };
+    const shiftPresets = SHIFT_PRESETS;
 
 
     const [formData, setFormData] = useState({
@@ -225,8 +104,10 @@ export default function Entry() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        const selectedCode = store.settings.shiftCodes.find(c => c.id === formData.codeId);
         const shiftData = {
             ...formData,
+            code: selectedCode ? selectedCode.code : (formData.code || ''),
             id: editId || crypto.randomUUID(),
             timestamp: editId ? formData.timestamp : Date.now()
         };
@@ -271,6 +152,50 @@ export default function Entry() {
                     </button>
                 )}
             </div>
+
+            {!editId && (
+                <div style={{
+                    background: 'rgba(249, 115, 22, 0.1)',
+                    border: '1px solid rgba(249, 115, 22, 0.25)',
+                    borderRadius: '16px',
+                    padding: '14px 16px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                            background: 'rgba(249, 115, 22, 0.2)',
+                            color: 'var(--color-primary)',
+                            borderRadius: '10px',
+                            padding: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <Sparkles size={18} />
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-text-main)' }}>
+                                Monatsdienstplan importieren
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                                CareMan Dienstplan (z.B. Nov 2026) komplett eintragen
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="btn-primary"
+                        style={{ fontSize: '13px', padding: '8px 14px', whiteSpace: 'nowrap' }}
+                    >
+                        Importieren
+                    </button>
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
@@ -423,6 +348,18 @@ export default function Entry() {
                     💾 {editId ? 'Änderungen speichern' : 'Speichern'}
                 </button>
             </form>
+
+            <CareManImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onImportSuccess={(yearMonth, count) => {
+                    navigate('/');
+                }}
+                store={store}
+                addShifts={addShifts}
+                ensureCodesAndTypes={ensureCodesAndTypes}
+                initialYearMonth="2026-11"
+            />
         </div>
     );
 }

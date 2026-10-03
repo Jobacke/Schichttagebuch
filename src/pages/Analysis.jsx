@@ -65,7 +65,8 @@ export default function Analysis() {
             delta,
             target,
             filteredData,
-            shiftTypes: store.settings?.shiftTypes || []
+            shiftTypes: store.settings?.shiftTypes || [],
+            shiftCodes: store.settings?.shiftCodes || []
         });
     };
 
@@ -152,6 +153,8 @@ export default function Analysis() {
                             {[...filteredData].sort((a, b) => a.date.localeCompare(b.date)).map(s => {
                                 const typeObj = (store.settings?.shiftTypes || []).find(t => t.id === s.typeId);
                                 const typeName = s.shiftTypeName || typeObj?.name || 'Dienst';
+                                const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
+                                const displayCode = s.code || codeObj?.code || '-';
                                 const d = new Date(s.date);
                                 const dateFormatted = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                                 return (
@@ -169,20 +172,22 @@ export default function Analysis() {
                                             gap: '6px'
                                         }}
                                     >
-                                        <div style={{ flex: 1, minWidth: '180px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                                        <div style={{ flex: 1, minWidth: '200px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, flexWrap: 'wrap' }}>
                                                 <span style={{ color: 'var(--color-primary)' }}>{dateFormatted}</span>
-                                                <span>•</span>
-                                                <span style={{ color: '#f1f5f9' }}>{s.code ? `${s.code} (${typeName})` : typeName}</span>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', fontSize: '12px', marginTop: '3px', flexWrap: 'wrap' }}>
-                                                <span>{s.startTime} - {s.endTime}</span>
-                                                {s.station && <span>• {s.station}</span>}
-                                                {s.vehicle && <span>• {s.vehicle}</span>}
-                                                {s.partner && (
-                                                    <span style={{ color: '#38bdf8', fontWeight: 500 }}>• 👤 {s.partner}</span>
+                                                {displayCode !== '-' && (
+                                                    <span style={{ background: '#334155', color: '#facc15', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>
+                                                        {displayCode}
+                                                    </span>
                                                 )}
+                                                <span style={{ color: '#f1f5f9' }}>{typeName}</span>
+                                                <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 'normal' }}>({s.startTime} - {s.endTime})</span>
                                             </div>
+                                            {s.partner && (
+                                                <div style={{ color: '#38bdf8', fontSize: '12.5px', marginTop: '3px', fontWeight: 500 }}>
+                                                    👤 {s.partner}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 );

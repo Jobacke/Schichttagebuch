@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 
-// Helper to calculate duration
+// Helper to calculate duration (in hours)
 function calculateDuration(start, end) {
     if (!start || !end) return 0;
     try {
@@ -23,209 +23,175 @@ const formatDate = (dateStr) => {
 };
 
 export function exportToPDF(data) {
-    const { label, stats, delta, target, filteredData, shiftTypes } = data;
+    const { label, stats, delta, target, filteredData, shiftTypes = [], shiftCodes = [] } = data;
 
-    // Use landscape orientation for better table display
+    // Use landscape orientation for clean 1-page monthly duty roster view
     const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
     });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    let yPos = 20;
-    const lineHeight = 7;
-    const margin = 20;
 
-    // Helper to add new page if needed
-    const checkPageBreak = (requiredSpace = 10) => {
-        if (yPos + requiredSpace > pageHeight - 20) {
+    const pageWidth = doc.internal.pageSize.getWidth();   // 297 mm
+    const pageHeight = doc.internal.pageSize.getHeight(); // 210 mm
+    const margin = 16;                                    // Printable width = 265 mm
+
+    let yPos = 16;
+
+    // Dynamic row height so monthly rosters fit on a single page
+    const shiftCount = filteredData?.length || 0;
+    const rowHeight = shiftCount > 24 ? 5.2 : shiftCount > 18 ? 5.6 : 6.0;
+
+    // Helper to add new page if content exceeds available space
+    const checkPageBreak = (requiredSpace = 8) => {
+        if (yPos + requiredSpace > pageHeight - 14) {
             doc.addPage();
-            yPos = 20;
+            yPos = 16;
             return true;
         }
         return false;
     };
 
-    // Title
-    doc.setFontSize(20);
+    // --- Compact Executive Header ---
+    // Title & Subtitle on Left
+    doc.setFontSize(17);
     doc.setFont(undefined, 'bold');
+    doc.setTextColor(15, 23, 42); // slate-900
     doc.text('Schichttagebuch - Auswertung', margin, yPos);
-    yPos += 10;
-
-    // Period
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text(label, margin, yPos);
-    yPos += 10;
-
-    // Divider
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 10;
-
-    // Statistics Section
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text('Zusammenfassung', margin, yPos);
-    yPos += 8;
 
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(label, margin, yPos + 6);
 
-    // Stats box
-    const statsBoxY = yPos;
-    doc.setFillColor(245, 245, 245);
-    doc.roundedRect(margin, statsBoxY, pageWidth - 2 * margin, 30, 3, 3, 'F');
+    // Compact KPI Badges on Right (Single-line cards)
+    const kpiBoxX = pageWidth - margin - 140;
+    const kpiBoxY = yPos - 3;
+    const kpiBoxW = 140;
+    const kpiBoxH = 13;
 
-    yPos += 8;
-    doc.text(`Geleistete Stunden: ${stats.actual.toFixed(1)} h`, margin + 5, yPos);
-    yPos += 7;
-    doc.text(`Anzahl Schichten: ${stats.count}`, margin + 5, yPos);
-    yPos += 7;
-    doc.text(`Soll-Stunden: ${target.toFixed(1)} h`, margin + 5, yPos);
-    yPos += 7;
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.roundedRect(kpiBoxX, kpiBoxY, kpiBoxW, kpiBoxH, 2.5, 2.5, 'FD');
 
-    // Saldo with color
+    const colW = kpiBoxW / 4;
     const isPositive = delta >= 0;
-    doc.setTextColor(isPositive ? 34 : 239, isPositive ? 197 : 68, isPositive ? 94 : 68);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Saldo: ${delta > 0 ? '+' : ''}${delta.toFixed(1)} h`, margin + 5, yPos);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(undefined, 'normal');
-    yPos += 12;
 
-    // Distribution
-    if (stats.distributionData && stats.distributionData.length > 0) {
-        checkPageBreak(15 + stats.distributionData.length * 7);
+    const kpis = [
+        { label: 'Geleistet', val: `${stats.actual.toFixed(1)} h`, color: [15, 23, 42] },
+        { label: 'Soll', val: `${target.toFixed(1)} h`, color: [100, 116, 139] },
+        { label: 'Saldo', val: `${delta > 0 ? '+' : ''}${delta.toFixed(1)} h`, color: isPositive ? [22, 163, 74] : [220, 38, 38] },
+        { label: 'Schichten', val: `${stats.count}`, color: [15, 23, 42] }
+    ];
 
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text('Verteilung nach Schichtart', margin, yPos);
-        yPos += 8;
-
-        doc.setFontSize(11);
+    kpis.forEach((kpi, idx) => {
+        const itemX = kpiBoxX + idx * colW + colW / 2;
+        doc.setFontSize(7.5);
         doc.setFont(undefined, 'normal');
-
-        stats.distributionData.forEach(item => {
-            checkPageBreak();
-            const percentage = ((item.value / stats.count) * 100).toFixed(1);
-            doc.text(`${item.name}: ${item.value} (${percentage}%)`, margin + 5, yPos);
-            yPos += 6;
-        });
-        yPos += 5;
-    }
-
-    // Detailed Shift List
-    if (filteredData && filteredData.length > 0) {
-        checkPageBreak(20);
-
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text('Schichten im Detail', margin, yPos);
-        yPos += 10;
-
-        // Table header - optimized for landscape with partner column
-        // Column positions for landscape (297mm width, 257mm printable width)
-        const colDatum = margin + 2;
-        const colSchichtart = margin + 28;
-        const colZeit = margin + 74;
-        const colWache = margin + 110;
-        const colFahrzeug = margin + 148;
-        const colPartner = margin + 180;
-        const colStunden = margin + 236;
+        doc.setTextColor(100, 116, 139);
+        doc.text(kpi.label, itemX, kpiBoxY + 4.5, { align: 'center' });
 
         doc.setFontSize(9.5);
         doc.setFont(undefined, 'bold');
-        doc.setFillColor(249, 115, 22); // Orange
-        doc.setTextColor(255, 255, 255);
-        doc.roundedRect(margin, yPos - 5, pageWidth - 2 * margin, 8, 2, 2, 'F');
+        doc.setTextColor(kpi.color[0], kpi.color[1], kpi.color[2]);
+        doc.text(kpi.val, itemX, kpiBoxY + 10, { align: 'center' });
+    });
 
+    yPos = 33;
+
+    // Divider Line
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 5;
+
+    // Compact Distribution Line (Optional)
+    if (stats.distributionData && stats.distributionData.length > 0) {
+        const distParts = stats.distributionData.map(
+            d => `${d.name}: ${d.value} (${((d.value / stats.count) * 100).toFixed(0)}%)`
+        );
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Verteilung: ${distParts.join('   •   ')}`, margin, yPos);
+        yPos += 6;
+    }
+
+    // --- Table "Schichten im Detail" ---
+    if (filteredData && filteredData.length > 0) {
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Schichten im Detail (${shiftCount})`, margin, yPos);
+        yPos += 4.5;
+
+        // Table Column Positions (Optimized for generous PartnerIn space)
+        // Total available table width: 265 mm
+        const colDatum = margin + 3;       // ~26 mm width (19 mm)
+        const colKuerzel = margin + 30;    // ~25 mm width (46 mm)
+        const colSchichtart = margin + 58; // ~44 mm width (74 mm)
+        const colZeit = margin + 105;      // ~38 mm width (121 mm)
+        const colPartner = margin + 146;   // ~116 mm width (162 mm -> plenty of room!)
+
+        // Table Header Bar (Primary Brand Orange)
+        doc.setFillColor(249, 115, 22);
+        doc.roundedRect(margin, yPos - 4.5, pageWidth - 2 * margin, 7.5, 2, 2, 'F');
+
+        doc.setFontSize(9.5);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(255, 255, 255);
         doc.text('Datum', colDatum, yPos);
+        doc.text('Schichtkürzel', colKuerzel, yPos);
         doc.text('Schichtart', colSchichtart, yPos);
         doc.text('Zeit', colZeit, yPos);
-        doc.text('Wache', colWache, yPos);
-        doc.text('Fahrzeug', colFahrzeug, yPos);
         doc.text('PartnerIn', colPartner, yPos);
-        doc.text('Stunden', colStunden, yPos);
-        yPos += 8;
+        yPos += 7.5;
 
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(15, 23, 42);
         doc.setFont(undefined, 'normal');
 
-        // Sort by date
+        // Sort shifts chronologically by date
         const sortedShifts = [...filteredData].sort((a, b) => a.date.localeCompare(b.date));
 
         sortedShifts.forEach((shift, index) => {
-            checkPageBreak(8);
+            checkPageBreak(rowHeight);
 
-            // Alternating row colors
+            // Alternating row background
             if (index % 2 === 0) {
-                doc.setFillColor(250, 250, 250);
-                doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 7, 'F');
+                doc.setFillColor(248, 250, 252);
+                doc.rect(margin, yPos - 4.2, pageWidth - 2 * margin, rowHeight, 'F');
             }
 
-            const shiftType = shiftTypes?.find(t => t.id === shift.typeId);
-            const typeName = shiftType?.name || 'Unbekannt';
-            const duration = calculateDuration(shift.startTime, shift.endTime);
+            // Derive shift details
+            const shiftCodeObj = shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
+            const displayCode = shift.code || shiftCodeObj?.code || '-';
 
-            // Process vehicle name - extract only "71/X" format
-            let vehicleName = shift.vehicle || '-';
+            const shiftTypeObj = shiftTypes.find(t => t.id === shift.typeId);
+            const displayType = shift.shiftTypeName || shiftTypeObj?.name || 'Dienst';
 
-            // Extract vehicle ID in format "71/1" or "71/2"
-            // Match pattern: 71 followed by / and a single digit
-            const vehicleMatch = vehicleName.match(/71\/(\d)/);
-            if (vehicleMatch) {
-                vehicleName = `71/${vehicleMatch[1]}`;
-            } else {
-                // Fallback: remove "RTW Akkon" and station name, keep what's left
-                vehicleName = vehicleName.replace(/^RTW Akkon\s*/i, '');
-                vehicleName = vehicleName.replace(/^(HBN|Sendling|Hauptwache|Nordwache|Südwache)\s*/i, '');
-                vehicleName = vehicleName.trim();
-                if (vehicleName.length > 25) {
-                    vehicleName = vehicleName.substring(0, 22) + '...';
-                }
-            }
+            const partnerName = shift.partner ? String(shift.partner).trim() : '-';
 
-            // Station name
-            let stationName = shift.station || '-';
-            if (stationName.length > 18) {
-                stationName = stationName.substring(0, 16) + '...';
-            }
-
-            // Partner name
-            let partnerName = shift.partner || '-';
-            if (partnerName.length > 25) {
-                partnerName = partnerName.substring(0, 23) + '...';
-            }
-
-            // Shift type name
-            let displayType = typeName;
-            if (displayType.length > 22) {
-                displayType = displayType.substring(0, 20) + '...';
-            }
-
+            doc.setFontSize(9);
             doc.text(formatDate(shift.date), colDatum, yPos);
+            doc.setFont(undefined, 'bold');
+            doc.text(displayCode, colKuerzel, yPos);
+            doc.setFont(undefined, 'normal');
             doc.text(displayType, colSchichtart, yPos);
-            doc.text(`${shift.startTime} - ${shift.endTime}`, colZeit, yPos);
-            doc.text(stationName, colWache, yPos);
-            doc.text(vehicleName, colFahrzeug, yPos);
-            doc.text(partnerName, colPartner, yPos);
-            doc.text(`${duration.toFixed(1)} h`, colStunden, yPos);
+            doc.text(`${shift.startTime || '07:00'} - ${shift.endTime || '19:00'}`, colZeit, yPos);
 
-            yPos += 7;
+            // PartnerIn: generous space (no truncating for regular partner names)
+            doc.text(partnerName, colPartner, yPos);
+
+            yPos += rowHeight;
         });
     }
 
-    // Footer on last page
+    // --- Footer ---
     doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    const footerText = `Erstellt am ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE')}`;
-    doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.setTextColor(148, 163, 184); // slate-400
+    const footerText = `Erstellt am ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE')} • Schichttagebuch`;
+    doc.text(footerText, pageWidth / 2, pageHeight - 7, { align: 'center' });
 
-    // Save PDF
+    // Download PDF
     const fileName = `Schichttagebuch_${label.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
     doc.save(fileName);
 }

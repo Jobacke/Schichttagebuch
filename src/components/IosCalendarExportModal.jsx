@@ -17,7 +17,7 @@ export default function IosCalendarExportModal({
 
   const [calendarName, setCalendarName] = useState('Familie');
   const [titleFormat, setTitleFormat] = useState('codeAndType'); // 'codeAndType', 'codeOnly', 'typeAndTimes'
-  const [alarmMinutes, setAlarmMinutes] = useState(60); // 60 min
+  const [alarmOption, setAlarmOption] = useState('1440'); // Default: 1 Tag vorher!
   const [selectedIds, setSelectedIds] = useState(() => new Set(shifts.map(s => s.id)));
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
@@ -48,7 +48,8 @@ export default function IosCalendarExportModal({
     downloadIcsFile(selectedShifts, {
       calendarName,
       titleFormat,
-      alarmMinutes: Number(alarmMinutes),
+      alarmOption,
+      alarmMinutes: alarmOption === '1440' ? 1440 : (Number(alarmOption) || 1440),
       yearMonth,
       storeSettings
     });
@@ -127,8 +128,10 @@ export default function IosCalendarExportModal({
                 <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text-main)' }}>
                   Ziel-Kalender: {calendarName}
                 </div>
-                <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
-                  Passend für deinen freigegebenen Apple / iOS Kalender
+                <div style={{ fontSize: '12px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
+                  <span>Passend für Apple / iOS</span>
+                  <span>•</span>
+                  <span style={{ color: '#facc15', fontWeight: 600 }}>🔔 Erinnerung: 1 Tag vorher aktiv</span>
                 </div>
               </div>
             </div>
@@ -180,18 +183,24 @@ export default function IosCalendarExportModal({
             </div>
 
             <div>
-              <label className="text-label">Erinnerung (Alarm)</label>
+              <label className="text-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Bell size={13} style={{ color: '#eab308' }} />
+                Erinnerung (iOS Hinweis)
+              </label>
               <select
                 className="input-premium"
-                value={alarmMinutes}
-                onChange={(e) => setAlarmMinutes(Number(e.target.value))}
+                value={alarmOption}
+                onChange={(e) => setAlarmOption(e.target.value)}
                 style={{ marginBottom: 0 }}
               >
-                <option value={0}>Keine Erinnerung</option>
-                <option value={30}>30 Minuten vorher</option>
-                <option value={60}>60 Minuten (1 Std) vorher</option>
-                <option value={120}>2 Stunden vorher</option>
-                <option value={720}>12 Stunden vorher</option>
+                <option value="1440">1 Tag vorher (Standard)</option>
+                <option value="1440_60">1 Tag vorher + 1 Std. vorher</option>
+                <option value="2880">2 Tage vorher</option>
+                <option value="720">12 Stunden vorher</option>
+                <option value="120">2 Stunden vorher</option>
+                <option value="60">1 Stunde vorher</option>
+                <option value="30">30 Minuten vorher</option>
+                <option value="0">Keine Erinnerung</option>
               </select>
             </div>
           </div>

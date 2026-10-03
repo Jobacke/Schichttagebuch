@@ -40,7 +40,8 @@ function escapeIcsText(str) {
 export function generateIcsCalendar(shifts, options = {}) {
   const {
     calendarName = 'Familie',
-    alarmMinutes = 60, // e.g. 60 min before shift
+    alarmMinutes = 1440,
+    alarmOption = '1440',
     titleFormat = 'codeAndType', // 'codeAndType', 'codeOnly', 'typeAndTimes'
     storeSettings = {}
   } = options;
@@ -133,10 +134,61 @@ export function generateIcsCalendar(shifts, options = {}) {
     icsContent.push(`DESCRIPTION:${description}`);
     icsContent.push('STATUS:CONFIRMED');
 
-    // Optional Alarm / Reminder
-    if (alarmMinutes > 0) {
+    // Optional Alarm / Reminder (supports 1 Tag vorher, multiple alarms, custom times)
+    const effectiveAlarm = String(alarmOption || alarmMinutes || '1440');
+
+    if (effectiveAlarm === '1440' || effectiveAlarm === 'day_before') {
       icsContent.push('BEGIN:VALARM');
-      icsContent.push(`TRIGGER:-PT${alarmMinutes}M`);
+      icsContent.push('TRIGGER:-P1D');
+      icsContent.push('ACTION:DISPLAY');
+      icsContent.push(`DESCRIPTION:Erinnerung: Morgen Dienst ${escapeIcsText(code)} (${startTimeStr} - ${endTimeStr} Uhr)`);
+      icsContent.push('END:VALARM');
+    } else if (effectiveAlarm === '1440_60') {
+      // 1. Alarm: 1 Tag vorher
+      icsContent.push('BEGIN:VALARM');
+      icsContent.push('TRIGGER:-P1D');
+      icsContent.push('ACTION:DISPLAY');
+      icsContent.push(`DESCRIPTION:Erinnerung: Morgen Dienst ${escapeIcsText(code)} (${startTimeStr} - ${endTimeStr} Uhr)`);
+      icsContent.push('END:VALARM');
+      // 2. Alarm: 1 Stunde vorher
+      icsContent.push('BEGIN:VALARM');
+      icsContent.push('TRIGGER:-PT1H');
+      icsContent.push('ACTION:DISPLAY');
+      icsContent.push(`DESCRIPTION:Erinnerung: In 1 Std. Dienst ${escapeIcsText(code)} (${startTimeStr} - ${endTimeStr} Uhr)`);
+      icsContent.push('END:VALARM');
+    } else if (effectiveAlarm === '2880') {
+      icsContent.push('BEGIN:VALARM');
+      icsContent.push('TRIGGER:-P2D');
+      icsContent.push('ACTION:DISPLAY');
+      icsContent.push(`DESCRIPTION:Erinnerung: In 2 Tagen Dienst ${escapeIcsText(code)}`);
+      icsContent.push('END:VALARM');
+    } else if (effectiveAlarm === '720') {
+      icsContent.push('BEGIN:VALARM');
+      icsContent.push('TRIGGER:-PT12H');
+      icsContent.push('ACTION:DISPLAY');
+      icsContent.push(`DESCRIPTION:Erinnerung: In 12 Std. Dienst ${escapeIcsText(code)}`);
+      icsContent.push('END:VALARM');
+    } else if (effectiveAlarm === '120') {
+      icsContent.push('BEGIN:VALARM');
+      icsContent.push('TRIGGER:-PT2H');
+      icsContent.push('ACTION:DISPLAY');
+      icsContent.push(`DESCRIPTION:Erinnerung: In 2 Std. Dienst ${escapeIcsText(code)}`);
+      icsContent.push('END:VALARM');
+    } else if (effectiveAlarm === '60') {
+      icsContent.push('BEGIN:VALARM');
+      icsContent.push('TRIGGER:-PT1H');
+      icsContent.push('ACTION:DISPLAY');
+      icsContent.push(`DESCRIPTION:Erinnerung: In 1 Std. Dienst ${escapeIcsText(code)}`);
+      icsContent.push('END:VALARM');
+    } else if (effectiveAlarm === '30') {
+      icsContent.push('BEGIN:VALARM');
+      icsContent.push('TRIGGER:-PT30M');
+      icsContent.push('ACTION:DISPLAY');
+      icsContent.push(`DESCRIPTION:Erinnerung: In 30 Min. Dienst ${escapeIcsText(code)}`);
+      icsContent.push('END:VALARM');
+    } else if (Number(effectiveAlarm) > 0) {
+      icsContent.push('BEGIN:VALARM');
+      icsContent.push(`TRIGGER:-PT${Number(effectiveAlarm)}M`);
       icsContent.push('ACTION:DISPLAY');
       icsContent.push(`DESCRIPTION:Erinnerung an Dienst ${escapeIcsText(code)}`);
       icsContent.push('END:VALARM');

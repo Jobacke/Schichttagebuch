@@ -182,6 +182,30 @@ export function StoreProvider({ children }) {
     }
   };
 
+  const deleteShifts = async (shiftIds = []) => {
+    if (!currentUser || !shiftIds || shiftIds.length === 0) return true;
+    try {
+      const batch = writeBatch(db);
+      shiftIds.forEach(id => {
+        batch.delete(doc(db, `users/${currentUser.uid}/shifts`, id));
+      });
+      await batch.commit();
+      return true;
+    } catch (e) {
+      console.warn("Batch delete failed, attempting fallback:", e);
+      try {
+        await Promise.all(shiftIds.map(id => {
+          return deleteDoc(doc(db, `users/${currentUser.uid}/shifts`, id));
+        }));
+        return true;
+      } catch (err) {
+        console.error("Delete Shifts Failed", err);
+        alert("Fehler beim Löschen: " + err.message);
+        return false;
+      }
+    }
+  };
+
   // Helper helper to update settings Doc
   const _updateSettingsDoc = async (newSettings) => {
     if (!currentUser) return;
@@ -255,6 +279,7 @@ export function StoreProvider({ children }) {
       addShifts,
       ensureCodesAndTypes,
       deleteShift,
+      deleteShifts,
       updateSettings,
       addSettingItem,
       removeSettingItem,

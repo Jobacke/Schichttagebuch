@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { SHIFT_PRESETS } from './shiftPresets';
 
 // Helper to calculate duration (in hours)
 function calculateDuration(start, end) {
@@ -13,19 +14,97 @@ function calculateDuration(start, end) {
     } catch { return 0; }
 }
 
-// Helper to format date
-const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const [y, m, d] = dateStr.split('-').map(Number);
-    if (!y || !m || !d) return '';
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+// Unified Shift Color Palette for High-Quality Print
+const getShiftColorRGB = (typeName = '', code = '') => {
+    const text = `${typeName} ${code}`.toLowerCase();
+    if (text.includes('früh') || text.includes('rf') || text.includes('fm') || text.includes('fh') || text.includes('fo')) {
+        return {
+            r: 2, g: 132, b: 199,         // #0284c7 (darker sky for crisp print)
+            bgR: 240, bgG: 249, bgB: 255, // sky-50
+            borderR: 125, borderG: 211, borderB: 252, // sky-300
+            label: 'Frühschicht'
+        };
+    }
+    if (text.includes('spät') || text.includes('rs') || text.includes('sm') || text.includes('sh') || text.includes('so')) {
+        return {
+            r: 234, g: 88, b: 12,          // #ea580c (deep orange for print)
+            bgR: 255, bgG: 247, bgB: 237,  // orange-50
+            borderR: 253, borderG: 186, borderB: 116, // orange-300
+            label: 'Spätschicht'
+        };
+    }
+    if (text.includes('nacht') || text.includes('rn') || text.includes('nm') || text.includes('nh')) {
+        return {
+            r: 147, g: 51, b: 234,         // #9333ea (deep purple for print)
+            bgR: 250, bgG: 245, bgB: 255,  // purple-50
+            borderR: 216, borderG: 180, borderB: 254, // purple-300
+            label: 'Nachtschicht'
+        };
+    }
+    if (text.includes('tag') || text.includes('rt') || text.includes('t1') || text.includes('t2') || text.includes('t3') || text.includes('t4')) {
+        return {
+            r: 202, g: 138, b: 4,          // #ca8a04 (deep yellow/amber for print)
+            bgR: 254, bgG: 252, bgB: 232,  // yellow-50
+            borderR: 253, borderG: 224, borderB: 71,  // yellow-300
+            label: 'Tagschicht'
+        };
+    }
+    return {
+        r: 22, g: 163, b: 74,          // #16a34a (green for print)
+        bgR: 240, bgG: 253, bgB: 244,  // green-50
+        borderR: 134, borderG: 239, borderB: 172, // green-300
+        label: typeName || 'Sonstige'
+    };
+};
+
+const resolveShiftDetails = (s, storeSettings, shiftCodes = [], shiftTypes = []) => {
+    if (!s) return { code: '', rawCode: '', typeName: 'Dienst' };
+
+    const codes = storeSettings?.shiftCodes || shiftCodes || [];
+    const types = storeSettings?.shiftTypes || shiftTypes || [];
+
+    const codeObj = codes.find(c => c.id === s.codeId || (s.code && c.code === s.code));
+    const typeObj = types.find(t => t.id === s.typeId);
+
+    let rawCode = s.code || codeObj?.code || '';
+    if (!rawCode && s.codeId && typeof s.codeId === 'string' && s.codeId.startsWith('preset_')) {
+        rawCode = s.codeId.replace('preset_', '');
+    }
+
+    const preset = rawCode ? (SHIFT_PRESETS[rawCode] || {}) : {};
+    const rawType = s.shiftTypeName || typeObj?.name || codeObj?.shiftTypeName || preset.shiftTypeName || '';
+
+    let displayCode = rawCode;
+    if (!displayCode) {
+        if (rawType.toLowerCase().includes('spät')) displayCode = 'Spät';
+        else if (rawType.toLowerCase().includes('früh')) displayCode = 'Früh';
+        else if (rawType.toLowerCase().includes('nacht')) displayCode = 'Nacht';
+        else if (rawType.toLowerCase().includes('tag')) displayCode = 'Tag';
+        else displayCode = rawType ? rawType.slice(0, 4) : 'Schicht';
+    }
+
+    return {
+        code: displayCode,
+        rawCode,
+        typeName: rawType || 'Dienst'
+    };
 };
 
 export function exportToPDF(data) {
-    const { label, stats, delta, target, filteredData, shiftTypes = [], shiftCodes = [] } = data;
+    const {
+        label,
+        stats,
+        delta,
+        target,
+        filteredData = [],
+        filterMode = 'month',
+        baseDate = new Date(),
+        storeSettings = {},
+        shiftTypes = [],
+        shiftCodes = []
+    } = data;
 
-    // Use landscape orientation for clean 1-page monthly duty roster view
+    // Use landscape orientation for clean 1-page European monthly duty roster view
     const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
@@ -34,49 +113,54 @@ export function exportToPDF(data) {
 
     const pageWidth = doc.internal.pageSize.getWidth();   // 297 mm
     const pageHeight = doc.internal.pageSize.getHeight(); // 210 mm
-    const margin = 16;                                    // Printable width = 265 mm
+    const margin = 14;                                    // Printable width = 269 mm
 
-    let yPos = 16;
+    // Group shifts by date string YYYY-MM-DD
+    const shiftsByDate = {};
+    filteredData.forEach(s => {
+        if (!s.date) return;
+        if (!shiftsByDate[s.date]) shiftsByDate[s.date] = [];
+        shiftsByDate[s.date].push(s);
+    });
 
-    // Dynamic row height so monthly rosters fit on a single page
-    const shiftCount = filteredData?.length || 0;
-    const rowHeight = shiftCount > 24 ? 5.2 : shiftCount > 18 ? 5.6 : 6.0;
-
-    // Helper to add new page if content exceeds available space
-    const checkPageBreak = (requiredSpace = 8) => {
-        if (yPos + requiredSpace > pageHeight - 14) {
-            doc.addPage();
-            yPos = 16;
-            return true;
-        }
-        return false;
-    };
-
-    // --- Compact Executive Header ---
-    // Title & Subtitle on Left
-    doc.setFontSize(17);
+    // --- Header Section ---
+    const yTop = 13;
+    doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
     doc.setTextColor(15, 23, 42); // slate-900
-    doc.text('Schichttagebuch - Auswertung', margin, yPos);
+    doc.text('Schichttagebuch - Monatsdienstplan', margin, yTop);
 
-    doc.setFontSize(11);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(249, 115, 22); // brand orange
+    doc.text(label, margin, yTop + 6);
+
+    const shiftCount = filteredData.length;
+    const dateObj = baseDate ? new Date(baseDate) : new Date();
+    const year = dateObj.getFullYear();
+    const month = dateObj.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const shiftDaysCount = Object.keys(shiftsByDate).length;
+    const freeDaysCount = Math.max(0, daysInMonth - shiftDaysCount);
+
+    doc.setFontSize(8.5);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(100, 116, 139); // slate-500
-    doc.text(label, margin, yPos + 6);
+    doc.text(`${shiftCount} Schichten   •   ${freeDaysCount} Tage frei   •   ${stats.actual.toFixed(1)} h geleistet`, margin, yTop + 11.5);
 
-    // Compact KPI Badges on Right (Single-line cards)
-    const kpiBoxX = pageWidth - margin - 140;
-    const kpiBoxY = yPos - 3;
-    const kpiBoxW = 140;
-    const kpiBoxH = 13;
+    // KPI Badges on the Top Right
+    const kpiBoxW = 132;
+    const kpiBoxH = 13.5;
+    const kpiBoxX = pageWidth - margin - kpiBoxW;
+    const kpiBoxY = yTop - 3.5;
 
-    doc.setFillColor(248, 250, 252); // slate-50
-    doc.setDrawColor(226, 232, 240); // slate-200
-    doc.roundedRect(kpiBoxX, kpiBoxY, kpiBoxW, kpiBoxH, 2.5, 2.5, 'FD');
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(kpiBoxX, kpiBoxY, kpiBoxW, kpiBoxH, 2, 2, 'FD');
 
     const colW = kpiBoxW / 4;
     const isPositive = delta >= 0;
-
     const kpis = [
         { label: 'Geleistet', val: `${stats.actual.toFixed(1)} h`, color: [15, 23, 42] },
         { label: 'Soll', val: `${target.toFixed(1)} h`, color: [100, 116, 139] },
@@ -94,111 +178,194 @@ export function exportToPDF(data) {
         doc.setFontSize(9.5);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(kpi.color[0], kpi.color[1], kpi.color[2]);
-        doc.text(kpi.val, itemX, kpiBoxY + 10, { align: 'center' });
+        doc.text(kpi.val, itemX, kpiBoxY + 10.2, { align: 'center' });
     });
 
-    yPos = 33;
+    // --- European Monthly Calendar Grid (Mo - So) ---
+    const gridY = 28;
+    const gridW = pageWidth - 2 * margin; // 269 mm
+    const dayColW = gridW / 7;            // 38.43 mm
 
-    // Divider Line
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 5;
+    // European weekday start: Monday = 0 ... Sunday = 6
+    const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
+    const totalCells = firstDay + daysInMonth;
+    const totalWeeks = Math.ceil(totalCells / 7);
 
-    // Compact Distribution Line (Optional)
-    if (stats.distributionData && stats.distributionData.length > 0) {
-        const distParts = stats.distributionData.map(
-            d => `${d.name}: ${d.value} (${((d.value / stats.count) * 100).toFixed(0)}%)`
-        );
+    // Weekday Header Row
+    const headerRowH = 6.5;
+    const weekdays = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+    weekdays.forEach((wd, i) => {
+        const hX = margin + i * dayColW;
+        const isWknd = i >= 5;
+        if (isWknd) {
+            doc.setFillColor(255, 237, 213); // soft orange
+            doc.setDrawColor(254, 215, 170);
+        } else {
+            doc.setFillColor(241, 245, 249); // slate-100
+            doc.setDrawColor(226, 232, 240);
+        }
+        doc.rect(hX, gridY, dayColW, headerRowH, 'FD');
+
         doc.setFontSize(8.5);
-        doc.setFont(undefined, 'normal');
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Verteilung: ${distParts.join('   •   ')}`, margin, yPos);
-        yPos += 6;
-    }
-
-    // --- Table "Schichten im Detail" ---
-    if (filteredData && filteredData.length > 0) {
-        doc.setFontSize(11);
         doc.setFont(undefined, 'bold');
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Schichten im Detail (${shiftCount})`, margin, yPos);
-        yPos += 8.5; // Generous breathing room between title and table header bar
+        if (isWknd) {
+            doc.setTextColor(234, 88, 12); // orange-600
+        } else {
+            doc.setTextColor(51, 65, 85); // slate-700
+        }
+        doc.text(wd, hX + dayColW / 2, gridY + 4.5, { align: 'center' });
+    });
 
-        // Table Column Positions (with consecutive numbering and generous PartnerIn space)
-        // Total available table width: 265 mm
-        const colNr = margin + 2;          // ~11 mm width
-        const colDatum = margin + 14;      // ~26 mm width (30 mm)
-        const colKuerzel = margin + 41;    // ~24 mm width (57 mm)
-        const colSchichtart = margin + 66; // ~40 mm width (82 mm)
-        const colZeit = margin + 108;      // ~36 mm width (124 mm)
-        const colPartner = margin + 146;   // ~118 mm width (162 mm -> plenty of room!)
+    // Calendar Day Cells
+    const calendarBottomLimit = 196;
+    const availableGridH = calendarBottomLimit - (gridY + headerRowH);
+    const dayRowH = availableGridH / totalWeeks; // ~31.2 mm for 5 weeks, ~26.0 mm for 6 weeks
 
-        // Table Header Bar (Primary Brand Orange)
-        doc.setFillColor(249, 115, 22);
-        doc.roundedRect(margin, yPos - 4.5, pageWidth - 2 * margin, 7.5, 2, 2, 'F');
+    for (let w = 0; w < totalWeeks; w++) {
+        for (let col = 0; col < 7; col++) {
+            const cellIndex = w * 7 + col;
+            const dayNum = cellIndex - firstDay + 1;
+            const cellX = margin + col * dayColW;
+            const cellY = gridY + headerRowH + w * dayRowH;
+            const isWeekend = col >= 5;
 
-        doc.setFontSize(9.5);
-        doc.setFont(undefined, 'bold');
-        doc.setTextColor(255, 255, 255);
-        doc.text('Nr.', colNr, yPos);
-        doc.text('Datum', colDatum, yPos);
-        doc.text('Schichtkürzel', colKuerzel, yPos);
-        doc.text('Schichtart', colSchichtart, yPos);
-        doc.text('Zeit', colZeit, yPos);
-        doc.text('PartnerIn', colPartner, yPos);
-        yPos += 7.5;
-
-        doc.setTextColor(15, 23, 42);
-        doc.setFont(undefined, 'normal');
-
-        // Sort shifts chronologically by date
-        const sortedShifts = [...filteredData].sort((a, b) => a.date.localeCompare(b.date));
-
-        sortedShifts.forEach((shift, index) => {
-            checkPageBreak(rowHeight);
-
-            // Alternating row background
-            if (index % 2 === 0) {
+            // Outside Month
+            if (dayNum < 1 || dayNum > daysInMonth) {
                 doc.setFillColor(248, 250, 252);
-                doc.rect(margin, yPos - 4.2, pageWidth - 2 * margin, rowHeight, 'F');
+                doc.setDrawColor(226, 232, 240);
+                doc.setLineWidth(0.2);
+                doc.rect(cellX, cellY, dayColW, dayRowH, 'FD');
+                continue;
             }
 
-            // Derive shift details
-            const shiftCodeObj = shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
-            const displayCode = shift.code || shiftCodeObj?.code || '-';
+            // Valid Day in Month
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+            const dayShifts = shiftsByDate[dateStr] || [];
+            const hasShift = dayShifts.length > 0;
 
-            const shiftTypeObj = shiftTypes.find(t => t.id === shift.typeId);
-            const displayType = shift.shiftTypeName || shiftTypeObj?.name || 'Dienst';
+            if (!hasShift) {
+                // Free Day
+                if (isWeekend) {
+                    doc.setFillColor(250, 250, 252);
+                } else {
+                    doc.setFillColor(255, 255, 255);
+                }
+                doc.setDrawColor(226, 232, 240);
+                doc.setLineWidth(0.25);
+                doc.rect(cellX, cellY, dayColW, dayRowH, 'FD');
 
-            const partnerName = shift.partner ? String(shift.partner).trim() : '-';
+                // Day number
+                doc.setFontSize(9.5);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(isWeekend ? 148 : 100, isWeekend ? 163 : 116, isWeekend ? 184 : 139);
+                doc.text(String(dayNum), cellX + dayColW - 2.5, cellY + 5.2, { align: 'right' });
 
-            doc.setFontSize(9);
-            // Consecutive numbering: 1, 2, 3...
-            doc.setTextColor(100, 116, 139);
-            doc.text(String(index + 1), colNr, yPos);
+                // Subtle "Frei"
+                doc.setFontSize(7);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(203, 213, 225);
+                doc.text('Frei', cellX + 2.5, cellY + 5.2);
+            } else {
+                // Shift Day
+                const s = dayShifts[0];
+                const resolved = resolveShiftDetails(s, storeSettings, shiftCodes, shiftTypes);
+                const colRGB = getShiftColorRGB(resolved.typeName, resolved.code);
 
-            doc.setTextColor(15, 23, 42);
-            doc.text(formatDate(shift.date), colDatum, yPos);
-            doc.setFont(undefined, 'bold');
-            doc.text(displayCode, colKuerzel, yPos);
-            doc.setFont(undefined, 'normal');
-            doc.text(displayType, colSchichtart, yPos);
-            doc.text(`${shift.startTime || '07:00'} - ${shift.endTime || '19:00'}`, colZeit, yPos);
+                // Background tint & border
+                doc.setFillColor(colRGB.bgR, colRGB.bgG, colRGB.bgB);
+                doc.setDrawColor(colRGB.borderR, colRGB.borderG, colRGB.borderB);
+                doc.setLineWidth(0.35);
+                doc.rect(cellX, cellY, dayColW, dayRowH, 'FD');
 
-            // PartnerIn: generous space (no truncating for regular partner names)
-            doc.text(partnerName, colPartner, yPos);
+                // Top Accent Stripe
+                doc.setFillColor(colRGB.r, colRGB.g, colRGB.b);
+                doc.rect(cellX, cellY, dayColW, 2.0, 'F');
 
-            yPos += rowHeight;
-        });
+                // Day Number (Top Right)
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(15, 23, 42);
+                doc.text(String(dayNum), cellX + dayColW - 2.5, cellY + 6.5, { align: 'right' });
+
+                // Shift Badge (Top Left)
+                doc.setFillColor(colRGB.r, colRGB.g, colRGB.b);
+                doc.roundedRect(cellX + 2.2, cellY + 3.2, 17, 4.8, 1, 1, 'F');
+                doc.setFontSize(8.5);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(255, 255, 255);
+                doc.text(resolved.code, cellX + 10.7, cellY + 6.6, { align: 'center' });
+
+                // Shift Type Name
+                doc.setFontSize(7.5);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(colRGB.r, colRGB.g, colRGB.b);
+                doc.text(resolved.typeName, cellX + 2.5, cellY + 11.5);
+
+                // Exact Shift Times & Duration
+                const dur = calculateDuration(s.startTime, s.endTime);
+                doc.setFontSize(7.5);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(51, 65, 85);
+                doc.text(`${s.startTime || '07:00'} - ${s.endTime || '19:00'} (${dur.toFixed(1)}h)`, cellX + 2.5, cellY + 15.5);
+
+                // Station / Vehicle
+                const stText = s.station || s.vehicle || '';
+                if (stText) {
+                    doc.setFontSize(6.5);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(100, 116, 139);
+                    const truncSt = doc.splitTextToSize(stText, dayColW - 5)[0] || '';
+                    doc.text(truncSt, cellX + 2.5, cellY + 19.3);
+                }
+
+                // Partner (Dedicated Line)
+                if (s.partner) {
+                    const partnerClean = s.partner.trim().startsWith('mit ') ? s.partner.trim() : `mit ${s.partner.trim()}`;
+                    doc.setFontSize(6.8);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(2, 132, 199); // cyan-600
+                    const pY = dayRowH > 28 ? cellY + 23.5 : cellY + 22.5;
+                    const truncP = doc.splitTextToSize(partnerClean, dayColW - 5)[0] || '';
+                    doc.text(truncP, cellX + 2.5, pY);
+                }
+            }
+        }
     }
 
-    // --- Footer ---
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184); // slate-400
-    const footerText = `Erstellt am ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE')} • Schichttagebuch`;
-    doc.text(footerText, pageWidth / 2, pageHeight - 7, { align: 'center' });
+    // --- Footer: Legend on Left, Date & App on Right ---
+    const footerY = 202;
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.line(margin, footerY - 4.5, pageWidth - margin, footerY - 4.5);
+
+    // Legend items
+    const legendItems = [
+        { label: 'Frühschicht', rgb: [2, 132, 199] },
+        { label: 'Spätschicht', rgb: [234, 88, 12] },
+        { label: 'Nachtschicht', rgb: [147, 51, 234] },
+        { label: 'Tagschicht', rgb: [202, 138, 4] },
+        { label: 'Dienstfrei', rgb: [148, 163, 184] }
+    ];
+
+    let legX = margin;
+    doc.setFontSize(7.5);
+    legendItems.forEach(item => {
+        doc.setFillColor(item.rgb[0], item.rgb[1], item.rgb[2]);
+        doc.rect(legX, footerY - 2.5, 3, 3, 'F');
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(71, 85, 105);
+        doc.text(item.label, legX + 4.5, footerY);
+        legX += doc.getTextWidth(item.label) + 12;
+    });
+
+    // Right-aligned footer info
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    const footerInfo = `Erstellt am ${new Date().toLocaleDateString('de-DE')} • Schichttagebuch`;
+    doc.text(footerInfo, pageWidth - margin, footerY, { align: 'right' });
 
     // Download PDF
-    const fileName = `Schichttagebuch_${label.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const fileName = `Dienstplan_${label.replace(/\s+/g, '_')}.pdf`;
     doc.save(fileName);
 }

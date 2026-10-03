@@ -445,6 +445,9 @@ export default function Analysis() {
             delta,
             target,
             filteredData,
+            filterMode,
+            baseDate,
+            storeSettings: store.settings,
             shiftTypes: store.settings?.shiftTypes || [],
             shiftCodes: store.settings?.shiftCodes || []
         });

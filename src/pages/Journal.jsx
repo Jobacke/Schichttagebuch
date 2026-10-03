@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { getDaysInMonth, startOfMonth, getDay, isSameDay, parseISO } from 'date-fns';
 import {
     ChevronLeft, ChevronRight, PenSquare, MapPin, Sparkles,
-    CheckCircle2, Trash2, CheckSquare, Square, X, AlertTriangle, Check
+    CheckCircle2, Trash2, CheckSquare, Square, X, AlertTriangle, Check,
+    Calendar as CalendarIcon
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
+import IosCalendarExportModal from '../components/IosCalendarExportModal';
 
 export default function Journal() {
     const { store, addShifts, ensureCodesAndTypes, deleteShifts } = useStore();
@@ -14,6 +16,7 @@ export default function Journal() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
 
     // Multi-Selection & Bulk Delete State
@@ -149,7 +152,31 @@ export default function Journal() {
                         {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'} im Monat
                     </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {monthShifts.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setIsCalendarExportModalOpen(true)}
+                            className="btn-secondary"
+                            style={{
+                                fontSize: '13px',
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                gap: '6px',
+                                background: 'rgba(234, 179, 8, 0.14)',
+                                color: '#facc15',
+                                border: '1px solid rgba(234, 179, 8, 0.35)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                            }}
+                            title="In iOS Kalender („Familie“) übertragen"
+                        >
+                            <CalendarIcon size={16} />
+                            iOS Kalender („Familie“)
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={() => setIsImportModalOpen(true)}
@@ -594,6 +621,16 @@ export default function Journal() {
                 addShifts={addShifts}
                 ensureCodesAndTypes={ensureCodesAndTypes}
                 initialYearMonth={currentYearMonthStr}
+            />
+
+            {/* iOS Calendar Export Modal */}
+            <IosCalendarExportModal
+                isOpen={isCalendarExportModalOpen}
+                onClose={() => setIsCalendarExportModalOpen(false)}
+                shifts={monthShifts}
+                currentMonthLabel={currentMonthLabel}
+                yearMonth={currentYearMonthStr}
+                storeSettings={store.settings}
             />
         </div>
     );

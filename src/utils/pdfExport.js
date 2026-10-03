@@ -122,15 +122,16 @@ export function exportToPDF(data) {
         doc.setFont(undefined, 'bold');
         doc.setTextColor(15, 23, 42);
         doc.text(`Schichten im Detail (${shiftCount})`, margin, yPos);
-        yPos += 4.5;
+        yPos += 8.5; // Generous breathing room between title and table header bar
 
-        // Table Column Positions (Optimized for generous PartnerIn space)
+        // Table Column Positions (with consecutive numbering and generous PartnerIn space)
         // Total available table width: 265 mm
-        const colDatum = margin + 3;       // ~26 mm width (19 mm)
-        const colKuerzel = margin + 30;    // ~25 mm width (46 mm)
-        const colSchichtart = margin + 58; // ~44 mm width (74 mm)
-        const colZeit = margin + 105;      // ~38 mm width (121 mm)
-        const colPartner = margin + 146;   // ~116 mm width (162 mm -> plenty of room!)
+        const colNr = margin + 2;          // ~11 mm width
+        const colDatum = margin + 14;      // ~26 mm width (30 mm)
+        const colKuerzel = margin + 41;    // ~24 mm width (57 mm)
+        const colSchichtart = margin + 66; // ~40 mm width (82 mm)
+        const colZeit = margin + 108;      // ~36 mm width (124 mm)
+        const colPartner = margin + 146;   // ~118 mm width (162 mm -> plenty of room!)
 
         // Table Header Bar (Primary Brand Orange)
         doc.setFillColor(249, 115, 22);
@@ -139,6 +140,7 @@ export function exportToPDF(data) {
         doc.setFontSize(9.5);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(255, 255, 255);
+        doc.text('Nr.', colNr, yPos);
         doc.text('Datum', colDatum, yPos);
         doc.text('Schichtkürzel', colKuerzel, yPos);
         doc.text('Schichtart', colSchichtart, yPos);
@@ -171,6 +173,11 @@ export function exportToPDF(data) {
             const partnerName = shift.partner ? String(shift.partner).trim() : '-';
 
             doc.setFontSize(9);
+            // Consecutive numbering: 1, 2, 3...
+            doc.setTextColor(100, 116, 139);
+            doc.text(String(index + 1), colNr, yPos);
+
+            doc.setTextColor(15, 23, 42);
             doc.text(formatDate(shift.date), colDatum, yPos);
             doc.setFont(undefined, 'bold');
             doc.text(displayCode, colKuerzel, yPos);

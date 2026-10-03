@@ -150,7 +150,7 @@ export default function Analysis() {
                     <div className="card-premium">
                         <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>📋 Schichten im Detail ({filteredData.length})</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {[...filteredData].sort((a, b) => a.date.localeCompare(b.date)).map(s => {
+                            {[...filteredData].sort((a, b) => a.date.localeCompare(b.date)).map((s, index) => {
                                 const typeObj = (store.settings?.shiftTypes || []).find(t => t.id === s.typeId);
                                 const typeName = s.shiftTypeName || typeObj?.name || 'Dienst';
                                 const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
@@ -174,6 +174,7 @@ export default function Analysis() {
                                     >
                                         <div style={{ flex: 1, minWidth: '200px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, flexWrap: 'wrap' }}>
+                                                <span style={{ color: '#64748b', fontSize: '11px', minWidth: '16px' }}>#{index + 1}</span>
                                                 <span style={{ color: 'var(--color-primary)' }}>{dateFormatted}</span>
                                                 {displayCode !== '-' && (
                                                     <span style={{ background: '#334155', color: '#facc15', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>

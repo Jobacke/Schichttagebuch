@@ -6,9 +6,12 @@ import {
 } from 'lucide-react';
 import {
   getActiveTeamRoster,
-  saveActiveTeamRoster,
+  saveStationTeamRoster,
   getSavedRosterSummaries,
+  deleteStationTeamRoster,
   deleteTeamRoster,
+  detectRosterStation,
+  ROSTER_STATIONS,
   runTeamRosterOcr,
   parseTeamRoster
 } from '../utils/teamRosterParser';
@@ -60,6 +63,8 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
   });
 
   const colleagues = [];
+  let mCount = 0, oCount = 0, hCount = 0;
+
   rows.forEach(r => {
     const nameEl = r.querySelector('.employee-cell') || r.children[0];
     const name = nameEl.textContent.trim();
@@ -72,6 +77,9 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
         if (code && code.length >= 2 && code !== '-' && code !== '/' && code !== '0') {
           const dateStr = \`\${yearMonth}-\${String(dayNum).padStart(2, '0')}\`;
           shifts[dateStr] = code;
+          if (code.endsWith('M') || code.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(code)) mCount++;
+          else if (code.endsWith('O') || code === 'RFO' || code === 'RSO' || code.startsWith('NFO') || code.startsWith('FFO')) oCount++;
+          else if (code.endsWith('H') || code.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(code)) hCount++;
         }
       }
     });
@@ -81,12 +89,16 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
     }
   });
 
-  const result = { yearMonth, monthLabel, colleagues };
+  let station = 'Sendling';
+  if (oCount > mCount && oCount > hCount) station = 'Obersendling';
+  else if (hCount > mCount && hCount > oCount) station = 'Hohenbrunn';
+
+  const result = { yearMonth, monthLabel, station, colleagues };
   copy(JSON.stringify(result));
-  alert(\`✅ Erfolg! \${colleagues.length} Kollegen für \${monthLabel} kopiert! Jetzt in der Schichten-App einfügen.\`);
+  alert(\`✅ Erfolg! \${colleagues.length} Kollegen für \${monthLabel} (Wache \${station}) kopiert! Jetzt in der Schichten-App einfügen.\`);
 })();`;
 
-const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var c=cs[colIdx].textContent.trim().replace(/\\*+$/,"").trim().toUpperCase();if(c&&c.length>=2&&c!=="-"&&c!=="/"&&c!=="0"){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=c;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var json=JSON.stringify({yearMonth:ym,monthLabel:ml,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" kopiert!\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
+const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];var mc=0,oc=0,hc=0;rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var c=cs[colIdx].textContent.trim().replace(/\\*+$/,"").trim().toUpperCase();if(c&&c.length>=2&&c!=="-"&&c!=="/"&&c!=="0"){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=c;if(c.endsWith("M")||c.indexOf("-M")!==-1)mc++;else if(c.endsWith("O")||c==="FFO"||c==="NFO")oc++;else if(c.endsWith("H"))hc++;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var st="Sendling";if(oc>mc&&oc>hc)st="Obersendling";else if(hc>mc&&hc>oc)st="Hohenbrunn";var json=JSON.stringify({yearMonth:ym,monthLabel:ml,station:st,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" (Wache "+st+") kopiert!\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
 
 export default function TeamRoster() {
   // Stored rosters list
@@ -120,6 +132,7 @@ export default function TeamRoster() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStation, setSelectedStation] = useState('ALL'); // 'ALL' | 'Sendling' | 'Hohenbrunn' | 'Obersendling'
+  const [uploadStationOverride, setUploadStationOverride] = useState('AUTO'); // 'AUTO' | 'Sendling' | 'Obersendling' | 'Hohenbrunn'
   const [copiedScript, setCopiedScript] = useState(false);
   const [copiedBookmarklet, setCopiedBookmarklet] = useState(false);
 
@@ -174,8 +187,18 @@ export default function TeamRoster() {
     }
   };
 
-  const handleDeleteRoster = (ym) => {
-    if (window.confirm(`Dienstplan für ${ym} wirklich aus der App löschen?`)) {
+  const handleDeleteStationRoster = (ym, st) => {
+    if (window.confirm(`Dienstplan für ${ym} (Wache ${st}) wirklich löschen?`)) {
+      deleteStationTeamRoster(ym, st);
+      const updated = getSavedRosterSummaries();
+      setSavedRosters(updated);
+      setRoster(getActiveTeamRoster(currentYearMonth));
+      setToastMessage(`Dienstplan für Wache ${st} gelöscht.`);
+    }
+  };
+
+  const handleDeleteMonthRoster = (ym) => {
+    if (window.confirm(`Alle Dienstpläne für ${ym} (alle Wachen) wirklich löschen?`)) {
       deleteTeamRoster(ym);
       const updated = getSavedRosterSummaries();
       setSavedRosters(updated);
@@ -183,7 +206,7 @@ export default function TeamRoster() {
         const fallback = updated[0]?.yearMonth || '2026-10';
         switchMonth(fallback);
       }
-      setToastMessage(`Dienstplan für ${ym} gelöscht.`);
+      setToastMessage(`Dienstpläne für ${ym} gelöscht.`);
     }
   };
 
@@ -440,10 +463,11 @@ export default function TeamRoster() {
       }
 
       setUploadProgress(100);
-      saveActiveTeamRoster(parsedRoster);
+      const targetStation = uploadStationOverride !== 'AUTO' ? uploadStationOverride : (parsedRoster.station || detectRosterStation(parsedRoster));
+      saveStationTeamRoster(parsedRoster, targetStation);
       setCurrentYearMonth(parsedRoster.yearMonth);
       localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
-      setRoster(parsedRoster);
+      setRoster(getActiveTeamRoster(parsedRoster.yearMonth));
       setSavedRosters(getSavedRosterSummaries());
 
       if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
@@ -459,7 +483,7 @@ export default function TeamRoster() {
       setIsUploadOpen(false);
       setIsProcessing(false);
       setUploadProgress(null);
-      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} gespeichert (${parsedRoster.totalShifts} Schichten)!`);
+      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) gespeichert (${parsedRoster.totalShifts} Schichten)!`);
     } catch (err) {
       console.error('Upload Error:', err);
       setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe das Dateiformat.'));
@@ -477,10 +501,11 @@ export default function TeamRoster() {
     try {
       const parsedRoster = await parseCareManHtml(pasteText, p => setUploadProgress(p));
       setUploadProgress(100);
-      saveActiveTeamRoster(parsedRoster);
+      const targetStation = uploadStationOverride !== 'AUTO' ? uploadStationOverride : (parsedRoster.station || detectRosterStation(parsedRoster));
+      saveStationTeamRoster(parsedRoster, targetStation);
       setCurrentYearMonth(parsedRoster.yearMonth);
       localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
-      setRoster(parsedRoster);
+      setRoster(getActiveTeamRoster(parsedRoster.yearMonth));
       setSavedRosters(getSavedRosterSummaries());
 
       if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
@@ -498,7 +523,7 @@ export default function TeamRoster() {
       setUploadProgress(null);
       setPasteText('');
       setActiveModalTab('paste');
-      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} übernommen (${parsedRoster.totalShifts} Schichten)!`);
+      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) übernommen (${parsedRoster.totalShifts} Schichten)!`);
     } catch (err) {
       console.error('Paste Error:', err);
       setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe den kopierten Inhalt.'));
@@ -1039,6 +1064,41 @@ export default function TeamRoster() {
                     </div>
                   </div>
 
+                  {/* Station Selector Chip Bar */}
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '5px' }}>
+                      Wachen-Zuordnung:
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {[
+                        { id: 'AUTO', label: '⚡ Auto-Erkennung' },
+                        { id: 'Sendling', label: 'Sendling (M)' },
+                        { id: 'Obersendling', label: 'Obersendling (O)' },
+                        { id: 'Hohenbrunn', label: 'Hohenbrunn (H)' }
+                      ].map(opt => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setUploadStationOverride(opt.id)}
+                          style={{
+                            flex: 1,
+                            padding: '6px 4px',
+                            borderRadius: '8px',
+                            border: uploadStationOverride === opt.id ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid var(--color-border)',
+                            background: uploadStationOverride === opt.id ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                            color: uploadStationOverride === opt.id ? '#38bdf8' : 'var(--color-text-muted)',
+                            fontSize: '11px',
+                            fontWeight: uploadStationOverride === opt.id ? 700 : 500,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <textarea
                     value={pasteText}
                     onChange={e => setPasteText(e.target.value)}
@@ -1077,26 +1137,23 @@ export default function TeamRoster() {
                 /* Stored Rosters Tab */
                 <div>
                   <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '12px', lineHeight: 1.4 }}>
-                    Alle gespeicherten Dienstpläne bleiben dauerhaft in der App abrufbar und können jederzeit gewechselt werden:
+                    Für jeden Monat können drei Pläne unabhängig gespeichert werden (Sendling, Obersendling, Hohenbrunn):
                   </div>
 
-                  <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {savedRosters.map(sr => {
                       const isActive = sr.yearMonth === currentYearMonth;
                       return (
                         <div
                           key={sr.yearMonth}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '12px 14px',
-                            background: isActive ? 'rgba(14, 165, 233, 0.12)' : 'rgba(15, 23, 42, 0.7)',
+                            background: isActive ? 'rgba(14, 165, 233, 0.08)' : 'rgba(15, 23, 42, 0.7)',
                             border: isActive ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid var(--color-border)',
-                            borderRadius: '12px'
+                            borderRadius: '14px',
+                            padding: '12px 14px'
                           }}
                         >
-                          <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ fontWeight: 700, fontSize: '13px', color: isActive ? '#38bdf8' : 'var(--color-text-main)' }}>
                                 {sr.monthLabel}
@@ -1114,44 +1171,101 @@ export default function TeamRoster() {
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                              {sr.hasData ? `${sr.totalColleagues} Kollegen · ${sr.totalShifts} Schichten` : 'Kein Plan hinterlegt'}
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {!isActive && sr.hasData && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    switchMonth(sr.yearMonth);
+                                    setIsUploadOpen(false);
+                                  }}
+                                  className="team-roster-today-btn"
+                                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                                >
+                                  Monat öffnen
+                                </button>
+                              )}
+                              {!sr.isPreset && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMonthRoster(sr.yearMonth)}
+                                  style={{
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    color: '#f87171',
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}
+                                  title="Ganzen Monat löschen"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {!isActive && sr.hasData && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  switchMonth(sr.yearMonth);
-                                  setIsUploadOpen(false);
-                                }}
-                                className="team-roster-today-btn"
-                                style={{ fontSize: '11px', padding: '5px 10px' }}
-                              >
-                                Öffnen
-                              </button>
-                            )}
-                            {!sr.isPreset && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteRoster(sr.yearMonth)}
-                                style={{
-                                  background: 'rgba(239, 68, 68, 0.15)',
-                                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                                  color: '#f87171',
-                                  padding: '6px 8px',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}
-                                title="Plan löschen"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            )}
+                          {/* 3 Stations Breakdown */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+                            {sr.stations.map(stInfo => {
+                              const stationTheme = stInfo.station === 'Sendling' ? '#38bdf8' : (stInfo.station === 'Hohenbrunn' ? '#34d399' : '#fb923c');
+                              return (
+                                <div
+                                  key={stInfo.station}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '6px 10px',
+                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    borderRadius: '8px',
+                                    fontSize: '11px'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{
+                                      width: '7px',
+                                      height: '7px',
+                                      borderRadius: '50%',
+                                      background: stInfo.hasData ? stationTheme : '#64748b'
+                                    }} />
+                                    <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>
+                                      Wache {stInfo.station}
+                                    </span>
+                                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                                      ({stInfo.station === 'Sendling' ? 'M' : (stInfo.station === 'Hohenbrunn' ? 'H' : 'O')})
+                                    </span>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '11px', color: stInfo.hasData ? 'var(--color-text-muted)' : '#64748b' }}>
+                                      {stInfo.hasData ? `${stInfo.totalColleagues} Kollege${stInfo.totalColleagues === 1 ? '' : 'n'} · ${stInfo.totalShifts} Dienste` : 'Kein Plan'}
+                                    </span>
+                                    {stInfo.hasData && !stInfo.isPreset && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteStationRoster(sr.yearMonth, stInfo.station)}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          color: '#f87171',
+                                          cursor: 'pointer',
+                                          padding: '2px',
+                                          display: 'flex',
+                                          alignItems: 'center'
+                                        }}
+                                        title={`Dienstplan ${stInfo.station} löschen`}
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
@@ -1159,6 +1273,7 @@ export default function TeamRoster() {
                   </div>
                 </div>
               )}
+
 
               {/* Progress Indicator */}
               {isProcessing && (

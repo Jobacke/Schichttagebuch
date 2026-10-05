@@ -105,12 +105,30 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
         }
       });
 
+      let targetStation = parsedJson.station || null;
+
       const totalShiftsCount = Object.values(shiftsByDateMap).reduce((acc, list) => acc + list.length, 0);
       if (cleanColleagues.length > 0) {
+        if (!targetStation) {
+          let mCount = 0, oCount = 0, hCount = 0;
+          cleanColleagues.forEach(c => {
+            Object.values(c.shifts).forEach(code => {
+              const up = (code || '').toUpperCase().trim();
+              if (up.endsWith('M') || up.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(up)) mCount++;
+              else if (up.endsWith('O') || up === 'RFO' || up === 'RSO' || up.startsWith('NFO') || up.startsWith('FFO')) oCount++;
+              else if (up.endsWith('H') || up.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(up)) hCount++;
+            });
+          });
+          if (oCount > mCount && oCount > hCount) targetStation = 'Obersendling';
+          else if (hCount > mCount && hCount > oCount) targetStation = 'Hohenbrunn';
+          else targetStation = 'Sendling';
+        }
+
         if (onProgress) onProgress(100);
         return {
           yearMonth: targetYearMonth,
           monthLabel: targetLabel,
+          station: targetStation,
           daysInMonth: totalDays,
           totalColleagues: cleanColleagues.length,
           totalShifts: totalShiftsCount,
@@ -481,9 +499,23 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
     throw new Error('In dieser Datei konnte keine lesbare Dienstplantabelle erkannt werden. Bitte nutze oben den Reiter „Text einfügen“: Markiere die Tabelle auf der CareMan-Seite einfach mit der Maus (oder Cmd + A), kopiere sie (Cmd + C) und füge sie dort direkt ein!');
   }
 
+  let detectedStation = 'Sendling';
+  let mCount = 0, oCount = 0, hCount = 0;
+  colleaguesList.forEach(c => {
+    Object.values(c.shifts).forEach(code => {
+      const up = (code || '').toUpperCase().trim();
+      if (up.endsWith('M') || up.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(up)) mCount++;
+      else if (up.endsWith('O') || up === 'RFO' || up === 'RSO' || up.startsWith('NFO') || up.startsWith('FFO')) oCount++;
+      else if (up.endsWith('H') || up.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(up)) hCount++;
+    });
+  });
+  if (oCount > mCount && oCount > hCount) detectedStation = 'Obersendling';
+  else if (hCount > mCount && hCount > oCount) detectedStation = 'Hohenbrunn';
+
   return {
     yearMonth,
     monthLabel,
+    station: detectedStation,
     daysInMonth,
     totalColleagues: colleaguesList.length,
     totalShifts,

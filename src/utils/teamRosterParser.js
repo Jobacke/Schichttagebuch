@@ -244,67 +244,216 @@ export function parseTeamRoster(text = '', fallbackYearMonth = '2026-10') {
 }
 
 /**
- * Storage key constants
+ * Station constants & Storage key prefix
  */
+export const ROSTER_STATIONS = ['Sendling', 'Obersendling', 'Hohenbrunn'];
 const STORAGE_KEY_PREFIX = 'schichten_team_roster_';
 const CURRENT_ROSTER_KEY = 'schichten_current_team_roster';
 
 /**
- * Loads the active team roster from localStorage or falls back to October 2026
+ * Automatically detects whether a roster belongs to Sendling, Obersendling, or Hohenbrunn:
+ * - Codes ending in 'M' (or DDM, C-M, etc.) -> Sendling
+ * - Codes ending in 'O' (or NFO, FFO, etc.) -> Obersendling
+ * - Codes ending in 'H' (or RFH, RTH, etc.) -> Hohenbrunn
  */
-export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
-  const preset = getPresetRosterForMonth(preferredYearMonth);
-
-  try {
-    const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${preferredYearMonth}`);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (preset && (!parsed.dataVersion || parsed.dataVersion < (preset.dataVersion || 1))) {
-        saveActiveTeamRoster(preset);
-        return preset;
-      }
-      return parsed;
-    }
-  } catch (e) {
-    console.warn('Error reading team roster from localStorage:', e);
+export function detectRosterStation(rosterData) {
+  if (!rosterData) return 'Sendling';
+  if (rosterData.station && ROSTER_STATIONS.includes(rosterData.station)) {
+    return rosterData.station;
   }
 
-  // Fallback to preloaded data if requested month is October 2026
-  if (preset) return preset;
+  let mCount = 0;
+  let oCount = 0;
+  let hCount = 0;
 
-  // Otherwise return empty month template so users can import that month
+  const checkCode = (code = '') => {
+    const c = (code || '').toUpperCase().trim();
+    if (!c || c === '-' || c === '/' || c === '0') return;
+    if (c.endsWith('M') || c.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(c)) {
+      mCount++;
+    } else if (c.endsWith('O') || c === 'RFO' || c === 'RSO' || c.startsWith('NFO') || c.startsWith('FFO')) {
+      oCount++;
+    } else if (c.endsWith('H') || c.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(c)) {
+      hCount++;
+    }
+  };
+
+  if (rosterData.colleagues) {
+    rosterData.colleagues.forEach(c => {
+      if (c.shifts) {
+        Object.values(c.shifts).forEach(code => checkCode(code));
+      }
+    });
+  }
+
+  if (rosterData.shiftsByDate) {
+    Object.values(rosterData.shiftsByDate).forEach(list => {
+      list.forEach(s => checkCode(s.code));
+    });
+  }
+
+  if (oCount > mCount && oCount > hCount) return 'Obersendling';
+  if (hCount > mCount && hCount > oCount) return 'Hohenbrunn';
+  if (mCount > 0) return 'Sendling';
+  if (oCount > 0) return 'Obersendling';
+  if (hCount > 0) return 'Hohenbrunn';
+  return 'Sendling';
+}
+
+/**
+ * Saves a station-specific team roster into localStorage
+ */
+export function saveStationTeamRoster(rosterData, stationOverride) {
+  if (!rosterData || !rosterData.yearMonth) return 'Sendling';
+  const station = stationOverride || rosterData.station || detectRosterStation(rosterData);
+  const updatedRoster = {
+    ...rosterData,
+    station
+  };
+
+  // Tag station on each shift in shiftsByDate
+  if (updatedRoster.shiftsByDate) {
+    Object.values(updatedRoster.shiftsByDate).forEach(list => {
+      list.forEach(s => {
+        s.station = s.station || station;
+      });
+    });
+  }
+
+  try {
+    const jsonStr = JSON.stringify(updatedRoster);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}_${station}`, jsonStr);
+    localStorage.setItem(CURRENT_ROSTER_KEY, jsonStr);
+    // Legacy compatibility for Sendling
+    if (station === 'Sendling') {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}`, jsonStr);
+    }
+  } catch (e) {
+    console.error('Error saving station roster:', e);
+  }
+
+  return station;
+}
+
+export function saveActiveTeamRoster(rosterData, stationOverride) {
+  return saveStationTeamRoster(rosterData, stationOverride);
+}
+
+/**
+ * Loads the active team roster for a month, merging all saved stations (Sendling, Obersendling, Hohenbrunn)
+ */
+export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
   const [y, m] = (preferredYearMonth || '2026-10').split('-').map(Number);
   const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   const daysInMonth = new Date(y, m, 0).getDate();
-  const shiftsByDate = {};
+  const monthLabel = `${monthNames[m - 1]} ${y}`;
+
+  // 1. Gather all stored station rosters for this month
+  const stationRosters = {};
+  ROSTER_STATIONS.forEach(st => {
+    try {
+      const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${preferredYearMonth}_${st}`);
+      if (stored) {
+        stationRosters[st] = JSON.parse(stored);
+      }
+    } catch (e) {}
+  });
+
+  // 2. Check legacy unsuffixed key if no station rosters found
+  if (Object.keys(stationRosters).length === 0) {
+    try {
+      const legacy = localStorage.getItem(`${STORAGE_KEY_PREFIX}${preferredYearMonth}`);
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        const detected = detectRosterStation(parsed);
+        stationRosters[detected] = parsed;
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback to preloaded October 2026 data if no saved station rosters exist for October
+  if (Object.keys(stationRosters).length === 0 && preferredYearMonth === '2026-10') {
+    const preset = getPresetRosterForMonth('2026-10');
+    if (preset) return preset;
+  }
+
+  // 4. Merge all available station rosters for this month into one unified view
+  const stationKeys = Object.keys(stationRosters);
+  if (stationKeys.length > 0) {
+    const mergedShiftsByDate = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+      mergedShiftsByDate[`${preferredYearMonth}-${String(d).padStart(2, '0')}`] = [];
+    }
+
+    const colleaguesMap = new Map();
+    let totalShifts = 0;
+
+    stationKeys.forEach(st => {
+      const r = stationRosters[st];
+      if (!r) return;
+
+      if (r.shiftsByDate) {
+        Object.entries(r.shiftsByDate).forEach(([dateStr, list]) => {
+          if (mergedShiftsByDate[dateStr]) {
+            list.forEach(shift => {
+              mergedShiftsByDate[dateStr].push({
+                ...shift,
+                station: shift.station || st
+              });
+              totalShifts++;
+            });
+          }
+        });
+      }
+
+      if (r.colleagues) {
+        r.colleagues.forEach(c => {
+          if (!colleaguesMap.has(c.name)) {
+            colleaguesMap.set(c.name, {
+              name: c.name,
+              station: st,
+              shifts: { ...c.shifts }
+            });
+          } else {
+            const existing = colleaguesMap.get(c.name);
+            Object.assign(existing.shifts, c.shifts);
+          }
+        });
+      }
+    });
+
+    return {
+      yearMonth: preferredYearMonth,
+      monthLabel,
+      daysInMonth,
+      totalColleagues: colleaguesMap.size,
+      totalShifts,
+      colleagues: Array.from(colleaguesMap.values()),
+      shiftsByDate: mergedShiftsByDate,
+      stationsPresent: stationKeys,
+      stationRosters,
+      isVerified: true
+    };
+  }
+
+  // 5. Empty template fallback
+  const emptyShiftsByDate = {};
   for (let d = 1; d <= daysInMonth; d++) {
-    shiftsByDate[`${preferredYearMonth}-${String(d).padStart(2, '0')}`] = [];
+    emptyShiftsByDate[`${preferredYearMonth}-${String(d).padStart(2, '0')}`] = [];
   }
 
   return {
     yearMonth: preferredYearMonth,
-    monthLabel: `${monthNames[m - 1]} ${y}`,
+    monthLabel,
     daysInMonth,
     totalColleagues: 0,
     totalShifts: 0,
     colleagues: [],
-    shiftsByDate,
+    shiftsByDate: emptyShiftsByDate,
+    stationsPresent: [],
+    stationRosters: {},
     isEmptyTemplate: true
   };
-}
-
-/**
- * Saves a team roster into localStorage
- */
-export function saveActiveTeamRoster(rosterData) {
-  if (!rosterData || !rosterData.yearMonth) return;
-  try {
-    const jsonStr = JSON.stringify(rosterData);
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${rosterData.yearMonth}`, jsonStr);
-    localStorage.setItem(CURRENT_ROSTER_KEY, jsonStr);
-  } catch (e) {
-    console.error('Error saving team roster to localStorage:', e);
-  }
 }
 
 /**
@@ -316,7 +465,8 @@ export function getSavedRosterMonths() {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
-        const ym = key.replace(STORAGE_KEY_PREFIX, '');
+        const rest = key.replace(STORAGE_KEY_PREFIX, '');
+        const ym = rest.split('_')[0];
         if (ym.match(/^\d{4}-\d{2}$/)) {
           months.add(ym);
         }
@@ -327,31 +477,89 @@ export function getSavedRosterMonths() {
 }
 
 /**
- * Returns summary info for all stored months
+ * Returns summary info for all stored months and their three stations
  */
 export function getSavedRosterSummaries() {
   const monthKeys = getSavedRosterMonths();
   return monthKeys.map(ym => {
-    const roster = getActiveTeamRoster(ym);
+    const combined = getActiveTeamRoster(ym);
     const [y, m] = ym.split('-').map(Number);
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-    const monthLabel = roster.monthLabel || `${monthNames[m - 1]} ${y}`;
+    const monthLabel = combined.monthLabel || `${monthNames[m - 1]} ${y}`;
+
+    const stationSummaries = ROSTER_STATIONS.map(st => {
+      let r = null;
+      let isPreset = false;
+      const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${ym}_${st}`);
+      if (stored) {
+        try { r = JSON.parse(stored); } catch (e) {}
+      } else if (ym === '2026-10' && !localStorage.getItem(`${STORAGE_KEY_PREFIX}2026-10_${st}`)) {
+        const preset = getPresetRosterForMonth('2026-10');
+        if (preset) {
+          isPreset = true;
+          let shiftCount = 0;
+          Object.entries(preset.shiftsByDate || {}).forEach(([dateStr, list]) => {
+            const filtered = list.filter(s => detectStation({ code: s.code, station: s.station }) === st);
+            shiftCount += filtered.length;
+          });
+          const colleagues = preset.colleagues?.filter(c => {
+            return Object.values(c.shifts || {}).some(code => detectStation({ code }) === st);
+          }) || [];
+          r = {
+            colleagues,
+            totalColleagues: colleagues.length,
+            totalShifts: shiftCount
+          };
+        }
+      }
+
+      return {
+        station: st,
+        hasData: Boolean(r && (r.totalShifts > 0 || (r.colleagues && r.colleagues.length > 0))),
+        totalColleagues: r?.totalColleagues || r?.colleagues?.length || 0,
+        totalShifts: r?.totalShifts || 0,
+        isPreset
+      };
+    });
+
+    const hasAnyData = Boolean(combined.colleagues && combined.colleagues.length > 0) ||
+      stationSummaries.some(s => s.hasData);
+
     return {
       yearMonth: ym,
       monthLabel,
-      totalColleagues: roster.totalColleagues || roster.colleagues?.length || 0,
-      totalShifts: roster.totalShifts || 0,
-      isPreset: ym === '2026-10' && !localStorage.getItem(`${STORAGE_KEY_PREFIX}2026-10`),
-      hasData: Boolean(roster.colleagues && roster.colleagues.length > 0)
+      totalColleagues: combined.totalColleagues || combined.colleagues?.length || 0,
+      totalShifts: combined.totalShifts || 0,
+      hasData: hasAnyData,
+      isPreset: ym === '2026-10' && !stationSummaries.some(s => !s.isPreset && s.hasData),
+      stations: stationSummaries
     };
   });
 }
 
 /**
- * Deletes a stored roster for a given month
+ * Deletes a specific station's roster for a given month
+ */
+export function deleteStationTeamRoster(yearMonth, station) {
+  if (!yearMonth || !station) return;
+  try {
+    localStorage.removeItem(`${STORAGE_KEY_PREFIX}${yearMonth}_${station}`);
+    if (station === 'Sendling') {
+      localStorage.removeItem(`${STORAGE_KEY_PREFIX}${yearMonth}`);
+    }
+  } catch (e) {
+    console.error('Error deleting station roster:', e);
+  }
+}
+
+/**
+ * Deletes all stored rosters for a given month
  */
 export function deleteTeamRoster(yearMonth) {
   if (!yearMonth) return;
+  ROSTER_STATIONS.forEach(st => {
+    deleteStationTeamRoster(yearMonth, st);
+  });
   try {
     localStorage.removeItem(`${STORAGE_KEY_PREFIX}${yearMonth}`);
     const current = localStorage.getItem(CURRENT_ROSTER_KEY);

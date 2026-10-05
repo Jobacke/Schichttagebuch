@@ -75,29 +75,29 @@ export default function TeamRoster() {
     }
   };
 
-function getShiftRank(code = '') {
-  const c = (code || '').toUpperCase().trim();
-  if (c.startsWith('RF') || c === 'RT1M' || c === 'RT3M' || c === 'RT1H') return 10;
-  if (c.startsWith('RT') && !c.includes('2') && !c.includes('4')) return 20;
-  if (c === 'RTH') return 20;
-  if (c.startsWith('RS') || c === 'RT2M' || c === 'RT4M' || c === 'RT2H') return 30;
-  if (c.startsWith('RN')) return 40;
-  if (['ACLS', 'PALS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 50;
-  if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 60;
-  return 70;
-}
+  function getShiftRank(code = '') {
+    const c = (code || '').toUpperCase().trim();
+    if (c.startsWith('RF') || c === 'RT1M' || c === 'RT3M' || c === 'RT1H') return 10;
+    if (c.startsWith('RT') && !c.includes('2') && !c.includes('4')) return 20;
+    if (c === 'RTH') return 20;
+    if (c.startsWith('RS') || c === 'RT2M' || c === 'RT4M' || c === 'RT2H') return 30;
+    if (c.startsWith('RN')) return 40;
+    if (['ACLS', 'PALS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 50;
+    if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 60;
+    return 70;
+  }
 
-function getShiftGroupName(code = '') {
-  const c = (code || '').toUpperCase().trim();
-  if (c.startsWith('RF') || c === 'RT1M' || c === 'RT3M' || c === 'RT1H') return 'Frühdienst';
-  if (c.startsWith('RT') && !c.includes('2') && !c.includes('4')) return 'Tagschicht';
-  if (c === 'RTH') return 'Tagschicht';
-  if (c.startsWith('RS') || c === 'RT2M' || c === 'RT4M' || c === 'RT2H') return 'Spätdienst';
-  if (c.startsWith('RN')) return 'Nachtdienst';
-  if (['ACLS', 'PALS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 'Fortbildung';
-  if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 'Urlaub / Abwesend';
-  return 'Sonderdienste';
-}
+  function getShiftGroupName(code = '') {
+    const c = (code || '').toUpperCase().trim();
+    if (c.startsWith('RF') || c === 'RT1M' || c === 'RT3M' || c === 'RT1H') return 'Frühdienst';
+    if (c.startsWith('RT') && !c.includes('2') && !c.includes('4')) return 'Tagschicht';
+    if (c === 'RTH') return 'Tagschicht';
+    if (c.startsWith('RS') || c === 'RT2M' || c === 'RT4M' || c === 'RT2H') return 'Spätdienst';
+    if (c.startsWith('RN')) return 'Nachtdienst';
+    if (['ACLS', 'PALS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 'Fortbildung';
+    if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 'Urlaub / Abwesend';
+    return 'Sonderdienste';
+  }
 
   // Filtered and sorted shifts for selected date
   const currentDayShifts = useMemo(() => {
@@ -208,63 +208,94 @@ function getShiftGroupName(code = '') {
   };
 
   return (
-    <div className="team-roster-container pb-28 max-w-lg mx-auto px-3">
+    <div className="team-roster-container">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-5 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 backdrop-blur-md text-xs font-semibold animate-fadeIn">
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 4000,
+          background: '#10b981',
+          color: 'white',
+          padding: '10px 18px',
+          borderRadius: '20px',
+          fontSize: '13px',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
           <CheckCircle2 size={16} />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Top Header: Title & Upload Button */}
-      <div className="flex items-center justify-between gap-2 pt-2 pb-3">
-        <div className="flex items-center gap-2">
-          <Users className="text-sky-400" size={22} />
-          <h1 className="text-xl font-bold text-white tracking-tight">
-            Wer hat Dienst?
-          </h1>
-        </div>
+      <div className="team-roster-header">
+        <h1 className="team-roster-title">
+          <Users style={{ color: '#38bdf8' }} size={24} />
+          <span>Wer hat Dienst?</span>
+        </h1>
 
         <button
+          type="button"
           onClick={() => setIsUploadOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-400 hover:text-sky-300 border border-slate-700 text-xs font-medium transition-all active:scale-95"
-          title="Neuen Dienstplan hochladen"
+          className="filter-chip"
+          style={{
+            background: 'rgba(14, 165, 233, 0.15)',
+            color: '#38bdf8',
+            borderColor: 'rgba(14, 165, 233, 0.3)',
+            fontWeight: 600,
+            padding: '7px 12px',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer'
+          }}
+          title="Neuen Dienstplan laden"
         >
-          <UploadCloud size={15} />
+          <UploadCloud size={16} />
           <span>Plan laden</span>
         </button>
       </div>
 
-      {/* Rock-solid Single-Row Date Stepper */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-2 px-3 mb-3 backdrop-blur-md flex items-center justify-between gap-2 shadow-sm">
+      {/* Single-Row Date Stepper */}
+      <div className="team-roster-stepper">
         <button
+          type="button"
           onClick={handlePrevDay}
-          className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition-all shrink-0"
+          className="team-roster-stepper-btn"
           title="Vorheriger Tag"
         >
           <ChevronLeft size={20} />
         </button>
 
-        <div className="flex items-center justify-center gap-2 min-w-0">
-          <span className="text-sm font-bold text-white truncate">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)' }}>
             {formattedSelectedDate}
           </span>
-          <span className="text-xs text-slate-400 shrink-0">
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
             • {currentDayShifts.length} im Dienst
           </span>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button
+            type="button"
             onClick={handleToday}
-            className="px-2 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-sky-400 hover:bg-slate-700 active:scale-95 transition-all"
+            className="team-roster-today-btn"
           >
             Heute
           </button>
           <button
+            type="button"
             onClick={handleNextDay}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition-all shrink-0"
+            className="team-roster-stepper-btn"
             title="Nächster Tag"
           >
             <ChevronRight size={20} />
@@ -273,45 +304,83 @@ function getShiftGroupName(code = '') {
       </div>
 
       {/* Slim Search Input */}
-      <div className="relative mb-3">
-        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+      <div className="team-roster-search-box">
+        <Search
+          size={16}
+          style={{
+            position: 'absolute',
+            left: '12px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--color-text-muted)',
+            pointerEvents: 'none'
+          }}
+        />
         <input
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Kollege oder Kürzel suchen..."
-          className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500/50 transition-all"
+          className="team-roster-search-input"
         />
         {searchQuery && (
           <button
+            type="button"
             onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+            style={{
+              position: 'absolute',
+              right: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--color-text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '4px'
+            }}
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         )}
       </div>
 
-      {/* Clean Flat List: Only Name & Shift Code */}
-      <div className="space-y-1">
+      {/* Shifts List: Grouped & Sorted */}
+      <div>
         {currentDayShifts.length === 0 ? (
-          <div className="text-center py-12 bg-slate-900/40 border border-slate-800/60 rounded-2xl p-6">
-            <p className="text-xs text-slate-400 font-medium">
+          <div style={{
+            textAlign: 'center',
+            padding: '36px 16px',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '16px'
+          }}>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: 0 }}>
               {searchQuery
                 ? `Keine Treffer für "${searchQuery}".`
                 : 'Für diesen Tag sind keine Dienste eingetragen.'}
             </p>
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => setSearchQuery('')}
-                className="mt-2 text-xs text-sky-400 hover:underline"
+                style={{
+                  marginTop: '10px',
+                  background: 'none',
+                  border: 'none',
+                  color: '#38bdf8',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
               >
                 Suche zurücksetzen
               </button>
             )}
           </div>
         ) : (
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800/60 shadow-sm">
+          <div className="team-roster-card">
             {currentDayShifts.map((shift, idx) => {
               const group = getShiftGroupName(shift.code);
               const prevGroup = idx > 0 ? getShiftGroupName(currentDayShifts[idx - 1].code) : null;
@@ -322,24 +391,33 @@ function getShiftGroupName(code = '') {
               return (
                 <React.Fragment key={`${shift.name}-${idx}`}>
                   {isNewGroup && (
-                    <div className="bg-slate-950/70 px-3.5 py-1.5 text-[10px] font-bold text-sky-400 uppercase tracking-wider border-t border-slate-800 first:border-t-0">
+                    <div className="team-roster-group-header">
                       {group}
                     </div>
                   )}
-                  <div
-                    className={`flex items-center justify-between px-3.5 py-2.5 transition-colors ${
-                      isJohannes
-                        ? 'bg-sky-500/15'
-                        : 'hover:bg-slate-800/40'
-                    }`}
-                  >
+                  <div className={`team-roster-row ${isJohannes ? 'is-user' : ''}`}>
                     {/* Colleague Name */}
-                    <div className="flex items-center gap-2 min-w-0 pr-2">
-                      <span className={`text-sm truncate ${isJohannes ? 'font-bold text-sky-300' : 'font-medium text-slate-200'}`}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, paddingRight: '8px' }}>
+                      <span style={{
+                        fontSize: '14px',
+                        fontWeight: isJohannes ? 700 : 500,
+                        color: isJohannes ? '#38bdf8' : 'var(--color-text-main)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
                         {shift.name}
                       </span>
                       {isJohannes && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500 text-white font-extrabold shrink-0">
+                        <span style={{
+                          fontSize: '10px',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          background: '#0284c7',
+                          color: 'white',
+                          fontWeight: 800,
+                          flexShrink: 0
+                        }}>
                           Du
                         </span>
                       )}
@@ -347,7 +425,7 @@ function getShiftGroupName(code = '') {
 
                     {/* Shift Code Badge with Station Color */}
                     <span
-                      className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border shrink-0 tracking-wide"
+                      className="team-roster-badge"
                       style={{
                         background: colorInfo.bg,
                         color: colorInfo.color,
@@ -366,19 +444,43 @@ function getShiftGroupName(code = '') {
 
       {/* Upload HTML / PDF / Screenshot Modal */}
       {isUploadOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-5 shadow-2xl space-y-4">
-            <div className="flex items-start justify-between pb-2 border-b border-slate-800">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <UploadCloud className="text-sky-400" size={18} />
-                  Dienstplan laden
-                </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  HTML (100% fehlerfrei), PDF oder Screenshot
-                </p>
+        <div className="modal-overlay" style={{ alignItems: 'center', zIndex: 3000 }}>
+          <div className="modal-content" style={{
+            maxWidth: '460px',
+            borderRadius: '24px',
+            background: 'var(--color-surface)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* Modal Header */}
+            <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  background: 'rgba(14, 165, 233, 0.15)',
+                  color: '#38bdf8',
+                  borderRadius: '10px',
+                  padding: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <UploadCloud size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text-main)' }}>
+                    Dienstplan laden
+                  </h3>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                    HTML (100% fehlerfrei), PDF oder Screenshot
+                  </span>
+                </div>
               </div>
               <button
+                type="button"
+                className="close-btn"
                 onClick={() => {
                   if (!isProcessing) {
                     setIsUploadOpen(false);
@@ -386,137 +488,204 @@ function getShiftGroupName(code = '') {
                     setIsPasteMode(false);
                   }
                 }}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            {/* Mode Switcher Tabs */}
-            <div className="flex bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs">
-              <button
-                type="button"
-                onClick={() => { setIsPasteMode(false); setUploadError(null); }}
-                className={`flex-1 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
-                  !isPasteMode
-                    ? 'bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/30'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <FileCode size={14} className={!isPasteMode ? 'text-sky-400' : ''} />
-                <span>Datei hochladen</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setIsPasteMode(true); setUploadError(null); }}
-                className={`flex-1 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
-                  isPasteMode
-                    ? 'bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/30'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Clipboard size={14} className={isPasteMode ? 'text-sky-400' : ''} />
-                <span>Text einfügen</span>
-              </button>
-            </div>
-
-            {!isPasteMode ? (
-              /* Drop / Select File Area */
-              <div
-                onClick={() => !isProcessing && fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
-                  isProcessing
-                    ? 'border-sky-500/50 bg-sky-500/5'
-                    : 'border-slate-700 hover:border-sky-500/60 bg-slate-950/40'
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".html,.htm,text/html,application/pdf,image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-
-                <div className="space-y-2">
-                  <div className="flex justify-center gap-2 mb-1">
-                    <FileCode size={26} className="text-emerald-400" />
-                    <FileText size={26} className="text-sky-400" />
-                    <UploadCloud size={26} className="text-slate-400" />
-                  </div>
-                  <div className="text-xs font-semibold text-slate-200">
-                    CareMan HTML-Datei auswählen
-                  </div>
-                  <div className="text-[10px] text-slate-300 leading-relaxed bg-slate-900/80 rounded-xl p-2.5 border border-slate-800 text-left space-y-1">
-                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                      <CheckCircle2 size={13} className="shrink-0" />
-                      <span>Empfohlen: Website als HTML speichern</span>
-                    </div>
-                    <p className="text-slate-400 pl-4.5">
-                      Auf der CareMan-Seite im Browser <strong>Cmd + S</strong> drücken, als <em>„Nur HTML“</em> speichern und hier wählen. 100% fehlerfreie Erkennung!
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Direct Paste Area */
-              <div className="space-y-3">
-                <textarea
-                  value={pasteText}
-                  onChange={e => setPasteText(e.target.value)}
-                  placeholder="Kopierten HTML-Quelltext oder markierte CareMan-Tabelle hier einfügen (Cmd + V)..."
-                  rows={6}
-                  className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono resize-none"
-                  disabled={isProcessing}
-                />
+            {/* Modal Body */}
+            <div className="modal-body" style={{ padding: '18px 20px' }}>
+              {/* Tab Switcher */}
+              <div style={{
+                display: 'flex',
+                background: 'rgba(15, 23, 42, 0.7)',
+                padding: '4px',
+                borderRadius: '12px',
+                border: '1px solid var(--color-border)',
+                marginBottom: '16px'
+              }}>
                 <button
                   type="button"
-                  disabled={isProcessing || !pasteText.trim()}
-                  onClick={handlePasteSubmit}
-                  className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white font-semibold text-xs transition-all active:scale-98 shadow-lg shadow-sky-500/20"
+                  onClick={() => { setIsPasteMode(false); setUploadError(null); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '8px',
+                    border: !isPasteMode ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
+                    background: !isPasteMode ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
+                    color: !isPasteMode ? '#38bdf8' : 'var(--color-text-muted)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
                 >
-                  Dienstplan einlesen
+                  <FileCode size={14} />
+                  <span>Datei hochladen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsPasteMode(true); setUploadError(null); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '8px',
+                    border: isPasteMode ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
+                    background: isPasteMode ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
+                    color: isPasteMode ? '#38bdf8' : 'var(--color-text-muted)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Clipboard size={14} />
+                  <span>Text einfügen</span>
                 </button>
               </div>
-            )}
 
-            {/* Processing Progress */}
-            {isProcessing && (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] text-slate-300">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <Sparkles size={13} className="text-sky-400 animate-spin" />
-                    Dienstplan wird eingelesen...
-                  </span>
-                  <span className="font-mono text-sky-400 font-bold">{uploadProgress}%</span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-sky-500 h-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
+              {!isPasteMode ? (
+                /* File Dropzone Area */
+                <div
+                  onClick={() => !isProcessing && fileInputRef.current?.click()}
+                  className="team-roster-modal-dropzone"
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".html,.htm,text/html,application/pdf,image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleFileChange}
                   />
+
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <FileCode size={28} style={{ color: '#10b981' }} />
+                    <FileText size={28} style={{ color: '#38bdf8' }} />
+                    <UploadCloud size={28} style={{ color: 'var(--color-text-muted)' }} />
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '8px' }}>
+                    CareMan HTML-Datei auswählen
+                  </div>
+
+                  <div style={{
+                    fontSize: '11px',
+                    color: 'var(--color-text-muted)',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    borderRadius: '12px',
+                    padding: '10px 12px',
+                    border: '1px solid var(--color-border)',
+                    textAlign: 'left',
+                    lineHeight: '1.4'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontWeight: 700, marginBottom: '4px' }}>
+                      <CheckCircle2 size={14} />
+                      <span>Empfehlung: Website als HTML speichern</span>
+                    </div>
+                    <span>
+                      Auf der CareMan-Dienstplanseite im Browser einfach <strong>Cmd + S</strong> drücken, als <em>„Nur HTML“</em> abspeichern und hier wählen. 100% fehlerfreie Erkennung!
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                /* Direct Paste Area */
+                <div>
+                  <textarea
+                    value={pasteText}
+                    onChange={e => setPasteText(e.target.value)}
+                    placeholder="Kopierten HTML-Quelltext oder markierte CareMan-Tabelle hier einfügen (Cmd + V)..."
+                    rows={7}
+                    className="input-premium"
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '12px',
+                      resize: 'none',
+                      marginBottom: '10px',
+                      background: 'rgba(15, 23, 42, 0.8)'
+                    }}
+                    disabled={isProcessing}
+                  />
+                  <button
+                    type="button"
+                    disabled={isProcessing || !pasteText.trim()}
+                    onClick={handlePasteSubmit}
+                    className="btn-primary"
+                    style={{
+                      width: '100%',
+                      background: '#0284c7',
+                      color: 'white',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                      padding: '10px',
+                      borderRadius: '10px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Dienstplan einlesen
+                  </button>
+                </div>
+              )}
 
-            {/* Error Message */}
-            {uploadError && (
-              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                <AlertCircle size={14} className="shrink-0" />
-                <span>{uploadError}</span>
-              </div>
-            )}
+              {/* Progress Indicator */}
+              {isProcessing && (
+                <div style={{ marginTop: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--color-text-main)', marginBottom: '6px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Sparkles size={14} style={{ color: '#38bdf8' }} />
+                      Dienstplan wird eingelesen...
+                    </span>
+                    <span style={{ fontWeight: 700, color: '#38bdf8' }}>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${uploadProgress}%`,
+                      height: '100%',
+                      background: '#38bdf8',
+                      transition: 'width 0.2s ease'
+                    }} />
+                  </div>
+                </div>
+              )}
 
-            {/* Modal Actions */}
-            <div className="pt-1 flex justify-end">
+              {/* Error Message */}
+              {uploadError && (
+                <div style={{
+                  marginTop: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="modal-footer" style={{ justifyContent: 'flex-end', padding: '12px 20px' }}>
               <button
+                type="button"
                 disabled={isProcessing}
                 onClick={() => {
                   setIsUploadOpen(false);
                   setUploadError(null);
                   setIsPasteMode(false);
                 }}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold disabled:opacity-50"
+                className="btn-secondary"
+                style={{ fontSize: '13px', padding: '8px 16px', borderRadius: '10px' }}
               >
                 Abbrechen
               </button>

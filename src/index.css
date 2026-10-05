@@ -454,3 +454,173 @@ h2 {
     transform: translateY(0);
   }
 }
+
+/* --- Team Roster ("Wer hat Dienst?") --- */
+.team-roster-container {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px 120px 16px;
+}
+
+.team-roster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0 14px 0;
+}
+
+.team-roster-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  margin: 0;
+}
+
+.team-roster-stepper {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-roster-stepper-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-main);
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.team-roster-stepper-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+.team-roster-stepper-btn:active {
+  transform: scale(0.95);
+}
+
+.team-roster-today-btn {
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  color: #38bdf8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.team-roster-today-btn:hover {
+  background: rgba(14, 165, 233, 0.25);
+}
+
+.team-roster-search-box {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.team-roster-search-input {
+  width: 100%;
+  padding: 10px 36px 10px 38px;
+  border-radius: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-main);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.team-roster-search-input:focus {
+  border-color: #38bdf8;
+}
+
+.team-roster-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.team-roster-group-header {
+  background: rgba(15, 23, 42, 0.75);
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #38bdf8;
+  border-top: 1px solid var(--color-border);
+}
+
+.team-roster-group-header:first-child {
+  border-top: none;
+}
+
+.team-roster-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s;
+}
+
+.team-roster-row:first-child {
+  border-top: none;
+}
+
+.team-roster-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.team-roster-row.is-user {
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.team-roster-badge {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+  letter-spacing: 0.03em;
+}
+
+.team-roster-modal-dropzone {
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(15, 23, 42, 0.5);
+  transition: all 0.2s ease;
+}
+
+.team-roster-modal-dropzone:hover {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.06);
+}

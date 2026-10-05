@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Search,
-  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText
+  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText, FileCode, Clipboard
 } from 'lucide-react';
 import {
   getActiveTeamRoster,
@@ -10,6 +10,7 @@ import {
   parseTeamRoster
 } from '../utils/teamRosterParser';
 import { parseCareManPdf } from '../utils/teamRosterPdfParser';
+import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
 import { getShiftColor } from '../utils/shiftColors';
 
 export default function TeamRoster() {
@@ -33,6 +34,8 @@ export default function TeamRoster() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+  const [isPasteMode, setIsPasteMode] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   const fileInputRef = useRef(null);
 
@@ -130,7 +133,7 @@ function getShiftGroupName(code = '') {
     }
   }, [selectedDate]);
 
-  // Handle File Upload (PDF or Image)
+  // Handle File Upload (HTML, PDF or Image)
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -142,14 +145,20 @@ function getShiftGroupName(code = '') {
     try {
       let parsedRoster;
 
-      // 1. PDF File Upload (Direct Vector Text - 100% Precision)
-      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      // 1. HTML File (.html, .htm) -> 100% Precision directly from page DOM
+      if (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm') || file.type === 'text/html') {
+        setUploadProgress(40);
+        parsedRoster = await parseCareManHtml(file, p => {
+          setUploadProgress(Math.min(95, 40 + Math.round(p * 0.55)));
+        });
+      } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        // 2. PDF File Upload
         setUploadProgress(30);
         parsedRoster = await parseCareManPdf(file, p => {
           setUploadProgress(Math.min(85, 30 + Math.round(p * 0.5)));
         });
       } else {
-        // 2. Image / Screenshot Upload (OCR)
+        // 3. Image / Screenshot Upload (OCR)
         setUploadProgress(25);
         const ocrText = await runTeamRosterOcr(file, progress => {
           setUploadProgress(Math.min(90, 25 + Math.round(progress * 0.7)));
@@ -168,6 +177,32 @@ function getShiftGroupName(code = '') {
     } catch (err) {
       console.error('Upload Error:', err);
       setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe das Dateiformat.'));
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle direct Paste (HTML or Tab-separated table text)
+  const handlePasteSubmit = async () => {
+    if (!pasteText.trim()) return;
+    setUploadError(null);
+    setIsProcessing(true);
+    setUploadProgress(30);
+
+    try {
+      const parsedRoster = await parseCareManHtml(pasteText, p => setUploadProgress(p));
+      setUploadProgress(100);
+      setRoster(parsedRoster);
+      saveActiveTeamRoster(parsedRoster);
+
+      setIsUploadOpen(false);
+      setIsProcessing(false);
+      setUploadProgress(null);
+      setPasteText('');
+      setIsPasteMode(false);
+      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} übernommen (${parsedRoster.totalShifts} Schichten)!`);
+    } catch (err) {
+      console.error('Paste Error:', err);
+      setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe den kopierten Inhalt.'));
       setIsProcessing(false);
     }
   };
@@ -329,7 +364,7 @@ function getShiftGroupName(code = '') {
         )}
       </div>
 
-      {/* Upload Screenshot / PDF Modal */}
+      {/* Upload HTML / PDF / Screenshot Modal */}
       {isUploadOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-5 shadow-2xl space-y-4">
@@ -340,7 +375,7 @@ function getShiftGroupName(code = '') {
                   Dienstplan laden
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  PDF (empfohlen) oder Screenshot auswählen
+                  HTML (100% fehlerfrei), PDF oder Screenshot
                 </p>
               </div>
               <button
@@ -348,6 +383,7 @@ function getShiftGroupName(code = '') {
                   if (!isProcessing) {
                     setIsUploadOpen(false);
                     setUploadError(null);
+                    setIsPasteMode(false);
                   }
                 }}
                 className="p-1 rounded-lg text-slate-400 hover:text-white"
@@ -356,36 +392,93 @@ function getShiftGroupName(code = '') {
               </button>
             </div>
 
-            {/* Drop / Select Area */}
-            <div
-              onClick={() => !isProcessing && fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
-                isProcessing
-                  ? 'border-sky-500/50 bg-sky-500/5'
-                  : 'border-slate-700 hover:border-sky-500/60 bg-slate-950/40'
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf,image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-
-              <div className="space-y-1.5">
-                <div className="flex justify-center gap-2 text-sky-400 mb-1">
-                  <FileText size={24} />
-                  <UploadCloud size={24} />
-                </div>
-                <div className="text-xs font-semibold text-slate-200">
-                  CareMan Datei auswählen
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  <span className="text-emerald-400 font-medium">Tipp:</span> Als <strong className="text-white">PDF</strong> ausdrucken/speichern für 100% perfekte Erkennung!
-                </p>
-              </div>
+            {/* Mode Switcher Tabs */}
+            <div className="flex bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs">
+              <button
+                type="button"
+                onClick={() => { setIsPasteMode(false); setUploadError(null); }}
+                className={`flex-1 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
+                  !isPasteMode
+                    ? 'bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <FileCode size={14} className={!isPasteMode ? 'text-sky-400' : ''} />
+                <span>Datei hochladen</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsPasteMode(true); setUploadError(null); }}
+                className={`flex-1 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
+                  isPasteMode
+                    ? 'bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Clipboard size={14} className={isPasteMode ? 'text-sky-400' : ''} />
+                <span>Text einfügen</span>
+              </button>
             </div>
+
+            {!isPasteMode ? (
+              /* Drop / Select File Area */
+              <div
+                onClick={() => !isProcessing && fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
+                  isProcessing
+                    ? 'border-sky-500/50 bg-sky-500/5'
+                    : 'border-slate-700 hover:border-sky-500/60 bg-slate-950/40'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".html,.htm,text/html,application/pdf,image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+
+                <div className="space-y-2">
+                  <div className="flex justify-center gap-2 mb-1">
+                    <FileCode size={26} className="text-emerald-400" />
+                    <FileText size={26} className="text-sky-400" />
+                    <UploadCloud size={26} className="text-slate-400" />
+                  </div>
+                  <div className="text-xs font-semibold text-slate-200">
+                    CareMan HTML-Datei auswählen
+                  </div>
+                  <div className="text-[10px] text-slate-300 leading-relaxed bg-slate-900/80 rounded-xl p-2.5 border border-slate-800 text-left space-y-1">
+                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                      <CheckCircle2 size={13} className="shrink-0" />
+                      <span>Empfohlen: Website als HTML speichern</span>
+                    </div>
+                    <p className="text-slate-400 pl-4.5">
+                      Auf der CareMan-Seite im Browser <strong>Cmd + S</strong> drücken, als <em>„Nur HTML“</em> speichern und hier wählen. 100% fehlerfreie Erkennung!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Direct Paste Area */
+              <div className="space-y-3">
+                <textarea
+                  value={pasteText}
+                  onChange={e => setPasteText(e.target.value)}
+                  placeholder="Kopierten HTML-Quelltext oder markierte CareMan-Tabelle hier einfügen (Cmd + V)..."
+                  rows={6}
+                  className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono resize-none"
+                  disabled={isProcessing}
+                />
+                <button
+                  type="button"
+                  disabled={isProcessing || !pasteText.trim()}
+                  onClick={handlePasteSubmit}
+                  className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white font-semibold text-xs transition-all active:scale-98 shadow-lg shadow-sky-500/20"
+                >
+                  Dienstplan einlesen
+                </button>
+              </div>
+            )}
 
             {/* Processing Progress */}
             {isProcessing && (
@@ -421,6 +514,7 @@ function getShiftGroupName(code = '') {
                 onClick={() => {
                   setIsUploadOpen(false);
                   setUploadError(null);
+                  setIsPasteMode(false);
                 }}
                 className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold disabled:opacity-50"
               >

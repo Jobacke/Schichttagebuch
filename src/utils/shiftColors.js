@@ -10,9 +10,9 @@ export function detectStation({ station = '', code = '', codeId = '', vehicle = 
     if (st.includes('sendling') || st.includes('sen')) return 'Sendling';
 
     const c = (code || (typeof codeId === 'string' && codeId.replace('preset_', '')) || '').toUpperCase().trim();
-    if (c.endsWith('O') || c === 'RFO' || c === 'RSO') return 'Obersendling';
-    if (c.endsWith('H') || c.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH'].includes(c)) return 'Hohenbrunn';
-    if (c.endsWith('M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M'].includes(c)) return 'Sendling';
+    if (c.endsWith('O') || c === 'RFO' || c === 'RSO' || c.startsWith('NFO') || c.startsWith('FFO')) return 'Obersendling';
+    if (c.endsWith('H') || c.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(c)) return 'Hohenbrunn';
+    if (c.endsWith('M') || c.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(c)) return 'Sendling';
 
     // Check presets
     const preset = SHIFT_PRESETS[c];

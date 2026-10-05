@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Search,
-  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText, FileCode, Clipboard
+  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText, FileCode, Clipboard, Copy, Bookmark
 } from 'lucide-react';
 import {
   getActiveTeamRoster,
@@ -11,22 +11,96 @@ import {
 } from '../utils/teamRosterParser';
 import { parseCareManPdf } from '../utils/teamRosterPdfParser';
 import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
-import { getShiftColor } from '../utils/shiftColors';
+import { getShiftColor, detectStation } from '../utils/shiftColors';
+
+const SIEDA_EXTRACTOR_SCRIPT = `(() => {
+  const urlDate = new URLSearchParams(window.location.search).get('date') || '';
+  let year = 2026;
+  let month = 11;
+  if (urlDate) {
+    const p = urlDate.split('-');
+    if (p.length >= 2) {
+      year = parseInt(p[0], 10);
+      month = parseInt(p[1], 10);
+    }
+  }
+  const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const yearMonth = \`\${year}-\${String(month).padStart(2, '0')}\`;
+  const monthLabel = \`\${monthNames[month - 1]} \${year}\`;
+
+  const table = document.querySelector('table.mat-table') || document.querySelector('table');
+  const headerRow = table?.querySelector('thead tr') || table?.querySelector('tr');
+  const headers = Array.from(headerRow?.children || []).map(c => c.textContent.trim());
+
+  const colToDay = new Map();
+  headers.forEach((h, idx) => {
+    const m = h.match(/(\\d+)/);
+    if (m) {
+      const d = parseInt(m[1], 10);
+      if (d >= 1 && d <= 31) colToDay.set(idx, d);
+    }
+  });
+
+  const rows = Array.from(document.querySelectorAll('tr')).filter(r => {
+    const nameEl = r.querySelector('.employee-cell') || r.children[0];
+    const txt = nameEl ? nameEl.textContent.trim() : '';
+    return txt.includes(',') && !txt.match(/\\d{2,}/);
+  });
+
+  const colleagues = [];
+  rows.forEach(r => {
+    const nameEl = r.querySelector('.employee-cell') || r.children[0];
+    const name = nameEl.textContent.trim();
+    const cells = Array.from(r.children);
+    const shifts = {};
+
+    colToDay.forEach((dayNum, colIdx) => {
+      if (colIdx < cells.length) {
+        let code = cells[colIdx].textContent.trim().replace(/\\*+$/, '').trim().toUpperCase();
+        if (code && code.length >= 2 && code !== '-' && code !== '/' && code !== '0') {
+          const dateStr = \`\${yearMonth}-\${String(dayNum).padStart(2, '0')}\`;
+          shifts[dateStr] = code;
+        }
+      }
+    });
+
+    if (Object.keys(shifts).length > 0) {
+      colleagues.push({ name, shifts });
+    }
+  });
+
+  const result = { yearMonth, monthLabel, colleagues };
+  copy(JSON.stringify(result));
+  alert(\`Erfolg! \${colleagues.length} Kollegen für \${monthLabel} kopiert. Jetzt in der Schichten-App einfügen!\`);
+})();`;
+
+const BOOKMARKLET_CODE = `javascript:(function(){const u=new URLSearchParams(window.location.search).get('date')||'';let y=2026,m=11;if(u){const p=u.split('-');if(p.length>=2){y=parseInt(p[0],10);m=parseInt(p[1],10);}}const mn=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];const ym=y+'-'+String(m).padStart(2,'0');const ml=mn[m-1]+' '+y;const t=document.querySelector('table.mat-table')||document.querySelector('table');if(!t)return alert('Keine Dienstplan-Tabelle gefunden!');const h=Array.from((t.querySelector('thead tr')||t.querySelector('tr'))?.children||[]).map(c=>c.textContent.trim());const cd=new Map();h.forEach((x,i)=>{const n=x.match(/(\\d+)/);if(n){const d=parseInt(n[1],10);if(d>=1&&d<=31)cd.set(i,d);}});const rs=Array.from(document.querySelectorAll('tr')).filter(r=>{const e=r.querySelector('.employee-cell')||r.children[0];const tx=e?e.textContent.trim():'';return tx.includes(',')&&!tx.match(/\\d{2,}/);});const cols=[];rs.forEach(r=>{const e=r.querySelector('.employee-cell')||r.children[0];const nm=e.textContent.trim();const cs=Array.from(r.children);const sh={};cd.forEach((dn,ci)=>{if(ci<cs.length){let c=cs[ci].textContent.trim().replace(/\\*+$/,'').trim().toUpperCase();if(c&&c.length>=2&&c!=='-'&&c!=='/'&&c!=='0'){sh[ym+'-'+String(dn).padStart(2,'0')]=c;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});navigator.clipboard.writeText(JSON.stringify({yearMonth:ym,monthLabel:ml,colleagues:cols})).then(()=>alert('Erfolg! '+cols.length+' Kollegen für '+ml+' kopiert. Jetzt in der Schichten-App einfügen!'));})();`;
 
 export default function TeamRoster() {
-  // Active roster data (defaults to cleaned October 2026 data)
-  const [roster, setRoster] = useState(() => getActiveTeamRoster('2026-10'));
+  // Current active yearMonth (defaults to current date or October 2026)
+  const [currentYearMonth, setCurrentYearMonth] = useState(() => {
+    const today = new Date();
+    const todayYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const stored = getActiveTeamRoster(todayYM);
+    if (stored && !stored.isEmptyTemplate) return todayYM;
+    return '2026-10';
+  });
+
+  // Active roster data
+  const [roster, setRoster] = useState(() => getActiveTeamRoster(currentYearMonth));
   
   // Selected date
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const ym = roster?.yearMonth || '2026-10';
+    const ym = roster?.yearMonth || currentYearMonth;
     if (todayStr.startsWith(ym)) return todayStr;
     return `${ym}-05`;
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStation, setSelectedStation] = useState('ALL'); // 'ALL' | 'Sendling' | 'Hohenbrunn' | 'Obersendling'
+  const [copiedScript, setCopiedScript] = useState(false);
 
   // Upload modal state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -34,7 +108,7 @@ export default function TeamRoster() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
-  const [isPasteMode, setIsPasteMode] = useState(false);
+  const [isPasteMode, setIsPasteMode] = useState(true); // Default to paste tab for SIEDA
   const [pasteText, setPasteText] = useState('');
 
   const fileInputRef = useRef(null);
@@ -48,9 +122,37 @@ export default function TeamRoster() {
   }, [toastMessage]);
 
   const daysInMonth = roster.daysInMonth || 31;
-  const yearMonth = roster.yearMonth || '2026-10';
+  const yearMonth = roster.yearMonth || currentYearMonth;
 
-  // Navigation handlers
+  // Month navigation handlers
+  const handlePrevMonth = () => {
+    const [y, m] = yearMonth.split('-').map(Number);
+    const prevDate = new Date(y, m - 2, 1);
+    const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    switchMonth(prevYM);
+  };
+
+  const handleNextMonth = () => {
+    const [y, m] = yearMonth.split('-').map(Number);
+    const nextDate = new Date(y, m, 1);
+    const nextYM = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+    switchMonth(nextYM);
+  };
+
+  const switchMonth = (newYM) => {
+    setCurrentYearMonth(newYM);
+    const loaded = getActiveTeamRoster(newYM);
+    setRoster(loaded);
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    if (todayStr.startsWith(newYM)) {
+      setSelectedDate(todayStr);
+    } else {
+      setSelectedDate(`${newYM}-01`);
+    }
+  };
+
+  // Day navigation handlers
   const handlePrevDay = () => {
     const currentDay = parseInt(selectedDate.split('-')[2], 10);
     if (currentDay > 1) {
@@ -71,7 +173,7 @@ export default function TeamRoster() {
     if (todayStr.startsWith(yearMonth)) {
       setSelectedDate(todayStr);
     } else {
-      setSelectedDate(`${yearMonth}-05`);
+      setSelectedDate(`${yearMonth}-01`);
     }
   };
 
@@ -99,10 +201,29 @@ export default function TeamRoster() {
     return 'Sonderdienste';
   }
 
+  // Station Counts for the currently selected day
+  const stationCounts = useMemo(() => {
+    const raw = roster.shiftsByDate?.[selectedDate] || [];
+    const counts = { ALL: raw.length, Sendling: 0, Hohenbrunn: 0, Obersendling: 0 };
+    raw.forEach(s => {
+      const st = detectStation({ code: s.code, station: s.station });
+      if (counts[st] !== undefined) counts[st]++;
+      else counts.Sendling++;
+    });
+    return counts;
+  }, [roster, selectedDate]);
+
   // Filtered and sorted shifts for selected date
   const currentDayShifts = useMemo(() => {
     const raw = roster.shiftsByDate?.[selectedDate] || [];
     const filtered = raw.filter(shift => {
+      // 1. Station filter
+      if (selectedStation !== 'ALL') {
+        const st = detectStation({ code: shift.code, station: shift.station });
+        if (st !== selectedStation) return false;
+      }
+
+      // 2. Search query filter
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
       return (
@@ -117,7 +238,7 @@ export default function TeamRoster() {
       if (rA !== rB) return rA - rB;
       return a.name.localeCompare(b.name, 'de');
     });
-  }, [roster, selectedDate, searchQuery]);
+  }, [roster, selectedDate, searchQuery, selectedStation]);
 
   // Formatted date string
   const formattedSelectedDate = useMemo(() => {
@@ -132,6 +253,12 @@ export default function TeamRoster() {
       return selectedDate;
     }
   }, [selectedDate]);
+
+  const handleCopyScript = () => {
+    navigator.clipboard.writeText(SIEDA_EXTRACTOR_SCRIPT);
+    setCopiedScript(true);
+    setTimeout(() => setCopiedScript(false), 3000);
+  };
 
   // Handle File Upload (HTML, PDF or Image)
   const handleFileChange = async (e) => {
@@ -252,34 +379,59 @@ export default function TeamRoster() {
         </div>
       )}
 
-      {/* Top Header: Title & Upload Button */}
+      {/* Top Header: Title, Month Selector & Upload Button */}
       <div className="team-roster-header">
         <h1 className="team-roster-title">
           <Users style={{ color: '#38bdf8' }} size={24} />
           <span>Wer hat Dienst?</span>
         </h1>
 
-        <button
-          type="button"
-          onClick={() => setIsUploadOpen(true)}
-          className="filter-chip"
-          style={{
-            background: 'rgba(14, 165, 233, 0.15)',
-            color: '#38bdf8',
-            borderColor: 'rgba(14, 165, 233, 0.3)',
-            fontWeight: 600,
-            padding: '7px 12px',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            cursor: 'pointer'
-          }}
-          title="Neuen Dienstplan laden"
-        >
-          <UploadCloud size={16} />
-          <span>Plan laden</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Month Stepper */}
+          <div className="team-roster-month-stepper">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="team-roster-month-btn"
+              title="Vorheriger Monat"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="team-roster-month-label">
+              {roster.monthLabel || yearMonth}
+            </span>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="team-roster-month-btn"
+              title="Nächster Monat"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsUploadOpen(true)}
+            className="filter-chip"
+            style={{
+              background: 'rgba(14, 165, 233, 0.15)',
+              color: '#38bdf8',
+              borderColor: 'rgba(14, 165, 233, 0.3)',
+              fontWeight: 600,
+              padding: '7px 12px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+            title="Dienstplan importieren"
+          >
+            <UploadCloud size={16} />
+            <span>Plan laden</span>
+          </button>
+        </div>
       </div>
 
       {/* Single-Row Date Stepper */}
@@ -319,6 +471,38 @@ export default function TeamRoster() {
             <ChevronRight size={20} />
           </button>
         </div>
+      </div>
+
+      {/* Station Filter Chips: Alle Wachen, Sendling, Hohenbrunn, Obersendling */}
+      <div className="team-roster-station-chips">
+        <button
+          type="button"
+          onClick={() => setSelectedStation('ALL')}
+          className={`team-roster-station-chip ${selectedStation === 'ALL' ? 'active' : ''}`}
+        >
+          Alle Wachen ({stationCounts.ALL})
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedStation('Sendling')}
+          className={`team-roster-station-chip ${selectedStation === 'Sendling' ? 'active' : ''}`}
+        >
+          Sendling ({stationCounts.Sendling})
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedStation('Hohenbrunn')}
+          className={`team-roster-station-chip ${selectedStation === 'Hohenbrunn' ? 'active' : ''}`}
+        >
+          Hohenbrunn ({stationCounts.Hohenbrunn})
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedStation('Obersendling')}
+          className={`team-roster-station-chip ${selectedStation === 'Obersendling' ? 'active' : ''}`}
+        >
+          Obersendling ({stationCounts.Obersendling})
+        </button>
       </div>
 
       {/* Slim Search Input */}
@@ -615,11 +799,54 @@ export default function TeamRoster() {
               ) : (
                 /* Direct Paste Area */
                 <div>
+                  {/* SIEDA Helper Card: Bookmarklet + Copy Command */}
+                  <div className="team-roster-helper-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8' }}>
+                        ⚡ 1-Klick Abgriff aus dem SIEDA-Portal
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                      Ziehe diesen Button mit der Maus in Deine Lesezeichenleiste. Wenn Du auf der Dienstplan-Seite bist, reicht <strong>ein einziger Klick</strong> darauf, um den Plan fehlerfrei zu kopieren:
+                    </p>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                      <a
+                        href={BOOKMARKLET_CODE}
+                        className="team-roster-bookmarklet-link"
+                        title="Mit der Maus in die Lesezeichenleiste ziehen"
+                        onClick={e => {
+                          e.preventDefault();
+                          alert('Ziehe diesen Button mit gedrückter Maustaste nach oben in Deine Lesezeichenleiste des Browsers!');
+                        }}
+                      >
+                        <Bookmark size={14} />
+                        <span>📋 Dienstplan kopieren (In Lesezeichenleiste ziehen)</span>
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyScript}
+                        className="team-roster-copy-code-btn"
+                        title="JavaScript-Befehl für Entwickler-Konsole kopieren"
+                      >
+                        <Copy size={13} />
+                        <span>{copiedScript ? 'Befehl kopiert! ✅' : 'Befehl für Konsole kopieren'}</span>
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '11px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle2 size={12} />
+                      <span>Danach einfach unten in das Feld klicken, <strong>Cmd + V</strong> drücken und einlesen!</span>
+                    </div>
+                  </div>
+
                   <textarea
                     value={pasteText}
                     onChange={e => setPasteText(e.target.value)}
-                    placeholder="Kopierten HTML-Quelltext oder markierte CareMan-Tabelle hier einfügen (Cmd + V)..."
-                    rows={7}
+                    placeholder="Kopierten Dienstplan hier mit Cmd + V einfügen..."
+                    rows={6}
                     className="input-premium"
                     style={{
                       fontFamily: 'monospace',

@@ -624,3 +624,129 @@ h2 {
   border-color: #38bdf8;
   background: rgba(14, 165, 233, 0.06);
 }
+
+/* Month Stepper in Header */
+.team-roster-month-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.team-roster-month-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.team-roster-month-btn:hover {
+  color: var(--color-text-main);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.team-roster-month-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* Station Filter Chips */
+.team-roster-station-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+  scrollbar-width: none;
+}
+
+.team-roster-station-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.team-roster-station-chip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.team-roster-station-chip:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-main);
+}
+
+.team-roster-station-chip.active {
+  background: rgba(14, 165, 233, 0.18);
+  border-color: rgba(14, 165, 233, 0.4);
+  color: #38bdf8;
+}
+
+/* Bookmarklet & Helper Box in Modal */
+.team-roster-helper-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.team-roster-copy-code-btn {
+  background: #0284c7;
+  color: white;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s;
+}
+
+.team-roster-copy-code-btn:hover {
+  background: #0369a1;
+}
+
+.team-roster-bookmarklet-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: grab;
+}
+
+.team-roster-bookmarklet-link:hover {
+  background: rgba(16, 185, 129, 0.25);
+}

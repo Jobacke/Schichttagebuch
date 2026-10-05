@@ -265,25 +265,32 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
       }
       return parsed;
     }
-    const current = localStorage.getItem(CURRENT_ROSTER_KEY);
-    if (current) {
-      const parsed = JSON.parse(current);
-      if (parsed.yearMonth === preferredYearMonth) {
-        if (preset && (!parsed.dataVersion || parsed.dataVersion < (preset.dataVersion || 1))) {
-          saveActiveTeamRoster(preset);
-          return preset;
-        }
-        return parsed;
-      }
-    }
   } catch (e) {
     console.warn('Error reading team roster from localStorage:', e);
   }
 
-  // Fallback to preloaded data
+  // Fallback to preloaded data if requested month is October 2026
   if (preset) return preset;
 
-  return OCTOBER_2026_TEAM_ROSTER;
+  // Otherwise return empty month template so users can import that month
+  const [y, m] = (preferredYearMonth || '2026-10').split('-').map(Number);
+  const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const shiftsByDate = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    shiftsByDate[`${preferredYearMonth}-${String(d).padStart(2, '0')}`] = [];
+  }
+
+  return {
+    yearMonth: preferredYearMonth,
+    monthLabel: `${monthNames[m - 1]} ${y}`,
+    daysInMonth,
+    totalColleagues: 0,
+    totalShifts: 0,
+    colleagues: [],
+    shiftsByDate,
+    isEmptyTemplate: true
+  };
 }
 
 /**
@@ -299,3 +306,23 @@ export function saveActiveTeamRoster(rosterData) {
     console.error('Error saving team roster to localStorage:', e);
   }
 }
+
+/**
+ * Returns all month keys currently available in localStorage or preloaded
+ */
+export function getSavedRosterMonths() {
+  const months = new Set(['2026-10', '2026-11']);
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        const ym = key.replace(STORAGE_KEY_PREFIX, '');
+        if (ym.match(/^\d{4}-\d{2}$/)) {
+          months.add(ym);
+        }
+      }
+    }
+  } catch (e) {}
+  return Array.from(months).sort();
+}
+

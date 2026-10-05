@@ -72,16 +72,47 @@ export default function TeamRoster() {
     }
   };
 
-  // Filtered shifts for selected date
+function getShiftRank(code = '') {
+  const c = (code || '').toUpperCase().trim();
+  if (c.startsWith('RF') || c === 'RT1M' || c === 'RT3M' || c === 'RT1H') return 10;
+  if (c.startsWith('RT') && !c.includes('2') && !c.includes('4')) return 20;
+  if (c === 'RTH') return 20;
+  if (c.startsWith('RS') || c === 'RT2M' || c === 'RT4M' || c === 'RT2H') return 30;
+  if (c.startsWith('RN')) return 40;
+  if (['ACLS', 'PALS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 50;
+  if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 60;
+  return 70;
+}
+
+function getShiftGroupName(code = '') {
+  const c = (code || '').toUpperCase().trim();
+  if (c.startsWith('RF') || c === 'RT1M' || c === 'RT3M' || c === 'RT1H') return 'Frühdienst';
+  if (c.startsWith('RT') && !c.includes('2') && !c.includes('4')) return 'Tagschicht';
+  if (c === 'RTH') return 'Tagschicht';
+  if (c.startsWith('RS') || c === 'RT2M' || c === 'RT4M' || c === 'RT2H') return 'Spätdienst';
+  if (c.startsWith('RN')) return 'Nachtdienst';
+  if (['ACLS', 'PALS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 'Fortbildung';
+  if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 'Urlaub / Abwesend';
+  return 'Sonderdienste';
+}
+
+  // Filtered and sorted shifts for selected date
   const currentDayShifts = useMemo(() => {
     const raw = roster.shiftsByDate?.[selectedDate] || [];
-    return raw.filter(shift => {
+    const filtered = raw.filter(shift => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
       return (
         shift.name.toLowerCase().includes(q) ||
         shift.code.toLowerCase().includes(q)
       );
+    });
+
+    return [...filtered].sort((a, b) => {
+      const rA = getShiftRank(a.code);
+      const rB = getShiftRank(b.code);
+      if (rA !== rB) return rA - rB;
+      return a.name.localeCompare(b.name, 'de');
     });
   }, [roster, selectedDate, searchQuery]);
 
@@ -247,42 +278,51 @@ export default function TeamRoster() {
         ) : (
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800/60 shadow-sm">
             {currentDayShifts.map((shift, idx) => {
+              const group = getShiftGroupName(shift.code);
+              const prevGroup = idx > 0 ? getShiftGroupName(currentDayShifts[idx - 1].code) : null;
+              const isNewGroup = group !== prevGroup;
               const colorInfo = getShiftColor('', shift.code);
               const isJohannes = shift.name.toLowerCase().includes('backhaus');
 
               return (
-                <div
-                  key={`${shift.name}-${idx}`}
-                  className={`flex items-center justify-between px-3.5 py-2.5 transition-colors ${
-                    isJohannes
-                      ? 'bg-sky-500/15'
-                      : 'hover:bg-slate-800/40'
-                  }`}
-                >
-                  {/* Colleague Name */}
-                  <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span className={`text-sm truncate ${isJohannes ? 'font-bold text-sky-300' : 'font-medium text-slate-200'}`}>
-                      {shift.name}
-                    </span>
-                    {isJohannes && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500 text-white font-extrabold shrink-0">
-                        Du
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Shift Code Badge with Station Color */}
-                  <span
-                    className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border shrink-0 tracking-wide"
-                    style={{
-                      background: colorInfo.bg,
-                      color: colorInfo.color,
-                      borderColor: colorInfo.border
-                    }}
+                <React.Fragment key={`${shift.name}-${idx}`}>
+                  {isNewGroup && (
+                    <div className="bg-slate-950/70 px-3.5 py-1.5 text-[10px] font-bold text-sky-400 uppercase tracking-wider border-t border-slate-800 first:border-t-0">
+                      {group}
+                    </div>
+                  )}
+                  <div
+                    className={`flex items-center justify-between px-3.5 py-2.5 transition-colors ${
+                      isJohannes
+                        ? 'bg-sky-500/15'
+                        : 'hover:bg-slate-800/40'
+                    }`}
                   >
-                    {shift.code}
-                  </span>
-                </div>
+                    {/* Colleague Name */}
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      <span className={`text-sm truncate ${isJohannes ? 'font-bold text-sky-300' : 'font-medium text-slate-200'}`}>
+                        {shift.name}
+                      </span>
+                      {isJohannes && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500 text-white font-extrabold shrink-0">
+                          Du
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Shift Code Badge with Station Color */}
+                    <span
+                      className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border shrink-0 tracking-wide"
+                      style={{
+                        background: colorInfo.bg,
+                        color: colorInfo.color,
+                        borderColor: colorInfo.border
+                      }}
+                    >
+                      {shift.code}
+                    </span>
+                  </div>
+                </React.Fragment>
               );
             })}
           </div>

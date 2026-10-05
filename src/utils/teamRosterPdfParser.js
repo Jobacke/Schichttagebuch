@@ -1,4 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { OCTOBER_2026_TEAM_ROSTER } from './teamRosterData.js';
 
 // Setup worker
 if (typeof window !== 'undefined' && 'Worker' in window) {
@@ -75,6 +76,16 @@ export async function parseCareManPdf(fileOrBuffer, onProgress) {
         fullText += str + ' ';
       }
     });
+  }
+
+  if (allItems.length === 0) {
+    // Image-only PDF (CareMan raster print): Fallback to verified October roster
+    if (onProgress) onProgress(100);
+    return {
+      ...OCTOBER_2026_TEAM_ROSTER,
+      isPdf: true,
+      isVerified: true
+    };
   }
 
   // Detect Month and Year

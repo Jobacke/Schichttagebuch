@@ -253,22 +253,34 @@ const CURRENT_ROSTER_KEY = 'schichten_current_team_roster';
  * Loads the active team roster from localStorage or falls back to October 2026
  */
 export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
+  const preset = getPresetRosterForMonth(preferredYearMonth);
+
   try {
     const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${preferredYearMonth}`);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (preset && (!parsed.dataVersion || parsed.dataVersion < (preset.dataVersion || 1))) {
+        saveActiveTeamRoster(preset);
+        return preset;
+      }
+      return parsed;
     }
     const current = localStorage.getItem(CURRENT_ROSTER_KEY);
     if (current) {
       const parsed = JSON.parse(current);
-      if (parsed.yearMonth === preferredYearMonth) return parsed;
+      if (parsed.yearMonth === preferredYearMonth) {
+        if (preset && (!parsed.dataVersion || parsed.dataVersion < (preset.dataVersion || 1))) {
+          saveActiveTeamRoster(preset);
+          return preset;
+        }
+        return parsed;
+      }
     }
   } catch (e) {
     console.warn('Error reading team roster from localStorage:', e);
   }
 
   // Fallback to preloaded data
-  const preset = getPresetRosterForMonth(preferredYearMonth);
   if (preset) return preset;
 
   return OCTOBER_2026_TEAM_ROSTER;

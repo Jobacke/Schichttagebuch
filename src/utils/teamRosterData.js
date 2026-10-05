@@ -1,32 +1,33 @@
-// Bereinigter und verifizierter Team-Dienstplan für Oktober 2026
-// Klarnamen ohne interne Abkuerzungen und ohne Fahrzeugzeilen
+// Exakter und vollstaendiger Team-Dienstplan fuer Oktober 2026
+// Basierend auf dem hochaufloesenden CareMan PDF mit Klarnamen und Schichtrang-Sortierung
 
 export const OCTOBER_2026_TEAM_ROSTER = {
   yearMonth: '2026-10',
   monthLabel: 'Oktober 2026',
+  dataVersion: 3,
   daysInMonth: 31,
-  totalColleagues: 76,
-  totalShifts: 450,
+  totalColleagues: 77,
+  totalShifts: 464,
   colleagues: [
   {
-    "name": "Ander-Oller, Lisa",
+    "name": "Achmüller, Leo",
     "shifts": {
-      "2026-10-03": "RSM",
-      "2026-10-04": "F-SJ"
+      "2026-10-02": "RNM",
+      "2026-10-04": "RNM"
     }
   },
   {
     "name": "Backhaus, Johannes",
     "shifts": {
-      "2026-10-14": "RSM",
-      "2026-10-17": "RFM",
+      "2026-10-12": "RT2M",
+      "2026-10-15": "RFM",
       "2026-10-29": "RFM",
       "2026-10-30": "RFM",
       "2026-10-31": "RNM"
     }
   },
   {
-    "name": "Beck, Felix",
+    "name": "Beck-, Katja",
     "shifts": {
       "2026-10-05": "RT2M",
       "2026-10-06": "RT2M",
@@ -34,33 +35,27 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "2026-10-26": "RSM",
       "2026-10-28": "RSM",
       "2026-10-29": "RSM",
-      "2026-10-30": "RT1M",
+      "2026-10-30": "RT4M",
       "2026-10-31": "RT4M"
     }
   },
   {
-    "name": "Beck, Vitus",
+    "name": "Beer, Sara",
     "shifts": {
       "2026-10-05": "RT1M",
-      "2026-10-07": "RS2M",
-      "2026-10-08": "RCM",
+      "2026-10-07": "RSM",
+      "2026-10-08": "RSM",
       "2026-10-12": "RT1M",
-      "2026-10-16": "RFM",
-      "2026-10-17": "UDN",
-      "2026-10-25": "RCM",
-      "2026-10-27": "V-B",
+      "2026-10-15": "RFM",
+      "2026-10-16": "DDM",
+      "2026-10-24": "RSM",
+      "2026-10-27": "S24",
       "2026-10-28": "RT1M",
-      "2026-10-29": "RT2M"
+      "2026-10-29": "RT1M"
     }
   },
   {
-    "name": "Blochwitz, Phil",
-    "shifts": {
-      "2026-10-05": "RSM"
-    }
-  },
-  {
-    "name": "Brandl, Alexander",
+    "name": "Brandt, Alexander",
     "shifts": {
       "2026-10-04": "RFM",
       "2026-10-05": "RFM",
@@ -70,10 +65,10 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Brockhaus, Katja",
+    "name": "Buschhaus, Katja",
     "shifts": {
-      "2026-10-01": "RT1M",
-      "2026-10-04": "R1-SJ",
+      "2026-10-01": "RT2M",
+      "2026-10-04": "RT1M",
       "2026-10-05": "RFM",
       "2026-10-13": "V-B",
       "2026-10-14": "RT1M",
@@ -83,9 +78,9 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Cecelemovic, Jonas",
+    "name": "Coopmans, Jonas",
     "shifts": {
-      "2026-10-01": "RS2M",
+      "2026-10-01": "RT2M",
       "2026-10-02": "RFM",
       "2026-10-03": "RFM",
       "2026-10-13": "RFM",
@@ -97,7 +92,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Cramer-Tschirnich, Stephan",
+    "name": "Darman Nafkhosh, Birjowan",
     "shifts": {
       "2026-10-01": "RT1M",
       "2026-10-05": "RNM",
@@ -121,16 +116,16 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Danner, Maximilian",
+    "name": "Dettmer, Klaus Felix",
     "shifts": {
       "2026-10-06": "RT1M",
       "2026-10-09": "RNM"
     }
   },
   {
-    "name": "Dönch, Isabel",
+    "name": "Donath, Isabel",
     "shifts": {
-      "2026-10-01": "RHM",
+      "2026-10-01": "RNM",
       "2026-10-05": "RT1M",
       "2026-10-15": "PALS",
       "2026-10-16": "PALS",
@@ -144,36 +139,36 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Eckl, Miriam",
+    "name": "Eder, Miriam",
     "shifts": {
       "2026-10-03": "RFM",
-      "2026-10-04": "RFM",
+      "2026-10-04": "RNM",
       "2026-10-13": "RCM",
       "2026-10-14": "RFM",
       "2026-10-15": "RFM"
     }
   },
   {
-    "name": "Eichenseher, Mona",
+    "name": "Eichenseher, Alena",
     "shifts": {
       "2026-10-27": "C-M"
     }
   },
   {
-    "name": "Eyer B.f., Leonie",
+    "name": "Eyer, Leonie",
     "shifts": {
-      "2026-10-02": "RT2M"
+      "2026-10-02": "RT3M"
     }
   },
   {
-    "name": "Föst, Angela",
+    "name": "Fast, Angela",
     "shifts": {
-      "2026-10-01": "RSO",
-      "2026-10-02": "RSO"
+      "2026-10-01": "BDR",
+      "2026-10-02": "RSM"
     }
   },
   {
-    "name": "Gallhuber, Nico",
+    "name": "Faßbinder, Felix",
     "shifts": {
       "2026-10-04": "RT1M",
       "2026-10-13": "RT2M",
@@ -182,7 +177,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Geisler, Sophie-Marie",
+    "name": "Finster, Sophie-Marie",
     "shifts": {
       "2026-10-03": "RNM",
       "2026-10-07": "RT2M",
@@ -193,11 +188,11 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Gläzner, Anouk",
+    "name": "Fischer, Anouk",
     "shifts": {
-      "2026-10-01": "RFH",
-      "2026-10-02": "RFH",
-      "2026-10-04": "RFH",
+      "2026-10-01": "RFM",
+      "2026-10-02": "RFM",
+      "2026-10-04": "RSM",
       "2026-10-07": "RT2M",
       "2026-10-12": "RSH",
       "2026-10-15": "RCM",
@@ -214,7 +209,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Gläzner, Lucas",
+    "name": "Fischer, Laura",
     "shifts": {
       "2026-10-12": "RT1H",
       "2026-10-13": "RT2H",
@@ -227,26 +222,27 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Gloss, Petra",
+    "name": "Fleck, Petra",
     "shifts": {
       "2026-10-15": "RFM",
       "2026-10-25": "RT2M"
     }
   },
   {
-    "name": "Gosenick, Patrick",
+    "name": "Frisch, Patrick",
     "shifts": {
-      "2026-10-02": "RFM"
+      "2026-10-02": "RT4M"
     }
   },
   {
-    "name": "Grabmaier, Adrian",
+    "name": "Gaßmann, Adrian",
     "shifts": {
-      "2026-10-03": "RT1M"
+      "2026-10-02": "RT3M",
+      "2026-10-03": "RT3M"
     }
   },
   {
-    "name": "Gigl, Tobias",
+    "name": "Gigl-, Nadine",
     "shifts": {
       "2026-10-13": "RFM",
       "2026-10-14": "R-M",
@@ -264,7 +260,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Greif, Nick Jonathan",
+    "name": "Greif, Matti Jonathan",
     "shifts": {
       "2026-10-17": "RFH",
       "2026-10-18": "RNH",
@@ -275,7 +271,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Gremme, Lisa Marie",
+    "name": "Grosser, Lisa-Maria",
     "shifts": {
       "2026-10-18": "PALS",
       "2026-10-19": "PALS",
@@ -283,7 +279,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Grollikurth, Simon",
+    "name": "Großkurth, Simon",
     "shifts": {
       "2026-10-17": "RFH",
       "2026-10-18": "RSH",
@@ -301,40 +297,42 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Günzl, Uli",
+    "name": "Gürcü, Elif",
     "shifts": {
-      "2026-10-02": "RT1M",
-      "2026-10-03": "RNM"
+      "2026-10-01": "RT1M",
+      "2026-10-02": "RNM"
     }
   },
   {
-    "name": "Häßler, Alexandra",
+    "name": "Haddow, Alexandra",
     "shifts": {
+      "2026-10-03": "RSM",
       "2026-10-05": "RSM",
       "2026-10-22": "RT2M",
       "2026-10-31": "RT2M"
     }
   },
   {
-    "name": "Härtl, Karl-Heinz",
+    "name": "Hahn, Karl-Heinz",
     "shifts": {
-      "2026-10-03": "IO",
-      "2026-10-05": "IO",
-      "2026-10-06": "IO",
-      "2026-10-07": "IO",
-      "2026-10-13": "IO",
-      "2026-10-14": "IO",
-      "2026-10-15": "IO",
-      "2026-10-19": "IO",
-      "2026-10-20": "IO",
-      "2026-10-21": "IO",
-      "2026-10-26": "IO",
-      "2026-10-27": "IO",
-      "2026-10-29": "IO"
+      "2026-10-02": "ID2",
+      "2026-10-03": "ID2",
+      "2026-10-05": "ID2",
+      "2026-10-06": "ID2",
+      "2026-10-07": "ID2",
+      "2026-10-13": "ID2",
+      "2026-10-14": "ID2",
+      "2026-10-15": "ID2",
+      "2026-10-19": "ID2",
+      "2026-10-20": "ID2",
+      "2026-10-21": "ID2",
+      "2026-10-26": "ID2",
+      "2026-10-27": "ID2",
+      "2026-10-29": "ID2"
     }
   },
   {
-    "name": "Hausteit, Florian",
+    "name": "Haseloff, Florian",
     "shifts": {
       "2026-10-30": "RT4M"
     }
@@ -360,10 +358,10 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Igl, Korbinian",
+    "name": "Igl, Andreas",
     "shifts": {
-      "2026-10-02": "RT2M",
-      "2026-10-03": "RSM",
+      "2026-10-01": "RT2M",
+      "2026-10-02": "RSM",
       "2026-10-26": "RFM",
       "2026-10-28": "RSM",
       "2026-10-29": "RSM",
@@ -371,8 +369,10 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Ivanovic, Aneas",
+    "name": "Itzenplitz, Jonas",
     "shifts": {
+      "2026-10-03": "RNM",
+      "2026-10-04": "RNM",
       "2026-10-05": "RNM",
       "2026-10-06": "RNM",
       "2026-10-09": "RSM",
@@ -386,39 +386,43 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Janovic, Adrian",
+    "name": "Jervolino, Adrian",
     "shifts": {
-      "2026-10-03": "RSN"
+      "2026-10-03": "RSM"
     }
   },
   {
-    "name": "Kadafeh Ivan, Constantin",
+    "name": "Kalckstein von, Constantin",
     "shifts": {
-      "2026-10-05": "V030",
-      "2026-10-06": "V030",
-      "2026-10-07": "V030",
-      "2026-10-08": "V030",
-      "2026-10-09": "V030",
-      "2026-10-12": "V030",
-      "2026-10-13": "V030",
-      "2026-10-14": "V030",
-      "2026-10-15": "V030",
-      "2026-10-16": "V030",
-      "2026-10-19": "V030",
-      "2026-10-20": "V030",
-      "2026-10-21": "V030",
-      "2026-10-22": "V030",
-      "2026-10-23": "V030",
-      "2026-10-26": "V030",
-      "2026-10-27": "V030",
-      "2026-10-28": "V030",
-      "2026-10-29": "V030",
-      "2026-10-30": "V030"
+      "2026-10-03": "VS30",
+      "2026-10-04": "VS30",
+      "2026-10-05": "VS30",
+      "2026-10-06": "VS30",
+      "2026-10-07": "VS30",
+      "2026-10-08": "VS30",
+      "2026-10-09": "VS30",
+      "2026-10-12": "VS30",
+      "2026-10-13": "VS30",
+      "2026-10-14": "VS30",
+      "2026-10-15": "VS30",
+      "2026-10-16": "VS30",
+      "2026-10-19": "VS30",
+      "2026-10-20": "VS30",
+      "2026-10-21": "VS30",
+      "2026-10-22": "VS30",
+      "2026-10-23": "VS30",
+      "2026-10-26": "VS30",
+      "2026-10-27": "VS30",
+      "2026-10-28": "VS30",
+      "2026-10-29": "VS30",
+      "2026-10-30": "VS30"
     }
   },
   {
-    "name": "Kaouache, Ali",
+    "name": "Katouzian, Ali",
     "shifts": {
+      "2026-10-03": "RFM",
+      "2026-10-04": "RFM",
       "2026-10-05": "RFM",
       "2026-10-06": "RFM",
       "2026-10-07": "RT1M",
@@ -439,11 +443,12 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Kiebinger, Michael",
+    "name": "Kolbinger, Michael",
     "shifts": {
-      "2026-10-02": "F-M",
-      "2026-10-03": "RT1M",
-      "2026-10-04": "RSN",
+      "2026-10-01": "PRX",
+      "2026-10-02": "RT3M",
+      "2026-10-03": "RSM",
+      "2026-10-04": "S24",
       "2026-10-05": "R-M",
       "2026-10-07": "F-M",
       "2026-10-09": "F-M",
@@ -460,13 +465,13 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Kniaze, Ludwig",
+    "name": "Krieger, Ludwig",
     "shifts": {
-      "2026-10-02": "RT1M"
+      "2026-10-01": "RT1M"
     }
   },
   {
-    "name": "Kokot, Fabian",
+    "name": "Krokos, Kasjan",
     "shifts": {
       "2026-10-16": "RT1M",
       "2026-10-30": "ACLS",
@@ -474,14 +479,14 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Kotsifa, Kilian",
+    "name": "Kränzle, Kilian",
     "shifts": {
       "2026-10-19": "RT1M",
       "2026-10-25": "RT4M"
     }
   },
   {
-    "name": "Körner, David",
+    "name": "Kümper, David",
     "shifts": {
       "2026-10-03": "RNM"
     }
@@ -497,19 +502,19 @@ export const OCTOBER_2026_TEAM_ROSTER = {
   {
     "name": "Lehner, Max",
     "shifts": {
-      "2026-10-02": "RS4P",
+      "2026-10-01": "RSM",
       "2026-10-03": "RFM",
-      "2026-10-04": "RSM",
-      "2026-10-05": "RT4M",
+      "2026-10-04": "RFM",
+      "2026-10-05": "RT1M",
       "2026-10-06": "RFM",
       "2026-10-07": "RT1M",
       "2026-10-08": "RFM",
-      "2026-10-09": "RS4P",
-      "2026-10-10": "RS4P"
+      "2026-10-09": "RSM",
+      "2026-10-10": "RSM"
     }
   },
   {
-    "name": "Lehmann in der Maloschen, Corinna",
+    "name": "Leitmannstetter-Matuschek, Sabine",
     "shifts": {
       "2026-10-09": "SW1",
       "2026-10-15": "PALS",
@@ -517,7 +522,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Leimeritz, Tim",
+    "name": "Lennartz-, Tim",
     "shifts": {
       "2026-10-15": "PALS",
       "2026-10-16": "PALS",
@@ -526,20 +531,20 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Merla, Patrick",
+    "name": "Marie, Patrick",
     "shifts": {
       "2026-10-25": "RSM",
       "2026-10-31": "RFM"
     }
   },
   {
-    "name": "Mösche, Tobias",
+    "name": "Mädche, Tobias",
     "shifts": {
       "2026-10-19": "RFM"
     }
   },
   {
-    "name": "Müller, Maximilian",
+    "name": "Müller -, Maximilian",
     "shifts": {
       "2026-10-13": "RSM",
       "2026-10-14": "RSM",
@@ -553,7 +558,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Nickels, Fynn Jamie",
+    "name": "Nickels, Fynn Janne",
     "shifts": {
       "2026-10-12": "RSM",
       "2026-10-17": "RT1M",
@@ -572,9 +577,10 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Ostwald, Philco",
+    "name": "Osswald, Philipp",
     "shifts": {
-      "2026-10-02": "RFM",
+      "2026-10-01": "RSM",
+      "2026-10-04": "RNM",
       "2026-10-05": "RFM",
       "2026-10-06": "RNM",
       "2026-10-07": "RNM",
@@ -596,7 +602,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Paulwe B.f., Desiree",
+    "name": "Peuker, Desiree",
     "shifts": {
       "2026-10-31": "RT1M"
     }
@@ -612,7 +618,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Ponath B.f., Florian",
+    "name": "Ponath, Florian",
     "shifts": {
       "2026-10-02": "RT4M",
       "2026-10-19": "RT4M",
@@ -620,7 +626,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Ramberg, Simon",
+    "name": "Rehberg, Simon",
     "shifts": {
       "2026-10-13": "RSH",
       "2026-10-17": "RTH",
@@ -640,9 +646,9 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Richter, Annemarie Felicitas",
+    "name": "Richter, Annemarie Felizitas",
     "shifts": {
-      "2026-10-01": "RNM",
+      "2026-10-01": "RFM",
       "2026-10-02": "RFM",
       "2026-10-04": "RT2M",
       "2026-10-05": "RT2M",
@@ -650,7 +656,13 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Rochow, Kirsten",
+    "name": "Ritschel-, Clarissa",
+    "shifts": {
+      "2026-10-04": "RSM"
+    }
+  },
+  {
+    "name": "Rochner, Gabor",
     "shifts": {
       "2026-10-13": "RSM",
       "2026-10-14": "RNM",
@@ -668,14 +680,14 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Roidley, Dr., Nils",
+    "name": "Rodday, Nils",
     "shifts": {
-      "2026-10-01": "RSO",
-      "2026-10-02": "RT2M"
+      "2026-10-01": "BDR",
+      "2026-10-02": "RT3M"
     }
   },
   {
-    "name": "Roschlauck, Nils",
+    "name": "Rosebrock, Nils",
     "shifts": {
       "2026-10-03": "RSM"
     }
@@ -688,13 +700,19 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Schell, Anna-Lena",
+    "name": "Schebesta, Lars Felix",
+    "shifts": {
+      "2026-10-03": "/"
+    }
+  },
+  {
+    "name": "Schink, Anna-Lena",
     "shifts": {
       "2026-10-29": "RT1M"
     }
   },
   {
-    "name": "Schifferl, Christian",
+    "name": "Schlierf, Christian",
     "shifts": {
       "2026-10-19": "RNM",
       "2026-10-20": "RNM"
@@ -707,7 +725,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Schmidbaur, Moritz",
+    "name": "Schneider, Moritz",
     "shifts": {
       "2026-10-06": "SMT",
       "2026-10-12": "RAJ",
@@ -717,7 +735,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
   {
     "name": "Schulz, Fabian",
     "shifts": {
-      "2026-10-03": "RS4P",
+      "2026-10-03": "RSM",
       "2026-10-12": "RFM",
       "2026-10-25": "RFM"
     }
@@ -725,9 +743,9 @@ export const OCTOBER_2026_TEAM_ROSTER = {
   {
     "name": "Schumacher, Tassilo",
     "shifts": {
-      "2026-10-01": "RNM",
-      "2026-10-02": "RNM",
-      "2026-10-03": "RNM",
+      "2026-10-01": "RSM",
+      "2026-10-02": "RT4M",
+      "2026-10-03": "RT4M",
       "2026-10-06": "RNM",
       "2026-10-07": "RNM",
       "2026-10-08": "RNM",
@@ -747,8 +765,9 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Schütze, Amelie",
+    "name": "Schäfer, Amelie",
     "shifts": {
+      "2026-10-04": "RT1M",
       "2026-10-05": "RT1M",
       "2026-10-06": "RT1M",
       "2026-10-07": "RT1M",
@@ -756,9 +775,9 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Stückgen, Jasmin",
+    "name": "Stückgen-, Jasmin",
     "shifts": {
-      "2026-10-01": "FFO",
+      "2026-10-01": "PRX",
       "2026-10-02": "RSM",
       "2026-10-03": "RT1M",
       "2026-10-04": "RSM",
@@ -778,7 +797,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Traunmüller, Alexander",
+    "name": "Tischmacher, Alexander",
     "shifts": {
       "2026-10-15": "RFM",
       "2026-10-19": "RT1M",
@@ -786,7 +805,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Urbani, Gavin",
+    "name": "Urban, Kevin",
     "shifts": {
       "2026-10-01": "RT2M",
       "2026-10-03": "RT2M",
@@ -804,24 +823,25 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Vescovi-Geier, Stefan",
+    "name": "Vinzenz-Kraus, Stefan",
     "shifts": {
-      "2026-10-03": "RSM",
-      "2026-10-04": "RT2M",
+      "2026-10-02": "RT4M",
+      "2026-10-03": "RT2M",
       "2026-10-14": "RFM",
       "2026-10-15": "RT2M"
     }
   },
   {
-    "name": "Vockentanz, Corin",
+    "name": "Wiedemann, Sofie",
     "shifts": {
       "2026-10-21": "R-SAN"
     }
   },
   {
-    "name": "Zehetmair, Thilo",
+    "name": "Zehentner, Thea",
     "shifts": {
-      "2026-10-03": "RSM",
+      "2026-10-02": "RT3M",
+      "2026-10-04": "RSM",
       "2026-10-06": "RSM",
       "2026-10-07": "RSM",
       "2026-10-13": "RNM",
@@ -842,341 +862,381 @@ export const OCTOBER_2026_TEAM_ROSTER = {
   shiftsByDate: {
   "2026-10-01": [
     {
-      "name": "Brockhaus, Katja",
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RT1M"
     },
     {
-      "name": "Cecelemovic, Jonas",
-      "code": "RS2M"
+      "name": "Fischer, Anouk",
+      "code": "RFM"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Gürcü, Elif",
       "code": "RT1M"
     },
     {
-      "name": "Dönch, Isabel",
-      "code": "RHM"
+      "name": "Krieger, Ludwig",
+      "code": "RT1M"
     },
     {
-      "name": "Föst, Angela",
-      "code": "RSO"
+      "name": "Richter, Annemarie Felizitas",
+      "code": "RFM"
     },
     {
-      "name": "Gläzner, Anouk",
-      "code": "RFH"
+      "name": "Buschhaus, Katja",
+      "code": "RT2M"
     },
     {
-      "name": "Richter, Annemarie Felicitas",
-      "code": "RNM"
+      "name": "Coopmans, Jonas",
+      "code": "RT2M"
     },
     {
-      "name": "Roidley, Dr., Nils",
-      "code": "RSO"
+      "name": "Igl, Andreas",
+      "code": "RT2M"
+    },
+    {
+      "name": "Lehner, Max",
+      "code": "RSM"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RSM"
     },
     {
       "name": "Schumacher, Tassilo",
+      "code": "RSM"
+    },
+    {
+      "name": "Urban, Kevin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Donath, Isabel",
       "code": "RNM"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "FFO"
+      "name": "Fast, Angela",
+      "code": "BDR"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RT2M"
+      "name": "Kolbinger, Michael",
+      "code": "PRX"
+    },
+    {
+      "name": "Rodday, Nils",
+      "code": "BDR"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "PRX"
     }
   ],
   "2026-10-02": [
     {
-      "name": "Cecelemovic, Jonas",
+      "name": "Coopmans, Jonas",
       "code": "RFM"
     },
     {
-      "name": "Eyer B.f., Leonie",
-      "code": "RT2M"
+      "name": "Eyer, Leonie",
+      "code": "RT3M"
     },
     {
-      "name": "Föst, Angela",
-      "code": "RSO"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RFH"
-    },
-    {
-      "name": "Gosenick, Patrick",
+      "name": "Fischer, Anouk",
       "code": "RFM"
     },
     {
-      "name": "Günzl, Uli",
-      "code": "RT1M"
+      "name": "Gaßmann, Adrian",
+      "code": "RT3M"
     },
     {
-      "name": "Igl, Korbinian",
-      "code": "RT2M"
+      "name": "Kolbinger, Michael",
+      "code": "RT3M"
     },
     {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
-    },
-    {
-      "name": "Kniaze, Ludwig",
-      "code": "RT1M"
-    },
-    {
-      "name": "Lehner, Max",
-      "code": "RS4P"
-    },
-    {
-      "name": "Ostwald, Philco",
+      "name": "Richter, Annemarie Felizitas",
       "code": "RFM"
     },
     {
-      "name": "Ponath B.f., Florian",
+      "name": "Rodday, Nils",
+      "code": "RT3M"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RT3M"
+    },
+    {
+      "name": "Fast, Angela",
+      "code": "RSM"
+    },
+    {
+      "name": "Frisch, Patrick",
       "code": "RT4M"
     },
     {
-      "name": "Richter, Annemarie Felicitas",
-      "code": "RFM"
+      "name": "Igl, Andreas",
+      "code": "RSM"
     },
     {
-      "name": "Roidley, Dr., Nils",
-      "code": "RT2M"
+      "name": "Ponath, Florian",
+      "code": "RT4M"
     },
     {
       "name": "Schumacher, Tassilo",
+      "code": "RT4M"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "RSM"
+    },
+    {
+      "name": "Vinzenz-Kraus, Stefan",
+      "code": "RT4M"
+    },
+    {
+      "name": "Achmüller, Leo",
       "code": "RNM"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "RSM"
+      "name": "Gürcü, Elif",
+      "code": "RNM"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
     }
   ],
   "2026-10-03": [
     {
-      "name": "Ander-Oller, Lisa",
-      "code": "RSM"
-    },
-    {
-      "name": "Cecelemovic, Jonas",
+      "name": "Coopmans, Jonas",
       "code": "RFM"
     },
     {
-      "name": "Eckl, Miriam",
+      "name": "Eder, Miriam",
       "code": "RFM"
     },
     {
-      "name": "Geisler, Sophie-Marie",
-      "code": "RNM"
+      "name": "Gaßmann, Adrian",
+      "code": "RT3M"
     },
     {
-      "name": "Grabmaier, Adrian",
-      "code": "RT1M"
-    },
-    {
-      "name": "Günzl, Uli",
-      "code": "RNM"
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Igl, Korbinian",
-      "code": "RSM"
-    },
-    {
-      "name": "Janovic, Adrian",
-      "code": "RSN"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "RT1M"
-    },
-    {
-      "name": "Körner, David",
-      "code": "RNM"
+      "name": "Katouzian, Ali",
+      "code": "RFM"
     },
     {
       "name": "Lehner, Max",
       "code": "RFM"
     },
     {
-      "name": "Roschlauck, Nils",
+      "name": "Stückgen-, Jasmin",
+      "code": "RT1M"
+    },
+    {
+      "name": "Haddow, Alexandra",
+      "code": "RSM"
+    },
+    {
+      "name": "Jervolino, Adrian",
+      "code": "RSM"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "RSM"
+    },
+    {
+      "name": "Rosebrock, Nils",
       "code": "RSM"
     },
     {
       "name": "Schulz, Fabian",
-      "code": "RS4P"
+      "code": "RSM"
     },
     {
       "name": "Schumacher, Tassilo",
-      "code": "RNM"
+      "code": "RT4M"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "RT1M"
-    },
-    {
-      "name": "Urbani, Gavin",
+      "name": "Urban, Kevin",
       "code": "RT2M"
     },
     {
-      "name": "Vescovi-Geier, Stefan",
-      "code": "RSM"
+      "name": "Vinzenz-Kraus, Stefan",
+      "code": "RT2M"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM"
+      "name": "Finster, Sophie-Marie",
+      "code": "RNM"
+    },
+    {
+      "name": "Itzenplitz, Jonas",
+      "code": "RNM"
+    },
+    {
+      "name": "Kümper, David",
+      "code": "RNM"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Schebesta, Lars Felix",
+      "code": "/"
     }
   ],
   "2026-10-04": [
     {
-      "name": "Ander-Oller, Lisa",
-      "code": "F-SJ"
-    },
-    {
-      "name": "Brandl, Alexander",
+      "name": "Brandt, Alexander",
       "code": "RFM"
     },
     {
-      "name": "Brockhaus, Katja",
-      "code": "R1-SJ"
-    },
-    {
-      "name": "Eckl, Miriam",
-      "code": "RFM"
-    },
-    {
-      "name": "Gallhuber, Nico",
+      "name": "Buschhaus, Katja",
       "code": "RT1M"
     },
     {
-      "name": "Gläzner, Anouk",
-      "code": "RFH"
+      "name": "Faßbinder, Felix",
+      "code": "RT1M"
     },
     {
-      "name": "Kiebinger, Michael",
-      "code": "RSN"
+      "name": "Katouzian, Ali",
+      "code": "RFM"
     },
     {
       "name": "Lehner, Max",
+      "code": "RFM"
+    },
+    {
+      "name": "Schäfer, Amelie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Fischer, Anouk",
       "code": "RSM"
     },
     {
-      "name": "Richter, Annemarie Felicitas",
+      "name": "Richter, Annemarie Felizitas",
       "code": "RT2M"
     },
     {
-      "name": "Stückgen, Jasmin",
+      "name": "Ritschel-, Clarissa",
       "code": "RSM"
     },
     {
-      "name": "Vescovi-Geier, Stefan",
-      "code": "RT2M"
+      "name": "Stückgen-, Jasmin",
+      "code": "RSM"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RSM"
+    },
+    {
+      "name": "Achmüller, Leo",
+      "code": "RNM"
+    },
+    {
+      "name": "Eder, Miriam",
+      "code": "RNM"
+    },
+    {
+      "name": "Itzenplitz, Jonas",
+      "code": "RNM"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RNM"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "S24"
     }
   ],
   "2026-10-05": [
     {
-      "name": "Beck, Felix",
-      "code": "RT2M"
-    },
-    {
-      "name": "Beck, Vitus",
+      "name": "Beer, Sara",
       "code": "RT1M"
     },
     {
-      "name": "Blochwitz, Phil",
-      "code": "RSM"
-    },
-    {
-      "name": "Brandl, Alexander",
+      "name": "Brandt, Alexander",
       "code": "RFM"
     },
     {
-      "name": "Brockhaus, Katja",
+      "name": "Buschhaus, Katja",
       "code": "RFM"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RNM"
-    },
-    {
-      "name": "Dönch, Isabel",
+      "name": "Donath, Isabel",
       "code": "RT1M"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Häßler, Alexandra",
-      "code": "RSM"
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RNM"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kaouache, Ali",
+      "name": "Katouzian, Ali",
       "code": "RFM"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "R-M"
     },
     {
       "name": "Lehner, Max",
-      "code": "RT4M"
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RFM"
-    },
-    {
-      "name": "Richter, Annemarie Felicitas",
-      "code": "RT2M"
-    },
-    {
-      "name": "Schütze, Amelie",
       "code": "RT1M"
     },
     {
-      "name": "Stückgen, Jasmin",
+      "name": "Osswald, Philipp",
+      "code": "RFM"
+    },
+    {
+      "name": "Schäfer, Amelie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Beck-, Katja",
+      "code": "RT2M"
+    },
+    {
+      "name": "Haddow, Alexandra",
       "code": "RSM"
+    },
+    {
+      "name": "Richter, Annemarie Felizitas",
+      "code": "RT2M"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "RSM"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RNM"
+    },
+    {
+      "name": "Itzenplitz, Jonas",
+      "code": "RNM"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "R-M"
     }
   ],
   "2026-10-06": [
     {
-      "name": "Beck, Felix",
-      "code": "RT2M"
-    },
-    {
-      "name": "Brandl, Alexander",
+      "name": "Brandt, Alexander",
       "code": "RFM"
     },
     {
-      "name": "Danner, Maximilian",
+      "name": "Dettmer, Klaus Felix",
       "code": "RT1M"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RNM"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kaouache, Ali",
+      "name": "Katouzian, Ali",
       "code": "RFM"
     },
     {
@@ -1188,66 +1248,58 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RFM"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RNM"
+      "name": "Schäfer, Amelie",
+      "code": "RT1M"
     },
     {
-      "name": "Richter, Annemarie Felicitas",
+      "name": "Urban, Kevin",
+      "code": "RFM"
+    },
+    {
+      "name": "Beck-, Katja",
       "code": "RT2M"
     },
     {
-      "name": "Schmidbaur, Moritz",
-      "code": "SMT"
+      "name": "Richter, Annemarie Felizitas",
+      "code": "RT2M"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RSM"
+    },
+    {
+      "name": "Itzenplitz, Jonas",
+      "code": "RNM"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RNM"
     },
     {
       "name": "Schumacher, Tassilo",
       "code": "RNM"
     },
     {
-      "name": "Schütze, Amelie",
-      "code": "RT1M"
+      "name": "Schneider, Moritz",
+      "code": "SMT"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RFM"
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM"
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
     }
   ],
   "2026-10-07": [
     {
-      "name": "Beck, Vitus",
-      "code": "RS2M"
-    },
-    {
-      "name": "Brandl, Alexander",
+      "name": "Brandt, Alexander",
       "code": "RT1M"
     },
     {
-      "name": "Geisler, Sophie-Marie",
-      "code": "RT2M"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT2M"
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kaouache, Ali",
+      "name": "Katouzian, Ali",
       "code": "RT1M"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
     },
     {
       "name": "Langguth, Florian",
@@ -1258,7 +1310,35 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RT1M"
     },
     {
-      "name": "Ostwald, Philco",
+      "name": "Schäfer, Amelie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Urban, Kevin",
+      "code": "RFM"
+    },
+    {
+      "name": "Beer, Sara",
+      "code": "RSM"
+    },
+    {
+      "name": "Finster, Sophie-Marie",
+      "code": "RT2M"
+    },
+    {
+      "name": "Fischer, Anouk",
+      "code": "RT2M"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "RT4M"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RSM"
+    },
+    {
+      "name": "Osswald, Philipp",
       "code": "RNM"
     },
     {
@@ -1266,45 +1346,25 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RNM"
     },
     {
-      "name": "Schütze, Amelie",
-      "code": "RT1M"
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "RT4M"
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RFM"
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM"
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-08": [
     {
-      "name": "Beck, Vitus",
-      "code": "RCM"
-    },
-    {
-      "name": "Brandl, Alexander",
+      "name": "Brandt, Alexander",
       "code": "RT1M"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RCM"
-    },
-    {
-      "name": "Geisler, Sophie-Marie",
-      "code": "RNM"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kaouache, Ali",
+      "name": "Katouzian, Ali",
       "code": "RT1M"
     },
     {
@@ -1312,64 +1372,80 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RFM"
     },
     {
+      "name": "Schäfer, Amelie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Beer, Sara",
+      "code": "RSM"
+    },
+    {
+      "name": "Urban, Kevin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Finster, Sophie-Marie",
+      "code": "RNM"
+    },
+    {
       "name": "Schumacher, Tassilo",
       "code": "RNM"
     },
     {
-      "name": "Schütze, Amelie",
-      "code": "RT1M"
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RT2M"
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RCM"
     }
   ],
   "2026-10-09": [
     {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Urban, Kevin",
+      "code": "RFM"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RSM"
     },
     {
-      "name": "Danner, Maximilian",
-      "code": "RNM"
-    },
-    {
-      "name": "Ivanovic, Aneas",
+      "name": "Itzenplitz, Jonas",
       "code": "RSM"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
-    },
-    {
-      "name": "Lehmann in der Maloschen, Corinna",
-      "code": "SW1"
     },
     {
       "name": "Lehner, Max",
-      "code": "RS4P"
+      "code": "RSM"
+    },
+    {
+      "name": "Dettmer, Klaus Felix",
+      "code": "RNM"
     },
     {
       "name": "Schumacher, Tassilo",
       "code": "RNM"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RFM"
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Leitmannstetter-Matuschek, Sabine",
+      "code": "SW1"
     }
   ],
   "2026-10-10": [
     {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RSM"
     },
     {
       "name": "Lehner, Max",
-      "code": "RS4P"
+      "code": "RSM"
     },
     {
       "name": "Schumacher, Tassilo",
@@ -1379,23 +1455,15 @@ export const OCTOBER_2026_TEAM_ROSTER = {
   "2026-10-11": [],
   "2026-10-12": [
     {
-      "name": "Beck, Felix",
+      "name": "Beck-, Katja",
       "code": "RT1M"
     },
     {
-      "name": "Beck, Vitus",
+      "name": "Beer, Sara",
       "code": "RT1M"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RSM"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RSH"
-    },
-    {
-      "name": "Gläzner, Lucas",
+      "name": "Fischer, Laura",
       "code": "RT1H"
     },
     {
@@ -1403,65 +1471,77 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RT1M"
     },
     {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kaouache, Ali",
-      "code": "VFU"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
-    },
-    {
       "name": "Langguth, Florian",
       "code": "RT1M"
     },
     {
-      "name": "Nickels, Fynn Jamie",
-      "code": "RSM"
+      "name": "Schulz, Fabian",
+      "code": "RFM"
     },
     {
       "name": "Reisinger, Eva",
       "code": "RTH"
     },
     {
-      "name": "Schmidbaur, Moritz",
+      "name": "Backhaus, Johannes",
+      "code": "RT2M"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RSM"
+    },
+    {
+      "name": "Fischer, Anouk",
+      "code": "RSH"
+    },
+    {
+      "name": "Nickels, Fynn Janne",
+      "code": "RSM"
+    },
+    {
+      "name": "Schneider, Moritz",
       "code": "RAJ"
     },
     {
-      "name": "Schulz, Fabian",
-      "code": "RFM"
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Katouzian, Ali",
+      "code": "VFU"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-13": [
     {
-      "name": "Brockhaus, Katja",
-      "code": "V-B"
-    },
-    {
-      "name": "Cecelemovic, Jonas",
+      "name": "Coopmans, Jonas",
       "code": "RFM"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RT2M"
-    },
-    {
-      "name": "Eckl, Miriam",
-      "code": "RCM"
-    },
-    {
-      "name": "Gallhuber, Nico",
-      "code": "RT2M"
-    },
-    {
-      "name": "Gigl, Tobias",
+      "name": "Gigl-, Nadine",
       "code": "RFM"
     },
     {
-      "name": "Gläzner, Lucas",
+      "name": "Runge, Thomas",
+      "code": "RT1M"
+    },
+    {
+      "name": "Reisinger, Eva",
+      "code": "RTH"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RT2M"
+    },
+    {
+      "name": "Faßbinder, Felix",
+      "code": "RT2M"
+    },
+    {
+      "name": "Fischer, Laura",
       "code": "RT2H"
     },
     {
@@ -1469,303 +1549,291 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RSM"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
-    },
-    {
-      "name": "Müller, Maximilian",
+      "name": "Müller -, Maximilian",
       "code": "RSM"
     },
     {
-      "name": "Ostwald, Philco",
+      "name": "Osswald, Philipp",
       "code": "RSM"
     },
     {
-      "name": "Ramberg, Simon",
+      "name": "Rehberg, Simon",
       "code": "RSH"
     },
     {
-      "name": "Reisinger, Eva",
-      "code": "RTH"
-    },
-    {
-      "name": "Rochow, Kirsten",
+      "name": "Rochner, Gabor",
       "code": "RSM"
     },
     {
-      "name": "Runge, Thomas",
-      "code": "RT1M"
-    },
-    {
-      "name": "Stückgen, Jasmin",
+      "name": "Stückgen-, Jasmin",
       "code": "RT2M"
     },
     {
-      "name": "Zehetmair, Thilo",
+      "name": "Zehentner, Thea",
       "code": "RNM"
+    },
+    {
+      "name": "Buschhaus, Katja",
+      "code": "V-B"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Eder, Miriam",
+      "code": "RCM"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-14": [
     {
-      "name": "Backhaus, Johannes",
-      "code": "RSM"
-    },
-    {
-      "name": "Brockhaus, Katja",
+      "name": "Buschhaus, Katja",
       "code": "RT1M"
     },
     {
-      "name": "Cecelemovic, Jonas",
+      "name": "Coopmans, Jonas",
       "code": "RFM"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RCM"
-    },
-    {
-      "name": "Eckl, Miriam",
+      "name": "Eder, Miriam",
       "code": "RFM"
     },
     {
-      "name": "Gigl, Tobias",
-      "code": "R-M"
+      "name": "Itzenplitz, Jonas",
+      "code": "RT1M"
     },
     {
-      "name": "Gläzner, Lucas",
-      "code": "RNH"
+      "name": "Osswald, Philipp",
+      "code": "RT1M"
+    },
+    {
+      "name": "Vinzenz-Kraus, Stefan",
+      "code": "RFM"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RSM"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RT1M"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
-    },
-    {
-      "name": "Müller, Maximilian",
+      "name": "Müller -, Maximilian",
       "code": "RSM"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RT1M"
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RNM"
-    },
-    {
-      "name": "Stückgen, Jasmin",
+      "name": "Stückgen-, Jasmin",
       "code": "RT2M"
     },
     {
-      "name": "Vescovi-Geier, Stefan",
-      "code": "RFM"
+      "name": "Fischer, Laura",
+      "code": "RNH"
     },
     {
-      "name": "Zehetmair, Thilo",
+      "name": "Rochner, Gabor",
       "code": "RNM"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RNM"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RCM"
+    },
+    {
+      "name": "Gigl-, Nadine",
+      "code": "R-M"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-15": [
     {
-      "name": "Brockhaus, Katja",
+      "name": "Backhaus, Johannes",
+      "code": "RFM"
+    },
+    {
+      "name": "Beer, Sara",
+      "code": "RFM"
+    },
+    {
+      "name": "Buschhaus, Katja",
       "code": "RT1M"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RCM"
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "PALS"
-    },
-    {
-      "name": "Eckl, Miriam",
+      "name": "Eder, Miriam",
       "code": "RFM"
     },
     {
-      "name": "Gigl, Tobias",
+      "name": "Fleck, Petra",
       "code": "RFM"
     },
     {
-      "name": "Gloss, Petra",
+      "name": "Gigl-, Nadine",
       "code": "RFM"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RCM"
-    },
-    {
-      "name": "Gläzner, Lucas",
-      "code": "RNH"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RFM"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
-    },
-    {
-      "name": "Lehmann in der Maloschen, Corinna",
-      "code": "PALS"
-    },
-    {
-      "name": "Leimeritz, Tim",
-      "code": "PALS"
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RS4"
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RT4M"
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RNM"
-    },
-    {
-      "name": "Traunmüller, Alexander",
+      "name": "Tischmacher, Alexander",
       "code": "RFM"
     },
     {
-      "name": "Vescovi-Geier, Stefan",
+      "name": "Müller -, Maximilian",
+      "code": "RS4"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RT4M"
+    },
+    {
+      "name": "Vinzenz-Kraus, Stefan",
       "code": "RT2M"
     },
     {
-      "name": "Zehetmair, Thilo",
+      "name": "Fischer, Laura",
+      "code": "RNH"
+    },
+    {
+      "name": "Rochner, Gabor",
       "code": "RNM"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RNM"
+    },
+    {
+      "name": "Donath, Isabel",
+      "code": "PALS"
+    },
+    {
+      "name": "Leitmannstetter-Matuschek, Sabine",
+      "code": "PALS"
+    },
+    {
+      "name": "Lennartz-, Tim",
+      "code": "PALS"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RCM"
+    },
+    {
+      "name": "Fischer, Anouk",
+      "code": "RCM"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-16": [
     {
-      "name": "Beck, Vitus",
+      "name": "Krokos, Kasjan",
+      "code": "RT1M"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
       "code": "RFM"
     },
     {
-      "name": "Brockhaus, Katja",
+      "name": "Buschhaus, Katja",
       "code": "RSM"
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "PALS"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RSM"
     },
     {
-      "name": "Ivanovic, Aneas",
+      "name": "Itzenplitz, Jonas",
       "code": "RT4M"
     },
     {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kaouache, Ali",
-      "code": "VFU"
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
-    },
-    {
-      "name": "Kokot, Fabian",
-      "code": "RT1M"
-    },
-    {
-      "name": "Lehmann in der Maloschen, Corinna",
-      "code": "PALS"
-    },
-    {
-      "name": "Leimeritz, Tim",
-      "code": "PALS"
-    },
-    {
-      "name": "Müller, Maximilian",
+      "name": "Müller -, Maximilian",
       "code": "RT2M"
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "PALS"
     },
     {
       "name": "Reisinger, Eva",
       "code": "RNH"
     },
     {
-      "name": "Rochow, Kirsten",
+      "name": "Rochner, Gabor",
       "code": "RNM"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RNM"
+    },
+    {
+      "name": "Donath, Isabel",
+      "code": "PALS"
+    },
+    {
+      "name": "Leitmannstetter-Matuschek, Sabine",
+      "code": "PALS"
+    },
+    {
+      "name": "Lennartz-, Tim",
+      "code": "PALS"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "PALS"
     },
     {
       "name": "Schumacher, Tassilo",
       "code": "PALS"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "RFM"
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM"
+      "name": "Katouzian, Ali",
+      "code": "VFU"
+    },
+    {
+      "name": "Beer, Sara",
+      "code": "DDM"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-17": [
     {
-      "name": "Backhaus, Johannes",
-      "code": "RFM"
-    },
-    {
-      "name": "Beck, Vitus",
-      "code": "UDN"
-    },
-    {
-      "name": "Brockhaus, Katja",
-      "code": "RSM"
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "RNM"
-    },
-    {
-      "name": "Greif, Nick Jonathan",
+      "name": "Greif, Matti Jonathan",
       "code": "RFH"
     },
     {
-      "name": "Grollikurth, Simon",
+      "name": "Großkurth, Simon",
       "code": "RFH"
     },
     {
@@ -1773,74 +1841,58 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RFH"
     },
     {
-      "name": "Hellstern, Robin",
-      "code": "RSM"
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RT2M"
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RT4M"
-    },
-    {
-      "name": "Nickels, Fynn Jamie",
+      "name": "Nickels, Fynn Janne",
       "code": "RT1M"
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "PALS"
     },
     {
       "name": "Pietsch, Amanda",
       "code": "RFM"
     },
     {
-      "name": "Ramberg, Simon",
+      "name": "Rehberg, Simon",
       "code": "RTH"
     },
     {
-      "name": "Schmidbaur, Moritz",
+      "name": "Buschhaus, Katja",
+      "code": "RSM"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RSM"
+    },
+    {
+      "name": "Itzenplitz, Jonas",
       "code": "RT2M"
+    },
+    {
+      "name": "Müller -, Maximilian",
+      "code": "RT4M"
+    },
+    {
+      "name": "Schneider, Moritz",
+      "code": "RT2M"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "RSM"
+    },
+    {
+      "name": "Donath, Isabel",
+      "code": "RNM"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "PALS"
     },
     {
       "name": "Schumacher, Tassilo",
       "code": "PALS"
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RSM"
     }
   ],
   "2026-10-18": [
     {
-      "name": "Dönch, Isabel",
-      "code": "RNM"
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "RNM"
-    },
-    {
-      "name": "Gläzner, Anouk",
+      "name": "Fischer, Anouk",
       "code": "RT1M"
-    },
-    {
-      "name": "Gläzner, Lucas",
-      "code": "PALS"
-    },
-    {
-      "name": "Greif, Nick Jonathan",
-      "code": "RNH"
-    },
-    {
-      "name": "Gremme, Lisa Marie",
-      "code": "PALS"
-    },
-    {
-      "name": "Grollikurth, Simon",
-      "code": "RSH"
     },
     {
       "name": "Gruber, Elena",
@@ -1851,65 +1903,65 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RT1M"
     },
     {
-      "name": "Ramberg, Simon",
+      "name": "Rehberg, Simon",
       "code": "RFH"
+    },
+    {
+      "name": "Großkurth, Simon",
+      "code": "RSH"
+    },
+    {
+      "name": "Donath, Isabel",
+      "code": "RNM"
+    },
+    {
+      "name": "Gigl-, Nadine",
+      "code": "RNM"
+    },
+    {
+      "name": "Greif, Matti Jonathan",
+      "code": "RNH"
+    },
+    {
+      "name": "Fischer, Laura",
+      "code": "PALS"
+    },
+    {
+      "name": "Grosser, Lisa-Maria",
+      "code": "PALS"
     }
   ],
   "2026-10-19": [
     {
-      "name": "Cecelemovic, Jonas",
-      "code": "V07-b"
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RFM"
     },
     {
-      "name": "Dönch, Isabel",
-      "code": "RNM"
-    },
-    {
-      "name": "Gläzner, Anouk",
+      "name": "Fischer, Anouk",
       "code": "RT1M"
     },
     {
-      "name": "Gläzner, Lucas",
-      "code": "PALS"
+      "name": "Kränzle, Kilian",
+      "code": "RT1M"
     },
     {
-      "name": "Gremme, Lisa Marie",
-      "code": "PALS"
+      "name": "Mädche, Tobias",
+      "code": "RFM"
+    },
+    {
+      "name": "Pietsch, Amanda",
+      "code": "RFM"
+    },
+    {
+      "name": "Tischmacher, Alexander",
+      "code": "RT1M"
     },
     {
       "name": "Gruber, Elena",
       "code": "RTH"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Kotsifa, Kilian",
-      "code": "RT1M"
-    },
-    {
-      "name": "Mösche, Tobias",
-      "code": "RFM"
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RNM"
-    },
-    {
-      "name": "Pietsch, Amanda",
-      "code": "RFM"
-    },
-    {
-      "name": "Ponath B.f., Florian",
+      "name": "Ponath, Florian",
       "code": "RT4M"
     },
     {
@@ -1917,159 +1969,151 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RSH"
     },
     {
-      "name": "Rochow, Kirsten",
+      "name": "Rochner, Gabor",
       "code": "RSM"
-    },
-    {
-      "name": "Schifferl, Christian",
-      "code": "RNM"
     },
     {
       "name": "Schumacher, Tassilo",
       "code": "RT2M"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "FFO"
-    },
-    {
-      "name": "Traunmüller, Alexander",
-      "code": "RT1M"
-    },
-    {
-      "name": "Urbani, Gavin",
+      "name": "Donath, Isabel",
       "code": "RNM"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RNM"
+    },
+    {
+      "name": "Schlierf, Christian",
+      "code": "RNM"
+    },
+    {
+      "name": "Urban, Kevin",
+      "code": "RNM"
+    },
+    {
+      "name": "Fischer, Laura",
+      "code": "PALS"
+    },
+    {
+      "name": "Grosser, Lisa-Maria",
+      "code": "PALS"
+    },
+    {
+      "name": "Coopmans, Jonas",
+      "code": "V07-b"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "FFO"
     }
   ],
   "2026-10-20": [
     {
-      "name": "Cecelemovic, Jonas",
-      "code": "V07-b"
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RFM"
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "RNM"
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "RNM"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT2M"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RT1M"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Leimeritz, Tim",
-      "code": "RSM"
-    },
-    {
-      "name": "Müller, Maximilian",
+      "name": "Müller -, Maximilian",
       "code": "RFM"
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RNM"
     },
     {
       "name": "Pietsch, Amanda",
       "code": "RT1M"
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RSM"
-    },
-    {
-      "name": "Schifferl, Christian",
-      "code": "RNM"
     },
     {
       "name": "Schumacher, Tassilo",
       "code": "RT1M"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "FFO"
-    },
-    {
-      "name": "Traunmüller, Alexander",
+      "name": "Tischmacher, Alexander",
       "code": "RT1M"
     },
     {
-      "name": "Urbani, Gavin",
+      "name": "Fischer, Anouk",
+      "code": "RT2M"
+    },
+    {
+      "name": "Lennartz-, Tim",
+      "code": "RSM"
+    },
+    {
+      "name": "Rochner, Gabor",
+      "code": "RSM"
+    },
+    {
+      "name": "Donath, Isabel",
       "code": "RNM"
     },
     {
-      "name": "Zehetmair, Thilo",
+      "name": "Gigl-, Nadine",
       "code": "RNM"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RNM"
+    },
+    {
+      "name": "Schlierf, Christian",
+      "code": "RNM"
+    },
+    {
+      "name": "Urban, Kevin",
+      "code": "RNM"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RNM"
+    },
+    {
+      "name": "Coopmans, Jonas",
+      "code": "V07-b"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "FFO"
     }
   ],
   "2026-10-21": [
     {
-      "name": "Cecelemovic, Jonas",
-      "code": "V07-b"
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RNM"
-    },
-    {
-      "name": "Gallhuber, Nico",
-      "code": "RNM"
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "RNM"
-    },
-    {
-      "name": "Gläzner, Anouk",
+      "name": "Fischer, Anouk",
       "code": "RT1M"
-    },
-    {
-      "name": "Gremme, Lisa Marie",
-      "code": "RZF"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RT1M"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "UDN"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Müller, Maximilian",
+      "name": "Müller -, Maximilian",
       "code": "RFM"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RSM"
+      "name": "Pietsch, Amanda",
+      "code": "RFM"
     },
     {
-      "name": "Pietsch, Amanda",
+      "name": "Stückgen-, Jasmin",
       "code": "RFM"
     },
     {
@@ -2077,69 +2121,61 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RTH"
     },
     {
+      "name": "Osswald, Philipp",
+      "code": "RSM"
+    },
+    {
       "name": "Schumacher, Tassilo",
       "code": "RT2M"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "RFM"
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RNM"
     },
     {
-      "name": "Vockentanz, Corin",
+      "name": "Faßbinder, Felix",
+      "code": "RNM"
+    },
+    {
+      "name": "Gigl-, Nadine",
+      "code": "RNM"
+    },
+    {
+      "name": "Coopmans, Jonas",
+      "code": "V07-b"
+    },
+    {
+      "name": "Itzenplitz, Jonas",
+      "code": "UDN"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Grosser, Lisa-Maria",
+      "code": "RZF"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Wiedemann, Sofie",
       "code": "R-SAN"
     }
   ],
   "2026-10-22": [
     {
-      "name": "Cecelemovic, Jonas",
-      "code": "V07-b"
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RNM"
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "RNM"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT2M"
-    },
-    {
-      "name": "Greif, Nick Jonathan",
-      "code": "RTH"
-    },
-    {
       "name": "Hellstern, Robin",
       "code": "RT1M"
     },
     {
-      "name": "Häßler, Alexandra",
-      "code": "RT2M"
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RNM"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Müller, Maximilian",
+      "name": "Müller -, Maximilian",
       "code": "RT1M"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RSM"
-    },
-    {
-      "name": "Ramberg, Simon",
-      "code": "RTH"
-    },
-    {
-      "name": "Rochow, Kirsten",
+      "name": "Rochner, Gabor",
       "code": "RT1M"
     },
     {
@@ -2147,63 +2183,107 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RT1M"
     },
     {
-      "name": "Stückgen, Jasmin",
+      "name": "Greif, Matti Jonathan",
+      "code": "RTH"
+    },
+    {
+      "name": "Rehberg, Simon",
+      "code": "RTH"
+    },
+    {
+      "name": "Fischer, Anouk",
       "code": "RT2M"
     },
     {
-      "name": "Urbani, Gavin",
+      "name": "Haddow, Alexandra",
+      "code": "RT2M"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RSM"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Urban, Kevin",
       "code": "RSH"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RNM"
+    },
+    {
+      "name": "Gigl-, Nadine",
+      "code": "RNM"
+    },
+    {
+      "name": "Itzenplitz, Jonas",
+      "code": "RNM"
+    },
+    {
+      "name": "Coopmans, Jonas",
+      "code": "V07-b"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
     }
   ],
   "2026-10-23": [
     {
-      "name": "Gigl, Tobias",
-      "code": "RNM"
+      "name": "Rehberg, Simon",
+      "code": "RFH"
     },
     {
-      "name": "Gläzner, Lucas",
-      "code": "RSM"
-    },
-    {
-      "name": "Greif, Nick Jonathan",
+      "name": "Greif, Matti Jonathan",
       "code": "RTH"
+    },
+    {
+      "name": "Fischer, Laura",
+      "code": "RSM"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RT4M"
     },
     {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RNM"
-    },
-    {
-      "name": "Ramberg, Simon",
-      "code": "RFH"
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RNM"
-    },
-    {
-      "name": "Zehetmair, Thilo",
+      "name": "Zehentner, Thea",
       "code": "RT2M"
+    },
+    {
+      "name": "Gigl-, Nadine",
+      "code": "RNM"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RNM"
+    },
+    {
+      "name": "Rochner, Gabor",
+      "code": "RNM"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
     }
   ],
   "2026-10-24": [
     {
-      "name": "Gigl, Tobias",
-      "code": "RNM"
+      "name": "Müller -, Maximilian",
+      "code": "RFM"
     },
     {
-      "name": "Gläzner, Lucas",
-      "code": "RNM"
+      "name": "Zehentner, Thea",
+      "code": "RT1M"
     },
     {
-      "name": "Greif, Nick Jonathan",
+      "name": "Beer, Sara",
+      "code": "RSM"
+    },
+    {
+      "name": "Greif, Matti Jonathan",
       "code": "RSH"
     },
     {
@@ -2211,62 +2291,26 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RT2M"
     },
     {
-      "name": "Müller, Maximilian",
-      "code": "RFM"
-    },
-    {
-      "name": "Rochow, Kirsten",
+      "name": "Rochner, Gabor",
       "code": "RSM"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RT1M"
+      "name": "Fischer, Laura",
+      "code": "RNM"
+    },
+    {
+      "name": "Gigl-, Nadine",
+      "code": "RNM"
     }
   ],
   "2026-10-25": [
     {
-      "name": "Beck, Vitus",
-      "code": "RCM"
-    },
-    {
-      "name": "Gallhuber, Nico",
-      "code": "RNM"
-    },
-    {
-      "name": "Geisler, Sophie-Marie",
+      "name": "Finster, Sophie-Marie",
       "code": "RFM"
     },
     {
-      "name": "Gigl, Tobias",
+      "name": "Gigl-, Nadine",
       "code": "RFM"
-    },
-    {
-      "name": "Gloss, Petra",
-      "code": "RT2M"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RSH"
-    },
-    {
-      "name": "Kaouache, Ali",
-      "code": "VFU"
-    },
-    {
-      "name": "Kotsifa, Kilian",
-      "code": "RT4M"
-    },
-    {
-      "name": "Merla, Patrick",
-      "code": "RSM"
-    },
-    {
-      "name": "Nickels, Fynn Jamie",
-      "code": "RTM"
-    },
-    {
-      "name": "Schloder, Darius",
-      "code": "RNM"
     },
     {
       "name": "Schulz, Fabian",
@@ -2277,65 +2321,81 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RFH"
     },
     {
-      "name": "Zehetmair, Thilo",
+      "name": "Nickels, Fynn Janne",
+      "code": "RTM"
+    },
+    {
+      "name": "Fischer, Anouk",
+      "code": "RSH"
+    },
+    {
+      "name": "Fleck, Petra",
+      "code": "RT2M"
+    },
+    {
+      "name": "Kränzle, Kilian",
+      "code": "RT4M"
+    },
+    {
+      "name": "Marie, Patrick",
+      "code": "RSM"
+    },
+    {
+      "name": "Faßbinder, Felix",
       "code": "RNM"
+    },
+    {
+      "name": "Schloder, Darius",
+      "code": "RNM"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RNM"
+    },
+    {
+      "name": "Katouzian, Ali",
+      "code": "VFU"
     }
   ],
   "2026-10-26": [
     {
-      "name": "Beck, Felix",
-      "code": "RSM"
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RT1M"
     },
     {
-      "name": "Gigl, Tobias",
+      "name": "Gigl-, Nadine",
       "code": "RFM"
     },
     {
-      "name": "Gläzner, Anouk",
-      "code": "RT2M"
-    },
-    {
-      "name": "Grollikurth, Simon",
-      "code": "RHH"
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Igl, Korbinian",
+      "name": "Igl, Andreas",
       "code": "RFM"
     },
     {
-      "name": "Ivanovic, Aneas",
+      "name": "Itzenplitz, Jonas",
       "code": "RFM"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
     },
     {
       "name": "Keiser, Mia",
       "code": "RFM"
     },
     {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
+      "name": "Beck-, Katja",
+      "code": "RSM"
+    },
+    {
+      "name": "Fischer, Anouk",
+      "code": "RT2M"
     },
     {
       "name": "Odorfer, Viviane",
       "code": "RT2M"
     },
     {
-      "name": "Ostwald, Philco",
+      "name": "Osswald, Philipp",
       "code": "RT2M"
     },
     {
-      "name": "Rochow, Kirsten",
+      "name": "Rochner, Gabor",
       "code": "RSH"
     },
     {
@@ -2343,132 +2403,148 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RSM"
     },
     {
-      "name": "Zehetmair, Thilo",
+      "name": "Zehentner, Thea",
       "code": "RNM"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Großkurth, Simon",
+      "code": "RHH"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-27": [
     {
-      "name": "Beck, Vitus",
-      "code": "V-B"
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RT1M"
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "RNM"
-    },
-    {
-      "name": "Eichenseher, Mona",
-      "code": "C-M"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RSM"
-    },
-    {
-      "name": "Grollikurth, Simon",
-      "code": "RNH"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RT1M"
     },
     {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
-    },
-    {
       "name": "Keiser, Mia",
       "code": "RT1M"
     },
     {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
+      "name": "Fischer, Anouk",
+      "code": "RSM"
     },
     {
       "name": "Odorfer, Viviane",
       "code": "RT2M"
     },
     {
-      "name": "Ostwald, Philco",
+      "name": "Osswald, Philipp",
       "code": "RSM"
     },
     {
-      "name": "Urbani, Gavin",
+      "name": "Urban, Kevin",
       "code": "RT2M"
     },
     {
-      "name": "Zehetmair, Thilo",
+      "name": "Donath, Isabel",
       "code": "RNM"
+    },
+    {
+      "name": "Großkurth, Simon",
+      "code": "RNH"
+    },
+    {
+      "name": "Zehentner, Thea",
+      "code": "RNM"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Beer, Sara",
+      "code": "S24"
+    },
+    {
+      "name": "Eichenseher, Alena",
+      "code": "C-M"
+    },
+    {
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-28": [
     {
-      "name": "Beck, Felix",
-      "code": "RSM"
-    },
-    {
-      "name": "Beck, Vitus",
+      "name": "Beer, Sara",
       "code": "RT1M"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RFM"
     },
     {
-      "name": "Dönch, Isabel",
+      "name": "Donath, Isabel",
       "code": "RT1M"
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RSM"
-    },
-    {
-      "name": "Igl, Korbinian",
-      "code": "RSM"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
     },
     {
       "name": "Keiser, Mia",
       "code": "RFM"
     },
     {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
+      "name": "Stückgen-, Jasmin",
+      "code": "RFM"
+    },
+    {
+      "name": "Beck-, Katja",
+      "code": "RSM"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RSM"
+    },
+    {
+      "name": "Igl, Andreas",
+      "code": "RSM"
     },
     {
       "name": "Odorfer, Viviane",
       "code": "RT2M"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RNM"
+      "name": "Urban, Kevin",
+      "code": "RT2M"
     },
     {
-      "name": "Rochow, Kirsten",
-      "code": "NFO"
+      "name": "Osswald, Philipp",
+      "code": "RNM"
     },
     {
       "name": "Schumacher, Tassilo",
       "code": "RNM"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "RFM"
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RT2M"
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Rochner, Gabor",
+      "code": "NFO"
     }
   ],
   "2026-10-29": [
@@ -2477,64 +2553,64 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RFM"
     },
     {
-      "name": "Beck, Felix",
-      "code": "RSM"
-    },
-    {
-      "name": "Beck, Vitus",
-      "code": "RT2M"
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RSM"
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "RT2M"
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO"
-    },
-    {
-      "name": "Igl, Korbinian",
-      "code": "RSM"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
+      "name": "Beer, Sara",
+      "code": "RT1M"
     },
     {
       "name": "Keiser, Mia",
       "code": "RT1M"
     },
     {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
+      "name": "Rochner, Gabor",
+      "code": "RT1M"
     },
     {
-      "name": "Ostwald, Philco",
+      "name": "Schink, Anna-Lena",
+      "code": "RT1M"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "RFM"
+    },
+    {
+      "name": "Beck-, Katja",
+      "code": "RSM"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RSM"
+    },
+    {
+      "name": "Donath, Isabel",
+      "code": "RT2M"
+    },
+    {
+      "name": "Igl, Andreas",
+      "code": "RSM"
+    },
+    {
+      "name": "Urban, Kevin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Osswald, Philipp",
       "code": "RNM"
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RT1M"
-    },
-    {
-      "name": "Schell, Anna-Lena",
-      "code": "RT1M"
     },
     {
       "name": "Schumacher, Tassilo",
       "code": "RNM"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "RFM"
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RT2M"
+      "name": "Hahn, Karl-Heinz",
+      "code": "ID2"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
     }
   ],
   "2026-10-30": [
@@ -2543,67 +2619,39 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RFM"
     },
     {
-      "name": "Beck, Felix",
+      "name": "Darman Nafkhosh, Birjowan",
       "code": "RT1M"
     },
     {
-      "name": "Cramer-Tschirnich, Stephan",
+      "name": "Fischer, Anouk",
       "code": "RT1M"
-    },
-    {
-      "name": "Geisler, Sophie-Marie",
-      "code": "ACLS"
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "ACLS"
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT1M"
-    },
-    {
-      "name": "Hausteit, Florian",
-      "code": "RT4M"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RFM"
     },
     {
-      "name": "Igl, Korbinian",
-      "code": "RT4M"
-    },
-    {
-      "name": "Ivanovic, Aneas",
+      "name": "Itzenplitz, Jonas",
       "code": "RT1M"
-    },
-    {
-      "name": "Kadafeh Ivan, Constantin",
-      "code": "V030"
     },
     {
       "name": "Keiser, Mia",
       "code": "RFM"
     },
     {
-      "name": "Kiebinger, Michael",
-      "code": "F-M"
+      "name": "Beck-, Katja",
+      "code": "RT4M"
     },
     {
-      "name": "Kokot, Fabian",
-      "code": "ACLS"
+      "name": "Haseloff, Florian",
+      "code": "RT4M"
     },
     {
-      "name": "Nickels, Fynn Jamie",
-      "code": "ACLS"
+      "name": "Igl, Andreas",
+      "code": "RT4M"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RNM"
-    },
-    {
-      "name": "Rochow, Kirsten",
+      "name": "Rochner, Gabor",
       "code": "RSM"
     },
     {
@@ -2611,94 +2659,122 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "code": "RSM"
     },
     {
+      "name": "Zehentner, Thea",
+      "code": "RSM"
+    },
+    {
+      "name": "Osswald, Philipp",
+      "code": "RNM"
+    },
+    {
       "name": "Schumacher, Tassilo",
       "code": "RNM"
     },
     {
-      "name": "Stückgen, Jasmin",
-      "code": "FFO"
+      "name": "Finster, Sophie-Marie",
+      "code": "ACLS"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM"
+      "name": "Gigl-, Nadine",
+      "code": "ACLS"
+    },
+    {
+      "name": "Krokos, Kasjan",
+      "code": "ACLS"
+    },
+    {
+      "name": "Nickels, Fynn Janne",
+      "code": "ACLS"
+    },
+    {
+      "name": "Kalckstein von, Constantin",
+      "code": "VS30"
+    },
+    {
+      "name": "Kolbinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Stückgen-, Jasmin",
+      "code": "FFO"
     }
   ],
   "2026-10-31": [
     {
-      "name": "Backhaus, Johannes",
-      "code": "RNM"
-    },
-    {
-      "name": "Beck, Felix",
-      "code": "RT4M"
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RSM"
-    },
-    {
-      "name": "Geisler, Sophie-Marie",
-      "code": "ACLS"
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "ACLS"
-    },
-    {
-      "name": "Gläzner, Anouk",
+      "name": "Fischer, Anouk",
       "code": "RFH"
-    },
-    {
-      "name": "Greif, Nick Jonathan",
-      "code": "RSM"
-    },
-    {
-      "name": "Gruber, Elena",
-      "code": "RTH"
     },
     {
       "name": "Hellstern, Robin",
       "code": "RFM"
     },
     {
-      "name": "Häßler, Alexandra",
-      "code": "RT2M"
-    },
-    {
-      "name": "Kokot, Fabian",
-      "code": "ACLS"
-    },
-    {
-      "name": "Leimeritz, Tim",
-      "code": "RTH"
-    },
-    {
-      "name": "Merla, Patrick",
+      "name": "Marie, Patrick",
       "code": "RFM"
     },
     {
-      "name": "Nickels, Fynn Jamie",
-      "code": "ACLS"
+      "name": "Peuker, Desiree",
+      "code": "RT1M"
+    },
+    {
+      "name": "Gruber, Elena",
+      "code": "RTH"
+    },
+    {
+      "name": "Lennartz-, Tim",
+      "code": "RTH"
+    },
+    {
+      "name": "Beck-, Katja",
+      "code": "RT4M"
+    },
+    {
+      "name": "Darman Nafkhosh, Birjowan",
+      "code": "RSM"
+    },
+    {
+      "name": "Greif, Matti Jonathan",
+      "code": "RSM"
+    },
+    {
+      "name": "Haddow, Alexandra",
+      "code": "RT2M"
     },
     {
       "name": "Odorfer, Viviane",
       "code": "RSH"
     },
     {
-      "name": "Paulwe B.f., Desiree",
-      "code": "RT1M"
-    },
-    {
-      "name": "Ponath B.f., Florian",
+      "name": "Ponath, Florian",
       "code": "RT4M"
     },
     {
-      "name": "Urbani, Gavin",
+      "name": "Urban, Kevin",
       "code": "RSM"
     },
     {
-      "name": "Zehetmair, Thilo",
+      "name": "Zehentner, Thea",
       "code": "RSM"
+    },
+    {
+      "name": "Backhaus, Johannes",
+      "code": "RNM"
+    },
+    {
+      "name": "Finster, Sophie-Marie",
+      "code": "ACLS"
+    },
+    {
+      "name": "Gigl-, Nadine",
+      "code": "ACLS"
+    },
+    {
+      "name": "Krokos, Kasjan",
+      "code": "ACLS"
+    },
+    {
+      "name": "Nickels, Fynn Janne",
+      "code": "ACLS"
     }
   ]
 }

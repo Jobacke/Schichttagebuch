@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Search,
-  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle
+  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText
 } from 'lucide-react';
 import {
   getActiveTeamRoster,
@@ -9,19 +9,20 @@ import {
   runTeamRosterOcr,
   parseTeamRoster
 } from '../utils/teamRosterParser';
+import { parseCareManPdf } from '../utils/teamRosterPdfParser';
 import { getShiftColor } from '../utils/shiftColors';
 
 export default function TeamRoster() {
-  // Active roster data (defaults to verified October 2026 data)
+  // Active roster data (defaults to cleaned October 2026 data)
   const [roster, setRoster] = useState(() => getActiveTeamRoster('2026-10'));
   
-  // Selected date (defaults to today if within month, otherwise 2026-10-16 or 2026-10-05)
+  // Selected date
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const ym = roster?.yearMonth || '2026-10';
     if (todayStr.startsWith(ym)) return todayStr;
-    return `${ym}-16`;
+    return `${ym}-05`;
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,11 +32,9 @@ export default function TeamRoster() {
   const [uploadProgress, setUploadProgress] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadError, setUploadError] = useState(null);
-  const [uploadPreview, setUploadPreview] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   const fileInputRef = useRef(null);
-  const dateInputRef = useRef(null);
 
   // Toast timer
   useEffect(() => {
@@ -69,7 +68,7 @@ export default function TeamRoster() {
     if (todayStr.startsWith(yearMonth)) {
       setSelectedDate(todayStr);
     } else {
-      setSelectedDate(`${yearMonth}-16`);
+      setSelectedDate(`${yearMonth}-05`);
     }
   };
 
@@ -86,42 +85,6 @@ export default function TeamRoster() {
     });
   }, [roster, selectedDate, searchQuery]);
 
-  // Group shifts by simple shift category (Früh, Tag, Spät, Nacht, Sonstige)
-  const groupedShifts = useMemo(() => {
-    const groups = [
-      { key: 'frueh', label: 'Frühdienst', items: [] },
-      { key: 'tag', label: 'Tagschicht', items: [] },
-      { key: 'spaat', label: 'Spätdienst', items: [] },
-      { key: 'nacht', label: 'Nachtdienst', items: [] },
-      { key: 'sonstig', label: 'Fortbildung / Sonstige', items: [] }
-    ];
-
-    currentDayShifts.forEach(shift => {
-      const code = (shift.code || '').toUpperCase();
-      const type = (shift.shiftTypeName || '').toLowerCase();
-
-      if (type.includes('nacht') || code.includes('RN') || code.endsWith('NM') || code.endsWith('NH')) {
-        groups[3].items.push(shift);
-      } else if (type.includes('spät') || code.includes('RS') || code.includes('RT2') || code.includes('RT4') || code.endsWith('SM') || code.endsWith('SH') || code.endsWith('SO')) {
-        groups[2].items.push(shift);
-      } else if (type.includes('tag') || code.includes('RT1') || code.includes('RT3') || code === 'RTH') {
-        groups[1].items.push(shift);
-      } else if (type.includes('früh') || code.includes('RF') || code.endsWith('FM') || code.endsWith('FH') || code.endsWith('FO')) {
-        groups[0].items.push(shift);
-      } else {
-        groups[4].items.push(shift);
-      }
-    });
-
-    return groups.filter(g => g.items.length > 0);
-  }, [currentDayShifts]);
-
-  // Total colleagues on duty for selected day
-  const dutyCount = useMemo(() => {
-    const raw = roster.shiftsByDate?.[selectedDate] || [];
-    return raw.filter(s => !s.isVacation).length;
-  }, [roster, selectedDate]);
-
   // Formatted date string
   const formattedSelectedDate = useMemo(() => {
     try {
@@ -129,36 +92,41 @@ export default function TeamRoster() {
       return d.toLocaleDateString('de-DE', {
         weekday: 'short',
         day: 'numeric',
-        month: 'long',
-        year: 'numeric'
+        month: 'short'
       });
     } catch {
       return selectedDate;
     }
   }, [selectedDate]);
 
-  // Handle Screenshot Upload
+  // Handle File Upload (PDF or Image)
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadError(null);
     setIsProcessing(true);
-    setUploadProgress(10);
+    setUploadProgress(15);
 
     try {
-      const previewUrl = URL.createObjectURL(file);
-      setUploadPreview(previewUrl);
+      let parsedRoster;
 
-      setUploadProgress(25);
-      const ocrText = await runTeamRosterOcr(file, progress => {
-        setUploadProgress(Math.min(90, 25 + Math.round(progress * 0.7)));
-      });
+      // 1. PDF File Upload (Direct Vector Text - 100% Precision)
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        setUploadProgress(30);
+        parsedRoster = await parseCareManPdf(file, p => {
+          setUploadProgress(Math.min(85, 30 + Math.round(p * 0.5)));
+        });
+      } else {
+        // 2. Image / Screenshot Upload (OCR)
+        setUploadProgress(25);
+        const ocrText = await runTeamRosterOcr(file, progress => {
+          setUploadProgress(Math.min(90, 25 + Math.round(progress * 0.7)));
+        });
+        parsedRoster = parseTeamRoster(ocrText, yearMonth);
+      }
 
-      setUploadProgress(95);
-      const parsedRoster = parseTeamRoster(ocrText, yearMonth);
       setUploadProgress(100);
-
       setRoster(parsedRoster);
       saveActiveTeamRoster(parsedRoster);
 
@@ -168,23 +136,23 @@ export default function TeamRoster() {
       setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} aktualisiert (${parsedRoster.totalShifts} Schichten)!`);
     } catch (err) {
       console.error('Upload Error:', err);
-      setUploadError('Erkennungsfehler: Bitte prüfe das Bildformat.');
+      setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe das Dateiformat.'));
       setIsProcessing(false);
     }
   };
 
   return (
-    <div className="team-roster-container pb-28 max-w-xl mx-auto px-2">
+    <div className="team-roster-container pb-28 max-w-lg mx-auto px-3">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500/95 text-white px-5 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 backdrop-blur-md text-xs font-semibold animate-fadeIn">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-5 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 backdrop-blur-md text-xs font-semibold animate-fadeIn">
           <CheckCircle2 size={16} />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Top Header: Title & Upload Button */}
-      <div className="flex items-center justify-between gap-2 pt-1 pb-3">
+      <div className="flex items-center justify-between gap-2 pt-2 pb-3">
         <div className="flex items-center gap-2">
           <Users className="text-sky-400" size={22} />
           <h1 className="text-xl font-bold text-white tracking-tight">
@@ -194,7 +162,7 @@ export default function TeamRoster() {
 
         <button
           onClick={() => setIsUploadOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-sky-400 hover:text-sky-300 border border-slate-700 text-xs font-medium transition-all active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-400 hover:text-sky-300 border border-slate-700 text-xs font-medium transition-all active:scale-95"
           title="Neuen Dienstplan hochladen"
         >
           <UploadCloud size={15} />
@@ -202,47 +170,35 @@ export default function TeamRoster() {
         </button>
       </div>
 
-      {/* Clean Date Stepper Bar */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2.5 mb-3 backdrop-blur-md flex items-center justify-between gap-1 shadow-sm">
+      {/* Rock-solid Single-Row Date Stepper */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-2 px-3 mb-3 backdrop-blur-md flex items-center justify-between gap-2 shadow-sm">
         <button
           onClick={handlePrevDay}
-          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition-all shrink-0"
+          className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition-all shrink-0"
           title="Vorheriger Tag"
         >
           <ChevronLeft size={20} />
         </button>
 
-        {/* Clickable Date Display with hidden native date input */}
-        <div
-          onClick={() => dateInputRef.current?.showPicker ? dateInputRef.current.showPicker() : dateInputRef.current?.focus()}
-          className="flex-1 text-center cursor-pointer py-1 px-2 rounded-xl hover:bg-slate-800/50 transition-colors relative"
-          title="Klicken, um Datum zu wählen"
-        >
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={selectedDate}
-            onChange={e => e.target.value && setSelectedDate(e.target.value)}
-            className="absolute inset-0 opacity-0 pointer-events-none w-full h-full"
-          />
-          <div className="text-sm font-bold text-white flex items-center justify-center gap-1.5">
-            <span>{formattedSelectedDate}</span>
-          </div>
-          <div className="text-[11px] text-slate-400 font-medium mt-0.5">
-            {dutyCount} {dutyCount === 1 ? 'Kollege' : 'Kollegen'} im Dienst
-          </div>
+        <div className="flex items-center justify-center gap-2 min-w-0">
+          <span className="text-sm font-bold text-white truncate">
+            {formattedSelectedDate}
+          </span>
+          <span className="text-xs text-slate-400 shrink-0">
+            • {currentDayShifts.length} im Dienst
+          </span>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={handleToday}
-            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-sky-400 hover:bg-slate-700 active:scale-95 transition-all"
+            className="px-2 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-sky-400 hover:bg-slate-700 active:scale-95 transition-all"
           >
             Heute
           </button>
           <button
             onClick={handleNextDay}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition-all shrink-0"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition-all shrink-0"
             title="Nächster Tag"
           >
             <ChevronRight size={20} />
@@ -257,8 +213,8 @@ export default function TeamRoster() {
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Kollege oder Schichtkürzel suchen..."
-          className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500/50 transition-all"
+          placeholder="Kollege oder Kürzel suchen..."
+          className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500/50 transition-all"
         />
         {searchQuery && (
           <button
@@ -270,9 +226,9 @@ export default function TeamRoster() {
         )}
       </div>
 
-      {/* Clean Reduced List: Grouped by Shift, Only Name & Shift Code */}
-      <div className="space-y-4">
-        {groupedShifts.length === 0 ? (
+      {/* Clean Flat List: Only Name & Shift Code */}
+      <div className="space-y-1">
+        {currentDayShifts.length === 0 ? (
           <div className="text-center py-12 bg-slate-900/40 border border-slate-800/60 rounded-2xl p-6">
             <p className="text-xs text-slate-400 font-medium">
               {searchQuery
@@ -289,64 +245,51 @@ export default function TeamRoster() {
             )}
           </div>
         ) : (
-          groupedShifts.map(group => (
-            <div key={group.key} className="space-y-1.5">
-              {/* Minimal Section Label */}
-              <div className="flex items-center justify-between px-1 text-xs text-slate-400 font-semibold">
-                <span>{group.label}</span>
-                <span className="text-[11px] text-slate-500 font-normal">
-                  {group.items.length}
-                </span>
-              </div>
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800/60 shadow-sm">
+            {currentDayShifts.map((shift, idx) => {
+              const colorInfo = getShiftColor('', shift.code);
+              const isJohannes = shift.name.toLowerCase().includes('backhaus');
 
-              {/* Rows: Just Name and Shift Code */}
-              <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl overflow-hidden divide-y divide-slate-800/60 shadow-sm">
-                {group.items.map((shift, idx) => {
-                  const colorInfo = getShiftColor(shift.shiftTypeName, shift.code, shift.station);
-                  const isJohannes = shift.name.toLowerCase().includes('backhaus');
-
-                  return (
-                    <div
-                      key={`${shift.name}-${idx}`}
-                      className={`flex items-center justify-between px-3.5 py-2.5 transition-colors ${
-                        isJohannes
-                          ? 'bg-sky-500/10 hover:bg-sky-500/15'
-                          : 'hover:bg-slate-800/40'
-                      }`}
-                    >
-                      {/* Colleague Name */}
-                      <div className="flex items-center gap-2 min-w-0 pr-2">
-                        <span className={`text-sm truncate ${isJohannes ? 'font-bold text-sky-300' : 'font-medium text-slate-200'}`}>
-                          {shift.name}
-                        </span>
-                        {isJohannes && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500 text-white font-extrabold shrink-0">
-                            Du
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Shift Code Badge with Station Color */}
-                      <span
-                        className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border shrink-0 tracking-wide"
-                        style={{
-                          background: colorInfo.bg,
-                          color: colorInfo.color,
-                          borderColor: colorInfo.border
-                        }}
-                      >
-                        {shift.code}
+              return (
+                <div
+                  key={`${shift.name}-${idx}`}
+                  className={`flex items-center justify-between px-3.5 py-2.5 transition-colors ${
+                    isJohannes
+                      ? 'bg-sky-500/15'
+                      : 'hover:bg-slate-800/40'
+                  }`}
+                >
+                  {/* Colleague Name */}
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className={`text-sm truncate ${isJohannes ? 'font-bold text-sky-300' : 'font-medium text-slate-200'}`}>
+                      {shift.name}
+                    </span>
+                    {isJohannes && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500 text-white font-extrabold shrink-0">
+                        Du
                       </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))
+                    )}
+                  </div>
+
+                  {/* Shift Code Badge with Station Color */}
+                  <span
+                    className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border shrink-0 tracking-wide"
+                    style={{
+                      background: colorInfo.bg,
+                      color: colorInfo.color,
+                      borderColor: colorInfo.border
+                    }}
+                  >
+                    {shift.code}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Upload Screenshot Modal */}
+      {/* Upload Screenshot / PDF Modal */}
       {isUploadOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-5 shadow-2xl space-y-4">
@@ -354,17 +297,16 @@ export default function TeamRoster() {
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <UploadCloud className="text-sky-400" size={18} />
-                  Dienstplan-Screenshot
+                  Dienstplan laden
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Neuen CareMan Monatsplan hochladen
+                  PDF (empfohlen) oder Screenshot auswählen
                 </p>
               </div>
               <button
                 onClick={() => {
                   if (!isProcessing) {
                     setIsUploadOpen(false);
-                    setUploadPreview(null);
                     setUploadError(null);
                   }
                 }}
@@ -386,28 +328,23 @@ export default function TeamRoster() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="application/pdf,image/*"
                 className="hidden"
                 onChange={handleFileChange}
               />
 
-              {uploadPreview ? (
-                <img
-                  src={uploadPreview}
-                  alt="Preview"
-                  className="max-h-32 mx-auto rounded-xl border border-slate-700 object-contain shadow-md"
-                />
-              ) : (
-                <div className="space-y-1.5">
-                  <UploadCloud size={24} className="mx-auto text-sky-400" />
-                  <div className="text-xs font-semibold text-slate-200">
-                    Bild auswählen
-                  </div>
-                  <p className="text-[10px] text-slate-500">
-                    CareMan Monatsplan (PNG, JPG)
-                  </p>
+              <div className="space-y-1.5">
+                <div className="flex justify-center gap-2 text-sky-400 mb-1">
+                  <FileText size={24} />
+                  <UploadCloud size={24} />
                 </div>
-              )}
+                <div className="text-xs font-semibold text-slate-200">
+                  CareMan Datei auswählen
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  <span className="text-emerald-400 font-medium">Tipp:</span> Als <strong className="text-white">PDF</strong> ausdrucken/speichern für 100% perfekte Erkennung!
+                </p>
+              </div>
             </div>
 
             {/* Processing Progress */}
@@ -416,7 +353,7 @@ export default function TeamRoster() {
                 <div className="flex items-center justify-between text-[11px] text-slate-300">
                   <span className="flex items-center gap-1.5 font-medium">
                     <Sparkles size={13} className="text-sky-400 animate-spin" />
-                    Wird verarbeitet...
+                    Dienstplan wird eingelesen...
                   </span>
                   <span className="font-mono text-sky-400 font-bold">{uploadProgress}%</span>
                 </div>
@@ -443,7 +380,6 @@ export default function TeamRoster() {
                 disabled={isProcessing}
                 onClick={() => {
                   setIsUploadOpen(false);
-                  setUploadPreview(null);
                   setUploadError(null);
                 }}
                 className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold disabled:opacity-50"

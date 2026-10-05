@@ -1,12 +1,12 @@
-// Automatisch generierter und verifizierter Team-Dienstplan für Oktober 2026
-// Basierend auf dem eingelesenen CareMan Dienstplan-Screenshot
+// Bereinigter und verifizierter Team-Dienstplan für Oktober 2026
+// Klarnamen ohne interne Abkuerzungen und ohne Fahrzeugzeilen
 
 export const OCTOBER_2026_TEAM_ROSTER = {
   yearMonth: '2026-10',
   monthLabel: 'Oktober 2026',
   daysInMonth: 31,
-  totalColleagues: 79,
-  totalShifts: 456,
+  totalColleagues: 76,
+  totalShifts: 450,
   colleagues: [
   {
     "name": "Ander-Oller, Lisa",
@@ -70,7 +70,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Brockhaus PFA, Katja",
+    "name": "Brockhaus, Katja",
     "shifts": {
       "2026-10-01": "RT1M",
       "2026-10-04": "R1-SJ",
@@ -154,7 +154,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Eichenseher FSJ, Mona",
+    "name": "Eichenseher, Mona",
     "shifts": {
       "2026-10-27": "C-M"
     }
@@ -227,7 +227,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Gloss FSJ, Petra",
+    "name": "Gloss, Petra",
     "shifts": {
       "2026-10-15": "RFM",
       "2026-10-25": "RT2M"
@@ -301,7 +301,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Günzl PFA, Uli",
+    "name": "Günzl, Uli",
     "shifts": {
       "2026-10-02": "RT1M",
       "2026-10-03": "RNM"
@@ -386,7 +386,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Janovic LA, Adrian",
+    "name": "Janovic, Adrian",
     "shifts": {
       "2026-10-03": "RSN"
     }
@@ -429,7 +429,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Keiser BFD, Mia",
+    "name": "Keiser, Mia",
     "shifts": {
       "2026-10-26": "RFM",
       "2026-10-27": "RT1M",
@@ -474,7 +474,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Kotsifa PFA, Kilian",
+    "name": "Kotsifa, Kilian",
     "shifts": {
       "2026-10-19": "RT1M",
       "2026-10-25": "RT4M"
@@ -495,7 +495,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Lehner PFA, Max",
+    "name": "Lehner, Max",
     "shifts": {
       "2026-10-02": "RS4P",
       "2026-10-03": "RFM",
@@ -533,7 +533,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Mösche LA, Tobias",
+    "name": "Mösche, Tobias",
     "shifts": {
       "2026-10-19": "RFM"
     }
@@ -560,21 +560,6 @@ export const OCTOBER_2026_TEAM_ROSTER = {
       "2026-10-25": "RTM",
       "2026-10-30": "ACLS",
       "2026-10-31": "ACLS"
-    }
-  },
-  {
-    "name": "Notfallsanitäterkurs, NFS 1",
-    "shifts": {
-      "2026-10-02": "RNM",
-      "2026-10-07": "RT2M",
-      "2026-10-08": "RFM"
-    }
-  },
-  {
-    "name": "Notfallsanitäterkurs, NFS 2",
-    "shifts": {
-      "2026-10-20": "RT2M",
-      "2026-10-29": "RNM"
     }
   },
   {
@@ -611,19 +596,13 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Parkopff, NFS 1",
-    "shifts": {
-      "2026-10-03": "RNM"
-    }
-  },
-  {
     "name": "Paulwe B.f., Desiree",
     "shifts": {
       "2026-10-31": "RT1M"
     }
   },
   {
-    "name": "Pietsch BFD, Amanda",
+    "name": "Pietsch, Amanda",
     "shifts": {
       "2026-10-17": "RFM",
       "2026-10-18": "RT1M",
@@ -702,7 +681,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Runge EA, Thomas",
+    "name": "Runge, Thomas",
     "shifts": {
       "2026-10-13": "RT1M",
       "2026-10-30": "RSM"
@@ -736,7 +715,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Schulz PFA, Fabian",
+    "name": "Schulz, Fabian",
     "shifts": {
       "2026-10-03": "RS4P",
       "2026-10-12": "RFM",
@@ -768,7 +747,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Schütze BFD, Amelie",
+    "name": "Schütze, Amelie",
     "shifts": {
       "2026-10-05": "RT1M",
       "2026-10-06": "RT1M",
@@ -799,7 +778,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Traunmüller FSJ, Alexander",
+    "name": "Traunmüller, Alexander",
     "shifts": {
       "2026-10-15": "RFM",
       "2026-10-19": "RT1M",
@@ -834,7 +813,7 @@ export const OCTOBER_2026_TEAM_ROSTER = {
     }
   },
   {
-    "name": "Vockentanz EA, Corin",
+    "name": "Vockentanz, Corin",
     "shifts": {
       "2026-10-21": "R-SAN"
     }
@@ -863,4623 +842,1863 @@ export const OCTOBER_2026_TEAM_ROSTER = {
   shiftsByDate: {
   "2026-10-01": [
     {
-      "name": "Gläzner, Anouk",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Brockhaus PFA, Katja",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "FFO",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Obersendling",
-      "startTime": "07:54",
-      "endTime": "16:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "RHM",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Brockhaus, Katja",
+      "code": "RT1M"
     },
     {
       "name": "Cecelemovic, Jonas",
-      "code": "RS2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RS2M"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Cramer-Tschirnich, Stephan",
+      "code": "RT1M"
+    },
+    {
+      "name": "Dönch, Isabel",
+      "code": "RHM"
     },
     {
       "name": "Föst, Angela",
-      "code": "RSO",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Obersendling",
-      "startTime": "15:54",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSO"
     },
     {
-      "name": "Roidley, Dr., Nils",
-      "code": "RSO",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Obersendling",
-      "startTime": "15:54",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gläzner, Anouk",
+      "code": "RFH"
     },
     {
       "name": "Richter, Annemarie Felicitas",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
+    },
+    {
+      "name": "Roidley, Dr., Nils",
+      "code": "RSO"
     },
     {
       "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "FFO"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RT2M"
     }
   ],
   "2026-10-02": [
     {
-      "name": "Gläzner, Anouk",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Cecelemovic, Jonas",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gosenick, Patrick",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Günzl PFA, Uli",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kniaze, Ludwig",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Richter, Annemarie Felicitas",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Eyer B.f., Leonie",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Igl, Korbinian",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehner PFA, Max",
-      "code": "RS4P",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Roidley, Dr., Nils",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ponath B.f., Florian",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
     },
     {
       "name": "Föst, Angela",
-      "code": "RSO",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Obersendling",
-      "startTime": "15:54",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSO"
     },
     {
-      "name": "Notfallsanitäterkurs, NFS 1",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gläzner, Anouk",
+      "code": "RFH"
+    },
+    {
+      "name": "Gosenick, Patrick",
+      "code": "RFM"
+    },
+    {
+      "name": "Günzl, Uli",
+      "code": "RT1M"
+    },
+    {
+      "name": "Igl, Korbinian",
+      "code": "RT2M"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Kniaze, Ludwig",
+      "code": "RT1M"
+    },
+    {
+      "name": "Lehner, Max",
+      "code": "RS4P"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RFM"
+    },
+    {
+      "name": "Ponath B.f., Florian",
+      "code": "RT4M"
+    },
+    {
+      "name": "Richter, Annemarie Felicitas",
+      "code": "RFM"
+    },
+    {
+      "name": "Roidley, Dr., Nils",
+      "code": "RT2M"
     },
     {
       "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RSM"
     }
   ],
   "2026-10-03": [
     {
+      "name": "Ander-Oller, Lisa",
+      "code": "RSM"
+    },
+    {
       "name": "Cecelemovic, Jonas",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Eckl, Miriam",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Grabmaier, Adrian",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehner PFA, Max",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ander-Oller, Lisa",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Igl, Korbinian",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Janovic LA, Adrian",
-      "code": "RSN",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Roschlauck, Nils",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schulz PFA, Fabian",
-      "code": "RS4P",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Vescovi-Geier, Stefan",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Geisler, Sophie-Marie",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
-      "name": "Günzl PFA, Uli",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Grabmaier, Adrian",
+      "code": "RT1M"
+    },
+    {
+      "name": "Günzl, Uli",
+      "code": "RNM"
+    },
+    {
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
+    },
+    {
+      "name": "Igl, Korbinian",
+      "code": "RSM"
+    },
+    {
+      "name": "Janovic, Adrian",
+      "code": "RSN"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "RT1M"
     },
     {
       "name": "Körner, David",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
-      "name": "Parkopff, NFS 1",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Lehner, Max",
+      "code": "RFM"
+    },
+    {
+      "name": "Roschlauck, Nils",
+      "code": "RSM"
+    },
+    {
+      "name": "Schulz, Fabian",
+      "code": "RS4P"
     },
     {
       "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RT1M"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Vescovi-Geier, Stefan",
+      "code": "RSM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RSM"
     }
   ],
   "2026-10-04": [
     {
-      "name": "Gläzner, Anouk",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Ander-Oller, Lisa",
+      "code": "F-SJ"
     },
     {
       "name": "Brandl, Alexander",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
+    },
+    {
+      "name": "Brockhaus, Katja",
+      "code": "R1-SJ"
     },
     {
       "name": "Eckl, Miriam",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Gallhuber, Nico",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
-      "name": "Ander-Oller, Lisa",
-      "code": "F-SJ",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Brockhaus PFA, Katja",
-      "code": "R1-SJ",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gläzner, Anouk",
+      "code": "RFH"
     },
     {
       "name": "Kiebinger, Michael",
-      "code": "RSN",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSN"
     },
     {
-      "name": "Lehner PFA, Max",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Lehner, Max",
+      "code": "RSM"
     },
     {
       "name": "Richter, Annemarie Felicitas",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
     },
     {
       "name": "Stückgen, Jasmin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
       "name": "Vescovi-Geier, Stefan",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
     }
   ],
   "2026-10-05": [
     {
-      "name": "Beck, Vitus",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Brandl, Alexander",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Brockhaus PFA, Katja",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kaouache, Ali",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schütze BFD, Amelie",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "R-M",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Beck, Felix",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
+    },
+    {
+      "name": "Beck, Vitus",
+      "code": "RT1M"
     },
     {
       "name": "Blochwitz, Phil",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
-      "name": "Häßler, Alexandra",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Brandl, Alexander",
+      "code": "RFM"
     },
     {
-      "name": "Richter, Annemarie Felicitas",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehner PFA, Max",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Brockhaus, Katja",
+      "code": "RFM"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
+    },
+    {
+      "name": "Dönch, Isabel",
+      "code": "RT1M"
+    },
+    {
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
+    },
+    {
+      "name": "Häßler, Alexandra",
+      "code": "RSM"
     },
     {
       "name": "Ivanovic, Aneas",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kaouache, Ali",
+      "code": "RFM"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "R-M"
+    },
+    {
+      "name": "Lehner, Max",
+      "code": "RT4M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RFM"
+    },
+    {
+      "name": "Richter, Annemarie Felicitas",
+      "code": "RT2M"
+    },
+    {
+      "name": "Schütze, Amelie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RSM"
     }
   ],
   "2026-10-06": [
     {
+      "name": "Beck, Felix",
+      "code": "RT2M"
+    },
+    {
       "name": "Brandl, Alexander",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Danner, Maximilian",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kaouache, Ali",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Langguth, Florian",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehner PFA, Max",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schütze BFD, Amelie",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schmidbaur, Moritz",
-      "code": "SMT",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Beck, Felix",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Richter, Annemarie Felicitas",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "IO"
     },
     {
       "name": "Ivanovic, Aneas",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kaouache, Ali",
+      "code": "RFM"
+    },
+    {
+      "name": "Langguth, Florian",
+      "code": "RFM"
+    },
+    {
+      "name": "Lehner, Max",
+      "code": "RFM"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RNM"
+    },
+    {
+      "name": "Richter, Annemarie Felicitas",
+      "code": "RT2M"
+    },
+    {
+      "name": "Schmidbaur, Moritz",
+      "code": "SMT"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RNM"
+    },
+    {
+      "name": "Schütze, Amelie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RFM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RSM"
     }
   ],
   "2026-10-07": [
     {
-      "name": "Brandl, Alexander",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kaouache, Ali",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Langguth, Florian",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehner PFA, Max",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schütze BFD, Amelie",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Beck, Vitus",
-      "code": "RS2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RS2M"
+    },
+    {
+      "name": "Brandl, Alexander",
+      "code": "RT1M"
     },
     {
       "name": "Geisler, Sophie-Marie",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
     },
     {
       "name": "Gläzner, Anouk",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
     },
     {
-      "name": "Notfallsanitäterkurs, NFS 1",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kaouache, Ali",
+      "code": "RT1M"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Langguth, Florian",
+      "code": "RFM"
+    },
+    {
+      "name": "Lehner, Max",
+      "code": "RT1M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RNM"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RNM"
+    },
+    {
+      "name": "Schütze, Amelie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RT4M"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RFM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RSM"
     }
   ],
   "2026-10-08": [
     {
-      "name": "Brandl, Alexander",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kaouache, Ali",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehner PFA, Max",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Notfallsanitäterkurs, NFS 1",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schütze BFD, Amelie",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Beck, Vitus",
-      "code": "RCM",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RCM"
+    },
+    {
+      "name": "Brandl, Alexander",
+      "code": "RT1M"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RCM",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RCM"
     },
     {
       "name": "Geisler, Sophie-Marie",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kaouache, Ali",
+      "code": "RT1M"
+    },
+    {
+      "name": "Lehner, Max",
+      "code": "RFM"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RNM"
+    },
+    {
+      "name": "Schütze, Amelie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RT2M"
     }
   ],
   "2026-10-09": [
     {
-      "name": "Urbani, Gavin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehmann in der Maloschen, Corinna",
-      "code": "SW1",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehner PFA, Max",
-      "code": "RS4P",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
       "name": "Danner, Maximilian",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
-      "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Ivanovic, Aneas",
+      "code": "RSM"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Lehmann in der Maloschen, Corinna",
+      "code": "SW1"
+    },
+    {
+      "name": "Lehner, Max",
+      "code": "RS4P"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RNM"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RFM"
     }
   ],
   "2026-10-10": [
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
-      "name": "Lehner PFA, Max",
-      "code": "RS4P",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Lehner, Max",
+      "code": "RS4P"
     },
     {
       "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     }
   ],
   "2026-10-11": [],
   "2026-10-12": [
     {
-      "name": "Gläzner, Lucas",
-      "code": "RT1H",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Beck, Felix",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Beck, Vitus",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Langguth, Florian",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schulz PFA, Fabian",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schmidbaur, Moritz",
-      "code": "RAJ",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Reisinger, Eva",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
-      "name": "Nickels, Fynn Jamie",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gläzner, Anouk",
+      "code": "RSH"
+    },
+    {
+      "name": "Gläzner, Lucas",
+      "code": "RT1H"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RT1M"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
     },
     {
       "name": "Kaouache, Ali",
-      "code": "VFU",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "VFU"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Langguth, Florian",
+      "code": "RT1M"
+    },
+    {
+      "name": "Nickels, Fynn Jamie",
+      "code": "RSM"
+    },
+    {
+      "name": "Reisinger, Eva",
+      "code": "RTH"
+    },
+    {
+      "name": "Schmidbaur, Moritz",
+      "code": "RAJ"
+    },
+    {
+      "name": "Schulz, Fabian",
+      "code": "RFM"
     }
   ],
   "2026-10-13": [
     {
+      "name": "Brockhaus, Katja",
+      "code": "V-B"
+    },
+    {
       "name": "Cecelemovic, Jonas",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Runge EA, Thomas",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Reisinger, Eva",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Eckl, Miriam",
-      "code": "RCM",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Lucas",
-      "code": "RT2H",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ramberg, Simon",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
+    },
+    {
+      "name": "Eckl, Miriam",
+      "code": "RCM"
     },
     {
       "name": "Gallhuber, Nico",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
+    },
+    {
+      "name": "Gigl, Tobias",
+      "code": "RFM"
+    },
+    {
+      "name": "Gläzner, Lucas",
+      "code": "RT2H"
     },
     {
       "name": "Hellstern, Robin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
-      "name": "Müller, Maximilian",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Brockhaus PFA, Katja",
-      "code": "V-B",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RSM"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RSM"
+    },
+    {
+      "name": "Ramberg, Simon",
+      "code": "RSH"
+    },
+    {
+      "name": "Reisinger, Eva",
+      "code": "RTH"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RSM"
+    },
+    {
+      "name": "Runge, Thomas",
+      "code": "RT1M"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RNM"
     }
   ],
   "2026-10-14": [
     {
-      "name": "Brockhaus PFA, Katja",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Backhaus, Johannes",
+      "code": "RSM"
+    },
+    {
+      "name": "Brockhaus, Katja",
+      "code": "RT1M"
     },
     {
       "name": "Cecelemovic, Jonas",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Eckl, Miriam",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Vescovi-Geier, Stefan",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RCM",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RCM"
+    },
+    {
+      "name": "Eckl, Miriam",
+      "code": "RFM"
     },
     {
       "name": "Gigl, Tobias",
-      "code": "R-M",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Backhaus, Johannes",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "R-M"
     },
     {
       "name": "Gläzner, Lucas",
-      "code": "RNH",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNH"
     },
     {
-      "name": "Rochow, Kirsten",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Hellstern, Robin",
+      "code": "RSM"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
+    },
+    {
+      "name": "Ivanovic, Aneas",
+      "code": "RT1M"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RSM"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RT1M"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RNM"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Vescovi-Geier, Stefan",
+      "code": "RFM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RNM"
     }
   ],
   "2026-10-15": [
     {
-      "name": "Brockhaus PFA, Katja",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Eckl, Miriam",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gloss FSJ, Petra",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Traunmüller FSJ, Alexander",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehmann in der Maloschen, Corinna",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Leimeritz, Tim",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
+      "name": "Brockhaus, Katja",
+      "code": "RT1M"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RCM",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RCM"
+    },
+    {
+      "name": "Dönch, Isabel",
+      "code": "PALS"
+    },
+    {
+      "name": "Eckl, Miriam",
+      "code": "RFM"
+    },
+    {
+      "name": "Gigl, Tobias",
+      "code": "RFM"
+    },
+    {
+      "name": "Gloss, Petra",
+      "code": "RFM"
     },
     {
       "name": "Gläzner, Anouk",
-      "code": "RCM",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RS4",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Vescovi-Geier, Stefan",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RCM"
     },
     {
       "name": "Gläzner, Lucas",
-      "code": "RNH",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNH"
     },
     {
-      "name": "Rochow, Kirsten",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Hellstern, Robin",
+      "code": "RFM"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Lehmann in der Maloschen, Corinna",
+      "code": "PALS"
+    },
+    {
+      "name": "Leimeritz, Tim",
+      "code": "PALS"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RS4"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RT4M"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RNM"
+    },
+    {
+      "name": "Traunmüller, Alexander",
+      "code": "RFM"
+    },
+    {
+      "name": "Vescovi-Geier, Stefan",
+      "code": "RT2M"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RNM"
     }
   ],
   "2026-10-16": [
     {
       "name": "Beck, Vitus",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
-      "name": "Kokot, Fabian",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Brockhaus, Katja",
+      "code": "RSM"
     },
     {
       "name": "Dönch, Isabel",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Lehmann in der Maloschen, Corinna",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Leimeritz, Tim",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Brockhaus PFA, Katja",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "PALS"
     },
     {
       "name": "Hellstern, Robin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
       "name": "Ivanovic, Aneas",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Reisinger, Eva",
-      "code": "RNH",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT4M"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
     },
     {
       "name": "Kaouache, Ali",
-      "code": "VFU",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "VFU"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Kokot, Fabian",
+      "code": "RT1M"
+    },
+    {
+      "name": "Lehmann in der Maloschen, Corinna",
+      "code": "PALS"
+    },
+    {
+      "name": "Leimeritz, Tim",
+      "code": "PALS"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RT2M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "PALS"
+    },
+    {
+      "name": "Reisinger, Eva",
+      "code": "RNH"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RNM"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "PALS"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RFM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RNM"
     }
   ],
   "2026-10-17": [
     {
-      "name": "Greif, Nick Jonathan",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Grollikurth, Simon",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gruber, Elena",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Backhaus, Johannes",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Nickels, Fynn Jamie",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Pietsch BFD, Amanda",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Ramberg, Simon",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Brockhaus PFA, Katja",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schmidbaur, Moritz",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Dönch, Isabel",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Beck, Vitus",
-      "code": "UDN",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "UDN"
+    },
+    {
+      "name": "Brockhaus, Katja",
+      "code": "RSM"
+    },
+    {
+      "name": "Dönch, Isabel",
+      "code": "RNM"
+    },
+    {
+      "name": "Greif, Nick Jonathan",
+      "code": "RFH"
+    },
+    {
+      "name": "Grollikurth, Simon",
+      "code": "RFH"
+    },
+    {
+      "name": "Gruber, Elena",
+      "code": "RFH"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RSM"
+    },
+    {
+      "name": "Ivanovic, Aneas",
+      "code": "RT2M"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RT4M"
+    },
+    {
+      "name": "Nickels, Fynn Jamie",
+      "code": "RT1M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "PALS"
+    },
+    {
+      "name": "Pietsch, Amanda",
+      "code": "RFM"
+    },
+    {
+      "name": "Ramberg, Simon",
+      "code": "RTH"
+    },
+    {
+      "name": "Schmidbaur, Moritz",
+      "code": "RT2M"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "PALS"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RSM"
     }
   ],
   "2026-10-18": [
     {
-      "name": "Gruber, Elena",
-      "code": "RT1H",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ramberg, Simon",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Pietsch BFD, Amanda",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Lucas",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Gremme, Lisa Marie",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Grollikurth, Simon",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Greif, Nick Jonathan",
-      "code": "RNH",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Dönch, Isabel",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Gigl, Tobias",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
+    },
+    {
+      "name": "Gläzner, Anouk",
+      "code": "RT1M"
+    },
+    {
+      "name": "Gläzner, Lucas",
+      "code": "PALS"
+    },
+    {
+      "name": "Greif, Nick Jonathan",
+      "code": "RNH"
+    },
+    {
+      "name": "Gremme, Lisa Marie",
+      "code": "PALS"
+    },
+    {
+      "name": "Grollikurth, Simon",
+      "code": "RSH"
+    },
+    {
+      "name": "Gruber, Elena",
+      "code": "RT1H"
+    },
+    {
+      "name": "Pietsch, Amanda",
+      "code": "RT1M"
+    },
+    {
+      "name": "Ramberg, Simon",
+      "code": "RFH"
     }
   ],
   "2026-10-19": [
     {
+      "name": "Cecelemovic, Jonas",
+      "code": "V07-b"
+    },
+    {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kotsifa PFA, Kilian",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Mösche LA, Tobias",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Pietsch BFD, Amanda",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Traunmüller FSJ, Alexander",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "FFO",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Obersendling",
-      "startTime": "07:54",
-      "endTime": "16:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Lucas",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Gremme, Lisa Marie",
-      "code": "PALS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Gruber, Elena",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Reisinger, Eva",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ponath B.f., Florian",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Dönch, Isabel",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gläzner, Anouk",
+      "code": "RT1M"
     },
     {
-      "name": "Schifferl, Christian",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gläzner, Lucas",
+      "code": "PALS"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gremme, Lisa Marie",
+      "code": "PALS"
     },
     {
-      "name": "Cecelemovic, Jonas",
-      "code": "V07-b",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "name": "Gruber, Elena",
+      "code": "RTH"
+    },
+    {
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Kotsifa, Kilian",
+      "code": "RT1M"
+    },
+    {
+      "name": "Mösche, Tobias",
+      "code": "RFM"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RNM"
+    },
+    {
+      "name": "Pietsch, Amanda",
+      "code": "RFM"
+    },
+    {
+      "name": "Ponath B.f., Florian",
+      "code": "RT4M"
+    },
+    {
+      "name": "Reisinger, Eva",
+      "code": "RSH"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RSM"
+    },
+    {
+      "name": "Schifferl, Christian",
+      "code": "RNM"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RT2M"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "FFO"
+    },
+    {
+      "name": "Traunmüller, Alexander",
+      "code": "RT1M"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RNM"
     }
   ],
   "2026-10-20": [
     {
+      "name": "Cecelemovic, Jonas",
+      "code": "V07-b"
+    },
+    {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Pietsch BFD, Amanda",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Traunmüller FSJ, Alexander",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "FFO",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Obersendling",
-      "startTime": "07:54",
-      "endTime": "16:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Leimeritz, Tim",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Notfallsanitäterkurs, NFS 2",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Dönch, Isabel",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Gigl, Tobias",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gläzner, Anouk",
+      "code": "RT2M"
     },
     {
-      "name": "Schifferl, Christian",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Hellstern, Robin",
+      "code": "RT1M"
     },
     {
-      "name": "Urbani, Gavin",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Cecelemovic, Jonas",
-      "code": "V07-b",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Leimeritz, Tim",
+      "code": "RSM"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RFM"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RNM"
+    },
+    {
+      "name": "Pietsch, Amanda",
+      "code": "RT1M"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RSM"
+    },
+    {
+      "name": "Schifferl, Christian",
+      "code": "RNM"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RT1M"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "FFO"
+    },
+    {
+      "name": "Traunmüller, Alexander",
+      "code": "RT1M"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RNM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RNM"
     }
   ],
   "2026-10-21": [
     {
-      "name": "Gläzner, Anouk",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Pietsch BFD, Amanda",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gremme, Lisa Marie",
-      "code": "RZF",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Vockentanz EA, Corin",
-      "code": "R-SAN",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Reisinger, Eva",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Cecelemovic, Jonas",
+      "code": "V07-b"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Gallhuber, Nico",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Gigl, Tobias",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
-      "name": "Cecelemovic, Jonas",
-      "code": "V07-b",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "name": "Gläzner, Anouk",
+      "code": "RT1M"
+    },
+    {
+      "name": "Gremme, Lisa Marie",
+      "code": "RZF"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RT1M"
+    },
+    {
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
       "name": "Ivanovic, Aneas",
-      "code": "UDN",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "UDN"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RFM"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RSM"
+    },
+    {
+      "name": "Pietsch, Amanda",
+      "code": "RFM"
+    },
+    {
+      "name": "Reisinger, Eva",
+      "code": "RTH"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RT2M"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RFM"
+    },
+    {
+      "name": "Vockentanz, Corin",
+      "code": "R-SAN"
     }
   ],
   "2026-10-22": [
     {
-      "name": "Hellstern, Robin",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Müller, Maximilian",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Greif, Nick Jonathan",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ramberg, Simon",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Häßler, Alexandra",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Cecelemovic, Jonas",
+      "code": "V07-b"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Gigl, Tobias",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
+    },
+    {
+      "name": "Gläzner, Anouk",
+      "code": "RT2M"
+    },
+    {
+      "name": "Greif, Nick Jonathan",
+      "code": "RTH"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RT1M"
+    },
+    {
+      "name": "Häßler, Alexandra",
+      "code": "RT2M"
     },
     {
       "name": "Ivanovic, Aneas",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Cecelemovic, Jonas",
-      "code": "V07-b",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "RNM"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RT1M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RSM"
+    },
+    {
+      "name": "Ramberg, Simon",
+      "code": "RTH"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RT1M"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RT1M"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RSH"
     }
   ],
   "2026-10-23": [
     {
-      "name": "Ramberg, Simon",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Greif, Nick Jonathan",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gigl, Tobias",
+      "code": "RNM"
     },
     {
       "name": "Gläzner, Lucas",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Greif, Nick Jonathan",
+      "code": "RTH"
     },
     {
       "name": "Hellstern, Robin",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT4M"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RNM"
+    },
+    {
+      "name": "Ramberg, Simon",
+      "code": "RFH"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RNM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RT2M"
     }
   ],
   "2026-10-24": [
     {
-      "name": "Müller, Maximilian",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Greif, Nick Jonathan",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Gigl, Tobias",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
       "name": "Gläzner, Lucas",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
+    },
+    {
+      "name": "Greif, Nick Jonathan",
+      "code": "RSH"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Müller, Maximilian",
+      "code": "RFM"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RSM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RT1M"
     }
   ],
   "2026-10-25": [
     {
-      "name": "Schumacher, Tassilo",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Geisler, Sophie-Marie",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schulz PFA, Fabian",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
       "name": "Beck, Vitus",
-      "code": "RCM",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gloss FSJ, Petra",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Merla, Patrick",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Nickels, Fynn Jamie",
-      "code": "RTM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kotsifa PFA, Kilian",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RCM"
     },
     {
       "name": "Gallhuber, Nico",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
-      "name": "Schloder, Darius",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Geisler, Sophie-Marie",
+      "code": "RFM"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gigl, Tobias",
+      "code": "RFM"
+    },
+    {
+      "name": "Gloss, Petra",
+      "code": "RT2M"
+    },
+    {
+      "name": "Gläzner, Anouk",
+      "code": "RSH"
     },
     {
       "name": "Kaouache, Ali",
-      "code": "VFU",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "VFU"
+    },
+    {
+      "name": "Kotsifa, Kilian",
+      "code": "RT4M"
+    },
+    {
+      "name": "Merla, Patrick",
+      "code": "RSM"
+    },
+    {
+      "name": "Nickels, Fynn Jamie",
+      "code": "RTM"
+    },
+    {
+      "name": "Schloder, Darius",
+      "code": "RNM"
+    },
+    {
+      "name": "Schulz, Fabian",
+      "code": "RFM"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RFH"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RNM"
     }
   ],
   "2026-10-26": [
     {
+      "name": "Beck, Felix",
+      "code": "RSM"
+    },
+    {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Gigl, Tobias",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Igl, Korbinian",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Keiser BFD, Mia",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Grollikurth, Simon",
-      "code": "RHH",
-      "shiftTypeName": "Tagdienst",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Beck, Felix",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Gläzner, Anouk",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
     },
     {
-      "name": "Odorfer, Viviane",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Grollikurth, Simon",
+      "code": "RHH"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
-      "name": "Schumacher, Tassilo",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Igl, Korbinian",
+      "code": "RFM"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Ivanovic, Aneas",
+      "code": "RFM"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Keiser, Mia",
+      "code": "RFM"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Odorfer, Viviane",
+      "code": "RT2M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RT2M"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RSH"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RSM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RNM"
     }
   ],
   "2026-10-27": [
     {
+      "name": "Beck, Vitus",
+      "code": "V-B"
+    },
+    {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Keiser BFD, Mia",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Eichenseher FSJ, Mona",
-      "code": "C-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Odorfer, Viviane",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Grollikurth, Simon",
-      "code": "RNH",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Dönch, Isabel",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RNM"
     },
     {
-      "name": "Zehetmair, Thilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Eichenseher, Mona",
+      "code": "C-M"
     },
     {
-      "name": "Beck, Vitus",
-      "code": "V-B",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "name": "Gläzner, Anouk",
+      "code": "RSM"
+    },
+    {
+      "name": "Grollikurth, Simon",
+      "code": "RNH"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RT1M"
+    },
+    {
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Keiser, Mia",
+      "code": "RT1M"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Odorfer, Viviane",
+      "code": "RT2M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RSM"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RT2M"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RNM"
     }
   ],
   "2026-10-28": [
     {
+      "name": "Beck, Felix",
+      "code": "RSM"
+    },
+    {
       "name": "Beck, Vitus",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Dönch, Isabel",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Keiser BFD, Mia",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "NFO",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Obersendling",
-      "startTime": "07:54",
-      "endTime": "16:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Beck, Felix",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Hellstern, Robin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
       "name": "Igl, Korbinian",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Odorfer, Viviane",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Keiser, Mia",
+      "code": "RFM"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Odorfer, Viviane",
+      "code": "RT2M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RNM"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "NFO"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RNM"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RFM"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RT2M"
     }
   ],
   "2026-10-29": [
     {
       "name": "Backhaus, Johannes",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Keiser BFD, Mia",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schell, Anna-Lena",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Härtl, Karl-Heinz",
-      "code": "IO",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Obersendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Beck, Felix",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
       "name": "Beck, Vitus",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
       "name": "Dönch, Isabel",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT2M"
+    },
+    {
+      "name": "Härtl, Karl-Heinz",
+      "code": "IO"
     },
     {
       "name": "Igl, Korbinian",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Notfallsanitäterkurs, NFS 2",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ostwald, Philco",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RSM"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Keiser, Mia",
+      "code": "RT1M"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RNM"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RT1M"
+    },
+    {
+      "name": "Schell, Anna-Lena",
+      "code": "RT1M"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RNM"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "RFM"
+    },
+    {
+      "name": "Urbani, Gavin",
+      "code": "RT2M"
     }
   ],
   "2026-10-30": [
     {
       "name": "Backhaus, Johannes",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RFM"
     },
     {
       "name": "Beck, Felix",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Cramer-Tschirnich, Stephan",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Gläzner, Anouk",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Ivanovic, Aneas",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Keiser BFD, Mia",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Stückgen, Jasmin",
-      "code": "FFO",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Obersendling",
-      "startTime": "07:54",
-      "endTime": "16:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT1M"
     },
     {
       "name": "Geisler, Sophie-Marie",
-      "code": "ACLS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
+      "code": "ACLS"
     },
     {
       "name": "Gigl, Tobias",
-      "code": "ACLS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
+      "code": "ACLS"
     },
     {
-      "name": "Kiebinger, Michael",
-      "code": "F-M",
-      "shiftTypeName": "Sonderdienst",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Kokot, Fabian",
-      "code": "ACLS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Nickels, Fynn Jamie",
-      "code": "ACLS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Rochow, Kirsten",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Runge EA, Thomas",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Gläzner, Anouk",
+      "code": "RT1M"
     },
     {
       "name": "Hausteit, Florian",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT4M"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RFM"
     },
     {
       "name": "Igl, Korbinian",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT4M"
     },
     {
-      "name": "Ostwald, Philco",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Schumacher, Tassilo",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Ivanovic, Aneas",
+      "code": "RT1M"
     },
     {
       "name": "Kadafeh Ivan, Constantin",
-      "code": "V030",
-      "shiftTypeName": "Urlaub / Freistellung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "16:30",
-      "isTraining": false,
-      "isVacation": true
+      "code": "V030"
+    },
+    {
+      "name": "Keiser, Mia",
+      "code": "RFM"
+    },
+    {
+      "name": "Kiebinger, Michael",
+      "code": "F-M"
+    },
+    {
+      "name": "Kokot, Fabian",
+      "code": "ACLS"
+    },
+    {
+      "name": "Nickels, Fynn Jamie",
+      "code": "ACLS"
+    },
+    {
+      "name": "Ostwald, Philco",
+      "code": "RNM"
+    },
+    {
+      "name": "Rochow, Kirsten",
+      "code": "RSM"
+    },
+    {
+      "name": "Runge, Thomas",
+      "code": "RSM"
+    },
+    {
+      "name": "Schumacher, Tassilo",
+      "code": "RNM"
+    },
+    {
+      "name": "Stückgen, Jasmin",
+      "code": "FFO"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RSM"
     }
   ],
   "2026-10-31": [
     {
-      "name": "Gläzner, Anouk",
-      "code": "RFH",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Hellstern, Robin",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Merla, Patrick",
-      "code": "RFM",
-      "shiftTypeName": "Frühschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Paulwe B.f., Desiree",
-      "code": "RT1M",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Sendling",
-      "startTime": "06:54",
-      "endTime": "15:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Geisler, Sophie-Marie",
-      "code": "ACLS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Gigl, Tobias",
-      "code": "ACLS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Kokot, Fabian",
-      "code": "ACLS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Nickels, Fynn Jamie",
-      "code": "ACLS",
-      "shiftTypeName": "Fortbildung",
-      "station": "Wache Sendling",
-      "startTime": "08:00",
-      "endTime": "17:00",
-      "isTraining": true,
-      "isVacation": false
-    },
-    {
-      "name": "Gruber, Elena",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Leimeritz, Tim",
-      "code": "RTH",
-      "shiftTypeName": "Tagschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "08:54",
-      "endTime": "19:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Odorfer, Viviane",
-      "code": "RSH",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Hohenbrunn",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Cramer-Tschirnich, Stephan",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Greif, Nick Jonathan",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Häßler, Alexandra",
-      "code": "RT2M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Urbani, Gavin",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
-    },
-    {
-      "name": "Zehetmair, Thilo",
-      "code": "RSM",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "14:54",
-      "endTime": "23:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Backhaus, Johannes",
+      "code": "RNM"
     },
     {
       "name": "Beck, Felix",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT4M"
+    },
+    {
+      "name": "Cramer-Tschirnich, Stephan",
+      "code": "RSM"
+    },
+    {
+      "name": "Geisler, Sophie-Marie",
+      "code": "ACLS"
+    },
+    {
+      "name": "Gigl, Tobias",
+      "code": "ACLS"
+    },
+    {
+      "name": "Gläzner, Anouk",
+      "code": "RFH"
+    },
+    {
+      "name": "Greif, Nick Jonathan",
+      "code": "RSM"
+    },
+    {
+      "name": "Gruber, Elena",
+      "code": "RTH"
+    },
+    {
+      "name": "Hellstern, Robin",
+      "code": "RFM"
+    },
+    {
+      "name": "Häßler, Alexandra",
+      "code": "RT2M"
+    },
+    {
+      "name": "Kokot, Fabian",
+      "code": "ACLS"
+    },
+    {
+      "name": "Leimeritz, Tim",
+      "code": "RTH"
+    },
+    {
+      "name": "Merla, Patrick",
+      "code": "RFM"
+    },
+    {
+      "name": "Nickels, Fynn Jamie",
+      "code": "ACLS"
+    },
+    {
+      "name": "Odorfer, Viviane",
+      "code": "RSH"
+    },
+    {
+      "name": "Paulwe B.f., Desiree",
+      "code": "RT1M"
     },
     {
       "name": "Ponath B.f., Florian",
-      "code": "RT4M",
-      "shiftTypeName": "Spätschicht",
-      "station": "Wache Sendling",
-      "startTime": "15:24",
-      "endTime": "00:06",
-      "isTraining": false,
-      "isVacation": false
+      "code": "RT4M"
     },
     {
-      "name": "Backhaus, Johannes",
-      "code": "RNM",
-      "shiftTypeName": "Nachtschicht",
-      "station": "Wache Sendling",
-      "startTime": "22:54",
-      "endTime": "07:06",
-      "isTraining": false,
-      "isVacation": false
+      "name": "Urbani, Gavin",
+      "code": "RSM"
+    },
+    {
+      "name": "Zehetmair, Thilo",
+      "code": "RSM"
     }
   ]
 }

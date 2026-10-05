@@ -245,13 +245,15 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
     const rawLines = htmlString.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     let dayColMap = new Map();
 
-    for (let r = 0; r < Math.min(30, rawLines.length); r++) {
-      const parts = rawLines[r].includes('\t') ? rawLines[r].split('\t') : rawLines[r].split(/\s{2,}/);
+    // Search ALL lines for the day numbers row (e.g. 1 2 3 ... 31)
+    for (let r = 0; r < rawLines.length; r++) {
+      const line = rawLines[r];
+      const parts = line.includes('\t') ? line.split('\t') : line.split(/\s{2,}|\s(?=\d+\b)/);
       const tempMap = new Map();
       parts.forEach((p, idx) => {
-        const numMatch = p.trim().match(/\b([1-9]|[12][0-9]|3[01])\b/);
-        if (numMatch) {
-          const d = parseInt(numMatch[1], 10);
+        const m = p.trim().match(/^([1-9]|[12][0-9]|3[01])$/);
+        if (m) {
+          const d = parseInt(m[1], 10);
           if (d >= 1 && d <= daysInMonth) tempMap.set(idx, d);
         }
       });

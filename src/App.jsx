@@ -7,6 +7,7 @@ import Journal from './pages/Journal';
 import Entry from './pages/Entry';
 import Analysis from './pages/Analysis';
 import Settings from './pages/Settings';
+import TeamRoster from './pages/TeamRoster';
 import Login from './pages/Login';
 
 // Setup Font
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="/analysis" replace />} />
         <Route path="analysis" element={<Analysis />} />
         <Route path="journal" element={<Journal />} />
+        <Route path="team" element={<TeamRoster />} />
         <Route path="add" element={<Entry />} />
         <Route path="settings" element={<Settings />} />
       </Route>

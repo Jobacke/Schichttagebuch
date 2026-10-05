@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Settings, PieChart } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Settings, PieChart, Users } from 'lucide-react';
 
 import { APP_VERSION } from '../version';
 
@@ -15,6 +15,7 @@ export default function Navigation() {
             </div>
             <NavItem to="/analysis" icon={PieChart} label="Daten" />
             <NavItem to="/journal" icon={LayoutDashboard} label="Journal" />
+            <NavItem to="/team" icon={Users} label="Team" />
             <NavItem to="/add" icon={PlusCircle} label="Eintrag" />
             <NavItem to="/settings" icon={Settings} label="Optionen" />
         </nav>

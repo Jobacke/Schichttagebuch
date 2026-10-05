@@ -9,6 +9,43 @@ import { detectStation } from './shiftColors.js';
  */
 export async function runTeamRosterOcr(imageSource, onProgress) {
   try {
+    let processedSource = imageSource;
+
+    // Browser Canvas Pre-Processing for much higher OCR accuracy on small screenshots
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      try {
+        const img = new Image();
+        const url = typeof imageSource === 'string' ? imageSource : URL.createObjectURL(imageSource);
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
+
+        const scale = img.width < 900 ? 2.5 : 1.5;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imgData.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const brightness = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114);
+          const v = brightness > 140 ? 255 : (brightness < 80 ? 0 : brightness);
+          d[i] = v;
+          d[i + 1] = v;
+          d[i + 2] = v;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        processedSource = canvas.toDataURL('image/png');
+      } catch (prepErr) {
+        console.warn('Canvas pre-processing fallback:', prepErr);
+      }
+    }
+
     const { createWorker } = await import('tesseract.js');
     const worker = await createWorker('deu', 1, {
       logger: m => {
@@ -18,7 +55,7 @@ export async function runTeamRosterOcr(imageSource, onProgress) {
       }
     });
 
-    const result = await worker.recognize(imageSource);
+    const result = await worker.recognize(processedSource);
     await worker.terminate();
     return result.data.text;
   } catch (err) {

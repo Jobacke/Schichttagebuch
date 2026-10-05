@@ -117,13 +117,13 @@ export default function Entry() {
             timestamp: editId ? formData.timestamp : Date.now()
         };
         addShift(shiftData);
-        navigate('/');
+        navigate('/journal');
     };
 
     const handleDelete = () => {
         if (confirm('Möchtest du diesen Eintrag wirklich unwiderruflich löschen?')) {
             deleteShift(editId);
-            navigate('/');
+            navigate('/journal');
         }
     };
 
@@ -358,7 +358,7 @@ export default function Entry() {
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 onImportSuccess={(yearMonth, count) => {
-                    navigate('/');
+                    navigate('/journal');
                 }}
                 store={store}
                 addShifts={addShifts}

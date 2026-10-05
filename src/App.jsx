@@ -40,9 +40,10 @@ function AppRoutes() {
           <Layout />
         </RequireAuth>
       }>
-        <Route index element={<Journal />} />
-        <Route path="add" element={<Entry />} />
+        <Route index element={<Navigate to="/analysis" replace />} />
         <Route path="analysis" element={<Analysis />} />
+        <Route path="journal" element={<Journal />} />
+        <Route path="add" element={<Entry />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

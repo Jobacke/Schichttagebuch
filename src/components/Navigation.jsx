@@ -13,8 +13,8 @@ export default function Navigation() {
                     v{APP_VERSION}
                 </span>
             </div>
-            <NavItem to="/" icon={LayoutDashboard} label="Journal" />
             <NavItem to="/analysis" icon={PieChart} label="Daten" />
+            <NavItem to="/journal" icon={LayoutDashboard} label="Journal" />
             <NavItem to="/add" icon={PlusCircle} label="Eintrag" isMain />
             <NavItem to="/settings" icon={Settings} label="Optionen" />
         </nav>

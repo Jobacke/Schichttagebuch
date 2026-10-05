@@ -422,7 +422,8 @@ export default function Journal() {
             {/* Shift List Cards */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {visibleShifts
-                    .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort newest first
+                    .slice()
+                    .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || '').localeCompare(b.startTime || ''))
                     .map(shift => {
                         const code = store.settings.shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
                         const displayCode = code ? code.code : (shift.code || 'Schicht');

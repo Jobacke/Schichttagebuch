@@ -245,7 +245,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
     const rawLines = htmlString.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     let dayColMap = new Map();
 
-    // Search ALL lines for the day numbers row (e.g. 1 2 3 ... 31)
+    // 1. Search ALL lines for the day numbers row (e.g. 1 2 3 ... 31)
     for (let r = 0; r < rawLines.length; r++) {
       const line = rawLines[r];
       const parts = line.includes('\t') ? line.split('\t') : line.split(/\s{2,}|\s(?=\d+\b)/);
@@ -263,28 +263,51 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
       }
     }
 
+    // 2. Process all colleague rows
     rawLines.forEach(line => {
       const parts = line.includes('\t') ? line.split('\t') : line.split(/\s{2,}/);
-      if (parts.length < 3) return;
+      if (parts.length < 2) return;
 
-      const namePart = parts.find((p, idx) => !dayColMap.has(idx) && p.includes(',') && !p.match(/\d{2,}/));
-      if (!namePart || isVehicleOrDummyRow(namePart)) return;
+      // Find colleague name in this row
+      const nameIdx = parts.findIndex(p => {
+        const t = p.trim();
+        return t.includes(',') && !t.match(/\d{2,}/) && t.length > 3 && t.length < 50;
+      });
 
-      const colleagueName = cleanColleagueName(namePart);
+      if (nameIdx === -1) return;
+      const rawName = parts[nameIdx].trim();
+      if (isVehicleOrDummyRow(rawName)) return;
+
+      const colleagueName = cleanColleagueName(rawName);
       if (!colleagueName) return;
 
       const colleagueShifts = {};
+
       if (dayColMap.size >= 10) {
+        // Explicit column index to day number mapping
         dayColMap.forEach((dayNum, colIdx) => {
           if (colIdx < parts.length) {
-            const token = parts[colIdx].trim().toUpperCase();
-            if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI') {
-              const cleanCode = token.split(/\s+/)[0];
+            const token = parts[colIdx].trim().replace(/\*+$/, '').toUpperCase();
+            if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
+              const cleanCode = token.split(/[\s,]+/)[0];
               colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = cleanCode;
               registerShift(colleagueName, dayNum, cleanCode);
             }
           }
         });
+      } else if (parts.length >= 25) {
+        // Direct column index mapping: each column after name corresponds to day 1, 2, ..., 31!
+        for (let d = 1; d <= daysInMonth; d++) {
+          const colIdx = nameIdx + d;
+          if (colIdx < parts.length) {
+            const token = parts[colIdx].trim().replace(/\*+$/, '').toUpperCase();
+            if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
+              const cleanCode = token.split(/[\s,]+/)[0];
+              colleagueShifts[`${yearMonth}-${String(d).padStart(2, '0')}`] = cleanCode;
+              registerShift(colleagueName, d, cleanCode);
+            }
+          }
+        }
       }
 
       if (Object.keys(colleagueShifts).length > 0 && !processedColleagues.has(colleagueName)) {
@@ -294,36 +317,58 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
     });
   }
 
-  // --- STRATEGY 4: GENERAL REGEX SCAN FOR "Name, Vorname ... RT1M ..." ---
+  // --- STRATEGY 4: MULTI-LINE COLLEAGUE BLOCKS (e.g. name followed by shift lines) ---
   if (colleaguesList.length === 0) {
     const lines = fullText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const knownCodes = ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH', 'RFO', 'RSO', 'ACLS', 'PALS', 'SMT', 'RAJ', 'V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'];
+    let currentColleague = null;
+    let colleagueShifts = {};
+    let dayIndex = 1;
 
-    lines.forEach(line => {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       const nameMatch = line.match(/^([A-ZÄÖÜ][a-zäöüß\-]+(?:\s+[A-ZÄÖÜ][a-zäöüß\-]+)*),\s*([A-ZÄÖÜ][a-zäöüß\-]+)/);
-      if (nameMatch && !isVehicleOrDummyRow(line)) {
-        const colleagueName = cleanColleagueName(`${nameMatch[1]}, ${nameMatch[2]}`);
-        const colleagueShifts = {};
 
-        // Find any day + code combinations in the line
-        knownCodes.forEach(code => {
-          const reg = new RegExp(`\\b([1-9]|[12][0-9]|3[01])\\b[^a-zA-Z0-9]*${code}|${code}[^a-zA-Z0-9]*\\b([1-9]|[12][0-9]|3[01])\\b`, 'g');
-          let m;
-          while ((m = reg.exec(line)) !== null) {
-            const dayNum = parseInt(m[1] || m[2], 10);
-            if (dayNum >= 1 && dayNum <= daysInMonth) {
-              colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = code;
-              registerShift(colleagueName, dayNum, code);
+      if (nameMatch && !isVehicleOrDummyRow(line)) {
+        if (currentColleague && Object.keys(colleagueShifts).length > 0 && !processedColleagues.has(currentColleague)) {
+          processedColleagues.add(currentColleague);
+          colleaguesList.push({ name: currentColleague, shifts: colleagueShifts });
+        }
+        currentColleague = cleanColleagueName(`${nameMatch[1]}, ${nameMatch[2]}`);
+        colleagueShifts = {};
+        dayIndex = 1;
+
+        const lineParts = line.split('\t').slice(1);
+        lineParts.forEach(p => {
+          const token = p.trim().replace(/\*+$/, '').toUpperCase();
+          if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
+            const cleanCode = token.split(/[\s,]+/)[0];
+            if (dayIndex <= daysInMonth) {
+              colleagueShifts[`${yearMonth}-${String(dayIndex).padStart(2, '0')}`] = cleanCode;
+              registerShift(currentColleague, dayIndex, cleanCode);
             }
           }
+          dayIndex++;
         });
-
-        if (Object.keys(colleagueShifts).length > 0 && !processedColleagues.has(colleagueName)) {
-          processedColleagues.add(colleagueName);
-          colleaguesList.push({ name: colleagueName, shifts: colleagueShifts });
-        }
+      } else if (currentColleague) {
+        const parts = line.split('\t');
+        parts.forEach(p => {
+          const token = p.trim().replace(/\*+$/, '').toUpperCase();
+          if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
+            const cleanCode = token.split(/[\s,]+/)[0];
+            if (dayIndex <= daysInMonth) {
+              colleagueShifts[`${yearMonth}-${String(dayIndex).padStart(2, '0')}`] = cleanCode;
+              registerShift(currentColleague, dayIndex, cleanCode);
+            }
+          }
+          dayIndex++;
+        });
       }
-    });
+    }
+
+    if (currentColleague && Object.keys(colleagueShifts).length > 0 && !processedColleagues.has(currentColleague)) {
+      processedColleagues.add(currentColleague);
+      colleaguesList.push({ name: currentColleague, shifts: colleagueShifts });
+    }
   }
 
   if (onProgress) onProgress(100);

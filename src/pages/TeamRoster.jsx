@@ -169,6 +169,15 @@ export default function TeamRoster() {
       setUploadProgress(100);
       setRoster(parsedRoster);
       saveActiveTeamRoster(parsedRoster);
+      if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        if (todayStr.startsWith(parsedRoster.yearMonth)) {
+          setSelectedDate(todayStr);
+        } else {
+          setSelectedDate(`${parsedRoster.yearMonth}-01`);
+        }
+      }
 
       setIsUploadOpen(false);
       setIsProcessing(false);
@@ -193,6 +202,15 @@ export default function TeamRoster() {
       setUploadProgress(100);
       setRoster(parsedRoster);
       saveActiveTeamRoster(parsedRoster);
+      if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        if (todayStr.startsWith(parsedRoster.yearMonth)) {
+          setSelectedDate(todayStr);
+        } else {
+          setSelectedDate(`${parsedRoster.yearMonth}-01`);
+        }
+      }
 
       setIsUploadOpen(false);
       setIsProcessing(false);

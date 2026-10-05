@@ -1,4 +1,4 @@
-import { SHIFT_PRESETS } from './shiftPresets';
+import { SHIFT_PRESETS } from './shiftPresets.js';
 
 /**
  * Detect station from shift object, station string, code, or preset

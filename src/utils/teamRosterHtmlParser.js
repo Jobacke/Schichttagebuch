@@ -27,13 +27,108 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
     throw new Error('Ungültiges HTML-Format.');
   }
 
-  if (onProgress) onProgress(35);
+  // 0. Direct JSON Support (from SIEDA 1-click extractor)
+  const trimmed = htmlString.trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsedJson = JSON.parse(trimmed);
+      let targetYearMonth = '2026-10';
+      let targetLabel = 'Oktober 2026';
+      let rawColleagues = [];
+
+      if (Array.isArray(parsedJson)) {
+        rawColleagues = parsedJson;
+      } else if (parsedJson && typeof parsedJson === 'object') {
+        if (parsedJson.yearMonth) targetYearMonth = parsedJson.yearMonth;
+        if (parsedJson.monthLabel) targetLabel = parsedJson.monthLabel;
+        if (Array.isArray(parsedJson.colleagues)) rawColleagues = parsedJson.colleagues;
+      }
+
+      // Check first date keys to infer yearMonth if not set
+      if (!parsedJson.yearMonth && rawColleagues.length > 0 && rawColleagues[0].shifts) {
+        const firstDateKey = Object.keys(rawColleagues[0].shifts)[0];
+        if (firstDateKey && firstDateKey.match(/^\d{4}-\d{2}/)) {
+          targetYearMonth = firstDateKey.slice(0, 7);
+          const [y, m] = targetYearMonth.split('-').map(Number);
+          const mNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+          targetLabel = `${mNames[m - 1]} ${y}`;
+        }
+      }
+
+      const [yNum, mNum] = targetYearMonth.split('-').map(Number);
+      const totalDays = new Date(yNum, mNum, 0).getDate();
+      const shiftsByDateMap = {};
+      for (let d = 1; d <= totalDays; d++) {
+        shiftsByDateMap[`${targetYearMonth}-${String(d).padStart(2, '0')}`] = [];
+      }
+
+      const cleanColleagues = [];
+      rawColleagues.forEach(c => {
+        const name = cleanColleagueName(c.name || '');
+        if (!name || !c.shifts) return;
+
+        const normalizedShifts = {};
+        Object.entries(c.shifts).forEach(([k, v]) => {
+          if (!v) return;
+          const cleanCode = String(v).replace(/\*+$/, '').trim().toUpperCase();
+          if (cleanCode.length < 2 || cleanCode === '-' || cleanCode === '/' || cleanCode === '0') return;
+
+          let dateStr = k;
+          if (!k.includes('-')) {
+            const dayNum = parseInt(k, 10);
+            if (dayNum >= 1 && dayNum <= totalDays) {
+              dateStr = `${targetYearMonth}-${String(dayNum).padStart(2, '0')}`;
+            }
+          }
+
+          if (shiftsByDateMap[dateStr]) {
+            normalizedShifts[dateStr] = cleanCode;
+            const st = getShiftTypeForCode(cleanCode);
+            const station = getStationForCode(cleanCode);
+            const times = getTimesForCode(cleanCode, st);
+
+            shiftsByDateMap[dateStr].push({
+              name: name,
+              code: cleanCode,
+              shiftTypeName: st,
+              station: station,
+              startTime: times.startTime,
+              endTime: times.endTime,
+              isTraining: st === 'Fortbildung',
+              isVacation: st.includes('Urlaub') || st.includes('Freistellung')
+            });
+          }
+        });
+
+        if (Object.keys(normalizedShifts).length > 0) {
+          cleanColleagues.push({ name, shifts: normalizedShifts });
+        }
+      });
+
+      const totalShiftsCount = Object.values(shiftsByDateMap).reduce((acc, list) => acc + list.length, 0);
+      if (cleanColleagues.length > 0) {
+        if (onProgress) onProgress(100);
+        return {
+          yearMonth: targetYearMonth,
+          monthLabel: targetLabel,
+          daysInMonth: totalDays,
+          totalColleagues: cleanColleagues.length,
+          totalShifts: totalShiftsCount,
+          colleagues: cleanColleagues,
+          shiftsByDate: shiftsByDateMap,
+          isVerified: true
+        };
+      }
+    } catch (jsonErr) {
+      console.warn('JSON parsing attempt failed, falling back to HTML/text parser:', jsonErr);
+    }
+  }
 
   // Parse HTML string in browser DOMParser
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlString, 'text/html');
 
-  // 1. Detect Month and Year from headings, title, or body text
+  // 1. Detect Month and Year from headings, title, body text or day header weekday
   const monthNames = [
     'januar', 'februar', 'märz', 'april', 'mai', 'juni',
     'juli', 'august', 'september', 'oktober', 'november', 'dezember'
@@ -49,6 +144,13 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
     if (mIdx !== -1) {
       month = mIdx + 1;
       year = parseInt(monthMatch[2], 10);
+    }
+  } else {
+    // Weekday-based detection: in 2026, Nov 1 is Sunday (So1), Oct 1 is Thursday (Do1), Dec 1 is Tuesday (Di1)
+    if (fullText.includes('So1') && fullText.includes('Mo2') && fullText.includes('Di3')) {
+      month = 11; // November 2026
+    } else if (fullText.includes('Do1') && fullText.includes('Fr2') && fullText.includes('Sa3')) {
+      month = 10; // Oktober 2026
     }
   }
 

@@ -74,7 +74,7 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
   alert(\`Erfolg! \${colleagues.length} Kollegen für \${monthLabel} kopiert. Jetzt in der Schichten-App einfügen!\`);
 })();`;
 
-const BOOKMARKLET_CODE = `javascript:(function(){const u=new URLSearchParams(window.location.search).get('date')||'';let y=2026,m=11;if(u){const p=u.split('-');if(p.length>=2){y=parseInt(p[0],10);m=parseInt(p[1],10);}}const mn=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];const ym=y+'-'+String(m).padStart(2,'0');const ml=mn[m-1]+' '+y;const t=document.querySelector('table.mat-table')||document.querySelector('table');if(!t)return alert('Keine Dienstplan-Tabelle gefunden!');const h=Array.from((t.querySelector('thead tr')||t.querySelector('tr'))?.children||[]).map(c=>c.textContent.trim());const cd=new Map();h.forEach((x,i)=>{const n=x.match(/(\\d+)/);if(n){const d=parseInt(n[1],10);if(d>=1&&d<=31)cd.set(i,d);}});const rs=Array.from(document.querySelectorAll('tr')).filter(r=>{const e=r.querySelector('.employee-cell')||r.children[0];const tx=e?e.textContent.trim():'';return tx.includes(',')&&!tx.match(/\\d{2,}/);});const cols=[];rs.forEach(r=>{const e=r.querySelector('.employee-cell')||r.children[0];const nm=e.textContent.trim();const cs=Array.from(r.children);const sh={};cd.forEach((dn,ci)=>{if(ci<cs.length){let c=cs[ci].textContent.trim().replace(/\\*+$/,'').trim().toUpperCase();if(c&&c.length>=2&&c!=='-'&&c!=='/'&&c!=='0'){sh[ym+'-'+String(dn).padStart(2,'0')]=c;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});navigator.clipboard.writeText(JSON.stringify({yearMonth:ym,monthLabel:ml,colleagues:cols})).then(()=>alert('Erfolg! '+cols.length+' Kollegen für '+ml+' kopiert. Jetzt in der Schichten-App einfügen!'));})();`;
+const BOOKMARKLET_CODE = `javascript:(function(){try{var u=new URLSearchParams(window.location.search).get("date")||"";var y=2026,m=11;if(u){var p=u.split("-");if(p.length>=2){y=parseInt(p[0],10);m=parseInt(p[1],10);}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var c=cs[colIdx].textContent.trim().replace(/\\*+$/,"").trim().toUpperCase();if(c&&c.length>=2&&c!=="-"&&c!=="/"&&c!=="0"){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=c;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var json=JSON.stringify({yearMonth:ym,monthLabel:ml,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" kopiert!\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
 
 export default function TeamRoster() {
   // Current active yearMonth (defaults to current date or October 2026)
@@ -101,6 +101,7 @@ export default function TeamRoster() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStation, setSelectedStation] = useState('ALL'); // 'ALL' | 'Sendling' | 'Hohenbrunn' | 'Obersendling'
   const [copiedScript, setCopiedScript] = useState(false);
+  const [copiedBookmarklet, setCopiedBookmarklet] = useState(false);
 
   // Upload modal state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -258,6 +259,12 @@ export default function TeamRoster() {
     navigator.clipboard.writeText(SIEDA_EXTRACTOR_SCRIPT);
     setCopiedScript(true);
     setTimeout(() => setCopiedScript(false), 3000);
+  };
+
+  const handleCopyBookmarklet = () => {
+    navigator.clipboard.writeText(BOOKMARKLET_CODE);
+    setCopiedBookmarklet(true);
+    setTimeout(() => setCopiedBookmarklet(false), 3000);
   };
 
   // Handle File Upload (HTML, PDF or Image)
@@ -818,12 +825,23 @@ export default function TeamRoster() {
                         title="Mit der Maus in die Lesezeichenleiste ziehen"
                         onClick={e => {
                           e.preventDefault();
-                          alert('Ziehe diesen Button mit gedrückter Maustaste nach oben in Deine Lesezeichenleiste des Browsers!');
+                          handleCopyBookmarklet();
                         }}
                       >
                         <Bookmark size={14} />
-                        <span>📋 Dienstplan kopieren (In Lesezeichenleiste ziehen)</span>
+                        <span>{copiedBookmarklet ? 'Lesezeichen-Code kopiert! ✅' : '📋 Dienstplan kopieren (In Leiste ziehen)'}</span>
                       </a>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyBookmarklet}
+                        className="team-roster-station-chip"
+                        style={{ fontSize: '11px', padding: '6px 10px' }}
+                        title="Lesezeichen-Code in die Zwischenablage kopieren (z.B. für Safari)"
+                      >
+                        <Copy size={13} />
+                        <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : 'Lesezeichen-Code kopieren'}</span>
+                      </button>
 
                       <button
                         type="button"
@@ -832,7 +850,7 @@ export default function TeamRoster() {
                         title="JavaScript-Befehl für Entwickler-Konsole kopieren"
                       >
                         <Copy size={13} />
-                        <span>{copiedScript ? 'Befehl kopiert! ✅' : 'Befehl für Konsole kopieren'}</span>
+                        <span>{copiedScript ? 'Konsolen-Befehl kopiert! ✅' : 'Befehl für Konsole kopieren'}</span>
                       </button>
                     </div>
 

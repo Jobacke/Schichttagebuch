@@ -1,6 +1,8 @@
 import { OCTOBER_2026_TEAM_ROSTER, getPresetRosterForMonth } from './teamRosterData.js';
 import { SHIFT_PRESETS, getPresetForCode } from './shiftPresets.js';
 import { detectStation } from './shiftColors.js';
+import { db } from '../firebase.js';
+import { collection, doc, setDoc, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 /**
  * Runs OCR on an image file or data URL using Tesseract.js
@@ -575,4 +577,192 @@ export function deleteTeamRoster(yearMonth) {
     console.error('Error deleting roster:', e);
   }
 }
+
+/**
+ * Saves a station roster directly to Cloud Firestore under users/{uid}/team_rosters/{yearMonth}_{station}
+ */
+export async function saveStationTeamRosterToCloud(rosterData, stationOverride, currentUser) {
+  if (!currentUser || !currentUser.uid || !db || !rosterData || !rosterData.yearMonth) return;
+  const station = stationOverride || rosterData.station || detectRosterStation(rosterData);
+  const docId = `${rosterData.yearMonth}_${station}`;
+
+  const cleanRoster = JSON.parse(JSON.stringify({
+    ...rosterData,
+    station
+  }));
+
+  const docData = {
+    yearMonth: rosterData.yearMonth,
+    station,
+    monthLabel: rosterData.monthLabel || '',
+    totalColleagues: rosterData.totalColleagues || rosterData.colleagues?.length || 0,
+    totalShifts: rosterData.totalShifts || 0,
+    updatedAt: new Date().toISOString(),
+    roster: cleanRoster
+  };
+
+  try {
+    const docRef = doc(db, 'users', currentUser.uid, 'team_rosters', docId);
+    await setDoc(docRef, docData);
+  } catch (err) {
+    console.error('Error saving team roster to cloud:', err);
+    throw err;
+  }
+}
+
+/**
+ * Deletes a specific station's roster from Cloud Firestore
+ */
+export async function deleteStationTeamRosterFromCloud(yearMonth, station, currentUser) {
+  if (!currentUser || !currentUser.uid || !db || !yearMonth || !station) return;
+  try {
+    const docRef = doc(db, 'users', currentUser.uid, 'team_rosters', `${yearMonth}_${station}`);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error('Error deleting station roster from cloud:', err);
+  }
+}
+
+/**
+ * Deletes all 3 stations' rosters for a month from Cloud Firestore
+ */
+export async function deleteTeamRosterFromCloud(yearMonth, currentUser) {
+  if (!currentUser || !currentUser.uid || !db || !yearMonth) return;
+  try {
+    for (const st of ROSTER_STATIONS) {
+      await deleteDoc(doc(db, 'users', currentUser.uid, 'team_rosters', `${yearMonth}_${st}`));
+    }
+  } catch (err) {
+    console.error('Error deleting team roster from cloud:', err);
+  }
+}
+
+/**
+ * Synchronizes local rosters with Cloud Firestore bidirectionally:
+ * - Uploads any local rosters from localStorage into Firestore if not present
+ * - Downloads all Firestore rosters into localStorage
+ */
+export async function syncTeamRostersWithCloud(currentUser) {
+  if (!currentUser || !currentUser.uid || !db) return { uploaded: 0, downloaded: 0, totalCloud: 0 };
+
+  try {
+    const colRef = collection(db, 'users', currentUser.uid, 'team_rosters');
+    const snap = await getDocs(colRef);
+    const cloudDocs = new Map();
+    snap.forEach(d => {
+      cloudDocs.set(d.id, d.data());
+    });
+
+    let uploaded = 0;
+    let downloaded = 0;
+
+    // 1. Check all localStorage items for rosters that need uploading to Cloud Firestore
+    const localKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        localKeys.push(key);
+      }
+    }
+
+    for (const key of localKeys) {
+      const rest = key.replace(STORAGE_KEY_PREFIX, '');
+      const parts = rest.split('_');
+
+      if (parts.length === 2 && parts[0].match(/^\d{4}-\d{2}$/) && ROSTER_STATIONS.includes(parts[1])) {
+        const docId = rest;
+        try {
+          const localData = JSON.parse(localStorage.getItem(key));
+          if (localData && (localData.totalShifts > 0 || (localData.colleagues && localData.colleagues.length > 0))) {
+            if (!cloudDocs.has(docId)) {
+              await saveStationTeamRosterToCloud(localData, parts[1], currentUser);
+              uploaded++;
+            }
+          }
+        } catch (e) {
+          console.error('Error uploading local roster to cloud:', e);
+        }
+      } else if (parts.length === 1 && parts[0].match(/^\d{4}-\d{2}$/)) {
+        // Legacy key without station suffix
+        const ym = parts[0];
+        try {
+          const localData = JSON.parse(localStorage.getItem(key));
+          if (localData && (localData.totalShifts > 0 || (localData.colleagues && localData.colleagues.length > 0))) {
+            const detected = detectRosterStation(localData);
+            const docId = `${ym}_${detected}`;
+            if (!cloudDocs.has(docId)) {
+              await saveStationTeamRosterToCloud(localData, detected, currentUser);
+              uploaded++;
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 2. Sync downloaded cloud docs to localStorage
+    cloudDocs.forEach((cData, docId) => {
+      const localKey = `${STORAGE_KEY_PREFIX}${docId}`;
+      const existing = localStorage.getItem(localKey);
+      if (!existing) {
+        const roster = cData.roster || cData;
+        localStorage.setItem(localKey, JSON.stringify(roster));
+        if (cData.station === 'Sendling') {
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}${cData.yearMonth}`, JSON.stringify(roster));
+        }
+        downloaded++;
+      }
+    });
+
+    return {
+      uploaded,
+      downloaded,
+      totalCloud: cloudDocs.size + uploaded
+    };
+  } catch (err) {
+    console.error('Error during team rosters cloud sync:', err);
+    throw err;
+  }
+}
+
+/**
+ * Subscribes to real-time changes in Firestore team_rosters collection
+ */
+export function subscribeToCloudTeamRosters(currentUser, onChange) {
+  if (!currentUser || !currentUser.uid || !db) return () => {};
+
+  const colRef = collection(db, 'users', currentUser.uid, 'team_rosters');
+  return onSnapshot(colRef, (snapshot) => {
+    let hasChanges = false;
+    snapshot.docChanges().forEach((change) => {
+      const docId = change.doc.id;
+      const localKey = `${STORAGE_KEY_PREFIX}${docId}`;
+
+      if (change.type === 'added' || change.type === 'modified') {
+        const cData = change.doc.data();
+        const roster = cData.roster || cData;
+        const currentLocal = localStorage.getItem(localKey);
+        const newStr = JSON.stringify(roster);
+        if (currentLocal !== newStr) {
+          localStorage.setItem(localKey, newStr);
+          if (cData.station === 'Sendling') {
+            localStorage.setItem(`${STORAGE_KEY_PREFIX}${cData.yearMonth}`, newStr);
+          }
+          hasChanges = true;
+        }
+      } else if (change.type === 'removed') {
+        if (localStorage.getItem(localKey)) {
+          localStorage.removeItem(localKey);
+          hasChanges = true;
+        }
+      }
+    });
+
+    if (hasChanges && typeof onChange === 'function') {
+      onChange();
+    }
+  }, (err) => {
+    console.error('Cloud team roster snapshot listener error:', err);
+  });
+}
+
 

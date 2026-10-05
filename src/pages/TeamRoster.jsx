@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Search,
   UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText, FileCode, Clipboard, Copy, Bookmark,
-  Calendar, Trash2, FolderOpen, Check
+  Calendar, Trash2, FolderOpen, Check, Cloud, RefreshCw
 } from 'lucide-react';
 import {
   getActiveTeamRoster,
@@ -13,8 +13,14 @@ import {
   detectRosterStation,
   ROSTER_STATIONS,
   runTeamRosterOcr,
-  parseTeamRoster
+  parseTeamRoster,
+  saveStationTeamRosterToCloud,
+  deleteStationTeamRosterFromCloud,
+  deleteTeamRosterFromCloud,
+  syncTeamRostersWithCloud,
+  subscribeToCloudTeamRosters
 } from '../utils/teamRosterParser';
+import { useAuth } from '../context/AuthContext';
 import { parseCareManPdf } from '../utils/teamRosterPdfParser';
 import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
 import { getShiftColor, detectStation } from '../utils/shiftColors';
@@ -101,6 +107,9 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
 const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];var mc=0,oc=0,hc=0;rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var c=cs[colIdx].textContent.trim().replace(/\\*+$/,"").trim().toUpperCase();if(c&&c.length>=2&&c!=="-"&&c!=="/"&&c!=="0"){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=c;if(c.endsWith("M")||c.indexOf("-M")!==-1)mc++;else if(c.endsWith("O")||c==="FFO"||c==="NFO")oc++;else if(c.endsWith("H"))hc++;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var st="Sendling";if(oc>mc&&oc>hc)st="Obersendling";else if(hc>mc&&hc>oc)st="Hohenbrunn";var json=JSON.stringify({yearMonth:ym,monthLabel:ml,station:st,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" (Wache "+st+") kopiert!\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
 
 export default function TeamRoster() {
+  const { currentUser } = useAuth();
+  const [cloudSyncing, setCloudSyncing] = useState(false);
+
   // Stored rosters list
   const [savedRosters, setSavedRosters] = useState(() => getSavedRosterSummaries());
 
@@ -120,6 +129,50 @@ export default function TeamRoster() {
 
   // Active roster data
   const [roster, setRoster] = useState(() => getActiveTeamRoster(currentYearMonth));
+
+  // Auto-sync with Firebase Cloud Firestore on login and listen for changes
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // 1. Initial bidirectional synchronization
+    syncTeamRostersWithCloud(currentUser)
+      .then(() => {
+        setSavedRosters(getSavedRosterSummaries());
+        setRoster(getActiveTeamRoster(currentYearMonth));
+      })
+      .catch(err => {
+        console.error('Initial team roster cloud sync failed:', err);
+      });
+
+    // 2. Real-time listener for rosters updated on other devices (e.g. Mac <-> iPhone)
+    const unsubscribe = subscribeToCloudTeamRosters(currentUser, () => {
+      setSavedRosters(getSavedRosterSummaries());
+      setRoster(getActiveTeamRoster(currentYearMonth));
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [currentUser, currentYearMonth]);
+
+  const handleManualCloudSync = async () => {
+    if (!currentUser) {
+      setToastMessage('Bitte zuerst anmelden für die Cloud-Synchronisation.');
+      return;
+    }
+    setCloudSyncing(true);
+    try {
+      const res = await syncTeamRostersWithCloud(currentUser);
+      setSavedRosters(getSavedRosterSummaries());
+      setRoster(getActiveTeamRoster(currentYearMonth));
+      setToastMessage(`☁️ Cloud synchronisiert: ${res.totalCloud || 0} Pläne bereit!`);
+    } catch (err) {
+      console.error('Manual sync failed:', err);
+      setToastMessage('Fehler bei der Cloud-Synchronisation.');
+    } finally {
+      setCloudSyncing(false);
+    }
+  };
   
   // Selected date
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -190,6 +243,11 @@ export default function TeamRoster() {
   const handleDeleteStationRoster = (ym, st) => {
     if (window.confirm(`Dienstplan für ${ym} (Wache ${st}) wirklich löschen?`)) {
       deleteStationTeamRoster(ym, st);
+      if (currentUser) {
+        deleteStationTeamRosterFromCloud(ym, st, currentUser).catch(err => {
+          console.error('Cloud delete failed:', err);
+        });
+      }
       const updated = getSavedRosterSummaries();
       setSavedRosters(updated);
       setRoster(getActiveTeamRoster(currentYearMonth));
@@ -200,6 +258,11 @@ export default function TeamRoster() {
   const handleDeleteMonthRoster = (ym) => {
     if (window.confirm(`Alle Dienstpläne für ${ym} (alle Wachen) wirklich löschen?`)) {
       deleteTeamRoster(ym);
+      if (currentUser) {
+        deleteTeamRosterFromCloud(ym, currentUser).catch(err => {
+          console.error('Cloud delete failed:', err);
+        });
+      }
       const updated = getSavedRosterSummaries();
       setSavedRosters(updated);
       if (currentYearMonth === ym) {
@@ -465,6 +528,11 @@ export default function TeamRoster() {
       setUploadProgress(100);
       const targetStation = uploadStationOverride !== 'AUTO' ? uploadStationOverride : (parsedRoster.station || detectRosterStation(parsedRoster));
       saveStationTeamRoster(parsedRoster, targetStation);
+      if (currentUser) {
+        saveStationTeamRosterToCloud(parsedRoster, targetStation, currentUser).catch(err => {
+          console.error('Cloud save failed:', err);
+        });
+      }
       setCurrentYearMonth(parsedRoster.yearMonth);
       localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
       setRoster(getActiveTeamRoster(parsedRoster.yearMonth));
@@ -503,6 +571,11 @@ export default function TeamRoster() {
       setUploadProgress(100);
       const targetStation = uploadStationOverride !== 'AUTO' ? uploadStationOverride : (parsedRoster.station || detectRosterStation(parsedRoster));
       saveStationTeamRoster(parsedRoster, targetStation);
+      if (currentUser) {
+        saveStationTeamRosterToCloud(parsedRoster, targetStation, currentUser).catch(err => {
+          console.error('Cloud save failed:', err);
+        });
+      }
       setCurrentYearMonth(parsedRoster.yearMonth);
       localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
       setRoster(getActiveTeamRoster(parsedRoster.yearMonth));
@@ -1136,8 +1209,80 @@ export default function TeamRoster() {
               ) : (
                 /* Stored Rosters Tab */
                 <div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '12px', lineHeight: 1.4 }}>
-                    Für jeden Monat können drei Pläne unabhängig gespeichert werden (Sendling, Obersendling, Hohenbrunn):
+                  {/* Cloud Sync Status Card */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(99, 102, 241, 0.12))',
+                    border: '1px solid rgba(14, 165, 233, 0.3)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        <div style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          background: 'rgba(14, 165, 233, 0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#38bdf8',
+                          flexShrink: 0
+                        }}>
+                          <Cloud size={16} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-main)' }}>
+                            Cloud-Synchronisation
+                          </div>
+                          <div style={{
+                            fontSize: '10px',
+                            color: 'var(--color-text-muted)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {currentUser ? `${currentUser.email} (aktiv)` : 'Nicht angemeldet'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleManualCloudSync}
+                        disabled={cloudSyncing || !currentUser}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: 'rgba(14, 165, 233, 0.25)',
+                          border: '1px solid rgba(14, 165, 233, 0.4)',
+                          color: '#38bdf8',
+                          padding: '5px 10px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: cloudSyncing || !currentUser ? 'default' : 'pointer',
+                          opacity: cloudSyncing || !currentUser ? 0.6 : 1,
+                          flexShrink: 0
+                        }}
+                      >
+                        <RefreshCw size={12} className={cloudSyncing ? 'spin-animation' : ''} />
+                        <span>{cloudSyncing ? 'Synchronisiere...' : 'Jetzt abgleichen'}</span>
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.35 }}>
+                      Pläne werden automatisch verschlüsselt in deinem Account gespeichert und sofort mit deinem iPhone und allen Geräten synchronisiert.
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '10px', lineHeight: 1.4 }}>
+                    Drei Wachen pro Monat unabhängig gespeichert (Sendling, Obersendling, Hohenbrunn):
                   </div>
 
                   <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>

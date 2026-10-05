@@ -311,7 +311,7 @@ export function saveActiveTeamRoster(rosterData) {
  * Returns all month keys currently available in localStorage or preloaded
  */
 export function getSavedRosterMonths() {
-  const months = new Set(['2026-10', '2026-11']);
+  const months = new Set(['2026-10']);
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -324,5 +324,47 @@ export function getSavedRosterMonths() {
     }
   } catch (e) {}
   return Array.from(months).sort();
+}
+
+/**
+ * Returns summary info for all stored months
+ */
+export function getSavedRosterSummaries() {
+  const monthKeys = getSavedRosterMonths();
+  return monthKeys.map(ym => {
+    const roster = getActiveTeamRoster(ym);
+    const [y, m] = ym.split('-').map(Number);
+    const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    const monthLabel = roster.monthLabel || `${monthNames[m - 1]} ${y}`;
+    return {
+      yearMonth: ym,
+      monthLabel,
+      totalColleagues: roster.totalColleagues || roster.colleagues?.length || 0,
+      totalShifts: roster.totalShifts || 0,
+      isPreset: ym === '2026-10' && !localStorage.getItem(`${STORAGE_KEY_PREFIX}2026-10`),
+      hasData: Boolean(roster.colleagues && roster.colleagues.length > 0)
+    };
+  });
+}
+
+/**
+ * Deletes a stored roster for a given month
+ */
+export function deleteTeamRoster(yearMonth) {
+  if (!yearMonth) return;
+  try {
+    localStorage.removeItem(`${STORAGE_KEY_PREFIX}${yearMonth}`);
+    const current = localStorage.getItem(CURRENT_ROSTER_KEY);
+    if (current) {
+      try {
+        const p = JSON.parse(current);
+        if (p.yearMonth === yearMonth) {
+          localStorage.removeItem(CURRENT_ROSTER_KEY);
+        }
+      } catch (err) {}
+    }
+  } catch (e) {
+    console.error('Error deleting roster:', e);
+  }
 }
 

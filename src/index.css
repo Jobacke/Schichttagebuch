@@ -662,6 +662,25 @@ h2 {
   white-space: nowrap;
 }
 
+.team-roster-month-select {
+  background: transparent;
+  border: none;
+  color: var(--color-text-main);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 6px;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  text-align: center;
+}
+
+.team-roster-month-select option {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 8px;
+}
+
 /* Station Filter Chips */
 .team-roster-station-chips {
   display: flex;

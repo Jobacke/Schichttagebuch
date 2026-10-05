@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Search,
-  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText, FileCode, Clipboard, Copy, Bookmark
+  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText, FileCode, Clipboard, Copy, Bookmark,
+  Calendar, Trash2, FolderOpen, Check
 } from 'lucide-react';
 import {
   getActiveTeamRoster,
   saveActiveTeamRoster,
+  getSavedRosterSummaries,
+  deleteTeamRoster,
   runTeamRosterOcr,
   parseTeamRoster
 } from '../utils/teamRosterParser';
@@ -14,16 +17,25 @@ import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
 import { getShiftColor, detectStation } from '../utils/shiftColors';
 
 const SIEDA_EXTRACTOR_SCRIPT = `(() => {
-  const urlDate = new URLSearchParams(window.location.search).get('date') || '';
   let year = 2026;
-  let month = 11;
-  if (urlDate) {
-    const p = urlDate.split('-');
-    if (p.length >= 2) {
-      year = parseInt(p[0], 10);
-      month = parseInt(p[1], 10);
+  let month = 10;
+  const urlMatch = window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);
+  if (urlMatch) {
+    year = parseInt(urlMatch[1], 10);
+    month = parseInt(urlMatch[2], 10);
+  } else {
+    const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    const pageText = document.body ? document.body.innerText : '';
+    const textMatch = pageText.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);
+    if (textMatch) {
+      const idx = monthNames.findIndex(m => m.toLowerCase() === textMatch[1].toLowerCase());
+      if (idx !== -1) {
+        month = idx + 1;
+        year = parseInt(textMatch[2], 10);
+      }
     }
   }
+
   const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   const yearMonth = \`\${year}-\${String(month).padStart(2, '0')}\`;
   const monthLabel = \`\${monthNames[month - 1]} \${year}\`;
@@ -71,14 +83,22 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
 
   const result = { yearMonth, monthLabel, colleagues };
   copy(JSON.stringify(result));
-  alert(\`Erfolg! \${colleagues.length} Kollegen für \${monthLabel} kopiert. Jetzt in der Schichten-App einfügen!\`);
+  alert(\`✅ Erfolg! \${colleagues.length} Kollegen für \${monthLabel} kopiert! Jetzt in der Schichten-App einfügen.\`);
 })();`;
 
-const BOOKMARKLET_CODE = `javascript:(function(){try{var u=new URLSearchParams(window.location.search).get("date")||"";var y=2026,m=11;if(u){var p=u.split("-");if(p.length>=2){y=parseInt(p[0],10);m=parseInt(p[1],10);}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var c=cs[colIdx].textContent.trim().replace(/\\*+$/,"").trim().toUpperCase();if(c&&c.length>=2&&c!=="-"&&c!=="/"&&c!=="0"){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=c;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var json=JSON.stringify({yearMonth:ym,monthLabel:ml,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" kopiert!\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
+const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var c=cs[colIdx].textContent.trim().replace(/\\*+$/,"").trim().toUpperCase();if(c&&c.length>=2&&c!=="-"&&c!=="/"&&c!=="0"){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=c;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var json=JSON.stringify({yearMonth:ym,monthLabel:ml,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" kopiert!\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
 
 export default function TeamRoster() {
-  // Current active yearMonth (defaults to current date or October 2026)
+  // Stored rosters list
+  const [savedRosters, setSavedRosters] = useState(() => getSavedRosterSummaries());
+
+  // Current active yearMonth (defaults to saved user choice or October 2026)
   const [currentYearMonth, setCurrentYearMonth] = useState(() => {
+    const saved = localStorage.getItem('schichten_selected_year_month');
+    if (saved) {
+      const r = getActiveTeamRoster(saved);
+      if (r && !r.isEmptyTemplate) return saved;
+    }
     const today = new Date();
     const todayYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     const stored = getActiveTeamRoster(todayYM);
@@ -103,13 +123,13 @@ export default function TeamRoster() {
   const [copiedScript, setCopiedScript] = useState(false);
   const [copiedBookmarklet, setCopiedBookmarklet] = useState(false);
 
-  // Upload modal state
+  // Upload modal state: activeModalTab can be 'paste' | 'file' | 'saved'
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState('paste');
   const [uploadProgress, setUploadProgress] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
-  const [isPasteMode, setIsPasteMode] = useState(true); // Default to paste tab for SIEDA
   const [pasteText, setPasteText] = useState('');
 
   const fileInputRef = useRef(null);
@@ -142,6 +162,7 @@ export default function TeamRoster() {
 
   const switchMonth = (newYM) => {
     setCurrentYearMonth(newYM);
+    localStorage.setItem('schichten_selected_year_month', newYM);
     const loaded = getActiveTeamRoster(newYM);
     setRoster(loaded);
     const today = new Date();
@@ -150,6 +171,19 @@ export default function TeamRoster() {
       setSelectedDate(todayStr);
     } else {
       setSelectedDate(`${newYM}-01`);
+    }
+  };
+
+  const handleDeleteRoster = (ym) => {
+    if (window.confirm(`Dienstplan für ${ym} wirklich aus der App löschen?`)) {
+      deleteTeamRoster(ym);
+      const updated = getSavedRosterSummaries();
+      setSavedRosters(updated);
+      if (currentYearMonth === ym) {
+        const fallback = updated[0]?.yearMonth || '2026-10';
+        switchMonth(fallback);
+      }
+      setToastMessage(`Dienstplan für ${ym} gelöscht.`);
     }
   };
 
@@ -185,9 +219,83 @@ export default function TeamRoster() {
     if (c === 'RTH') return 20;
     if (c.startsWith('RS') || c === 'RT2M' || c === 'RT4M' || c === 'RT2H') return 30;
     if (c.startsWith('RN')) return 40;
-    if (['ACLS', 'PALS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 50;
+    if (['ACLS', 'PALS', 'SMT', 'RAJ', 'PRX'].some(k => c.includes(k))) return 50;
     if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 60;
     return 70;
+  }
+
+  function getShiftCodeSortPriority(code = '') {
+    const c = (code || '').toUpperCase().trim();
+
+    // 1. Frühdienste (06:00 / 06:30 / 07:00)
+    if (c === 'RFM') return 100;
+    if (c === 'RFH') return 102;
+    if (c === 'RFO' || c === 'FFO') return 104;
+    if (c.startsWith('RF')) return 106;
+
+    if (c === 'RT1M') return 110;
+    if (c === 'RT1H') return 112;
+    if (c === 'RT1O') return 114;
+    if (c.startsWith('RT1')) return 116;
+
+    if (c === 'RT3M') return 120;
+    if (c === 'RT3H') return 122;
+    if (c.startsWith('RT3')) return 124;
+
+    // 2. Tagschichten
+    if (c === 'RTM') return 200;
+    if (c === 'RTH') return 202;
+    if (c === 'RHH') return 204;
+    if (c === 'DDM') return 210;
+    if (c === 'ID2') return 220;
+    if (c === 'BDR') return 230;
+    if (c === 'RCM') return 240;
+
+    // 3. Spätdienste
+    if (c === 'RT2M') return 300;
+    if (c === 'RT2H') return 302;
+    if (c.startsWith('RT2')) return 304;
+
+    if (c === 'RT4M') return 310;
+    if (c === 'RT4H') return 312;
+    if (c.startsWith('RT4')) return 314;
+
+    if (c === 'RSM') return 320;
+    if (c === 'RSH') return 322;
+    if (c === 'RSO') return 324;
+    if (c === 'RS2M') return 326;
+    if (c === 'RS4') return 328;
+    if (c.startsWith('RS')) return 330;
+
+    // 4. Nachtdienste
+    if (c === 'RNM') return 400;
+    if (c === 'RNH') return 402;
+    if (c === 'RNO' || c === 'NFO') return 404;
+    if (c.startsWith('RN')) return 406;
+
+    // 5. Sonderdienste
+    if (c === 'S24') return 500;
+    if (c === 'SW1') return 510;
+    if (c === 'RZF') return 520;
+    if (c === 'R-SAN') return 530;
+    if (c === 'F-M' || c === 'C-M' || c === 'R-M') return 540;
+
+    // 6. Fortbildung
+    if (c === 'ACLS') return 600;
+    if (c === 'PALS') return 610;
+    if (c === 'SMT') return 620;
+    if (c === 'RAJ') return 630;
+    if (c === 'PRX') return 640;
+
+    // 7. Abwesenheit / Urlaub
+    if (c === 'VS30' || c === 'V030') return 700;
+    if (c === 'V-B') return 710;
+    if (c === 'V07' || c === 'V07-B' || c === 'V07-b') return 720;
+    if (c === 'VFU') return 730;
+    if (c === 'UDN') return 740;
+    if (c.startsWith('V')) return 750;
+
+    return 800;
   }
 
   function getShiftGroupName(code = '') {
@@ -197,7 +305,7 @@ export default function TeamRoster() {
     if (c === 'RTH') return 'Tagschicht';
     if (c.startsWith('RS') || c === 'RT2M' || c === 'RT4M' || c === 'RT2H') return 'Spätdienst';
     if (c.startsWith('RN')) return 'Nachtdienst';
-    if (['ACLS', 'PALS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 'Fortbildung';
+    if (['ACLS', 'PALS', 'SMT', 'RAJ', 'PRX'].some(k => c.includes(k))) return 'Fortbildung';
     if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 'Urlaub / Abwesend';
     return 'Sonderdienste';
   }
@@ -215,6 +323,7 @@ export default function TeamRoster() {
   }, [roster, selectedDate]);
 
   // Filtered and sorted shifts for selected date
+  // Sorted strictly by shift code hierarchy, and secondarily by colleague name
   const currentDayShifts = useMemo(() => {
     const raw = roster.shiftsByDate?.[selectedDate] || [];
     const filtered = raw.filter(shift => {
@@ -234,12 +343,42 @@ export default function TeamRoster() {
     });
 
     return [...filtered].sort((a, b) => {
+      // 1. Schichtgruppen-Rang (Frühdienst -> Tagschicht -> Spätdienst -> Nachtdienst etc.)
       const rA = getShiftRank(a.code);
       const rB = getShiftRank(b.code);
       if (rA !== rB) return rA - rB;
+
+      // 2. Rettungsschichtkürzel-Priorität (RFM vor RT1M vor RT3M; RT2M vor RT4M vor RSM; RNM vor RNH etc.)
+      const pA = getShiftCodeSortPriority(a.code);
+      const pB = getShiftCodeSortPriority(b.code);
+      if (pA !== pB) return pA - pB;
+
+      // 3. Alphabetischer Schichtcode
+      const codeComp = a.code.localeCompare(b.code);
+      if (codeComp !== 0) return codeComp;
+
+      // 4. Kollegenname alphabetisch (bei identischem Schichtkürzel)
       return a.name.localeCompare(b.name, 'de');
     });
   }, [roster, selectedDate, searchQuery, selectedStation]);
+
+  // All displayable months (combining saved plans with currently viewed month)
+  const allDisplayMonths = useMemo(() => {
+    const map = new Map();
+    savedRosters.forEach(r => map.set(r.yearMonth, r));
+    if (!map.has(yearMonth)) {
+      const [y, m] = yearMonth.split('-').map(Number);
+      const mNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+      map.set(yearMonth, {
+        yearMonth,
+        monthLabel: `${mNames[m - 1]} ${y}`,
+        totalColleagues: 0,
+        totalShifts: 0,
+        hasData: false
+      });
+    }
+    return Array.from(map.values()).sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
+  }, [savedRosters, yearMonth]);
 
   // Formatted date string
   const formattedSelectedDate = useMemo(() => {
@@ -301,8 +440,12 @@ export default function TeamRoster() {
       }
 
       setUploadProgress(100);
-      setRoster(parsedRoster);
       saveActiveTeamRoster(parsedRoster);
+      setCurrentYearMonth(parsedRoster.yearMonth);
+      localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
+      setRoster(parsedRoster);
+      setSavedRosters(getSavedRosterSummaries());
+
       if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
         const today = new Date();
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -316,7 +459,7 @@ export default function TeamRoster() {
       setIsUploadOpen(false);
       setIsProcessing(false);
       setUploadProgress(null);
-      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} aktualisiert (${parsedRoster.totalShifts} Schichten)!`);
+      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} gespeichert (${parsedRoster.totalShifts} Schichten)!`);
     } catch (err) {
       console.error('Upload Error:', err);
       setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe das Dateiformat.'));
@@ -334,8 +477,12 @@ export default function TeamRoster() {
     try {
       const parsedRoster = await parseCareManHtml(pasteText, p => setUploadProgress(p));
       setUploadProgress(100);
-      setRoster(parsedRoster);
       saveActiveTeamRoster(parsedRoster);
+      setCurrentYearMonth(parsedRoster.yearMonth);
+      localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
+      setRoster(parsedRoster);
+      setSavedRosters(getSavedRosterSummaries());
+
       if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
         const today = new Date();
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -350,7 +497,7 @@ export default function TeamRoster() {
       setIsProcessing(false);
       setUploadProgress(null);
       setPasteText('');
-      setIsPasteMode(false);
+      setActiveModalTab('paste');
       setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} übernommen (${parsedRoster.totalShifts} Schichten)!`);
     } catch (err) {
       console.error('Paste Error:', err);
@@ -394,7 +541,7 @@ export default function TeamRoster() {
         </h1>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Month Stepper */}
+          {/* Month Stepper with Interactive Month Picker */}
           <div className="team-roster-month-stepper">
             <button
               type="button"
@@ -404,9 +551,18 @@ export default function TeamRoster() {
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="team-roster-month-label">
-              {roster.monthLabel || yearMonth}
-            </span>
+            <select
+              value={yearMonth}
+              onChange={e => switchMonth(e.target.value)}
+              className="team-roster-month-select"
+              title="Monat auswählen"
+            >
+              {allDisplayMonths.map(m => (
+                <option key={m.yearMonth} value={m.yearMonth}>
+                  {m.monthLabel} {m.hasData ? `(${m.totalColleagues} Kollege${m.totalColleagues === 1 ? '' : 'n'})` : ''}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={handleNextMonth}
@@ -694,7 +850,7 @@ export default function TeamRoster() {
                   if (!isProcessing) {
                     setIsUploadOpen(false);
                     setUploadError(null);
-                    setIsPasteMode(false);
+                    setActiveModalTab('paste');
                   }
                 }}
               >
@@ -715,53 +871,76 @@ export default function TeamRoster() {
               }}>
                 <button
                   type="button"
-                  onClick={() => { setIsPasteMode(false); setUploadError(null); }}
+                  onClick={() => { setActiveModalTab('paste'); setUploadError(null); }}
                   style={{
                     flex: 1,
-                    padding: '8px',
+                    padding: '8px 4px',
                     borderRadius: '8px',
-                    border: !isPasteMode ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
-                    background: !isPasteMode ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
-                    color: !isPasteMode ? '#38bdf8' : 'var(--color-text-muted)',
-                    fontSize: '12px',
+                    border: activeModalTab === 'paste' ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
+                    background: activeModalTab === 'paste' ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
+                    color: activeModalTab === 'paste' ? '#38bdf8' : 'var(--color-text-muted)',
+                    fontSize: '11px',
                     fontWeight: 600,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
+                    gap: '4px',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <FileCode size={14} />
-                  <span>Datei hochladen</span>
+                  <Clipboard size={13} />
+                  <span>SIEDA einfügen</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setIsPasteMode(true); setUploadError(null); }}
+                  onClick={() => { setActiveModalTab('file'); setUploadError(null); }}
                   style={{
                     flex: 1,
-                    padding: '8px',
+                    padding: '8px 4px',
                     borderRadius: '8px',
-                    border: isPasteMode ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
-                    background: isPasteMode ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
-                    color: isPasteMode ? '#38bdf8' : 'var(--color-text-muted)',
-                    fontSize: '12px',
+                    border: activeModalTab === 'file' ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
+                    background: activeModalTab === 'file' ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
+                    color: activeModalTab === 'file' ? '#38bdf8' : 'var(--color-text-muted)',
+                    fontSize: '11px',
                     fontWeight: 600,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
+                    gap: '4px',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <Clipboard size={14} />
-                  <span>Text einfügen</span>
+                  <FileCode size={13} />
+                  <span>Datei laden</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveModalTab('saved'); setUploadError(null); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 4px',
+                    borderRadius: '8px',
+                    border: activeModalTab === 'saved' ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
+                    background: activeModalTab === 'saved' ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
+                    color: activeModalTab === 'saved' ? '#38bdf8' : 'var(--color-text-muted)',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <FolderOpen size={13} />
+                  <span>Pläne ({savedRosters.filter(r => r.hasData).length})</span>
                 </button>
               </div>
 
-              {!isPasteMode ? (
+              {activeModalTab === 'file' ? (
                 /* File Dropzone Area */
                 <div
                   onClick={() => !isProcessing && fileInputRef.current?.click()}
@@ -803,7 +982,7 @@ export default function TeamRoster() {
                     </span>
                   </div>
                 </div>
-              ) : (
+              ) : activeModalTab === 'paste' ? (
                 /* Direct Paste Area */
                 <div>
                   {/* SIEDA Helper Card: Bookmarklet + Copy Command */}
@@ -829,7 +1008,7 @@ export default function TeamRoster() {
                         }}
                       >
                         <Bookmark size={14} />
-                        <span>{copiedBookmarklet ? 'Lesezeichen-Code kopiert! ✅' : '📋 Dienstplan kopieren (In Leiste ziehen)'}</span>
+                        <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '📋 Dienstplan kopieren'}</span>
                       </a>
 
                       <button
@@ -840,7 +1019,7 @@ export default function TeamRoster() {
                         title="Lesezeichen-Code in die Zwischenablage kopieren (z.B. für Safari)"
                       >
                         <Copy size={13} />
-                        <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : 'Lesezeichen-Code kopieren'}</span>
+                        <span>{copiedBookmarklet ? 'Code kopiert! ✅' : 'Lesezeichen-Code kopieren'}</span>
                       </button>
 
                       <button
@@ -850,7 +1029,7 @@ export default function TeamRoster() {
                         title="JavaScript-Befehl für Entwickler-Konsole kopieren"
                       >
                         <Copy size={13} />
-                        <span>{copiedScript ? 'Konsolen-Befehl kopiert! ✅' : 'Befehl für Konsole kopieren'}</span>
+                        <span>{copiedScript ? 'Befehl kopiert! ✅' : 'Befehl für Konsole kopieren'}</span>
                       </button>
                     </div>
 
@@ -893,6 +1072,91 @@ export default function TeamRoster() {
                   >
                     Dienstplan einlesen
                   </button>
+                </div>
+              ) : (
+                /* Stored Rosters Tab */
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '12px', lineHeight: 1.4 }}>
+                    Alle gespeicherten Dienstpläne bleiben dauerhaft in der App abrufbar und können jederzeit gewechselt werden:
+                  </div>
+
+                  <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {savedRosters.map(sr => {
+                      const isActive = sr.yearMonth === currentYearMonth;
+                      return (
+                        <div
+                          key={sr.yearMonth}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 14px',
+                            background: isActive ? 'rgba(14, 165, 233, 0.12)' : 'rgba(15, 23, 42, 0.7)',
+                            border: isActive ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid var(--color-border)',
+                            borderRadius: '12px'
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontWeight: 700, fontSize: '13px', color: isActive ? '#38bdf8' : 'var(--color-text-main)' }}>
+                                {sr.monthLabel}
+                              </span>
+                              {isActive && (
+                                <span style={{
+                                  fontSize: '10px',
+                                  background: '#0284c7',
+                                  color: 'white',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: 800
+                                }}>
+                                  Aktiv
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                              {sr.hasData ? `${sr.totalColleagues} Kollegen · ${sr.totalShifts} Schichten` : 'Kein Plan hinterlegt'}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {!isActive && sr.hasData && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  switchMonth(sr.yearMonth);
+                                  setIsUploadOpen(false);
+                                }}
+                                className="team-roster-today-btn"
+                                style={{ fontSize: '11px', padding: '5px 10px' }}
+                              >
+                                Öffnen
+                              </button>
+                            )}
+                            {!sr.isPreset && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRoster(sr.yearMonth)}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  color: '#f87171',
+                                  padding: '6px 8px',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                title="Plan löschen"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 

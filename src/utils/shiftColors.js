@@ -10,12 +10,13 @@ export function detectStation({ station = '', code = '', codeId = '', vehicle = 
     if (st.includes('sendling') || st.includes('sen')) return 'Sendling';
 
     const c = (code || (typeof codeId === 'string' && codeId.replace('preset_', '')) || '').toUpperCase().trim();
-    if (c.endsWith('O') || c === 'RFO' || c === 'RSO' || c.startsWith('NFO') || c.startsWith('FFO')) return 'Obersendling';
-    if (c.endsWith('H') || c.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(c)) return 'Hohenbrunn';
-    if (c.endsWith('M') || c.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(c)) return 'Sendling';
+    const base = c.replace(/\*+$/, '').trim();
+    if (base.endsWith('O') || base === 'RFO' || base === 'RSO' || base.startsWith('NFO') || base.startsWith('FFO')) return 'Obersendling';
+    if (base.endsWith('H') || base.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(base)) return 'Hohenbrunn';
+    if (base.endsWith('M') || base.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(base)) return 'Sendling';
 
     // Check presets
-    const preset = SHIFT_PRESETS[c];
+    const preset = SHIFT_PRESETS[c] || SHIFT_PRESETS[base];
     if (preset?.station) {
         const pst = preset.station.toLowerCase();
         if (pst.includes('ober')) return 'Obersendling';
@@ -167,7 +168,7 @@ export const STATION_THEMES = {
 };
 
 export function getShiftThemeKey(typeName = '', code = '') {
-    const text = `${typeName} ${code}`.toLowerCase();
+    const text = `${typeName} ${code}`.toLowerCase().replace(/\*+$/, '');
     if (text.includes('früh') || text.includes('rf') || text.includes('fm') || text.includes('fh') || text.includes('fo')) return 'frueh';
     if (text.includes('spät') || text.includes('rs') || text.includes('sm') || text.includes('sh') || text.includes('so')) return 'spaat';
     if (text.includes('nacht') || text.includes('rn') || text.includes('nm') || text.includes('nh')) return 'nacht';

@@ -71,9 +71,10 @@ export async function runTeamRosterOcr(imageSource, onProgress) {
  */
 export function getStationForCode(code = '') {
   const c = code.toUpperCase().trim();
-  if (c.endsWith('H') || c.startsWith('RH') || c.includes('HBN')) return 'Wache Hohenbrunn';
-  if (c.endsWith('O') || c.startsWith('RO') || c.includes('OBS') || c.includes('FO')) return 'Wache Obersendling';
-  if (c.endsWith('M') || c.startsWith('RM') || c.includes('SEN') || c.includes('SJ')) return 'Wache Sendling';
+  const clean = c.replace(/\*+$/, '').trim();
+  if (clean.endsWith('H') || clean.startsWith('RH') || clean.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(clean)) return 'Wache Hohenbrunn';
+  if (clean.endsWith('O') || clean.startsWith('RO') || clean.includes('OBS') || clean.includes('FO') || clean.startsWith('NFO') || clean.startsWith('FFO')) return 'Wache Obersendling';
+  if (clean.endsWith('M') || clean.startsWith('RM') || clean.includes('SEN') || clean.includes('SJ') || clean.includes('-M')) return 'Wache Sendling';
   return 'Wache Sendling';
 }
 
@@ -82,17 +83,18 @@ export function getStationForCode(code = '') {
  */
 export function getShiftTypeForCode(code = '') {
   const c = code.toUpperCase().trim();
-  const preset = getPresetForCode(c);
+  const clean = c.replace(/\*+$/, '').trim();
+  const preset = getPresetForCode(c) || getPresetForCode(clean);
   if (preset?.shiftTypeName) return preset.shiftTypeName;
 
-  if (['PALS', 'ACLS', 'SMT', 'RAJ'].some(k => c.includes(k))) return 'Fortbildung';
-  if (['V030', 'V-B', 'V07', 'VFU', 'UDN'].some(k => c.includes(k))) return 'Urlaub / Freistellung';
-  if (['IO', 'F-M', 'C-M', 'SW1', 'RZF', 'R-SAN'].some(k => c.includes(k))) return 'Sonderdienst';
-  if (c.includes('RN') || c.endsWith('NM') || c.endsWith('NH')) return 'Nachtschicht';
-  if (c.includes('RF') || c.endsWith('FM') || c.endsWith('FH') || c.endsWith('FO')) return 'Frühschicht';
-  if (c.includes('RS') || c.endsWith('SM') || c.endsWith('SH') || c.endsWith('SO')) return 'Spätschicht';
-  if (c.includes('RT') || c.startsWith('RT') || c.includes('TH')) {
-    if (c.includes('1') || c.includes('3') || c === 'RTH') return 'Tagschicht';
+  if (['PALS', 'ACLS', 'SMT', 'RAJ'].some(k => clean.includes(k))) return 'Fortbildung';
+  if (['V030', 'V-B', 'V07', 'VFU', 'UDN'].some(k => clean.includes(k))) return 'Urlaub / Freistellung';
+  if (['IO', 'F-M', 'C-M', 'SW1', 'RZF', 'R-SAN'].some(k => clean.includes(k))) return 'Sonderdienst';
+  if (clean.includes('RN') || clean.endsWith('NM') || clean.endsWith('NH')) return 'Nachtschicht';
+  if (clean.includes('RF') || clean.endsWith('FM') || clean.endsWith('FH') || clean.endsWith('FO')) return 'Frühschicht';
+  if (clean.includes('RS') || clean.endsWith('SM') || clean.endsWith('SH') || clean.endsWith('SO')) return 'Spätschicht';
+  if (clean.includes('RT') || clean.startsWith('RT') || clean.includes('TH')) {
+    if (clean.includes('1') || clean.includes('3') || clean === 'RTH') return 'Tagschicht';
     return 'Spätschicht';
   }
   return 'Tagdienst';
@@ -102,25 +104,26 @@ export function getShiftTypeForCode(code = '') {
  * Helper for shift start and end times
  */
 export function getTimesForCode(code = '', shiftTypeName = '') {
-  const preset = getPresetForCode(code);
+  const c = code.toUpperCase().trim();
+  const clean = c.replace(/\*+$/, '').trim();
+  const preset = getPresetForCode(code) || getPresetForCode(clean);
   if (preset?.startTime && preset?.endTime) {
     return { startTime: preset.startTime, endTime: preset.endTime };
   }
   const st = (shiftTypeName || getShiftTypeForCode(code)).toLowerCase();
-  const c = code.toUpperCase();
   if (st.includes('nacht')) return { startTime: '22:54', endTime: '07:06' };
   if (st.includes('früh')) {
-    if (c.endsWith('O')) return { startTime: '07:54', endTime: '16:06' };
+    if (clean.endsWith('O')) return { startTime: '07:54', endTime: '16:06' };
     return { startTime: '06:54', endTime: '15:06' };
   }
   if (st.includes('spät')) {
-    if (c.endsWith('O')) return { startTime: '15:54', endTime: '00:06' };
-    if (c.includes('RT4')) return { startTime: '15:24', endTime: '00:06' };
+    if (clean.endsWith('O')) return { startTime: '15:54', endTime: '00:06' };
+    if (clean.includes('RT4')) return { startTime: '15:24', endTime: '00:06' };
     return { startTime: '14:54', endTime: '23:06' };
   }
   if (st.includes('tag')) {
-    if (c.includes('RT3')) return { startTime: '06:54', endTime: '15:36' };
-    if (c.includes('RT1')) return { startTime: '06:54', endTime: '15:06' };
+    if (clean.includes('RT3')) return { startTime: '06:54', endTime: '15:36' };
+    if (clean.includes('RT1')) return { startTime: '06:54', endTime: '15:06' };
     return { startTime: '08:54', endTime: '19:06' };
   }
   if (st.includes('fortbildung')) return { startTime: '08:00', endTime: '17:00' };
@@ -270,12 +273,13 @@ export function detectRosterStation(rosterData) {
 
   const checkCode = (code = '') => {
     const c = (code || '').toUpperCase().trim();
-    if (!c || c === '-' || c === '/' || c === '0') return;
-    if (c.endsWith('M') || c.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(c)) {
+    const base = c.replace(/\*+$/, '').trim();
+    if (!base || base === '-' || base === '/' || base === '0') return;
+    if (base.endsWith('M') || base.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(base)) {
       mCount++;
-    } else if (c.endsWith('O') || c === 'RFO' || c === 'RSO' || c.startsWith('NFO') || c.startsWith('FFO')) {
+    } else if (base.endsWith('O') || base === 'RFO' || base === 'RSO' || base.startsWith('NFO') || base.startsWith('FFO')) {
       oCount++;
-    } else if (c.endsWith('H') || c.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(c)) {
+    } else if (base.endsWith('H') || base.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(base)) {
       hCount++;
     }
   };

@@ -175,7 +175,8 @@ export async function parseCareManPdf(fileOrBuffer, onProgress) {
       // Match shift codes in this row to the closest day column
       items.forEach(it => {
         const code = it.str.toUpperCase().trim();
-        if (knownCodesSet.has(code) || it !== nameItem) {
+        const base = code.replace(/\*+$/, '').trim();
+        if (knownCodesSet.has(code) || knownCodesSet.has(base) || it !== nameItem) {
           // Find closest day column
           let closestDay = null;
           let minDist = 99999;
@@ -193,8 +194,8 @@ export async function parseCareManPdf(fileOrBuffer, onProgress) {
             shiftsByDate[dateStr].push({
               name: cleaned,
               code: code,
-              shiftTypeName: code.includes('N') ? 'Nachtschicht' : (code.includes('F') ? 'Frühschicht' : 'Spätschicht'),
-              station: code.endsWith('H') ? 'Wache Hohenbrunn' : (code.endsWith('O') ? 'Wache Obersendling' : 'Wache Sendling')
+              shiftTypeName: base.includes('N') ? 'Nachtschicht' : (base.includes('F') ? 'Frühschicht' : 'Spätschicht'),
+              station: (base.endsWith('H') || base.includes('HBN')) ? 'Wache Hohenbrunn' : ((base.endsWith('O') || base.includes('OBS')) ? 'Wache Obersendling' : 'Wache Sendling')
             });
           }
         }

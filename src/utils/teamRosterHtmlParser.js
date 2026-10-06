@@ -70,7 +70,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
         const normalizedShifts = {};
         Object.entries(c.shifts).forEach(([k, v]) => {
           if (!v) return;
-          const cleanCode = String(v).replace(/\*+$/, '').trim().toUpperCase();
+          const cleanCode = String(v).trim().toUpperCase();
           if (cleanCode.length < 2 || cleanCode === '-' || cleanCode === '/' || cleanCode === '0') return;
 
           let dateStr = k;
@@ -274,7 +274,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
                 if (attr) code = attr.trim();
               }
               const tokens = code.split(/[\s\r\n]+/).filter(Boolean);
-              const validToken = tokens.find(t => /^[A-Z0-9\-]{2,10}$/i.test(t));
+              const validToken = tokens.find(t => /^[A-Z0-9\-*]{2,10}$/i.test(t));
               if (validToken) {
                 const cleanCode = validToken.toUpperCase();
                 colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = cleanCode;
@@ -342,7 +342,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
             if (cIdx < shiftCells.length) {
               const code = shiftCells[cIdx].textContent.trim().toUpperCase();
               const tokens = code.split(/[\s\r\n]+/).filter(Boolean);
-              const validToken = tokens.find(t => /^[A-Z0-9\-]{2,10}$/i.test(t));
+              const validToken = tokens.find(t => /^[A-Z0-9\-*]{2,10}$/i.test(t));
               if (validToken) {
                 const cleanCode = validToken.toUpperCase();
                 colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = cleanCode;
@@ -407,7 +407,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
         // Explicit column index to day number mapping
         dayColMap.forEach((dayNum, colIdx) => {
           if (colIdx < parts.length) {
-            const token = parts[colIdx].trim().replace(/\*+$/, '').toUpperCase();
+            const token = parts[colIdx].trim().toUpperCase();
             if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
               const cleanCode = token.split(/[\s,]+/)[0];
               colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = cleanCode;
@@ -420,7 +420,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
         for (let d = 1; d <= daysInMonth; d++) {
           const colIdx = nameIdx + d;
           if (colIdx < parts.length) {
-            const token = parts[colIdx].trim().replace(/\*+$/, '').toUpperCase();
+            const token = parts[colIdx].trim().toUpperCase();
             if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
               const cleanCode = token.split(/[\s,]+/)[0];
               colleagueShifts[`${yearMonth}-${String(d).padStart(2, '0')}`] = cleanCode;
@@ -459,7 +459,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
 
         const lineParts = line.split('\t').slice(1);
         lineParts.forEach(p => {
-          const token = p.trim().replace(/\*+$/, '').toUpperCase();
+          const token = p.trim().toUpperCase();
           if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
             const cleanCode = token.split(/[\s,]+/)[0];
             if (dayIndex <= daysInMonth) {
@@ -472,7 +472,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
       } else if (currentColleague) {
         const parts = line.split('\t');
         parts.forEach(p => {
-          const token = p.trim().replace(/\*+$/, '').toUpperCase();
+          const token = p.trim().toUpperCase();
           if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
             const cleanCode = token.split(/[\s,]+/)[0];
             if (dayIndex <= daysInMonth) {

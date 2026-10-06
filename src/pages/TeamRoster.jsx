@@ -79,13 +79,14 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
 
     colToDay.forEach((dayNum, colIdx) => {
       if (colIdx < cells.length) {
-        let code = cells[colIdx].textContent.trim().replace(/\\*+$/, '').trim().toUpperCase();
+        let code = cells[colIdx].textContent.trim().toUpperCase();
         if (code && code.length >= 2 && code !== '-' && code !== '/' && code !== '0') {
           const dateStr = \`\${yearMonth}-\${String(dayNum).padStart(2, '0')}\`;
           shifts[dateStr] = code;
-          if (code.endsWith('M') || code.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(code)) mCount++;
-          else if (code.endsWith('O') || code === 'RFO' || code === 'RSO' || code.startsWith('NFO') || code.startsWith('FFO')) oCount++;
-          else if (code.endsWith('H') || code.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(code)) hCount++;
+          const base = code.replace(/\\*+$/, '').trim();
+          if (base.endsWith('M') || base.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(base)) mCount++;
+          else if (base.endsWith('O') || base === 'RFO' || base === 'RSO' || base.startsWith('NFO') || base.startsWith('FFO')) oCount++;
+          else if (base.endsWith('H') || base.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(base)) hCount++;
         }
       }
     });
@@ -104,7 +105,7 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
   alert(\`✅ Erfolg! \${colleagues.length} Kollegen für \${monthLabel} (Wache \${station}) kopiert! Jetzt in der Schichten-App einfügen.\`);
 })();`;
 
-const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];var mc=0,oc=0,hc=0;rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var c=cs[colIdx].textContent.trim().replace(/\\*+$/,"").trim().toUpperCase();if(c&&c.length>=2&&c!=="-"&&c!=="/"&&c!=="0"){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=c;if(c.endsWith("M")||c.indexOf("-M")!==-1)mc++;else if(c.endsWith("O")||c==="FFO"||c==="NFO")oc++;else if(c.endsWith("H"))hc++;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var st="Sendling";if(oc>mc&&oc>hc)st="Obersendling";else if(hc>mc&&hc>oc)st="Hohenbrunn";var json=JSON.stringify({yearMonth:ym,monthLabel:ml,station:st,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" (Wache "+st+") kopiert!\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
+const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];var mc=0,oc=0,hc=0;rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var c=cs[colIdx].textContent.trim().toUpperCase();if(c&&c.length>=2&&c!=="-"&&c!=="/"&&c!=="0"){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=c;var b=c.replace(/\\*+$/,"").trim();if(b.endsWith("M")||b.indexOf("-M")!==-1)mc++;else if(b.endsWith("O")||b==="FFO"||b==="NFO")oc++;else if(b.endsWith("H")||["RFH","RTH","RT1H","RT2H","RSH","RNH","RHH"].indexOf(b)!==-1)hc++;}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var st="Sendling";if(oc>mc&&oc>hc)st="Obersendling";else if(hc>mc&&hc>oc)st="Hohenbrunn";var json=JSON.stringify({yearMonth:ym,monthLabel:ml,station:st,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" (Wache "+st+") kopiert!\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
 
 export default function TeamRoster() {
   const { currentUser } = useAuth();
@@ -299,7 +300,7 @@ export default function TeamRoster() {
   };
 
   function getShiftRank(code = '') {
-    const c = (code || '').toUpperCase().trim();
+    const c = (code || '').toUpperCase().trim().replace(/\*+$/, '');
     if (c.startsWith('RF') || c === 'RT1M' || c === 'RT3M' || c === 'RT1H') return 10;
     if (c.startsWith('RT') && !c.includes('2') && !c.includes('4')) return 20;
     if (c === 'RTH') return 20;
@@ -311,7 +312,7 @@ export default function TeamRoster() {
   }
 
   function getShiftCodeSortPriority(code = '') {
-    const c = (code || '').toUpperCase().trim();
+    const c = (code || '').toUpperCase().trim().replace(/\*+$/, '');
 
     // 1. Frühdienste (06:00 / 06:30 / 07:00)
     if (c === 'RFM') return 100;
@@ -342,6 +343,7 @@ export default function TeamRoster() {
     if (c === 'RT2H') return 302;
     if (c.startsWith('RT2')) return 304;
 
+    // 3. Spätdienste Forts.
     if (c === 'RT4M') return 310;
     if (c === 'RT4H') return 312;
     if (c.startsWith('RT4')) return 314;
@@ -385,7 +387,7 @@ export default function TeamRoster() {
   }
 
   function getShiftGroupName(code = '') {
-    const c = (code || '').toUpperCase().trim();
+    const c = (code || '').toUpperCase().trim().replace(/\*+$/, '');
     if (c.startsWith('RF') || c === 'RT1M' || c === 'RT3M' || c === 'RT1H') return 'Frühdienst';
     if (c.startsWith('RT') && !c.includes('2') && !c.includes('4')) return 'Tagschicht';
     if (c === 'RTH') return 'Tagschicht';

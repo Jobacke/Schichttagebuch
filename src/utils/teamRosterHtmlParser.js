@@ -70,7 +70,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
         const normalizedShifts = {};
         Object.entries(c.shifts).forEach(([k, v]) => {
           if (!v) return;
-          const cleanCode = String(v).trim().toUpperCase();
+          const cleanCode = String(v).replace(/\s+/g, '').toUpperCase();
           if (cleanCode.length < 2 || cleanCode === '-' || cleanCode === '/' || cleanCode === '0') return;
 
           let dateStr = k;
@@ -113,10 +113,10 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
           let mCount = 0, oCount = 0, hCount = 0;
           cleanColleagues.forEach(c => {
             Object.values(c.shifts).forEach(code => {
-              const up = (code || '').toUpperCase().trim();
-              if (up.endsWith('M') || up.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(up)) mCount++;
-              else if (up.endsWith('O') || up === 'RFO' || up === 'RSO' || up.startsWith('NFO') || up.startsWith('FFO')) oCount++;
-              else if (up.endsWith('H') || up.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(up)) hCount++;
+              const base = (code || '').toUpperCase().trim().replace(/\*+$/, '');
+              if (base.endsWith('M') || base.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(base)) mCount++;
+              else if (base.endsWith('O') || base === 'RFO' || base === 'RSO' || base.startsWith('NFO') || base.startsWith('FFO')) oCount++;
+              else if (base.endsWith('H') || base.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(base)) hCount++;
             });
           });
           if (oCount > mCount && oCount > hCount) targetStation = 'Obersendling';

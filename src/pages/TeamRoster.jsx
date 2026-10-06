@@ -238,17 +238,21 @@ export default function TeamRoster() {
     switchMonth(nextYM);
   };
 
-  const switchMonth = (newYM) => {
+  const switchMonth = (newYM, targetDate = null) => {
     setCurrentYearMonth(newYM);
     localStorage.setItem('schichten_selected_year_month', newYM);
     const loaded = getActiveTeamRoster(newYM);
     setRoster(loaded);
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    if (todayStr.startsWith(newYM)) {
-      setSelectedDate(todayStr);
+    if (targetDate) {
+      setSelectedDate(targetDate);
     } else {
-      setSelectedDate(`${newYM}-01`);
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      if (todayStr.startsWith(newYM)) {
+        setSelectedDate(todayStr);
+      } else {
+        setSelectedDate(`${newYM}-01`);
+      }
     }
   };
 
@@ -290,6 +294,12 @@ export default function TeamRoster() {
     const currentDay = parseInt(selectedDate.split('-')[2], 10);
     if (currentDay > 1) {
       setSelectedDate(`${yearMonth}-${String(currentDay - 1).padStart(2, '0')}`);
+    } else {
+      const [y, m] = yearMonth.split('-').map(Number);
+      const prevDate = new Date(y, m - 1, 0); // last day of prev month
+      const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+      const lastDayStr = `${prevYM}-${String(prevDate.getDate()).padStart(2, '0')}`;
+      switchMonth(prevYM, lastDayStr);
     }
   };
 
@@ -297,16 +307,23 @@ export default function TeamRoster() {
     const currentDay = parseInt(selectedDate.split('-')[2], 10);
     if (currentDay < daysInMonth) {
       setSelectedDate(`${yearMonth}-${String(currentDay + 1).padStart(2, '0')}`);
+    } else {
+      const [y, m] = yearMonth.split('-').map(Number);
+      const nextDate = new Date(y, m, 1);
+      const nextYM = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+      const firstDayStr = `${nextYM}-01`;
+      switchMonth(nextYM, firstDayStr);
     }
   };
 
   const handleToday = () => {
     const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    if (todayStr.startsWith(yearMonth)) {
-      setSelectedDate(todayStr);
+    const todayYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const todayStr = `${todayYM}-${String(today.getDate()).padStart(2, '0')}`;
+    if (yearMonth !== todayYM) {
+      switchMonth(todayYM, todayStr);
     } else {
-      setSelectedDate(`${yearMonth}-01`);
+      setSelectedDate(todayStr);
     }
   };
 

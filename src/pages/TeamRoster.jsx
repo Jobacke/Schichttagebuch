@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Search,
-  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, FileText, FileCode, Clipboard, Copy, Bookmark,
+  UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, AlertTriangle, FileText, FileCode, Clipboard, Copy, Bookmark,
   Calendar, Trash2, FolderOpen, Check, Cloud, RefreshCw
 } from 'lucide-react';
 import {
@@ -478,6 +478,88 @@ export default function TeamRoster() {
     });
   }, [roster, selectedDate, searchQuery, selectedStation]);
 
+  // Staffing Analysis: Jedes reguläre Schichtkürzel ohne '*' muss mindestens 2x vorkommen
+  const staffingAnalysis = useMemo(() => {
+    const raw = roster.shiftsByDate?.[selectedDate] || [];
+    const shiftsToCheck = selectedStation === 'ALL'
+      ? raw
+      : raw.filter(s => detectStation({ code: s.code, station: s.station }) === selectedStation);
+
+    const regularCounts = {}; // baseCode -> Anzahl regulär besetzt (ohne '*')
+    const starCounts = {};    // baseCode -> Anzahl mit '*' (Zusatzkraft/3. Person)
+    const colleaguesByCode = {}; // baseCode -> Array von Kollegennamen
+
+    shiftsToCheck.forEach(shift => {
+      const fullCode = (shift.code || '').trim();
+      if (!fullCode || fullCode === '/' || fullCode === 'FREI' || fullCode === '00' || fullCode === '-') return;
+
+      const baseCode = fullCode.replace(/\*+$/, '').trim().toUpperCase();
+      const hasAsterisk = fullCode.includes('*');
+
+      // Abwesenheiten (Urlaub) und Fortbildung ausschließen
+      const group = getShiftGroupName(baseCode);
+      if (group === 'Urlaub / Abwesend' || group === 'Fortbildung') return;
+      if (baseCode.startsWith('V') || baseCode.startsWith('U') || baseCode === 'KRANK') return;
+
+      if (hasAsterisk) {
+        starCounts[baseCode] = (starCounts[baseCode] || 0) + 1;
+      } else {
+        regularCounts[baseCode] = (regularCounts[baseCode] || 0) + 1;
+        if (!colleaguesByCode[baseCode]) colleaguesByCode[baseCode] = [];
+        colleaguesByCode[baseCode].push(shift.name);
+      }
+    });
+
+    const allRelevantCodes = new Set([
+      ...Object.keys(regularCounts),
+      ...Object.keys(starCounts)
+    ]);
+
+    const understaffed = [];
+    const fullyStaffed = [];
+    const understaffedCodes = new Set();
+
+    allRelevantCodes.forEach(code => {
+      const count = regularCounts[code] || 0;
+      const stars = starCounts[code] || 0;
+      const item = {
+        code,
+        count,
+        stars,
+        missing: Math.max(0, 2 - count),
+        colleagues: colleaguesByCode[code] || [],
+        group: getShiftGroupName(code),
+        station: detectStation({ code })
+      };
+
+      if (count < 2) {
+        understaffed.push(item);
+        understaffedCodes.add(code);
+      } else {
+        fullyStaffed.push(item);
+      }
+    });
+
+    // Sortierung nach Schichtrang und Priorität
+    understaffed.sort((a, b) => {
+      const rA = getShiftRank(a.code);
+      const rB = getShiftRank(b.code);
+      if (rA !== rB) return rA - rB;
+      const pA = getShiftCodeSortPriority(a.code);
+      const pB = getShiftCodeSortPriority(b.code);
+      if (pA !== pB) return pA - pB;
+      return a.code.localeCompare(b.code);
+    });
+
+    return {
+      totalEvaluated: allRelevantCodes.size,
+      understaffed,
+      fullyStaffed,
+      understaffedCodes,
+      hasUnderstaffed: understaffed.length > 0
+    };
+  }, [roster, selectedDate, selectedStation]);
+
   // All displayable months (combining saved plans with currently viewed month)
   const allDisplayMonths = useMemo(() => {
     const map = new Map();
@@ -839,6 +921,79 @@ export default function TeamRoster() {
         )}
       </div>
 
+      {/* Staffing Evaluation Box (Mind. 2x Besetzung pro regulärem Schichtkürzel ohne *) */}
+      {staffingAnalysis.totalEvaluated > 0 && (
+        <div className={`team-roster-staffing-box ${staffingAnalysis.hasUnderstaffed ? 'warning' : 'success'}`}>
+          <div className="team-roster-staffing-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {staffingAnalysis.hasUnderstaffed ? (
+                <>
+                  <AlertTriangle size={17} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>
+                    Fehlende Besetzung ({staffingAnalysis.understaffed.length})
+                  </span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#10b981' }}>
+                    Alle Schichten voll besetzt (mind. 2x)
+                  </span>
+                </>
+              )}
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+              {staffingAnalysis.hasUnderstaffed ? 'Mind. 2 Personen ohne *' : `${staffingAnalysis.totalEvaluated} Kürzel geprüft`}
+            </span>
+          </div>
+
+          {staffingAnalysis.hasUnderstaffed && (
+            <div className="team-roster-staffing-chips">
+              {staffingAnalysis.understaffed.map(item => {
+                const isSelected = searchQuery.toUpperCase() === item.code;
+                return (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => setSearchQuery(isSelected ? '' : item.code)}
+                    className={`team-roster-staffing-pill ${isSelected ? 'selected' : ''}`}
+                    title={`Klicken zum Filtern nach ${item.code} (${item.colleagues.join(', ') || 'Kein Kollege eingeteilt'})`}
+                  >
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                      {item.count}x {item.code}
+                    </span>
+                    {item.stars > 0 && (
+                      <span className="pill-star-note" title={`${item.stars}x ${item.code}* als Zusatzkraft`}>
+                        (+{item.stars}*)
+                      </span>
+                    )}
+                    {selectedStation === 'ALL' && (
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '1px 5px',
+                        borderRadius: '4px',
+                        background: item.station === 'Hohenbrunn' ? 'rgba(16, 185, 129, 0.2)' :
+                                    item.station === 'Obersendling' ? 'rgba(245, 158, 11, 0.2)' :
+                                    'rgba(56, 189, 248, 0.2)',
+                        color: item.station === 'Hohenbrunn' ? '#34d399' :
+                               item.station === 'Obersendling' ? '#fbbf24' :
+                               '#38bdf8',
+                        fontWeight: 600
+                      }}>
+                        {item.station}
+                      </span>
+                    )}
+                    <span className="pill-missing">
+                      fehlt {item.missing}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Shifts List: Grouped & Sorted */}
       <div>
         {currentDayShifts.length === 0 ? (
@@ -916,17 +1071,27 @@ export default function TeamRoster() {
                       )}
                     </div>
 
-                    {/* Shift Code Badge with Station Color */}
-                    <span
-                      className="team-roster-badge"
-                      style={{
-                        background: colorInfo.bg,
-                        color: colorInfo.color,
-                        borderColor: colorInfo.border
-                      }}
-                    >
-                      {shift.code}
-                    </span>
+                    {/* Shift Code Badge with Station Color and Understaffed Indicator */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                      {!shift.code.includes('*') && staffingAnalysis.understaffedCodes.has((shift.code || '').trim().toUpperCase()) && (
+                        <span
+                          className="team-roster-staffing-tag"
+                          title="In dieser Schicht fehlt ein Kollege bzw. eine Kollegin (nur 1x besetzt)"
+                        >
+                          ⚠️ 1x
+                        </span>
+                      )}
+                      <span
+                        className="team-roster-badge"
+                        style={{
+                          background: colorInfo.bg,
+                          color: colorInfo.color,
+                          borderColor: colorInfo.border
+                        }}
+                      >
+                        {shift.code}
+                      </span>
+                    </div>
                   </div>
                 </React.Fragment>
               );

@@ -782,3 +782,100 @@ h2 {
 .spin-animation {
   animation: spin 1s linear infinite;
 }
+
+/* Team Roster Staffing Evaluation */
+.team-roster-staffing-box {
+  margin-bottom: 14px;
+  border-radius: 14px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+
+.team-roster-staffing-box.warning {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.team-roster-staffing-box.success {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+}
+
+.team-roster-staffing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.team-roster-staffing-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.team-roster-staffing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.team-roster-staffing-pill:hover {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+}
+
+.team-roster-staffing-pill.selected {
+  background: #f59e0b;
+  color: #0f172a;
+  border-color: #f59e0b;
+  font-weight: 700;
+}
+
+.team-roster-staffing-pill .pill-star-note {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.team-roster-staffing-pill.selected .pill-star-note {
+  color: #1e293b;
+}
+
+.team-roster-staffing-pill .pill-missing {
+  font-size: 11px;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.team-roster-staffing-pill.selected .pill-missing {
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+}
+
+.team-roster-staffing-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 6px;
+  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  letter-spacing: 0.02em;
+}

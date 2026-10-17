@@ -3,7 +3,7 @@ import { useStore } from '../context/StoreContext';
 import {
     Plus, Clock, Tag, Truck, Hash, MapPin,
     Database, ChevronLeft, ChevronRight, Trash2, RotateCcw, Check, CalendarDays,
-    PenSquare, X
+    PenSquare, X, Coins
 } from 'lucide-react';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { APP_VERSION } from '../version';
@@ -16,7 +16,9 @@ export default function Settings() {
         removeSettingItem,
         updateWeeklyHours,
         setMonthlyWeeklyHours,
-        removeMonthlyWeeklyHours
+        removeMonthlyWeeklyHours,
+        updateDefaultBonusAmount,
+        updateAllBonusShiftsAmount
     } = useStore();
     const [activeScreen, setActiveScreen] = useState(null);
 
@@ -27,10 +29,11 @@ export default function Settings() {
             <DetailScreen
                 title={
                     activeScreen === 'targetHours' ? 'Sollstunden & Arbeitszeit' :
-                        activeScreen === 'codes' ? 'Schichtkürzel' :
-                            activeScreen === 'types' ? 'Schichtarten' :
-                                activeScreen === 'stations' ? 'Wachen' :
-                                    activeScreen === 'vehicles' ? 'Fahrzeuge' : 'Funkrufnamen'
+                        activeScreen === 'bonus' ? 'Bonus-Vergütung' :
+                            activeScreen === 'codes' ? 'Schichtkürzel' :
+                                activeScreen === 'types' ? 'Schichtarten' :
+                                    activeScreen === 'stations' ? 'Wachen' :
+                                        activeScreen === 'vehicles' ? 'Fahrzeuge' : 'Funkrufnamen'
                 }
                 onBack={goBack}
             >
@@ -41,6 +44,14 @@ export default function Settings() {
                         onUpdateWeeklyHours={updateWeeklyHours}
                         onSetMonthlyWeeklyHours={setMonthlyWeeklyHours}
                         onRemoveMonthlyWeeklyHours={removeMonthlyWeeklyHours}
+                    />
+                )}
+                {activeScreen === 'bonus' && (
+                    <BonusSettingsManager
+                        defaultBonusAmount={store.settings?.defaultBonusAmount ?? 75}
+                        shifts={store.shifts || []}
+                        onUpdateDefaultBonus={updateDefaultBonusAmount}
+                        onUpdateAllBonusShifts={updateAllBonusShiftsAmount}
                     />
                 )}
                 {activeScreen === 'codes' && (
@@ -81,6 +92,10 @@ export default function Settings() {
                 <SettingsItem
                     icon={CalendarDays} color="#eab308" label="Sollstunden & Arbeitszeit"
                     value={`${store.settings?.defaultWeeklyHours ?? 20} h/Woche`} onClick={() => setActiveScreen('targetHours')}
+                />
+                <SettingsItem
+                    icon={Coins} color="#10b981" label="Bonus-Betrag (Standard)"
+                    value={`${store.settings?.defaultBonusAmount ?? 75} €`} onClick={() => setActiveScreen('bonus')}
                 />
                 <SettingsItem
                     icon={Clock} color="#f97316" label="Schichtkürzel & Zeiten"
@@ -895,6 +910,163 @@ function MonthTargetRow({ monthName, daysInMonth, defaultWeekly, hasCustom, cust
                     </button>
                 )}
             </div>
+        </div>
+    );
+}
+
+function BonusSettingsManager({ defaultBonusAmount = 75, shifts = [], onUpdateDefaultBonus, onUpdateAllBonusShifts }) {
+    const [amountInput, setAmountInput] = useState(defaultBonusAmount.toString());
+    const [savedFeedback, setSavedFeedback] = useState(false);
+    const [bulkUpdatedCount, setBulkUpdatedCount] = useState(null);
+
+    useEffect(() => {
+        setAmountInput(defaultBonusAmount.toString());
+    }, [defaultBonusAmount]);
+
+    const handleSaveDefault = (e) => {
+        if (e) e.preventDefault();
+        const parsed = parseFloat(amountInput);
+        if (!isNaN(parsed) && parsed >= 0) {
+            onUpdateDefaultBonus(parsed);
+            setSavedFeedback(true);
+            setTimeout(() => setSavedFeedback(false), 2000);
+        }
+    };
+
+    const handlePresetClick = (val) => {
+        setAmountInput(val.toString());
+        onUpdateDefaultBonus(val);
+        setSavedFeedback(true);
+        setTimeout(() => setSavedFeedback(false), 2000);
+    };
+
+    const bonusShiftsCount = (shifts || []).filter(s => s.hasBonus).length;
+
+    const handleApplyToExisting = async () => {
+        const parsed = parseFloat(amountInput);
+        if (isNaN(parsed) || parsed < 0) return;
+        if (window.confirm(`Möchtest du wirklich alle ${bonusShiftsCount} bereits markierten Bonus-Schichten auf ${parsed} € aktualisieren?`)) {
+            const count = await onUpdateAllBonusShifts(parsed);
+            setBulkUpdatedCount(count);
+            setTimeout(() => setBulkUpdatedCount(null), 3500);
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="card-premium" style={{ borderLeft: '4px solid #10b981' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '20px' }}>💰</span>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text-main)' }}>
+                            Standard Bonus-Betrag
+                        </h3>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                            Wird automatisch voreingestellt, wenn du bei einer Schicht den Haken „Bonus“ setzt.
+                        </span>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSaveDefault} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '14px' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                        <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            className="input-premium"
+                            style={{ marginBottom: 0, paddingRight: '40px', fontSize: '16px', fontWeight: 700, color: '#34d399' }}
+                            value={amountInput}
+                            onChange={(e) => setAmountInput(e.target.value)}
+                        />
+                        <span style={{
+                            position: 'absolute',
+                            right: '14px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            color: '#34d399',
+                            fontSize: '15px',
+                            fontWeight: 700,
+                            pointerEvents: 'none'
+                        }}>
+                            €
+                        </span>
+                    </div>
+                    <button
+                        type="submit"
+                        className="btn-primary"
+                        style={{
+                            width: 'auto',
+                            padding: '12px 18px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: savedFeedback ? 'var(--color-success)' : '#10b981'
+                        }}
+                    >
+                        {savedFeedback ? <><Check size={18} /> Gespeichert</> : 'Speichern'}
+                    </button>
+                </form>
+
+                <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Schnellauswahl:</span>
+                    {[50, 75, 100, 125, 150, 200].map(val => {
+                        const active = Number(defaultBonusAmount) === val;
+                        return (
+                            <button
+                                key={val}
+                                type="button"
+                                onClick={() => handlePresetClick(val)}
+                                style={{
+                                    padding: '5px 12px',
+                                    borderRadius: '8px',
+                                    fontSize: '12px',
+                                    fontWeight: active ? 700 : 500,
+                                    background: active ? '#10b981' : '#0f172a',
+                                    color: active ? '#0f172a' : '#cbd5e1',
+                                    border: active ? '1px solid #10b981' : '1px solid #334155',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {val} €
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {bonusShiftsCount > 0 && (
+                <div className="card-premium">
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--color-text-main)' }}>
+                        Bestehende Bonus-Schichten ({bonusShiftsCount})
+                    </h3>
+                    <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', margin: '0 0 14px 0', lineHeight: 1.5 }}>
+                        Neue Bonus-Schichten erhalten automatisch den oben eingestellten Standardbetrag ({defaultBonusAmount} €). Falls du auch alle bereits eingetragenen Bonus-Schichten auf {amountInput || defaultBonusAmount} € umstellen möchtest:
+                    </p>
+                    <button
+                        type="button"
+                        onClick={handleApplyToExisting}
+                        className="btn-secondary"
+                        style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(16, 185, 129, 0.35)',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#34d399',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Alle {bonusShiftsCount} Bonus-Schichten auf {amountInput || defaultBonusAmount} € setzen
+                    </button>
+                    {bulkUpdatedCount !== null && (
+                        <div style={{ marginTop: '10px', fontSize: '12.5px', color: '#34d399', fontWeight: 600, textAlign: 'center' }}>
+                            ✓ {bulkUpdatedCount} Bonus-Schichten erfolgreich aktualisiert!
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

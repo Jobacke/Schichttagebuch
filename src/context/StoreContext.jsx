@@ -20,8 +20,17 @@ const INITIAL_SETTINGS = {
   callSigns: ['Florian 1/83/1', 'Florian 1/76/1', 'Florian 1/10/1'],
   stations: ['Hauptwache', 'Nordwache', 'Südwache'],
   defaultWeeklyHours: 20,
-  monthlyWeeklyHours: {}
+  monthlyWeeklyHours: {},
+  defaultBonusAmount: 75
 };
+
+export function getShiftBonusAmount(shift, settings) {
+  if (!shift || !shift.hasBonus) return 0;
+  const custom = parseFloat(shift.bonusAmount);
+  if (!isNaN(custom) && custom >= 0) return custom;
+  const def = parseFloat(settings?.defaultBonusAmount);
+  return !isNaN(def) && def >= 0 ? def : 75;
+}
 
 export function StoreProvider({ children }) {
   const { currentUser } = useAuth();
@@ -274,6 +283,55 @@ export function StoreProvider({ children }) {
     _updateSettingsDoc(newSettings);
   };
 
+  const updateDefaultBonusAmount = (amount) => {
+    const num = parseFloat(amount);
+    const validAmount = !isNaN(num) && num >= 0 ? num : 75;
+    const newSettings = { ...settings, defaultBonusAmount: validAmount };
+    setSettings(newSettings);
+    _updateSettingsDoc(newSettings);
+  };
+
+  const toggleShiftBonus = async (shift, customAmount = null) => {
+    if (!currentUser || !shift || !shift.id) return;
+    try {
+      const nextHasBonus = !shift.hasBonus;
+      const defaultAmt = parseFloat(settings?.defaultBonusAmount);
+      const fallbackAmt = !isNaN(defaultAmt) && defaultAmt >= 0 ? defaultAmt : 75;
+      const nextBonusAmount = nextHasBonus
+        ? (customAmount !== null && !isNaN(parseFloat(customAmount)) ? parseFloat(customAmount) : (shift.bonusAmount ?? fallbackAmt))
+        : (shift.bonusAmount ?? fallbackAmt);
+
+      const updatedShift = {
+        ...shift,
+        hasBonus: nextHasBonus,
+        bonusAmount: nextBonusAmount
+      };
+      await setDoc(doc(db, `users/${currentUser.uid}/shifts`, shift.id), updatedShift);
+    } catch (e) {
+      console.error("Toggle Shift Bonus Failed", e);
+    }
+  };
+
+  const updateAllBonusShiftsAmount = async (newAmount) => {
+    if (!currentUser) return 0;
+    const num = parseFloat(newAmount);
+    if (isNaN(num) || num < 0) return 0;
+    const bonusShifts = (shifts || []).filter(s => s.hasBonus);
+    if (bonusShifts.length === 0) return 0;
+    try {
+      const batch = writeBatch(db);
+      bonusShifts.forEach(s => {
+        const ref = doc(db, `users/${currentUser.uid}/shifts`, s.id);
+        batch.set(ref, { ...s, bonusAmount: num });
+      });
+      await batch.commit();
+      return bonusShifts.length;
+    } catch (e) {
+      console.error("Update All Bonus Shifts Failed", e);
+      return 0;
+    }
+  };
+
   // Ensure store always has valid objects
   const safeStore = {
     shifts: shifts || [],
@@ -281,7 +339,8 @@ export function StoreProvider({ children }) {
       ...INITIAL_SETTINGS,
       ...(settings || {}),
       defaultWeeklyHours: settings?.defaultWeeklyHours !== undefined ? settings.defaultWeeklyHours : INITIAL_SETTINGS.defaultWeeklyHours,
-      monthlyWeeklyHours: settings?.monthlyWeeklyHours || settings?.monthlyTargets || INITIAL_SETTINGS.monthlyWeeklyHours
+      monthlyWeeklyHours: settings?.monthlyWeeklyHours || settings?.monthlyTargets || INITIAL_SETTINGS.monthlyWeeklyHours,
+      defaultBonusAmount: settings?.defaultBonusAmount !== undefined ? Number(settings.defaultBonusAmount) : INITIAL_SETTINGS.defaultBonusAmount
     }
   };
 
@@ -300,6 +359,9 @@ export function StoreProvider({ children }) {
       updateWeeklyHours,
       setMonthlyWeeklyHours,
       removeMonthlyWeeklyHours,
+      updateDefaultBonusAmount,
+      toggleShiftBonus,
+      updateAllBonusShiftsAmount,
       // Backward compatibility aliases
       setMonthlyTarget: setMonthlyWeeklyHours,
       removeMonthlyTarget: removeMonthlyWeeklyHours,

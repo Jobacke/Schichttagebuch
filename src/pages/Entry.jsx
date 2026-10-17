@@ -18,6 +18,8 @@ export default function Entry() {
     const shiftPresets = SHIFT_PRESETS;
 
 
+    const defaultBonus = store.settings?.defaultBonusAmount ?? 75;
+
     const [formData, setFormData] = useState({
         date: today,
         startTime: '07:00',
@@ -27,7 +29,9 @@ export default function Entry() {
         station: '',
         partner: '',
         vehicle: '',
-        callSign: ''
+        callSign: '',
+        hasBonus: false,
+        bonusAmount: defaultBonus
     });
 
     // Track whether a preset is active (to disable certain fields)
@@ -38,7 +42,13 @@ export default function Entry() {
         if (editId && store.shifts.length > 0) {
             const shiftToEdit = store.shifts.find(s => s.id === editId);
             if (shiftToEdit) {
-                setFormData(shiftToEdit);
+                setFormData({
+                    ...shiftToEdit,
+                    hasBonus: Boolean(shiftToEdit.hasBonus),
+                    bonusAmount: shiftToEdit.bonusAmount !== undefined && shiftToEdit.bonusAmount !== null
+                        ? shiftToEdit.bonusAmount
+                        : (store.settings?.defaultBonusAmount ?? 75)
+                });
             }
         } else {
             // Set defaults only for new entries
@@ -49,7 +59,8 @@ export default function Entry() {
                     codeId: store.settings.shiftCodes[0]?.id,
                     station: store.settings.stations[0],
                     vehicle: store.settings.vehicles[0],
-                    callSign: store.settings.callSigns[0]
+                    callSign: store.settings.callSigns[0],
+                    bonusAmount: store.settings?.defaultBonusAmount ?? 75
                 }));
             }
         }
@@ -110,8 +121,14 @@ export default function Entry() {
     const handleSubmit = (e) => {
         e.preventDefault();
         const selectedCode = store.settings.shiftCodes.find(c => c.id === formData.codeId);
+        const parsedBonus = parseFloat(formData.bonusAmount);
+        const validBonusAmount = !isNaN(parsedBonus) && parsedBonus >= 0
+            ? parsedBonus
+            : (store.settings?.defaultBonusAmount ?? 75);
         const shiftData = {
             ...formData,
+            hasBonus: Boolean(formData.hasBonus),
+            bonusAmount: validBonusAmount,
             code: selectedCode ? selectedCode.code : (formData.code || ''),
             id: editId || crypto.randomUUID(),
             timestamp: editId ? formData.timestamp : Date.now()
@@ -347,6 +364,152 @@ export default function Entry() {
                             style={{ width: '100%' }}
                         />
                     </div>
+                </div>
+
+                {/* Bonus Card */}
+                <div
+                    className="card-premium"
+                    style={{
+                        border: formData.hasBonus
+                            ? '1px solid rgba(16, 185, 129, 0.5)'
+                            : 'var(--glass-border)',
+                        background: formData.hasBonus
+                            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.85))'
+                            : 'var(--color-surface)',
+                        transition: 'all 0.2s ease'
+                    }}
+                >
+                    <div
+                        onClick={() => setFormData(prev => ({
+                            ...prev,
+                            hasBonus: !prev.hasBonus,
+                            bonusAmount: prev.bonusAmount !== undefined && prev.bonusAmount !== '' ? prev.bonusAmount : defaultBonus
+                        }))}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            cursor: 'pointer',
+                            userSelect: 'none'
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '7px',
+                                border: formData.hasBonus ? '2px solid #10b981' : '2px solid #475569',
+                                background: formData.hasBonus ? '#10b981' : 'transparent',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#fff',
+                                fontWeight: 800,
+                                fontSize: '14px',
+                                transition: 'all 0.15s ease',
+                                flexShrink: 0
+                            }}>
+                                {formData.hasBonus ? '✓' : ''}
+                            </div>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '16px', fontWeight: 700, color: formData.hasBonus ? '#34d399' : 'var(--color-text-main)' }}>
+                                        💰 Bonus-Schicht
+                                    </span>
+                                    {formData.hasBonus && (
+                                        <span style={{
+                                            fontSize: '12px',
+                                            fontWeight: 700,
+                                            background: 'rgba(16, 185, 129, 0.2)',
+                                            color: '#34d399',
+                                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                                            padding: '2px 8px',
+                                            borderRadius: '6px'
+                                        }}>
+                                            +{Number(formData.bonusAmount || defaultBonus).toFixed(0)} €
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                                    Haken setzen für Einspring-/Zusatz-Bonus (Standard: {defaultBonus} €)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {formData.hasBonus && (
+                        <div style={{
+                            marginTop: '14px',
+                            paddingTop: '14px',
+                            borderTop: '1px solid rgba(16, 185, 129, 0.25)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                                <label className="text-label" style={{ margin: 0, color: '#cbd5e1' }}>
+                                    Bonus-Betrag (€)
+                                </label>
+                                <div style={{ position: 'relative', width: '130px' }}>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        name="bonusAmount"
+                                        value={formData.bonusAmount}
+                                        onChange={handleChange}
+                                        className="input-premium"
+                                        style={{
+                                            width: '100%',
+                                            marginBottom: 0,
+                                            paddingRight: '30px',
+                                            textAlign: 'right',
+                                            fontWeight: 700,
+                                            color: '#34d399',
+                                            borderColor: 'rgba(16, 185, 129, 0.4)'
+                                        }}
+                                    />
+                                    <span style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        color: '#34d399',
+                                        fontWeight: 700,
+                                        pointerEvents: 'none'
+                                    }}>
+                                        €
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginRight: '4px' }}>Schnellwahl:</span>
+                                {[50, 75, 100, 125, 150].map(amt => {
+                                    const isActive = Number(formData.bonusAmount) === amt;
+                                    return (
+                                        <button
+                                            key={amt}
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, bonusAmount: amt }))}
+                                            style={{
+                                                padding: '4px 10px',
+                                                borderRadius: '8px',
+                                                fontSize: '12px',
+                                                fontWeight: isActive ? 700 : 500,
+                                                background: isActive ? '#10b981' : 'rgba(15, 23, 42, 0.7)',
+                                                color: isActive ? '#0f172a' : '#94a3b8',
+                                                border: isActive ? '1px solid #10b981' : '1px solid #334155',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {amt} €
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <button type="submit" className="btn-primary" style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: '600', marginTop: '8px' }}>

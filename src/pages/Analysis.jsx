@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { APP_VERSION } from '../version';
 import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
-import { useStore } from '../context/StoreContext';
+import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { exportToPDF } from '../utils/pdfExport';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { getShiftColor, STATION_THEMES, detectStation } from '../utils/shiftColors';
@@ -99,9 +99,16 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                         const prefix = `${year}-${mStr}`;
                         const monthShifts = filteredData.filter(s => s.date?.startsWith(prefix));
                         let mHours = 0;
+                        let mBonusCount = 0;
+                        let mBonusSum = 0;
                         monthShifts.forEach(s => {
                             const dur = parseFloat(calcDuration(s.startTime, s.endTime)) || 0;
                             mHours += dur;
+                            const bAmt = getShiftBonusAmount(s, storeSettings);
+                            if (bAmt > 0) {
+                                mBonusCount++;
+                                mBonusSum += bAmt;
+                            }
                         });
                         const daysInM = new Date(year, mIdx + 1, 0).getDate();
                         const monthlyWeekly = storeSettings?.monthlyWeeklyHours?.[prefix] ?? storeSettings?.defaultWeeklyHours ?? 20;
@@ -113,7 +120,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                 key={mName}
                                 style={{
                                     background: hasShifts ? '#1e293b' : '#0f172a',
-                                    border: hasShifts ? '1px solid #334155' : '1px solid rgba(255,255,255,0.03)',
+                                    border: mBonusCount > 0 ? '1px solid rgba(250, 204, 21, 0.4)' : (hasShifts ? '1px solid #334155' : '1px solid rgba(255,255,255,0.03)'),
                                     borderRadius: '8px',
                                     padding: '8px 10px'
                                 }}
@@ -132,6 +139,11 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                         / {mTarget.toFixed(0)}h
                                     </span>
                                 </div>
+                                {mBonusCount > 0 && (
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#facc15', marginTop: '3px' }}>
+                                        💰 {mBonusCount}x ({mBonusSum.toFixed(0)} €)
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -238,6 +250,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                     const resolved = hasShift ? resolveShiftDetails(firstShift, storeSettings) : null;
                     const shiftColor = resolved?.colorInfo;
                     const isSelected = selectedDateStr === item.dateStr;
+                    const hasBonusDay = hasShift && item.shifts.some(sh => sh.hasBonus);
 
                     return (
                         <div
@@ -256,10 +269,10 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                 background: hasShift ? shiftColor.bg : (item.isWeekend ? 'rgba(30, 41, 59, 0.4)' : '#0f172a'),
                                 border: isSelected
                                     ? '2px solid #38bdf8'
-                                    : (hasShift ? `1px solid ${shiftColor.border}` : '1px solid #1e293b'),
+                                    : (hasBonusDay ? '1px solid #facc15' : (hasShift ? `1px solid ${shiftColor.border}` : '1px solid #1e293b')),
                                 boxShadow: isSelected ? '0 0 10px rgba(56, 189, 248, 0.35)' : 'none'
                             }}
-                            title={hasShift ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})` : `Tag ${item.dayNum}: Frei`}
+                            title={hasShift ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})${hasBonusDay ? ' • 💰 Bonus' : ''}` : `Tag ${item.dayNum}: Frei`}
                         >
                             {/* Day Number & Station Badge */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 2px' }}>
@@ -300,7 +313,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                     whiteSpace: 'nowrap',
                                     textAlign: 'center'
                                 }}>
-                                    {resolved.code}
+                                    {resolved.code}{hasBonusDay ? '💰' : ''}
                                 </div>
                             ) : (
                                 <div style={{
@@ -348,6 +361,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                             const dur = calcDuration(s.startTime, s.endTime);
                             const resolvedShift = resolveShiftDetails(s, storeSettings);
                             const shiftCol = resolvedShift.colorInfo;
+                            const bAmt = getShiftBonusAmount(s, storeSettings);
                             return (
                                 <div key={s.id || idx} style={{ marginTop: idx > 0 ? '10px' : 0, borderTop: idx > 0 ? '1px solid #334155' : 'none', paddingTop: idx > 0 ? '8px' : 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -379,6 +393,19 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                         }}>
                                             📍 {resolvedShift.station}
                                         </span>
+                                        {bAmt > 0 && (
+                                            <span style={{
+                                                background: 'rgba(250, 204, 21, 0.15)',
+                                                color: '#facc15',
+                                                border: '1px solid rgba(250, 204, 21, 0.4)',
+                                                padding: '1px 6px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                fontWeight: 800
+                                            }}>
+                                                💰 +{bAmt} € Bonus
+                                            </span>
+                                        )}
                                     </div>
                                     {s.vehicle && (
                                         <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
@@ -433,7 +460,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
 }
 
 export default function Analysis() {
-    const { store } = useStore();
+    const { store, toggleShiftBonus } = useStore();
     // Use the decoupled logic hook
     const logic = useAnalysisLogic();
     const {
@@ -443,7 +470,8 @@ export default function Analysis() {
         selectedTypes, setSelectedTypes,
         selectedVehicles, setSelectedVehicles,
         selectedStations, setSelectedStations,
-        stats, delta, isInvalid, filteredData
+        onlyBonus, setOnlyBonus,
+        stats, bonusOverview, delta, isInvalid, filteredData
     } = logic;
 
     const isPositive = delta >= 0;
@@ -496,7 +524,7 @@ export default function Analysis() {
 
     if (loading) return <div className="page-content center">Lade Daten...</div>;
 
-    const hasActiveFilters = selectedTypes.length > 0 || selectedVehicles.length > 0 || selectedStations.length > 0;
+    const hasActiveFilters = selectedTypes.length > 0 || selectedVehicles.length > 0 || selectedStations.length > 0 || onlyBonus;
 
     return (
         <div className="page-content">
@@ -760,7 +788,7 @@ export default function Analysis() {
                         {/* "Alle" Chip */}
                         <button
                             type="button"
-                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); }}
+                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); setOnlyBonus(false); }}
                             style={{
                                 padding: '4px 10px',
                                 borderRadius: '20px',
@@ -774,6 +802,32 @@ export default function Analysis() {
                             }}
                         >
                             Alle
+                        </button>
+
+                        {/* "💰 Nur Bonus" Chip */}
+                        <button
+                            type="button"
+                            onClick={() => setOnlyBonus(!onlyBonus)}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                fontWeight: onlyBonus ? 800 : 600,
+                                background: onlyBonus ? 'rgba(250, 204, 21, 0.18)' : 'transparent',
+                                border: onlyBonus ? '1px solid #facc15' : '1px solid #334155',
+                                color: onlyBonus ? '#facc15' : '#94a3b8',
+                                boxShadow: onlyBonus ? '0 0 8px rgba(250, 204, 21, 0.3)' : 'none',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                            }}
+                            title="Nur Schichten mit gesetztem Bonus-Haken anzeigen"
+                        >
+                            <span>💰</span>
+                            <span>Nur Bonus</span>
+                            {onlyBonus && <span style={{ fontSize: '10px' }}>✓</span>}
                         </button>
 
                         {/* Wachen Chips */}
@@ -876,7 +930,7 @@ export default function Analysis() {
                     {hasActiveFilters && (
                         <button
                             type="button"
-                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); }}
+                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); setOnlyBonus(false); }}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -892,14 +946,14 @@ export default function Analysis() {
                             title="Alle Filter zurücksetzen"
                         >
                             <X size={12} />
-                            <span>Filter aufheben ({selectedTypes.length + selectedVehicles.length + selectedStations.length})</span>
+                            <span>Filter aufheben ({selectedTypes.length + selectedVehicles.length + selectedStations.length + (onlyBonus ? 1 : 0)})</span>
                         </button>
                     )}
                 </div>
             </div>
 
             {/* KPI Cards */}
-            <div className="stats-grid">
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))' }}>
                 <div className="stat-card">
                     <span className="text-label">Geleistet</span>
                     <span className="text-value">{stats.actual.toFixed(1)} h</span>
@@ -907,6 +961,23 @@ export default function Analysis() {
                 <div className="stat-card">
                     <span className="text-label">Schichten</span>
                     <span className="text-value">{stats.count}</span>
+                </div>
+                <div
+                    className="stat-card"
+                    onClick={() => setOnlyBonus(!onlyBonus)}
+                    style={{
+                        cursor: 'pointer',
+                        border: stats.bonusCount > 0 || onlyBonus ? '1px solid rgba(250, 204, 21, 0.45)' : undefined,
+                        background: onlyBonus ? 'rgba(250, 204, 21, 0.12)' : undefined
+                    }}
+                    title="Klicken, um nach Bonus-Schichten zu filtern"
+                >
+                    <span className="text-label" style={{ color: stats.bonusCount > 0 ? '#facc15' : undefined }}>
+                        💰 Bonus ({stats.bonusCount}x)
+                    </span>
+                    <span className="text-value" style={{ color: stats.bonusCount > 0 ? '#facc15' : '#64748b' }}>
+                        {stats.bonusTotalAmount.toFixed(0)} €
+                    </span>
                 </div>
                 <div className="stat-card full-width" style={{ borderLeft: `4px solid ${colorClass}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
@@ -919,6 +990,226 @@ export default function Analysis() {
                         <div style={{ fontSize: '24px' }}>{isPositive ? "📈" : "📉"}</div>
                     </div>
                 </div>
+            </div>
+
+            {/* Dedicated 💰 Bonus-Auswertung Section */}
+            <div
+                className="card-premium"
+                style={{
+                    border: stats.bonusCount > 0 || bonusOverview.yearBonusCount > 0
+                        ? '1px solid rgba(250, 204, 21, 0.35)'
+                        : '1px solid #334155',
+                    background: stats.bonusCount > 0
+                        ? 'linear-gradient(180deg, rgba(250, 204, 21, 0.06) 0%, rgba(15, 23, 42, 0.95) 100%)'
+                        : undefined
+                }}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                    <div>
+                        <h3 className="text-label" style={{ margin: 0, color: '#facc15', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>💰 Bonus-Auswertung</span>
+                            <span style={{
+                                fontSize: '10.5px',
+                                background: 'rgba(250, 204, 21, 0.15)',
+                                color: '#fde047',
+                                padding: '2px 7px',
+                                borderRadius: '6px',
+                                fontWeight: 700,
+                                textTransform: 'none'
+                            }}>
+                                Standard: {store.settings?.defaultBonusAmount ?? 75} €
+                            </span>
+                        </h3>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setOnlyBonus(!onlyBonus)}
+                        style={{
+                            background: onlyBonus ? '#facc15' : 'rgba(250, 204, 21, 0.12)',
+                            color: onlyBonus ? '#0f172a' : '#facc15',
+                            border: '1px solid rgba(250, 204, 21, 0.4)',
+                            borderRadius: '8px',
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {onlyBonus ? '✓ Filter: Nur Bonus aktiv' : '🔍 Nur Bonus-Schichten filtern'}
+                    </button>
+                </div>
+
+                {/* Top Summary Boxes: Zeitraum | Jahr | Gesamt */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', marginBottom: '14px' }}>
+                    {/* Box 1: Gewählter Zeitraum */}
+                    <div style={{
+                        background: '#1e293b',
+                        border: '1px solid rgba(250, 204, 21, 0.3)',
+                        borderRadius: '8px',
+                        padding: '10px 12px'
+                    }}>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                            Gewählter Zeitraum ({label})
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <span style={{ fontSize: '20px', fontWeight: 800, color: '#facc15' }}>
+                                {stats.bonusTotalAmount.toFixed(0)} €
+                            </span>
+                            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                {stats.bonusCount} {stats.bonusCount === 1 ? 'Schicht' : 'Schichten'}
+                            </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                            {stats.bonusHours.toFixed(1)} Std. in Bonus-Schichten
+                        </div>
+                    </div>
+
+                    {/* Box 2: Laufendes Jahr */}
+                    <div style={{
+                        background: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '8px',
+                        padding: '10px 12px'
+                    }}>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                            Jahressumme {bonusOverview.year}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <span style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8' }}>
+                                {bonusOverview.yearBonusAmount.toFixed(0)} €
+                            </span>
+                            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                {bonusOverview.yearBonusCount} {bonusOverview.yearBonusCount === 1 ? 'Schicht' : 'Schichten'}
+                            </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                            {bonusOverview.yearBonusHours.toFixed(1)} Std. im Jahr {bonusOverview.year}
+                        </div>
+                    </div>
+
+                    {/* Box 3: Alle Jahre / Gesamt */}
+                    <div style={{
+                        background: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '8px',
+                        padding: '10px 12px'
+                    }}>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                            Gesamt (Alle Jahre)
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <span style={{ fontSize: '20px', fontWeight: 800, color: '#4ade80' }}>
+                                {bonusOverview.allTimeBonusAmount.toFixed(0)} €
+                            </span>
+                            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                {bonusOverview.allTimeBonusCount} {bonusOverview.allTimeBonusCount === 1 ? 'Schicht' : 'Schichten'}
+                            </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                            {bonusOverview.byYear.length > 0
+                                ? bonusOverview.byYear.map(y => `${y.year}: ${y.amount.toFixed(0)}€ (${y.count}x)`).join(' • ')
+                                : 'Noch keine Bonus-Schichten markiert'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Monthly Breakdown Grid (Jan - Dez for selected Year) */}
+                <div style={{ marginBottom: (stats.bonusByStation.length > 0 || stats.bonusByCode.length > 0) ? '12px' : 0 }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                        Monatsübersicht Bonus {bonusOverview.year}:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '6px' }}>
+                        {bonusOverview.months.map((m) => {
+                            const isSelectedMonth = filterMode === 'month' && baseDate.getMonth() === m.monthIndex;
+                            const hasB = m.count > 0;
+                            return (
+                                <div
+                                    key={m.key}
+                                    onClick={() => {
+                                        const newD = new Date(baseDate);
+                                        newD.setMonth(m.monthIndex);
+                                        setBaseDate(newD);
+                                        setFilterMode('month');
+                                    }}
+                                    style={{
+                                        background: hasB ? 'rgba(250, 204, 21, 0.1)' : '#0f172a',
+                                        border: isSelectedMonth
+                                            ? '1.5px solid #38bdf8'
+                                            : (hasB ? '1px solid rgba(250, 204, 21, 0.4)' : '1px solid #1e293b'),
+                                        borderRadius: '7px',
+                                        padding: '6px 6px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer'
+                                    }}
+                                    title={`${m.monthName} ${bonusOverview.year}: ${m.count}x Bonus (${m.amount.toFixed(0)} €)`}
+                                >
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: hasB ? '#f8fafc' : '#64748b' }}>
+                                        {m.monthName}
+                                    </div>
+                                    <div style={{ fontSize: '12px', fontWeight: 800, color: hasB ? '#facc15' : '#334155', marginTop: '2px' }}>
+                                        {hasB ? `${m.amount.toFixed(0)} €` : '—'}
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: hasB ? '#fde047' : '#475569' }}>
+                                        {hasB ? `${m.count}x` : '0x'}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Breakdown by Wache & Kürzel in current period (if bonus shifts exist) */}
+                {(stats.bonusByStation.length > 0 || stats.bonusByCode.length > 0) && (
+                    <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '12px',
+                        paddingTop: '10px',
+                        borderTop: '1px solid rgba(255,255,255,0.06)',
+                        fontSize: '12px'
+                    }}>
+                        {stats.bonusByStation.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ color: '#94a3b8', fontWeight: 600 }}>Nach Wache ({label}):</span>
+                                {stats.bonusByStation.map(bs => {
+                                    const th = STATION_THEMES[bs.station] || STATION_THEMES.Sendling;
+                                    return (
+                                        <span key={bs.station} style={{
+                                            background: th.badgeBg,
+                                            color: th.primaryHex,
+                                            border: `1px solid ${th.badgeBorder}`,
+                                            padding: '2px 8px',
+                                            borderRadius: '6px',
+                                            fontSize: '11.5px',
+                                            fontWeight: 700
+                                        }}>
+                                            {bs.station}: {bs.count}x ({bs.amount.toFixed(0)} €)
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        {stats.bonusByCode.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ color: '#94a3b8', fontWeight: 600 }}>Nach Kürzel:</span>
+                                {stats.bonusByCode.map(bc => (
+                                    <span key={bc.code} style={{
+                                        background: '#1e293b',
+                                        color: '#facc15',
+                                        border: '1px solid rgba(250, 204, 21, 0.3)',
+                                        padding: '2px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '11.5px',
+                                        fontWeight: 700
+                                    }}>
+                                        {bc.code}: {bc.count}x ({bc.amount.toFixed(0)} €)
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Charts */}
@@ -1011,6 +1302,7 @@ export default function Analysis() {
                                 const resolvedShift = resolveShiftDetails(s, store.settings);
                                 const d = new Date(s.date);
                                 const dateFormatted = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                                const bAmt = getShiftBonusAmount(s, store.settings);
                                 return (
                                     <div
                                         key={s.id}
@@ -1020,6 +1312,7 @@ export default function Analysis() {
                                             alignItems: 'center',
                                             padding: '10px 12px',
                                             background: '#1e293b',
+                                            border: bAmt > 0 ? '1px solid rgba(250, 204, 21, 0.35)' : '1px solid transparent',
                                             borderRadius: '8px',
                                             fontSize: '13px',
                                             flexWrap: 'wrap',
@@ -1061,6 +1354,19 @@ export default function Analysis() {
                                                         🚑 {s.vehicle}
                                                     </span>
                                                 )}
+                                                {bAmt > 0 && (
+                                                    <span style={{
+                                                        background: 'rgba(250, 204, 21, 0.15)',
+                                                        color: '#facc15',
+                                                        border: '1px solid rgba(250, 204, 21, 0.4)',
+                                                        padding: '1px 6px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 800
+                                                    }}>
+                                                        💰 +{bAmt} €
+                                                    </span>
+                                                )}
                                             </div>
                                             {s.partner && (
                                                 <div style={{ color: '#38bdf8', fontSize: '12.5px', marginTop: '3px', fontWeight: 500 }}>
@@ -1068,6 +1374,30 @@ export default function Analysis() {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Quick Bonus Checkbox Button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleShiftBonus(s)}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                padding: '4px 9px',
+                                                borderRadius: '6px',
+                                                fontSize: '11.5px',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                background: s.hasBonus ? 'rgba(250, 204, 21, 0.18)' : 'rgba(15, 23, 42, 0.6)',
+                                                color: s.hasBonus ? '#facc15' : '#64748b',
+                                                border: s.hasBonus ? '1px solid rgba(250, 204, 21, 0.5)' : '1px solid #334155',
+                                                transition: 'all 0.15s ease'
+                                            }}
+                                            title={s.hasBonus ? `Bonus (${bAmt} €) deaktivieren` : `Bonus (${store.settings?.defaultBonusAmount ?? 75} €) aktivieren`}
+                                        >
+                                            <span>{s.hasBonus ? '☑' : '☐'}</span>
+                                            <span>Bonus</span>
+                                        </button>
                                     </div>
                                 );
                             })}

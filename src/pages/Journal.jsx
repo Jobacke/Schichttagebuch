@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { getDaysInMonth, startOfMonth, getDay, isSameDay, parseISO } from 'date-fns';
 import {
@@ -12,7 +12,7 @@ import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import { getShiftColor } from '../utils/shiftColors';
 
 export default function Journal() {
-    const { store, addShifts, ensureCodesAndTypes, deleteShifts } = useStore();
+    const { store, addShifts, ensureCodesAndTypes, deleteShifts, toggleShiftBonus } = useStore();
     const navigate = useNavigate();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
@@ -161,9 +161,24 @@ export default function Journal() {
                     />
                     <div>
                         <h1 style={{ margin: 0, fontSize: '24px', lineHeight: 1.15 }}>Übersicht</h1>
-                        <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                            {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'} im Monat
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                                {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'} im Monat
+                            </span>
+                            {monthShifts.some(s => s.hasBonus) && (
+                                <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    color: '#34d399',
+                                    background: 'rgba(16, 185, 129, 0.15)',
+                                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                                    padding: '1px 7px',
+                                    borderRadius: '6px'
+                                }}>
+                                    💰 {monthShifts.filter(s => s.hasBonus).length}x Bonus ({monthShifts.reduce((acc, s) => acc + getShiftBonusAmount(s, store.settings), 0)} €)
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -249,7 +264,9 @@ export default function Journal() {
                     {Array.from({ length: daysInMonth }).map((_, i) => {
                         const dayNum = i + 1;
                         const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNum);
-                        const hasShift = monthShifts.some(s => isSameDay(parseISO(s.date), date));
+                        const dayShifts = monthShifts.filter(s => isSameDay(parseISO(s.date), date));
+                        const hasShift = dayShifts.length > 0;
+                        const hasBonusShift = dayShifts.some(s => s.hasBonus);
                         const isSelected = selectedDate && isSameDay(date, selectedDate);
 
                         return (
@@ -257,8 +274,23 @@ export default function Journal() {
                                 key={dayNum}
                                 className={`day-cell ${hasShift ? 'has-shift' : ''} ${isSelected ? 'selected' : ''}`}
                                 onClick={() => setSelectedDate(date)}
+                                style={{ position: 'relative' }}
                             >
                                 {dayNum}
+                                {hasBonusShift && (
+                                    <span
+                                        title="Bonus-Schicht"
+                                        style={{
+                                            position: 'absolute',
+                                            top: '2px',
+                                            right: '3px',
+                                            fontSize: '8px',
+                                            lineHeight: 1
+                                        }}
+                                    >
+                                        💰
+                                    </span>
+                                )}
                             </div>
                         );
                     })}
@@ -495,11 +527,26 @@ export default function Journal() {
                                 </div>
 
                                 {/* Details */}
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: shiftCol.color }}>
-                                            {displayCode}
-                                        </span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '8px', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ fontSize: '16px', fontWeight: 'bold', color: shiftCol.color }}>
+                                                {displayCode}
+                                            </span>
+                                            {shift.hasBonus && (
+                                                <span style={{
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    background: 'rgba(16, 185, 129, 0.18)',
+                                                    color: '#34d399',
+                                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '5px'
+                                                }}>
+                                                    +{getShiftBonusAmount(shift, store.settings)} € Bonus
+                                                </span>
+                                            )}
+                                        </div>
                                         <span style={{ fontSize: '12px', background: '#334155', padding: '2px 8px', borderRadius: '4px', color: '#cbd5e1' }}>
                                             {shift.startTime} - {shift.endTime}
                                         </span>
@@ -523,9 +570,39 @@ export default function Journal() {
                                     )}
                                 </div>
 
-                                {/* Single Delete or Edit Icon */}
+                                {/* Bonus Checkmark Toggle + Single Delete or Edit Icon */}
                                 {!isSelectMode && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px', flexShrink: 0 }}>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleShiftBonus(shift);
+                                            }}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                padding: '5px 8px',
+                                                borderRadius: '8px',
+                                                fontSize: '11.5px',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                border: shift.hasBonus
+                                                    ? '1px solid #10b981'
+                                                    : '1px solid rgba(148, 163, 184, 0.25)',
+                                                background: shift.hasBonus
+                                                    ? 'rgba(16, 185, 129, 0.18)'
+                                                    : 'rgba(15, 23, 42, 0.5)',
+                                                color: shift.hasBonus ? '#34d399' : '#94a3b8',
+                                                transition: 'all 0.15s ease'
+                                            }}
+                                            title={shift.hasBonus ? `Bonus aktiv (${getShiftBonusAmount(shift, store.settings)} €) – Klicken zum Entfernen` : `Bonus-Haken setzen (+${store.settings?.defaultBonusAmount ?? 75} €)`}
+                                        >
+                                            <span>{shift.hasBonus ? '✓' : '☐'}</span>
+                                            <span>Bonus</span>
+                                        </button>
+
                                         <button
                                             type="button"
                                             onClick={(e) => {
@@ -548,7 +625,7 @@ export default function Journal() {
                                         >
                                             <Trash2 size={16} />
                                         </button>
-                                        <PenSquare size={16} style={{ opacity: 0.5, marginLeft: '4px' }} />
+                                        <PenSquare size={16} style={{ opacity: 0.5, marginLeft: '2px' }} />
                                     </div>
                                 )}
                             </div>

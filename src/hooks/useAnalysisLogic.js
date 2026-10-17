@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { detectStation } from '../utils/shiftColors';
 
 // --- Native Helpers ---
@@ -63,10 +63,11 @@ export function useAnalysisLogic() {
     const [customStart, setCustomStart] = useState('');
     const [customEnd, setCustomEnd] = useState('');
 
-    // Filter Arrays
+    // Filter Arrays & Bonus Toggle
     const [selectedTypes, setSelectedTypes] = useState([]);
     const [selectedVehicles, setSelectedVehicles] = useState([]);
     const [selectedStations, setSelectedStations] = useState([]);
+    const [onlyBonus, setOnlyBonus] = useState(false);
 
     // Logic
     const { start, end, label, target, isInvalid } = useMemo(() => {
@@ -126,6 +127,9 @@ export function useAnalysisLogic() {
             // Range Check
             if (d < start || d > end) return false;
 
+            // Bonus Filter Check
+            if (onlyBonus && !s.hasBonus) return false;
+
             // Type Check
             if (selectedTypes.length > 0 && !selectedTypes.includes(s.typeId)) return false;
 
@@ -140,12 +144,17 @@ export function useAnalysisLogic() {
 
             return true;
         });
-    }, [store.shifts, start, end, selectedTypes, selectedVehicles, selectedStations]);
+    }, [store.shifts, start, end, onlyBonus, selectedTypes, selectedVehicles, selectedStations]);
 
     const stats = useMemo(() => {
         let actual = 0;
+        let bonusCount = 0;
+        let bonusTotalAmount = 0;
+        let bonusHours = 0;
         const typeCounts = {};
         const shiftsByDate = {}; // date string -> hours
+        const bonusByStationMap = {};
+        const bonusByCodeMap = {};
 
         filteredData.forEach(s => {
             const dur = calculateDuration(s.startTime, s.endTime);
@@ -155,6 +164,24 @@ export function useAnalysisLogic() {
             typeCounts[tName] = (typeCounts[tName] || 0) + 1;
 
             shiftsByDate[s.date] = (shiftsByDate[s.date] || 0) + dur;
+
+            if (s.hasBonus) {
+                const amt = getShiftBonusAmount(s, store.settings);
+                bonusCount += 1;
+                bonusTotalAmount += amt;
+                bonusHours += dur;
+
+                const st = detectStation(s);
+                if (!bonusByStationMap[st]) bonusByStationMap[st] = { station: st, count: 0, amount: 0, hours: 0 };
+                bonusByStationMap[st].count += 1;
+                bonusByStationMap[st].amount += amt;
+                bonusByStationMap[st].hours += dur;
+
+                const codeStr = s.code || tName || 'Schicht';
+                if (!bonusByCodeMap[codeStr]) bonusByCodeMap[codeStr] = { code: codeStr, count: 0, amount: 0 };
+                bonusByCodeMap[codeStr].count += 1;
+                bonusByCodeMap[codeStr].amount += amt;
+            }
         });
 
         // Prepare simple arrays for UI
@@ -173,8 +200,100 @@ export function useAnalysisLogic() {
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
 
-        return { actual, count: filteredData.length, chartData, distributionData };
+        const bonusByStation = Object.values(bonusByStationMap).sort((a, b) => b.amount - a.amount);
+        const bonusByCode = Object.values(bonusByCodeMap).sort((a, b) => b.amount - a.amount);
+
+        return {
+            actual,
+            count: filteredData.length,
+            bonusCount,
+            bonusTotalAmount,
+            bonusHours,
+            bonusByStation,
+            bonusByCode,
+            chartData,
+            distributionData
+        };
     }, [filteredData, store.settings]);
+
+    // Annual & All-Time Bonus Overview (Monatliche und jährliche Auswertung)
+    const bonusOverview = useMemo(() => {
+        const year = baseDate.getFullYear();
+        const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+        const monthShortNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+        const months = Array.from({ length: 12 }, (_, mIdx) => ({
+            monthIndex: mIdx,
+            monthName: monthNames[mIdx],
+            monthShort: monthShortNames[mIdx],
+            yearMonth: `${year}-${String(mIdx + 1).padStart(2, '0')}`,
+            count: 0,
+            amount: 0,
+            hours: 0,
+            totalShiftsInMonth: 0
+        }));
+
+        let yearBonusCount = 0;
+        let yearBonusAmount = 0;
+        let yearBonusHours = 0;
+
+        let allTimeBonusCount = 0;
+        let allTimeBonusAmount = 0;
+        const yearsMap = {}; // year -> { year, count, amount }
+
+        (store.shifts || []).forEach(s => {
+            if (!s.date) return;
+
+            // Apply non-date filters if active (type, vehicle, station) so breakdown matches active resource filters
+            if (selectedTypes.length > 0 && !selectedTypes.includes(s.typeId)) return;
+            if (selectedVehicles.length > 0 && !selectedVehicles.includes(s.vehicle)) return;
+            if (selectedStations.length > 0) {
+                const st = detectStation(s);
+                if (!selectedStations.includes(st)) return;
+            }
+
+            const [sYear, sMonth] = s.date.split('-').map(Number);
+            if (sYear === year && sMonth >= 1 && sMonth <= 12) {
+                months[sMonth - 1].totalShiftsInMonth += 1;
+            }
+
+            if (s.hasBonus) {
+                const amt = getShiftBonusAmount(s, store.settings);
+                const dur = calculateDuration(s.startTime, s.endTime);
+
+                allTimeBonusCount += 1;
+                allTimeBonusAmount += amt;
+
+                if (sYear) {
+                    if (!yearsMap[sYear]) yearsMap[sYear] = { year: sYear, count: 0, amount: 0 };
+                    yearsMap[sYear].count += 1;
+                    yearsMap[sYear].amount += amt;
+                }
+
+                if (sYear === year && sMonth >= 1 && sMonth <= 12) {
+                    months[sMonth - 1].count += 1;
+                    months[sMonth - 1].amount += amt;
+                    months[sMonth - 1].hours += dur;
+                    yearBonusCount += 1;
+                    yearBonusAmount += amt;
+                    yearBonusHours += dur;
+                }
+            }
+        });
+
+        const byYear = Object.values(yearsMap).sort((a, b) => b.year - a.year);
+
+        return {
+            year,
+            months,
+            yearBonusCount,
+            yearBonusAmount,
+            yearBonusHours,
+            allTimeBonusCount,
+            allTimeBonusAmount,
+            byYear
+        };
+    }, [store.shifts, store.settings, baseDate, selectedTypes, selectedVehicles, selectedStations]);
 
     return {
         loading,
@@ -186,7 +305,9 @@ export function useAnalysisLogic() {
         selectedTypes, setSelectedTypes,
         selectedVehicles, setSelectedVehicles,
         selectedStations, setSelectedStations,
+        onlyBonus, setOnlyBonus,
         stats,
+        bonusOverview,
         delta: stats.actual - target,
         weeklyRate: filterMode === 'month'
             ? getMonthlyWeeklyHours(baseDate.getFullYear(), baseDate.getMonth(), store.settings)

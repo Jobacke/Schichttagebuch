@@ -111,10 +111,14 @@ export function exportToPDF(data) {
     doc.setFontSize(8.5);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(100, 116, 139); // slate-500
-    doc.text(`${shiftCount} Schichten   •   ${freeDaysCount} Tage frei   •   ${stats.actual.toFixed(1)} h geleistet`, margin, yTop + 11.5);
+    const bonusSummaryText = (stats?.bonusCount > 0)
+        ? `   •   Bonus: ${stats.bonusCount}x (${stats.bonusTotalAmount.toFixed(0)} EUR)`
+        : '';
+    doc.text(`${shiftCount} Schichten   •   ${freeDaysCount} Tage frei   •   ${stats.actual.toFixed(1)} h geleistet${bonusSummaryText}`, margin, yTop + 11.5);
 
     // KPI Badges on the Top Right
-    const kpiBoxW = 132;
+    const hasBonusKpi = stats?.bonusCount > 0;
+    const kpiBoxW = hasBonusKpi ? 156 : 132;
     const kpiBoxH = 13.5;
     const kpiBoxX = pageWidth - margin - kpiBoxW;
     const kpiBoxY = yTop - 3.5;
@@ -124,14 +128,15 @@ export function exportToPDF(data) {
     doc.setLineWidth(0.3);
     doc.roundedRect(kpiBoxX, kpiBoxY, kpiBoxW, kpiBoxH, 2, 2, 'FD');
 
-    const colW = kpiBoxW / 4;
     const isPositive = delta >= 0;
     const kpis = [
         { label: 'Geleistet', val: `${stats.actual.toFixed(1)} h`, color: [15, 23, 42] },
         { label: 'Soll', val: `${target.toFixed(1)} h`, color: [100, 116, 139] },
         { label: 'Saldo', val: `${delta > 0 ? '+' : ''}${delta.toFixed(1)} h`, color: isPositive ? [22, 163, 74] : [220, 38, 38] },
-        { label: 'Schichten', val: `${stats.count}`, color: [15, 23, 42] }
+        { label: 'Schichten', val: `${stats.count}`, color: [15, 23, 42] },
+        ...(hasBonusKpi ? [{ label: `Bonus (${stats.bonusCount}x)`, val: `${stats.bonusTotalAmount.toFixed(0)} EUR`, color: [202, 138, 4] }] : [])
     ];
+    const colW = kpiBoxW / kpis.length;
 
     kpis.forEach((kpi, idx) => {
         const itemX = kpiBoxX + idx * colW + colW / 2;

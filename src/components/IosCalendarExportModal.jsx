@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Calendar, Check, Download, X, Bell,
-  Smartphone, CheckCircle2, RefreshCw, Trash2,
-  Sparkles, Type, Users, MapPin, Truck, HelpCircle, ChevronDown
+  Calendar, Check, Download, X,
+  Smartphone, CheckCircle2, Trash2,
+  Users, MapPin, Truck, HelpCircle, ChevronDown
 } from 'lucide-react';
 import {
   downloadIcsFile,
@@ -11,17 +11,6 @@ import {
   getCalendarExportHistory
 } from '../utils/calendarExport';
 import { getShiftColor } from '../utils/shiftColors';
-
-const ALARM_LABELS = {
-  '1440': '1 Tag vorher aktiv',
-  '1440_60': '1 Tag + 1 Std. vorher aktiv',
-  '2880': '2 Tage vorher aktiv',
-  '720': '12 Std. vorher aktiv',
-  '120': '2 Std. vorher aktiv',
-  '60': '1 Std. vorher aktiv',
-  '30': '30 Min. vorher aktiv',
-  '0': 'Keine Erinnerung'
-};
 
 export default function IosCalendarExportModal({
   isOpen,
@@ -33,7 +22,6 @@ export default function IosCalendarExportModal({
 }) {
   if (!isOpen) return null;
 
-  const [calendarName] = useState('Familie');
   const [titleFormat, setTitleFormat] = useState('codeAndType'); // 'codeAndType', 'codeOnly', 'typeAndTimes'
   const [alarmOption, setAlarmOption] = useState('1440'); // Default: 1 Tag vorher!
   const [overwriteMode, setOverwriteMode] = useState('update'); // 'update' | 'forceNew'
@@ -92,7 +80,7 @@ export default function IosCalendarExportModal({
     if (selectedShifts.length === 0) return;
 
     downloadIcsFile(selectedShifts, {
-      calendarName,
+      calendarName: 'Dienstplan',
       titleFormat,
       alarmOption,
       alarmMinutes: alarmOption === '1440' ? 1440 : (Number(alarmOption) || 1440),
@@ -109,7 +97,7 @@ export default function IosCalendarExportModal({
   const handleDownloadCancelIcs = () => {
     if (shifts.length === 0) return;
     downloadCancelIcsFile(selectedShifts.length > 0 ? selectedShifts : shifts, {
-      calendarName,
+      calendarName: 'Dienstplan',
       titleFormat,
       yearMonth,
       storeSettings
@@ -121,6 +109,18 @@ export default function IosCalendarExportModal({
   const sortedShifts = useMemo(() => {
     return shifts.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
   }, [shifts]);
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: '11px',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: '#94a3b8',
+    marginBottom: '6px'
+  };
+
+  const controlHeight = '38px';
 
   return (
     <div
@@ -150,13 +150,14 @@ export default function IosCalendarExportModal({
           position: 'relative'
         }}
       >
-        {/* Top Header */}
+        {/* Top Header with Integrated Shift Count Badge */}
         <div style={{
           padding: '16px 22px',
           borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '12px',
           background: 'rgba(15, 23, 42, 0.5)',
           flexShrink: 0
         }}>
@@ -194,19 +195,36 @@ export default function IosCalendarExportModal({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Shift Count Pill */}
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.14)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              color: '#fbbf24',
+              height: '34px',
+              padding: '0 12px',
+              borderRadius: '10px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              whiteSpace: 'nowrap'
+            }}>
+              {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'}
+            </div>
+
             <button
               type="button"
               onClick={() => setIsTipPopupOpen(true)}
               style={{
-                background: 'rgba(245, 158, 11, 0.12)',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-                color: '#fbbf24',
+                background: 'rgba(148, 163, 184, 0.1)',
+                border: '1px solid rgba(148, 163, 184, 0.2)',
+                color: '#cbd5e1',
                 height: '34px',
                 padding: '0 11px',
                 borderRadius: '10px',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
                 fontSize: '12px',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -214,7 +232,7 @@ export default function IosCalendarExportModal({
               }}
               title="Hilfe & Tipp zum Überschreiben im Apple Kalender anzeigen"
             >
-              <HelpCircle size={15} />
+              <HelpCircle size={15} style={{ color: '#fbbf24' }} />
               <span>Tipp</span>
             </button>
 
@@ -243,85 +261,14 @@ export default function IosCalendarExportModal({
 
         {/* Main Body */}
         <div style={{
-          padding: '16px 22px',
+          padding: '18px 22px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: '16px',
           flex: 1,
           minHeight: 0
         }}>
-          {/* 1. Target Calendar Status Banner */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(30, 41, 59, 0.6) 100%)',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
-            borderRadius: '14px',
-            padding: '11px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            flexWrap: 'wrap',
-            flexShrink: 0
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                color: '#0f172a',
-                borderRadius: '9px',
-                width: '30px',
-                height: '30px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 10px rgba(245, 158, 11, 0.3)',
-                flexShrink: 0
-              }}>
-                <Check size={17} strokeWidth={3} />
-              </div>
-              <div>
-                <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
-                  Ziel-Kalender: {calendarName}
-                </div>
-                <div style={{
-                  fontSize: '11.5px',
-                  color: '#cbd5e1',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '7px',
-                  marginTop: '2px',
-                  flexWrap: 'wrap'
-                }}>
-                  <span style={{ color: '#94a3b8' }}>Passend für Apple / iOS</span>
-                  <span style={{ color: '#475569' }}>•</span>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    color: alarmOption === '0' ? '#94a3b8' : '#fbbf24',
-                    fontWeight: 600
-                  }}>
-                    <Bell size={11} />
-                    Erinnerung: {ALARM_LABELS[alarmOption] || '1 Tag vorher aktiv'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{
-              background: 'rgba(245, 158, 11, 0.16)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
-              color: '#fbbf24',
-              padding: '4px 11px',
-              borderRadius: '999px',
-              fontSize: '12px',
-              fontWeight: 700,
-              whiteSpace: 'nowrap'
-            }}>
-              {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'}
-            </div>
-          </div>
-
           {/* Feedback Banners after Download */}
           {downloadSuccess === 'export' && (
             <div style={{
@@ -339,7 +286,7 @@ export default function IosCalendarExportModal({
             }}>
               <CheckCircle2 size={17} style={{ flexShrink: 0 }} />
               <div>
-                <strong>Kalenderdatei (.ics) erstellt!</strong> Öffne die Datei im Kalender und wähle <strong>„{calendarName}“</strong>.
+                <strong>Kalenderdatei (.ics) erstellt!</strong> Öffne die Datei und wähle beim Import deinen gewünschten Ziel-Kalender aus.
               </div>
             </div>
           )}
@@ -365,40 +312,33 @@ export default function IosCalendarExportModal({
             </div>
           )}
 
-          {/* 2. Compact Settings Row: Title Format & Reminder */}
+          {/* Symmetrical 2x2 Settings Grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '10px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '12px 14px',
+            background: 'rgba(15, 23, 42, 0.45)',
+            border: '1px solid rgba(148, 163, 184, 0.12)',
+            borderRadius: '14px',
+            padding: '14px',
             flexShrink: 0
           }}>
+            {/* Cell 1 (Top-Left): Title Format */}
             <div>
-              <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontSize: '10.5px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                color: '#94a3b8',
-                marginBottom: '5px'
-              }}>
-                <Type size={11} style={{ color: '#38bdf8' }} />
-                Titel im Kalender
-              </label>
+              <label style={labelStyle}>Titel im Kalender</label>
               <div style={{ position: 'relative' }}>
                 <select
                   value={titleFormat}
                   onChange={(e) => setTitleFormat(e.target.value)}
                   style={{
                     width: '100%',
+                    height: controlHeight,
                     appearance: 'none',
                     WebkitAppearance: 'none',
-                    background: 'rgba(30, 41, 59, 0.75)',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    background: '#1e293b',
+                    border: '1px solid rgba(148, 163, 184, 0.22)',
                     borderRadius: '10px',
-                    padding: '8px 30px 8px 11px',
+                    padding: '0 32px 0 12px',
                     color: '#f8fafc',
                     fontSize: '12.5px',
                     fontWeight: 600,
@@ -411,7 +351,7 @@ export default function IosCalendarExportModal({
                   <option value="typeAndTimes">Schichtart & Zeiten</option>
                 </select>
                 <ChevronDown
-                  size={14}
+                  size={15}
                   style={{
                     position: 'absolute',
                     right: '10px',
@@ -424,33 +364,22 @@ export default function IosCalendarExportModal({
               </div>
             </div>
 
+            {/* Cell 2 (Top-Right): Reminder */}
             <div>
-              <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontSize: '10.5px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                color: '#94a3b8',
-                marginBottom: '5px'
-              }}>
-                <Bell size={11} style={{ color: '#fbbf24' }} />
-                Erinnerung (iOS Hinweis)
-              </label>
+              <label style={labelStyle}>Erinnerung (iOS Hinweis)</label>
               <div style={{ position: 'relative' }}>
                 <select
                   value={alarmOption}
                   onChange={(e) => setAlarmOption(e.target.value)}
                   style={{
                     width: '100%',
+                    height: controlHeight,
                     appearance: 'none',
                     WebkitAppearance: 'none',
-                    background: 'rgba(30, 41, 59, 0.75)',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    background: '#1e293b',
+                    border: '1px solid rgba(148, 163, 184, 0.22)',
                     borderRadius: '10px',
-                    padding: '8px 30px 8px 11px',
+                    padding: '0 32px 0 12px',
                     color: '#f8fafc',
                     fontSize: '12.5px',
                     fontWeight: 600,
@@ -468,7 +397,7 @@ export default function IosCalendarExportModal({
                   <option value="0">Keine Erinnerung</option>
                 </select>
                 <ChevronDown
-                  size={14}
+                  size={15}
                   style={{
                     position: 'absolute',
                     right: '10px',
@@ -480,129 +409,94 @@ export default function IosCalendarExportModal({
                 />
               </div>
             </div>
-          </div>
 
-          {/* 3. Sleek Single-Line Overwrite Controls (Without verbose subtext) */}
-          <div style={{
-            background: 'rgba(15, 23, 42, 0.5)',
-            border: '1px solid rgba(148, 163, 184, 0.14)',
-            borderRadius: '12px',
-            padding: '10px 12px',
-            flexShrink: 0
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '8px',
-              marginBottom: '8px'
-            }}>
+            {/* Cell 3 (Bottom-Left): Overwrite Mode Segmented Switch */}
+            <div>
+              <label style={labelStyle}>Bestehende Termine</label>
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '10.5px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                color: '#94a3b8'
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '4px',
+                height: controlHeight,
+                background: '#0f172a',
+                border: '1px solid rgba(148, 163, 184, 0.22)',
+                borderRadius: '10px',
+                padding: '3px'
               }}>
-                <RefreshCw size={11} style={{ color: '#38bdf8' }} />
-                Bestehende Termine im Kalender behandeln
+                <button
+                  type="button"
+                  onClick={() => setOverwriteMode('update')}
+                  style={{
+                    border: 'none',
+                    borderRadius: '7px',
+                    background: overwriteMode === 'update' ? '#334155' : 'transparent',
+                    color: overwriteMode === 'update' ? '#f8fafc' : '#94a3b8',
+                    fontSize: '12px',
+                    fontWeight: overwriteMode === 'update' ? 700 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Aktualisieren
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOverwriteMode('forceNew')}
+                  style={{
+                    border: 'none',
+                    borderRadius: '7px',
+                    background: overwriteMode === 'forceNew' ? '#334155' : 'transparent',
+                    color: overwriteMode === 'forceNew' ? '#f8fafc' : '#94a3b8',
+                    fontSize: '12px',
+                    fontWeight: overwriteMode === 'forceNew' ? 700 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Neu erzwingen
+                </button>
               </div>
+            </div>
 
+            {/* Cell 4 (Bottom-Right): Cancel .ics Action */}
+            <div>
+              <label style={labelStyle}>Kalender bereinigen</label>
               <button
                 type="button"
                 onClick={handleDownloadCancelIcs}
                 style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.28)',
-                  color: '#fca5a5',
-                  borderRadius: '7px',
-                  padding: '3px 9px',
-                  fontSize: '11px',
+                  width: '100%',
+                  height: controlHeight,
+                  background: '#1e293b',
+                  border: '1px solid rgba(148, 163, 184, 0.22)',
+                  color: '#cbd5e1',
+                  borderRadius: '10px',
+                  padding: '0 12px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  display: 'inline-flex',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  justifyContent: 'center',
+                  gap: '7px',
                   transition: 'all 0.15s ease'
                 }}
                 title="Lädt eine .ics Storno-Datei herunter, die bereits übertragene Termine dieses Monats aus dem Kalender entfernt"
               >
-                <Trash2 size={11} />
-                Alte Termine per .ics löschen
-              </button>
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '8px'
-            }}>
-              <button
-                type="button"
-                onClick={() => setOverwriteMode('update')}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '9px',
-                  cursor: 'pointer',
-                  background: overwriteMode === 'update'
-                    ? 'rgba(56, 189, 248, 0.15)'
-                    : 'rgba(30, 41, 59, 0.45)',
-                  border: overwriteMode === 'update'
-                    ? '1.5px solid rgba(56, 189, 248, 0.65)'
-                    : '1px solid rgba(148, 163, 184, 0.14)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '7px',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  color: overwriteMode === 'update' ? '#f8fafc' : '#94a3b8',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <RefreshCw size={13} style={{ color: overwriteMode === 'update' ? '#38bdf8' : '#64748b' }} />
-                <span>Bestehende aktualisieren</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setOverwriteMode('forceNew')}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '9px',
-                  cursor: 'pointer',
-                  background: overwriteMode === 'forceNew'
-                    ? 'rgba(245, 158, 11, 0.15)'
-                    : 'rgba(30, 41, 59, 0.45)',
-                  border: overwriteMode === 'forceNew'
-                    ? '1.5px solid rgba(245, 158, 11, 0.65)'
-                    : '1px solid rgba(148, 163, 184, 0.14)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '7px',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  color: overwriteMode === 'forceNew' ? '#f8fafc' : '#94a3b8',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <Sparkles size={13} style={{ color: overwriteMode === 'forceNew' ? '#fbbf24' : '#64748b' }} />
-                <span>Neu-Eintrag erzwingen</span>
+                <Trash2 size={14} style={{ color: '#f87171' }} />
+                <span>Alte Termine per .ics löschen</span>
               </button>
             </div>
           </div>
 
-          {/* 4. Generous Shifts Selection List */}
+          {/* Shifts Selection List */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
-            minHeight: '220px'
+            minHeight: '240px'
           }}>
             <div style={{
               display: 'flex',
@@ -678,7 +572,7 @@ export default function IosCalendarExportModal({
                 flexDirection: 'column',
                 gap: '7px',
                 flex: 1,
-                maxHeight: '340px',
+                maxHeight: '380px',
                 overflowY: 'auto',
                 paddingRight: '4px'
               }}>
@@ -893,7 +787,7 @@ export default function IosCalendarExportModal({
             type="button"
             onClick={onClose}
             style={{
-              flex: 1,
+              flex: 0.8,
               background: 'rgba(30, 41, 59, 0.8)',
               border: '1px solid rgba(148, 163, 184, 0.2)',
               color: '#cbd5e1',
@@ -913,7 +807,7 @@ export default function IosCalendarExportModal({
             onClick={handleExport}
             disabled={selectedShifts.length === 0}
             style={{
-              flex: 2.3,
+              flex: 2.5,
               background: selectedShifts.length > 0
                 ? 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)'
                 : 'rgba(234, 179, 8, 0.3)',
@@ -922,7 +816,7 @@ export default function IosCalendarExportModal({
               padding: '11px 18px',
               borderRadius: '12px',
               fontWeight: 700,
-              fontSize: '14.5px',
+              fontSize: '14px',
               cursor: selectedShifts.length > 0 ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
@@ -933,9 +827,9 @@ export default function IosCalendarExportModal({
               transition: 'all 0.15s ease'
             }}
           >
-            <Download size={18} strokeWidth={2.5} />
+            <Download size={18} strokeWidth={2.5} style={{ flexShrink: 0 }} />
             <span>
-              {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'} in „{calendarName}“ exportieren
+              {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'} als ics-Datei zum Import in Kalender exportieren
             </span>
           </button>
         </div>
@@ -1014,15 +908,15 @@ export default function IosCalendarExportModal({
 
               <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
-                  <strong style={{ color: '#38bdf8' }}>1. Bestehende aktualisieren (Standard):</strong><br />
+                  <strong style={{ color: '#f8fafc' }}>1. Aktualisieren (Standard):</strong><br />
                   Nutzt dieselbe Kalender-ID und sendet automatisch eine höhere <strong>Versionsnummer (SEQUENCE)</strong> mit, damit der Kalender vorhandene Termine aktualisiert.
                 </div>
                 <div>
-                  <strong style={{ color: '#fbbf24' }}>2. Neu-Eintrag erzwingen:</strong><br />
+                  <strong style={{ color: '#f8fafc' }}>2. Neu erzwingen:</strong><br />
                   Vergibt eine neue Kalender-ID – ideal, falls iOS Safari beim Tippen auf „Alle hinzufügen“ bereits bekannte IDs überspringt (z. B. wenn du nur einen geänderten Dienst überträgst).
                 </div>
                 <div>
-                  <strong style={{ color: '#fca5a5' }}>3. Alte Termine per .ics löschen:</strong><br />
+                  <strong style={{ color: '#f8fafc' }}>3. Alte Termine per .ics löschen:</strong><br />
                   Erzeugt eine Storno-Datei, die die bisherigen Monats-Einträge aus dem Kalender entfernt, bevor du den aktualisierten Plan frisch einträgst.
                 </div>
               </div>

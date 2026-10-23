@@ -242,10 +242,10 @@ export default function Journal() {
                                 fontWeight: 600,
                                 cursor: 'pointer'
                             }}
-                            title="In iOS Kalender („Familie“) übertragen"
+                            title="Dienste als .ics-Datei für den Kalender exportieren"
                         >
                             <CalendarIcon size={16} />
-                            iOS Kalender („Familie“)
+                            In Kalender übertragen
                         </button>
                     )}
                     <button

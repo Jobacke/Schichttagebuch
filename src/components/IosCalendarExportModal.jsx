@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import {
   Calendar, Check, Download, X, Bell,
-  Smartphone, CheckCircle2, RefreshCw, Trash2
+  Smartphone, CheckCircle2, RefreshCw, Trash2,
+  Sparkles, Type, Users, MapPin, Truck, Info, ChevronDown
 } from 'lucide-react';
 import {
   downloadIcsFile,
@@ -9,6 +10,18 @@ import {
   getShiftExportStatus,
   getCalendarExportHistory
 } from '../utils/calendarExport';
+import { getShiftColor } from '../utils/shiftColors';
+
+const ALARM_LABELS = {
+  '1440': '1 Tag vorher aktiv',
+  '1440_60': '1 Tag + 1 Std. vorher aktiv',
+  '2880': '2 Tage vorher aktiv',
+  '720': '12 Std. vorher aktiv',
+  '120': '2 Std. vorher aktiv',
+  '60': '1 Std. vorher aktiv',
+  '30': '30 Min. vorher aktiv',
+  '0': 'Keine Erinnerung'
+};
 
 export default function IosCalendarExportModal({
   isOpen,
@@ -104,194 +117,395 @@ export default function IosCalendarExportModal({
     setTimeout(() => setDownloadSuccess(null), 9000);
   };
 
+  const sortedShifts = useMemo(() => {
+    return shifts.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  }, [shifts]);
+
   return (
-    <div className="modal-overlay" style={{ alignItems: 'center' }}>
-      <div className="modal-content" style={{
-        maxWidth: '640px',
-        maxHeight: '94vh',
-        borderRadius: '24px',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* Header */}
-        <div className="modal-header" style={{ padding: '18px 24px', borderBottom: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      style={{
+        alignItems: 'center',
+        padding: '16px',
+        backdropFilter: 'blur(10px)',
+        backgroundColor: 'rgba(2, 6, 23, 0.78)'
+      }}
+    >
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '680px',
+          width: '100%',
+          maxHeight: '92vh',
+          borderRadius: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'linear-gradient(180deg, #162033 0%, #0f172a 100%)',
+          border: '1px solid rgba(148, 163, 184, 0.16)',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.75)',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Top Header */}
+        <div style={{
+          padding: '18px 24px',
+          borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'rgba(15, 23, 42, 0.5)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
-              background: 'rgba(234, 179, 8, 0.15)',
-              color: '#eab308',
-              borderRadius: '12px',
-              padding: '10px',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(234, 179, 8, 0.08) 100%)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              color: '#fbbf24',
+              borderRadius: '14px',
+              width: '44px',
+              height: '44px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.15)',
+              flexShrink: 0
             }}>
-              <Calendar size={24} />
+              <Calendar size={22} />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: 'var(--color-text-main)', textTransform: 'none' }}>
+              <h2 style={{
+                margin: 0,
+                fontSize: '19px',
+                fontWeight: 700,
+                color: '#f8fafc',
+                letterSpacing: '-0.01em',
+                textTransform: 'none'
+              }}>
                 In iOS Kalender übertragen
               </h2>
-              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                Dienstplan für {currentMonthLabel} exportieren
-              </span>
+              <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '2px' }}>
+                Dienstplan für <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{currentMonthLabel}</span> exportieren
+              </div>
             </div>
           </div>
-          <button className="close-btn" onClick={onClose}>
-            <X size={20} />
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'rgba(148, 163, 184, 0.1)',
+              border: '1px solid rgba(148, 163, 184, 0.15)',
+              color: '#94a3b8',
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            title="Schließen"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="modal-body" style={{ padding: '20px 24px', overflowY: 'auto' }}>
-          {/* iOS Calendar Badge */}
+        {/* Scrollable Body */}
+        <div style={{
+          padding: '20px 24px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          {/* 1. Target Calendar Status Banner */}
           <div style={{
-            background: 'rgba(234, 179, 8, 0.1)',
-            border: '1px solid rgba(234, 179, 8, 0.3)',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.13) 0%, rgba(30, 41, 59, 0.65) 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.32)',
             borderRadius: '16px',
             padding: '14px 16px',
-            marginBottom: '16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px'
+            gap: '12px',
+            flexWrap: 'wrap'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
-                background: '#f59e0b',
-                color: '#1e293b',
-                borderRadius: '8px',
-                width: '32px',
-                height: '32px',
+                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                color: '#0f172a',
+                borderRadius: '10px',
+                width: '34px',
+                height: '34px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontWeight: 'bold',
-                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)'
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.35)',
+                flexShrink: 0
               }}>
-                <Check size={20} strokeWidth={3} />
+                <Check size={19} strokeWidth={3} />
               </div>
               <div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text-main)' }}>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
                   Ziel-Kalender: {calendarName}
                 </div>
-                <div style={{ fontSize: '12px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
-                  <span>Passend für Apple / iOS</span>
-                  <span>•</span>
-                  <span style={{ color: '#facc15', fontWeight: 600 }}>🔔 Erinnerung: 1 Tag vorher aktiv</span>
+                <div style={{
+                  fontSize: '12px',
+                  color: '#cbd5e1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '4px',
+                  flexWrap: 'wrap'
+                }}>
+                  <span style={{ color: '#94a3b8' }}>Passend für Apple / iOS</span>
+                  <span style={{ color: '#475569' }}>•</span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: alarmOption === '0' ? '#94a3b8' : '#fbbf24',
+                    fontWeight: 600
+                  }}>
+                    <Bell size={12} />
+                    Erinnerung: {ALARM_LABELS[alarmOption] || '1 Tag vorher aktiv'}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div style={{ fontSize: '12px', color: '#eab308', fontWeight: 600, textAlign: 'right' }}>
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.16)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              color: '#fbbf24',
+              padding: '5px 12px',
+              borderRadius: '999px',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              whiteSpace: 'nowrap'
+            }}>
               {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'}
             </div>
           </div>
 
-          {/* Success Download Banner */}
+          {/* Feedback Banners after Download */}
           {downloadSuccess === 'export' && (
             <div style={{
-              background: 'rgba(34, 197, 94, 0.15)',
-              border: '1px solid rgba(34, 197, 94, 0.4)',
-              color: 'var(--color-success)',
-              padding: '14px',
-              borderRadius: '12px',
-              marginBottom: '16px',
+              background: 'rgba(16, 185, 129, 0.14)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              color: '#34d399',
+              padding: '12px 14px',
+              borderRadius: '14px',
               fontSize: '13px',
-              lineHeight: 1.4,
-              animation: 'fadeIn 0.2s ease-out'
+              lineHeight: 1.45,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px'
             }}>
-              <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                <CheckCircle2 size={16} /> Kalenderdatei (.ics) mit Update-Version erstellt!
+              <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: '1px' }} />
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '2px' }}>
+                  Kalenderdatei (.ics) mit Update-Version erstellt!
+                </div>
+                <span style={{ color: '#d1fae5' }}>
+                  Öffne die heruntergeladene Datei in der <strong>Kalender-App</strong> und wähle den Kalender <strong>„{calendarName}“</strong> aus.
+                </span>
               </div>
-              Öffne die heruntergeladene Datei in der <strong>Kalender-App</strong> und wähle den Kalender <strong>„{calendarName}“</strong> aus.
             </div>
           )}
 
           {downloadSuccess === 'cancel' && (
             <div style={{
-              background: 'rgba(56, 189, 248, 0.15)',
+              background: 'rgba(56, 189, 248, 0.14)',
               border: '1px solid rgba(56, 189, 248, 0.4)',
               color: '#38bdf8',
-              padding: '14px',
-              borderRadius: '12px',
-              marginBottom: '16px',
+              padding: '12px 14px',
+              borderRadius: '14px',
               fontSize: '13px',
-              lineHeight: 1.4,
-              animation: 'fadeIn 0.2s ease-out'
+              lineHeight: 1.45,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px'
             }}>
-              <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                <Trash2 size={16} /> Lösch-Datei (.ics) heruntergeladen!
+              <Trash2 size={18} style={{ flexShrink: 0, marginTop: '1px' }} />
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '2px' }}>
+                  Lösch-Datei (.ics) heruntergeladen!
+                </div>
+                <span style={{ color: '#e0f2fe' }}>
+                  1. Öffne die Datei <strong>„..._Loeschen.ics“</strong> im Kalender, um die alten Einträge zu entfernen.<br />
+                  2. Klicke danach unten auf <strong>„Dienste in ‚{calendarName}‘ exportieren“</strong>, um den aktuellen Stand sauber einzutragen.
+                </span>
               </div>
-              1. Öffne die Datei <strong>„..._Loeschen.ics“</strong> im Kalender, um die alten Einträge zu entfernen.<br />
-              2. Klicke danach unten auf <strong>„Dienste in ‚{calendarName}‘ exportieren“</strong>, um den aktuellen Stand sauber einzutragen.
             </div>
           )}
 
-          {/* Options: Title format & Alarm */}
+          {/* 2. Export Settings: Title Format & Reminder */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '12px',
-            marginBottom: '14px'
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '12px'
           }}>
-            <div>
-              <label className="text-label">Titel im Kalender</label>
-              <select
-                className="input-premium"
-                value={titleFormat}
-                onChange={(e) => setTitleFormat(e.target.value)}
-                style={{ marginBottom: 0 }}
-              >
-                <option value="codeAndType">Kürzel & Art (z.B. RT2M (Spätschicht))</option>
-                <option value="codeOnly">Nur Kürzel (z.B. RT2M)</option>
-                <option value="typeAndTimes">Schichtart & Zeiten</option>
-              </select>
+            {/* Title Format Select */}
+            <div style={{
+              background: 'rgba(15, 23, 42, 0.55)',
+              border: '1px solid rgba(148, 163, 184, 0.14)',
+              borderRadius: '14px',
+              padding: '10px 12px'
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: '#94a3b8',
+                marginBottom: '6px'
+              }}>
+                <Type size={12} style={{ color: '#38bdf8' }} />
+                Titel im Kalender
+              </label>
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={titleFormat}
+                  onChange={(e) => setTitleFormat(e.target.value)}
+                  style={{
+                    width: '100%',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    background: '#1e293b',
+                    border: '1px solid rgba(148, 163, 184, 0.22)',
+                    borderRadius: '10px',
+                    padding: '9px 32px 9px 11px',
+                    color: '#f8fafc',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="codeAndType">Kürzel & Art (z.B. RT2M (Spätschicht))</option>
+                  <option value="codeOnly">Nur Kürzel (z.B. RT2M)</option>
+                  <option value="typeAndTimes">Schichtart & Zeiten</option>
+                </select>
+                <ChevronDown
+                  size={15}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#94a3b8',
+                    pointerEvents: 'none'
+                  }}
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="text-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Bell size={13} style={{ color: '#eab308' }} />
+            {/* Reminder Select */}
+            <div style={{
+              background: 'rgba(15, 23, 42, 0.55)',
+              border: '1px solid rgba(148, 163, 184, 0.14)',
+              borderRadius: '14px',
+              padding: '10px 12px'
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: '#94a3b8',
+                marginBottom: '6px'
+              }}>
+                <Bell size={12} style={{ color: '#fbbf24' }} />
                 Erinnerung (iOS Hinweis)
               </label>
-              <select
-                className="input-premium"
-                value={alarmOption}
-                onChange={(e) => setAlarmOption(e.target.value)}
-                style={{ marginBottom: 0 }}
-              >
-                <option value="1440">1 Tag vorher (Standard)</option>
-                <option value="1440_60">1 Tag vorher + 1 Std. vorher</option>
-                <option value="2880">2 Tage vorher</option>
-                <option value="720">12 Stunden vorher</option>
-                <option value="120">2 Stunden vorher</option>
-                <option value="60">1 Stunde vorher</option>
-                <option value="30">30 Minuten vorher</option>
-                <option value="0">Keine Erinnerung</option>
-              </select>
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={alarmOption}
+                  onChange={(e) => setAlarmOption(e.target.value)}
+                  style={{
+                    width: '100%',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    background: '#1e293b',
+                    border: '1px solid rgba(148, 163, 184, 0.22)',
+                    borderRadius: '10px',
+                    padding: '9px 32px 9px 11px',
+                    color: '#f8fafc',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="1440">1 Tag vorher (Standard)</option>
+                  <option value="1440_60">1 Tag vorher + 1 Std. vorher</option>
+                  <option value="2880">2 Tage vorher</option>
+                  <option value="720">12 Stunden vorher</option>
+                  <option value="120">2 Stunden vorher</option>
+                  <option value="60">1 Stunde vorher</option>
+                  <option value="30">30 Minuten vorher</option>
+                  <option value="0">Keine Erinnerung</option>
+                </select>
+                <ChevronDown
+                  size={15}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#94a3b8',
+                    pointerEvents: 'none'
+                  }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Overwrite / Update Controls for Existing Calendar Entries */}
+          {/* 3. Overwrite / Update Controls for Existing Calendar Entries */}
           <div style={{
-            background: 'rgba(15, 23, 42, 0.65)',
-            border: '1px solid #334155',
-            borderRadius: '14px',
-            padding: '12px 14px',
-            marginBottom: '18px'
+            background: 'rgba(15, 23, 42, 0.55)',
+            border: '1px solid rgba(148, 163, 184, 0.14)',
+            borderRadius: '16px',
+            padding: '12px 14px'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-              <label className="text-label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px', color: '#e2e8f0' }}>
-                <RefreshCw size={13} style={{ color: '#38bdf8' }} />
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '8px',
+              marginBottom: '10px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: '#cbd5e1'
+              }}>
+                <RefreshCw size={12} style={{ color: '#38bdf8' }} />
                 Bestehende Termine im Kalender behandeln
-              </label>
+              </div>
 
               <button
                 type="button"
                 onClick={handleDownloadCancelIcs}
                 style={{
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.35)',
-                  color: '#f87171',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.28)',
+                  color: '#fca5a5',
                   borderRadius: '8px',
                   padding: '4px 10px',
                   fontSize: '11.5px',
@@ -299,7 +513,8 @@ export default function IosCalendarExportModal({
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '5px',
+                  transition: 'all 0.15s ease'
                 }}
                 title="Lädt eine .ics Storno-Datei herunter, die bereits übertragene Termine dieses Monats aus dem Kalender entfernt"
               >
@@ -308,251 +523,476 @@ export default function IosCalendarExportModal({
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '10px'
+            }}>
+              {/* Mode 1: Update existing */}
               <button
                 type="button"
                 onClick={() => setOverwriteMode('update')}
                 style={{
-                  padding: '8px 10px',
-                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
                   textAlign: 'left',
                   cursor: 'pointer',
-                  background: overwriteMode === 'update' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(30, 41, 59, 0.5)',
-                  border: overwriteMode === 'update' ? '1px solid #38bdf8' : '1px solid #334155',
-                  color: overwriteMode === 'update' ? '#f8fafc' : '#94a3b8'
+                  background: overwriteMode === 'update'
+                    ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.16) 0%, rgba(30, 41, 59, 0.8) 100%)'
+                    : 'rgba(30, 41, 59, 0.45)',
+                  border: overwriteMode === 'update'
+                    ? '1.5px solid rgba(56, 189, 248, 0.65)'
+                    : '1px solid rgba(148, 163, 184, 0.15)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ fontSize: '12px', fontWeight: 700, color: overwriteMode === 'update' ? '#38bdf8' : '#cbd5e1' }}>
-                  🔄 Bestehende aktualisieren
-                </div>
-                <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px', lineHeight: 1.3 }}>
-                  Gleiche Kalender-ID + höhere Versionsnummer (SEQUENCE)
+                <div style={{
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  border: overwriteMode === 'update' ? '5px solid #38bdf8' : '2px solid #475569',
+                  background: '#0f172a',
+                  marginTop: '1px',
+                  flexShrink: 0
+                }} />
+                <div>
+                  <div style={{
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    color: overwriteMode === 'update' ? '#f8fafc' : '#cbd5e1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}>
+                    <RefreshCw size={12} style={{ color: overwriteMode === 'update' ? '#38bdf8' : '#64748b' }} />
+                    Bestehende aktualisieren
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', lineHeight: 1.35 }}>
+                    Gleiche Kalender-ID + höhere Versionsnummer (SEQUENCE)
+                  </div>
                 </div>
               </button>
 
+              {/* Mode 2: Force new UID */}
               <button
                 type="button"
                 onClick={() => setOverwriteMode('forceNew')}
                 style={{
-                  padding: '8px 10px',
-                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
                   textAlign: 'left',
                   cursor: 'pointer',
-                  background: overwriteMode === 'forceNew' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(30, 41, 59, 0.5)',
-                  border: overwriteMode === 'forceNew' ? '1px solid #eab308' : '1px solid #334155',
-                  color: overwriteMode === 'forceNew' ? '#f8fafc' : '#94a3b8'
+                  background: overwriteMode === 'forceNew'
+                    ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(30, 41, 59, 0.8) 100%)'
+                    : 'rgba(30, 41, 59, 0.45)',
+                  border: overwriteMode === 'forceNew'
+                    ? '1.5px solid rgba(245, 158, 11, 0.65)'
+                    : '1px solid rgba(148, 163, 184, 0.15)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ fontSize: '12px', fontWeight: 700, color: overwriteMode === 'forceNew' ? '#facc15' : '#cbd5e1' }}>
-                  ✨ Neu-Eintrag erzwingen
-                </div>
-                <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px', lineHeight: 1.3 }}>
-                  Vergibt neue ID (falls iOS „Alle hinzufügen“ bekannte IDs ignoriert)
+                <div style={{
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  border: overwriteMode === 'forceNew' ? '5px solid #fbbf24' : '2px solid #475569',
+                  background: '#0f172a',
+                  marginTop: '1px',
+                  flexShrink: 0
+                }} />
+                <div>
+                  <div style={{
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    color: overwriteMode === 'forceNew' ? '#f8fafc' : '#cbd5e1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}>
+                    <Sparkles size={12} style={{ color: overwriteMode === 'forceNew' ? '#fbbf24' : '#64748b' }} />
+                    Neu-Eintrag erzwingen
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', lineHeight: 1.35 }}>
+                    Vergibt neue ID (falls iOS „Alle hinzufügen“ bekannte IDs ignoriert)
+                  </div>
                 </div>
               </button>
             </div>
           </div>
 
-          {/* Shifts Selection List */}
-          <div style={{ marginBottom: '18px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-              <span className="text-label" style={{ margin: 0 }}>
-                Zu übertragende Dienste ({selectedShifts.length} von {shifts.length})
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* 4. Shifts Selection List */}
+          <div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '10px',
+              flexWrap: 'wrap',
+              gap: '8px'
+            }}>
+              <div style={{
+                fontSize: '11.5px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: '#94a3b8'
+              }}>
+                Zu übertragende Dienste <span style={{ color: '#e2e8f0' }}>({selectedShifts.length} von {shifts.length})</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {changedOrNewIds.length > 0 && changedOrNewIds.length < shifts.length && (
                   <button
                     type="button"
                     onClick={selectOnlyChanged}
                     style={{
-                      background: 'rgba(249, 115, 22, 0.15)',
-                      border: '1px solid rgba(249, 115, 22, 0.4)',
-                      color: '#f97316',
+                      background: 'rgba(249, 115, 22, 0.14)',
+                      border: '1px solid rgba(249, 115, 22, 0.35)',
+                      color: '#fb923c',
                       fontSize: '11.5px',
-                      padding: '2px 8px',
-                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
                       cursor: 'pointer',
                       fontWeight: 700
                     }}
                   >
-                    ✏️ Nur geänderte/neue ({changedOrNewIds.length})
+                    Nur geänderte/neue ({changedOrNewIds.length})
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={toggleSelectAll}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--color-primary)',
-                    fontSize: '12px',
+                    background: 'rgba(148, 163, 184, 0.1)',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    color: '#e2e8f0',
+                    fontSize: '11.5px',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
                     cursor: 'pointer',
                     fontWeight: 600
                   }}
                 >
-                  {selectedIds.size === shifts.length ? 'Keine' : 'Alle auswählen'}
+                  {selectedIds.size === shifts.length ? 'Keine auswählen' : 'Alle auswählen'}
                 </button>
               </div>
             </div>
 
             {shifts.length === 0 ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', background: 'var(--color-bg)', borderRadius: '12px' }}>
+              <div style={{
+                padding: '28px',
+                textAlign: 'center',
+                color: '#64748b',
+                background: 'rgba(15, 23, 42, 0.5)',
+                borderRadius: '14px',
+                border: '1px dashed rgba(148, 163, 184, 0.2)'
+              }}>
                 Keine Dienste in diesem Monat vorhanden.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                {shifts
-                  .slice()
-                  .sort((a, b) => new Date(a.date) - new Date(b.date))
-                  .map(shift => {
-                    const isChecked = selectedIds.has(shift.id);
-                    const shiftCodeObj = (storeSettings.shiftCodes || []).find(
-                      c => c.id === shift.codeId || c.code === shift.code
-                    );
-                    const code = shift.code || shiftCodeObj?.code || 'Schicht';
-                    const dateObj = new Date(shift.date);
-                    const weekday = dateObj.toLocaleDateString('de-DE', { weekday: 'short' });
-                    const formattedDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                    const status = exportHistory ? shiftStatuses[shift.id] : null;
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                maxHeight: '260px',
+                overflowY: 'auto',
+                paddingRight: '4px'
+              }}>
+                {sortedShifts.map(shift => {
+                  const isChecked = selectedIds.has(shift.id);
+                  const shiftCodeObj = (storeSettings.shiftCodes || []).find(
+                    c => c.id === shift.codeId || c.code === shift.code
+                  );
+                  const code = shift.code || shiftCodeObj?.code || 'Schicht';
+                  const shiftTypeObj = (storeSettings.shiftTypes || []).find(t => t.id === shift.typeId);
+                  const typeName = shift.shiftTypeName || shiftTypeObj?.name || '';
+                  const shiftCol = getShiftColor(typeName, code, shift.station, shift.vehicle);
 
-                    return (
-                      <div
-                        key={shift.id}
-                        onClick={() => toggleShift(shift.id)}
-                        style={{
+                  const dateObj = new Date(shift.date);
+                  const weekday = dateObj.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
+                  const formattedDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                  const status = exportHistory ? shiftStatuses[shift.id] : null;
+                  const cleanPartner = shift.partner
+                    ? (shift.partner.trim().startsWith('mit ') ? shift.partner.trim() : `mit ${shift.partner.trim()}`)
+                    : '';
+
+                  return (
+                    <div
+                      key={shift.id}
+                      onClick={() => toggleShift(shift.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '10px 14px',
+                        borderRadius: '14px',
+                        background: isChecked
+                          ? 'rgba(30, 41, 59, 0.78)'
+                          : 'rgba(15, 23, 42, 0.4)',
+                        border: status === 'modified'
+                          ? '1px solid rgba(249, 115, 22, 0.45)'
+                          : (isChecked ? '1px solid rgba(148, 163, 184, 0.18)' : '1px solid rgba(148, 163, 184, 0.06)'),
+                        cursor: 'pointer',
+                        opacity: isChecked ? 1 : 0.48,
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {/* Custom Vector Checkbox */}
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '6px',
+                        background: isChecked ? '#eab308' : 'rgba(15, 23, 42, 0.8)',
+                        border: isChecked ? '1.5px solid #eab308' : '1.5px solid #475569',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#0f172a',
+                        flexShrink: 0,
+                        transition: 'all 0.15s ease'
+                      }}>
+                        {isChecked && <Check size={14} strokeWidth={3} />}
+                      </div>
+
+                      {/* Date Tile */}
+                      <div style={{
+                        minWidth: '48px',
+                        padding: '4px 6px',
+                        borderRadius: '10px',
+                        background: 'rgba(15, 23, 42, 0.65)',
+                        border: '1px solid rgba(148, 163, 184, 0.12)',
+                        textAlign: 'center',
+                        flexShrink: 0
+                      }}>
+                        <span style={{
+                          fontSize: '10px',
+                          color: '#fbbf24',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          display: 'block',
+                          lineHeight: 1.1
+                        }}>
+                          {weekday}
+                        </span>
+                        <span style={{
+                          fontSize: '13.5px',
+                          fontWeight: 800,
+                          color: '#f8fafc',
+                          lineHeight: 1.2
+                        }}>
+                          {formattedDate}.
+                        </span>
+                      </div>
+
+                      {/* Shift Code Pill in Station Color */}
+                      <div style={{
+                        background: shiftCol.bg,
+                        color: shiftCol.color,
+                        border: `1px solid ${shiftCol.border}`,
+                        padding: '4px 9px',
+                        borderRadius: '8px',
+                        fontWeight: 800,
+                        fontSize: '12px',
+                        minWidth: '52px',
+                        textAlign: 'center',
+                        flexShrink: 0
+                      }}>
+                        {code}
+                      </div>
+
+                      {/* Main Shift Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
                           display: 'flex',
                           alignItems: 'center',
-                          padding: '10px 14px',
-                          borderRadius: '12px',
-                          background: isChecked ? 'var(--color-surface)' : 'rgba(15, 23, 42, 0.4)',
-                          border: status === 'modified'
-                            ? '1px solid rgba(249, 115, 22, 0.5)'
-                            : (isChecked ? '1px solid var(--color-border)' : '1px solid transparent'),
-                          cursor: 'pointer',
-                          opacity: isChecked ? 1 : 0.5,
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleShift(shift.id)}
-                          style={{ marginRight: '12px', width: '18px', height: '18px', accentColor: '#eab308' }}
-                        />
-
-                        <div style={{ width: '50px', textAlign: 'center', marginRight: '10px' }}>
-                          <span style={{ fontSize: '10px', color: '#eab308', fontWeight: 'bold', display: 'block' }}>{weekday}</span>
-                          <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{formattedDate}</span>
-                        </div>
-
-                        <div style={{
-                          background: 'rgba(234, 179, 8, 0.15)',
-                          color: '#eab308',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontWeight: 'bold',
-                          fontSize: '12px',
-                          minWidth: '48px',
-                          textAlign: 'center',
-                          marginRight: '12px'
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          flexWrap: 'wrap'
                         }}>
-                          {code}
-                        </div>
+                          <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#f8fafc' }}>
+                            {shift.startTime} – {shift.endTime} Uhr
+                          </span>
 
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-main)' }}>
-                              {shift.startTime} - {shift.endTime} Uhr
-                            </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             {status === 'modified' && (
                               <span style={{
                                 fontSize: '10px',
                                 fontWeight: 700,
-                                background: 'rgba(249, 115, 22, 0.2)',
+                                background: 'rgba(249, 115, 22, 0.18)',
+                                border: '1px solid rgba(249, 115, 22, 0.35)',
                                 color: '#fb923c',
-                                padding: '1px 6px',
-                                borderRadius: '4px'
+                                padding: '1px 7px',
+                                borderRadius: '999px'
                               }}>
-                                ✏️ Geändert
+                                Geändert
                               </span>
                             )}
                             {status === 'new' && (
                               <span style={{
                                 fontSize: '10px',
                                 fontWeight: 700,
-                                background: 'rgba(56, 189, 248, 0.2)',
+                                background: 'rgba(56, 189, 248, 0.18)',
+                                border: '1px solid rgba(56, 189, 248, 0.35)',
                                 color: '#38bdf8',
-                                padding: '1px 6px',
-                                borderRadius: '4px'
+                                padding: '1px 7px',
+                                borderRadius: '999px'
                               }}>
-                                🆕 Neu
+                                Neu
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                            {shift.station} {shift.vehicle ? `• ${shift.vehicle}` : ''} {shift.partner ? `• 👤 ${shift.partner}` : ''}
-                          </div>
+                        </div>
+
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginTop: '3px',
+                          fontSize: '11.5px',
+                          color: '#94a3b8',
+                          flexWrap: 'wrap'
+                        }}>
+                          {shift.station && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              color: shiftCol.stationColor,
+                              fontWeight: 600
+                            }}>
+                              <MapPin size={11} />
+                              {shift.station}
+                            </span>
+                          )}
+                          {shift.vehicle && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ color: '#475569' }}>•</span>
+                              <Truck size={11} />
+                              {shift.vehicle}
+                            </span>
+                          )}
+                          {cleanPartner && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#38bdf8',
+                              fontWeight: 500
+                            }}>
+                              <span style={{ color: '#475569' }}>•</span>
+                              <Users size={11} />
+                              {cleanPartner}
+                            </span>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* iOS Instructions Box */}
+          {/* 5. Compact Info / Overwrite Tip Box */}
           <div style={{
-            background: 'var(--color-bg)',
+            background: 'rgba(15, 23, 42, 0.7)',
+            border: '1px solid rgba(148, 163, 184, 0.12)',
             borderRadius: '14px',
-            padding: '12px 16px',
+            padding: '12px 14px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
             fontSize: '12px',
-            color: 'var(--color-text-muted)',
+            color: '#94a3b8',
             lineHeight: 1.5
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text-main)', fontWeight: 'bold', marginBottom: '4px' }}>
-              <Smartphone size={16} color="#eab308" />
-              Tipp zum Überschreiben im Apple Kalender:
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.14)',
+              color: '#fbbf24',
+              borderRadius: '8px',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              marginTop: '1px'
+            }}>
+              <Smartphone size={15} />
             </div>
             <div>
-              Die Export-Datei enthält jetzt eine automatische <strong>Versionsnummer (SEQUENCE)</strong>, damit bestehende Termine aktualisiert werden. Falls iOS Safari beim Tippen auf „Alle hinzufügen“ bereits vorhandene Termine überspringt, kannst du oben <strong>„Alte Termine per .ics löschen“</strong> nutzen oder nur den geänderten Dienst mit <strong>„✨ Neu-Eintrag erzwingen“</strong> übertragen.
+              <div style={{ color: '#e2e8f0', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span>Tipp zum Überschreiben im Apple Kalender</span>
+              </div>
+              <div>
+                Die Export-Datei enthält jetzt eine automatische <strong style={{ color: '#cbd5e1' }}>Versionsnummer (SEQUENCE)</strong>, damit bestehende Termine aktualisiert werden. Falls iOS Safari beim Tippen auf „Alle hinzufügen“ bereits vorhandene Termine überspringt, kannst du oben <strong style={{ color: '#fca5a5' }}>„Alte Termine per .ics löschen“</strong> nutzen oder nur den geänderten Dienst mit <strong style={{ color: '#fbbf24' }}>„Neu-Eintrag erzwingen“</strong> übertragen.
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="modal-footer" style={{ padding: '16px 24px', background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)' }}>
+        {/* Sticky Footer */}
+        <div style={{
+          padding: '16px 24px',
+          background: 'rgba(15, 23, 42, 0.85)',
+          borderTop: '1px solid rgba(148, 163, 184, 0.12)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
           <button
             type="button"
-            className="btn-secondary"
             onClick={onClose}
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+              background: 'rgba(30, 41, 59, 0.8)',
+              border: '1px solid rgba(148, 163, 184, 0.2)',
+              color: '#cbd5e1',
+              padding: '12px 18px',
+              borderRadius: '12px',
+              fontWeight: 600,
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
           >
             Schließen
           </button>
+
           <button
             type="button"
             onClick={handleExport}
             disabled={selectedShifts.length === 0}
             style={{
-              flex: 2,
-              background: '#eab308',
+              flex: 2.2,
+              background: selectedShifts.length > 0
+                ? 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)'
+                : 'rgba(234, 179, 8, 0.3)',
               color: '#0f172a',
               border: 'none',
               padding: '12px 20px',
-              borderRadius: 'var(--radius-button)',
+              borderRadius: '12px',
               fontWeight: 700,
-              fontSize: '15px',
+              fontSize: '14.5px',
               cursor: selectedShifts.length > 0 ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 4px 15px rgba(234, 179, 8, 0.3)',
-              opacity: selectedShifts.length > 0 ? 1 : 0.6
+              boxShadow: selectedShifts.length > 0 ? '0 8px 20px -4px rgba(234, 179, 8, 0.4)' : 'none',
+              opacity: selectedShifts.length > 0 ? 1 : 0.5,
+              transition: 'all 0.15s ease'
             }}
           >
             <Download size={18} strokeWidth={2.5} />
-            {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'} in „{calendarName}“ exportieren
+            <span>
+              {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'} in „{calendarName}“ exportieren
+            </span>
           </button>
         </div>
       </div>

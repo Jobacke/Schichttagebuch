@@ -89,7 +89,11 @@ export function StoreProvider({ children }) {
     if (!currentUser) return;
     try {
       const id = shift.id || crypto.randomUUID();
-      await setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), shift);
+      await setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), {
+        ...shift,
+        id,
+        updatedAt: Date.now()
+      });
     } catch (e) {
       console.error("Add Shift Failed", e);
       alert("Fehler beim Speichern: " + e.message);
@@ -100,22 +104,37 @@ export function StoreProvider({ children }) {
     if (!currentUser || !shiftsArray || shiftsArray.length === 0) return true;
     try {
       const batch = writeBatch(db);
+      const reusedIdsByDate = {};
 
       if (overwriteExistingDates) {
         const datesToOverwrite = new Set(shiftsArray.map(s => s.date));
-        const existingToDelete = (shifts || []).filter(s => datesToOverwrite.has(s.date));
-        existingToDelete.forEach(s => {
-          batch.delete(doc(db, `users/${currentUser.uid}/shifts`, s.id));
+        const existingOnDates = (shifts || []).filter(s => datesToOverwrite.has(s.date));
+        existingOnDates.forEach(s => {
+          if (!reusedIdsByDate[s.date]) {
+            // Reuse first existing shift ID on that date so iOS Calendar UID stays identical!
+            reusedIdsByDate[s.date] = s;
+          } else {
+            // Delete any extra shifts on that same date
+            batch.delete(doc(db, `users/${currentUser.uid}/shifts`, s.id));
+          }
         });
       }
 
       shiftsArray.forEach(shift => {
-        const id = shift.id || crypto.randomUUID();
+        const prevShift = overwriteExistingDates ? reusedIdsByDate[shift.date] : null;
+        if (prevShift) {
+          delete reusedIdsByDate[shift.date];
+        }
+        const id = prevShift?.id || shift.id || crypto.randomUUID();
         const ref = doc(db, `users/${currentUser.uid}/shifts`, id);
         batch.set(ref, {
           ...shift,
           id,
-          timestamp: shift.timestamp || Date.now()
+          hasBonus: shift.hasBonus !== undefined ? shift.hasBonus : Boolean(prevShift?.hasBonus),
+          bonusAmount: shift.bonusAmount !== undefined ? shift.bonusAmount : (prevShift?.bonusAmount ?? (settings?.defaultBonusAmount ?? 75)),
+          partner: shift.partner || prevShift?.partner || '',
+          timestamp: prevShift?.timestamp || shift.timestamp || Date.now(),
+          updatedAt: Date.now()
         });
       });
 
@@ -129,7 +148,8 @@ export function StoreProvider({ children }) {
           return setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), {
             ...shift,
             id,
-            timestamp: shift.timestamp || Date.now()
+            timestamp: shift.timestamp || Date.now(),
+            updatedAt: Date.now()
           });
         }));
         return true;

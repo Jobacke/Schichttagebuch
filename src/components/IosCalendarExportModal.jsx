@@ -1,9 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Calendar, Check, Download, X, Clock, MapPin, Bell,
-  Smartphone, Laptop, CheckCircle2, ShieldCheck, ChevronRight
+  Calendar, Check, Download, X, Bell,
+  Smartphone, CheckCircle2, RefreshCw, Trash2
 } from 'lucide-react';
-import { downloadIcsFile } from '../utils/calendarExport';
+import {
+  downloadIcsFile,
+  downloadCancelIcsFile,
+  getShiftExportStatus,
+  getCalendarExportHistory
+} from '../utils/calendarExport';
 
 export default function IosCalendarExportModal({
   isOpen,
@@ -15,11 +20,32 @@ export default function IosCalendarExportModal({
 }) {
   if (!isOpen) return null;
 
-  const [calendarName, setCalendarName] = useState('Familie');
+  const [calendarName] = useState('Familie');
   const [titleFormat, setTitleFormat] = useState('codeAndType'); // 'codeAndType', 'codeOnly', 'typeAndTimes'
   const [alarmOption, setAlarmOption] = useState('1440'); // Default: 1 Tag vorher!
+  const [overwriteMode, setOverwriteMode] = useState('update'); // 'update' | 'forceNew'
   const [selectedIds, setSelectedIds] = useState(() => new Set(shifts.map(s => s.id)));
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(null); // null | 'export' | 'cancel'
+  const [exportVersionTick, setExportVersionTick] = useState(0);
+
+  const exportHistory = useMemo(() => {
+    return getCalendarExportHistory(yearMonth);
+  }, [yearMonth, exportVersionTick]);
+
+  const shiftStatuses = useMemo(() => {
+    const map = {};
+    shifts.forEach(s => {
+      map[s.id] = getShiftExportStatus(s, yearMonth, storeSettings);
+    });
+    return map;
+  }, [shifts, yearMonth, storeSettings, exportVersionTick]);
+
+  const changedOrNewIds = useMemo(() => {
+    if (!exportHistory) return [];
+    return shifts
+      .filter(s => shiftStatuses[s.id] === 'modified' || shiftStatuses[s.id] === 'new')
+      .map(s => s.id);
+  }, [shifts, shiftStatuses, exportHistory]);
 
   const selectedShifts = useMemo(() => {
     return shifts.filter(s => selectedIds.has(s.id));
@@ -30,6 +56,12 @@ export default function IosCalendarExportModal({
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(shifts.map(s => s.id)));
+    }
+  };
+
+  const selectOnlyChanged = () => {
+    if (changedOrNewIds.length > 0) {
+      setSelectedIds(new Set(changedOrNewIds));
     }
   };
 
@@ -50,12 +82,26 @@ export default function IosCalendarExportModal({
       titleFormat,
       alarmOption,
       alarmMinutes: alarmOption === '1440' ? 1440 : (Number(alarmOption) || 1440),
+      overwriteMode,
       yearMonth,
       storeSettings
     });
 
-    setDownloadSuccess(true);
-    setTimeout(() => setDownloadSuccess(false), 8000);
+    setExportVersionTick(t => t + 1);
+    setDownloadSuccess('export');
+    setTimeout(() => setDownloadSuccess(null), 9000);
+  };
+
+  const handleDownloadCancelIcs = () => {
+    if (shifts.length === 0) return;
+    downloadCancelIcsFile(selectedShifts.length > 0 ? selectedShifts : shifts, {
+      calendarName,
+      titleFormat,
+      yearMonth,
+      storeSettings
+    });
+    setDownloadSuccess('cancel');
+    setTimeout(() => setDownloadSuccess(null), 9000);
   };
 
   return (
@@ -97,13 +143,13 @@ export default function IosCalendarExportModal({
 
         {/* Modal Body */}
         <div className="modal-body" style={{ padding: '20px 24px', overflowY: 'auto' }}>
-          {/* iOS Calendar Badge (Match user image) */}
+          {/* iOS Calendar Badge */}
           <div style={{
             background: 'rgba(234, 179, 8, 0.1)',
             border: '1px solid rgba(234, 179, 8, 0.3)',
             borderRadius: '16px',
-            padding: '16px',
-            marginBottom: '20px',
+            padding: '14px 16px',
+            marginBottom: '16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -142,7 +188,7 @@ export default function IosCalendarExportModal({
           </div>
 
           {/* Success Download Banner */}
-          {downloadSuccess && (
+          {downloadSuccess === 'export' && (
             <div style={{
               background: 'rgba(34, 197, 94, 0.15)',
               border: '1px solid rgba(34, 197, 94, 0.4)',
@@ -155,9 +201,29 @@ export default function IosCalendarExportModal({
               animation: 'fadeIn 0.2s ease-out'
             }}>
               <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                <CheckCircle2 size={16} /> Kalenderdatei (.ics) erfolgreich erstellt!
+                <CheckCircle2 size={16} /> Kalenderdatei (.ics) mit Update-Version erstellt!
               </div>
-              Tippe auf deinem iPhone in Safari auf <strong>„Laden“</strong> und öffne die Datei mit der <strong>Kalender-App</strong>, um alle Dienste mit einem Klick in <strong>„Familie“</strong> zu speichern.
+              Öffne die heruntergeladene Datei in der <strong>Kalender-App</strong> und wähle den Kalender <strong>„{calendarName}“</strong> aus.
+            </div>
+          )}
+
+          {downloadSuccess === 'cancel' && (
+            <div style={{
+              background: 'rgba(56, 189, 248, 0.15)',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              color: '#38bdf8',
+              padding: '14px',
+              borderRadius: '12px',
+              marginBottom: '16px',
+              fontSize: '13px',
+              lineHeight: 1.4,
+              animation: 'fadeIn 0.2s ease-out'
+            }}>
+              <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <Trash2 size={16} /> Lösch-Datei (.ics) heruntergeladen!
+              </div>
+              1. Öffne die Datei <strong>„..._Loeschen.ics“</strong> im Kalender, um die alten Einträge zu entfernen.<br />
+              2. Klicke danach unten auf <strong>„Dienste in ‚{calendarName}‘ exportieren“</strong>, um den aktuellen Stand sauber einzutragen.
             </div>
           )}
 
@@ -166,7 +232,7 @@ export default function IosCalendarExportModal({
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: '12px',
-            marginBottom: '20px'
+            marginBottom: '14px'
           }}>
             <div>
               <label className="text-label">Titel im Kalender</label>
@@ -205,26 +271,128 @@ export default function IosCalendarExportModal({
             </div>
           </div>
 
+          {/* Overwrite / Update Controls for Existing Calendar Entries */}
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.65)',
+            border: '1px solid #334155',
+            borderRadius: '14px',
+            padding: '12px 14px',
+            marginBottom: '18px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              <label className="text-label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px', color: '#e2e8f0' }}>
+                <RefreshCw size={13} style={{ color: '#38bdf8' }} />
+                Bestehende Termine im Kalender behandeln
+              </label>
+
+              <button
+                type="button"
+                onClick={handleDownloadCancelIcs}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#f87171',
+                  borderRadius: '8px',
+                  padding: '4px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="Lädt eine .ics Storno-Datei herunter, die bereits übertragene Termine dieses Monats aus dem Kalender entfernt"
+              >
+                <Trash2 size={12} />
+                Alte Termine per .ics löschen
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setOverwriteMode('update')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: '10px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  background: overwriteMode === 'update' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(30, 41, 59, 0.5)',
+                  border: overwriteMode === 'update' ? '1px solid #38bdf8' : '1px solid #334155',
+                  color: overwriteMode === 'update' ? '#f8fafc' : '#94a3b8'
+                }}
+              >
+                <div style={{ fontSize: '12px', fontWeight: 700, color: overwriteMode === 'update' ? '#38bdf8' : '#cbd5e1' }}>
+                  🔄 Bestehende aktualisieren
+                </div>
+                <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px', lineHeight: 1.3 }}>
+                  Gleiche Kalender-ID + höhere Versionsnummer (SEQUENCE)
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOverwriteMode('forceNew')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: '10px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  background: overwriteMode === 'forceNew' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(30, 41, 59, 0.5)',
+                  border: overwriteMode === 'forceNew' ? '1px solid #eab308' : '1px solid #334155',
+                  color: overwriteMode === 'forceNew' ? '#f8fafc' : '#94a3b8'
+                }}
+              >
+                <div style={{ fontSize: '12px', fontWeight: 700, color: overwriteMode === 'forceNew' ? '#facc15' : '#cbd5e1' }}>
+                  ✨ Neu-Eintrag erzwingen
+                </div>
+                <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px', lineHeight: 1.3 }}>
+                  Vergibt neue ID (falls iOS „Alle hinzufügen“ bekannte IDs ignoriert)
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Shifts Selection List */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={{ marginBottom: '18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
               <span className="text-label" style={{ margin: 0 }}>
                 Zu übertragende Dienste ({selectedShifts.length} von {shifts.length})
               </span>
-              <button
-                type="button"
-                onClick={toggleSelectAll}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--color-primary)',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                {selectedIds.size === shifts.length ? 'Keine' : 'Alle auswählen'}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {changedOrNewIds.length > 0 && changedOrNewIds.length < shifts.length && (
+                  <button
+                    type="button"
+                    onClick={selectOnlyChanged}
+                    style={{
+                      background: 'rgba(249, 115, 22, 0.15)',
+                      border: '1px solid rgba(249, 115, 22, 0.4)',
+                      color: '#f97316',
+                      fontSize: '11.5px',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 700
+                    }}
+                  >
+                    ✏️ Nur geänderte/neue ({changedOrNewIds.length})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-primary)',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  {selectedIds.size === shifts.length ? 'Keine' : 'Alle auswählen'}
+                </button>
+              </div>
             </div>
 
             {shifts.length === 0 ? (
@@ -234,6 +402,7 @@ export default function IosCalendarExportModal({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                 {shifts
+                  .slice()
                   .sort((a, b) => new Date(a.date) - new Date(b.date))
                   .map(shift => {
                     const isChecked = selectedIds.has(shift.id);
@@ -244,6 +413,7 @@ export default function IosCalendarExportModal({
                     const dateObj = new Date(shift.date);
                     const weekday = dateObj.toLocaleDateString('de-DE', { weekday: 'short' });
                     const formattedDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                    const status = exportHistory ? shiftStatuses[shift.id] : null;
 
                     return (
                       <div
@@ -255,7 +425,9 @@ export default function IosCalendarExportModal({
                           padding: '10px 14px',
                           borderRadius: '12px',
                           background: isChecked ? 'var(--color-surface)' : 'rgba(15, 23, 42, 0.4)',
-                          border: isChecked ? '1px solid var(--color-border)' : '1px solid transparent',
+                          border: status === 'modified'
+                            ? '1px solid rgba(249, 115, 22, 0.5)'
+                            : (isChecked ? '1px solid var(--color-border)' : '1px solid transparent'),
                           cursor: 'pointer',
                           opacity: isChecked ? 1 : 0.5,
                           transition: 'all 0.15s'
@@ -288,11 +460,37 @@ export default function IosCalendarExportModal({
                         </div>
 
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-main)' }}>
-                            {shift.startTime} - {shift.endTime} Uhr
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                              {shift.startTime} - {shift.endTime} Uhr
+                            </span>
+                            {status === 'modified' && (
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                background: 'rgba(249, 115, 22, 0.2)',
+                                color: '#fb923c',
+                                padding: '1px 6px',
+                                borderRadius: '4px'
+                              }}>
+                                ✏️ Geändert
+                              </span>
+                            )}
+                            {status === 'new' && (
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                background: 'rgba(56, 189, 248, 0.2)',
+                                color: '#38bdf8',
+                                padding: '1px 6px',
+                                borderRadius: '4px'
+                              }}>
+                                🆕 Neu
+                              </span>
+                            )}
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                            {shift.station} {shift.vehicle ? `• ${shift.vehicle}` : ''}
+                            {shift.station} {shift.vehicle ? `• ${shift.vehicle}` : ''} {shift.partner ? `• 👤 ${shift.partner}` : ''}
                           </div>
                         </div>
                       </div>
@@ -306,21 +504,18 @@ export default function IosCalendarExportModal({
           <div style={{
             background: 'var(--color-bg)',
             borderRadius: '14px',
-            padding: '14px 16px',
+            padding: '12px 16px',
             fontSize: '12px',
             color: 'var(--color-text-muted)',
             lineHeight: 1.5
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text-main)', fontWeight: 'bold', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text-main)', fontWeight: 'bold', marginBottom: '4px' }}>
               <Smartphone size={16} color="#eab308" />
-              So funktioniert die Übernahme auf iPhone & iPad:
+              Tipp zum Überschreiben im Apple Kalender:
             </div>
-            <ol style={{ margin: 0, paddingLeft: '18px' }}>
-              <li>Unten auf <strong>„Dienstplan für ‚Familie‘ herunterladen (.ics)“</strong> tippen.</li>
-              <li>Safari fragt nach Bestätigung: Auf <strong>„Laden“</strong> tippen und die Datei öffnen.</li>
-              <li>In der Apple Kalender-App oben rechts auf <strong>„Alle hinzufügen“</strong> tippen.</li>
-              <li>Wähle deinen Kalender <strong style={{ color: '#eab308' }}>„Familie“</strong> aus und bestätige – fertig!</li>
-            </ol>
+            <div>
+              Die Export-Datei enthält jetzt eine automatische <strong>Versionsnummer (SEQUENCE)</strong>, damit bestehende Termine aktualisiert werden. Falls iOS Safari beim Tippen auf „Alle hinzufügen“ bereits vorhandene Termine überspringt, kannst du oben <strong>„Alte Termine per .ics löschen“</strong> nutzen oder nur den geänderten Dienst mit <strong>„✨ Neu-Eintrag erzwingen“</strong> übertragen.
+            </div>
           </div>
         </div>
 
@@ -357,7 +552,7 @@ export default function IosCalendarExportModal({
             }}
           >
             <Download size={18} strokeWidth={2.5} />
-            {selectedShifts.length} Dienste in „{calendarName}“ exportieren
+            {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'} in „{calendarName}“ exportieren
           </button>
         </div>
       </div>

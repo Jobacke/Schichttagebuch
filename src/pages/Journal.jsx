@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore, getShiftBonusAmount } from '../context/StoreContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getDaysInMonth, startOfMonth, getDay, isSameDay, parseISO } from 'date-fns';
 import {
     ChevronLeft, ChevronRight, PenSquare, MapPin, Sparkles,
@@ -11,10 +11,33 @@ import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import { getShiftColor } from '../utils/shiftColors';
 
+const JOURNAL_MONTH_STORAGE_KEY = 'schichttagebuch_journal_month';
+
+function parseYearMonthToDate(ymStr) {
+    if (!ymStr || !/^\d{4}-\d{2}$/.test(ymStr)) return null;
+    const [y, m] = ymStr.split('-').map(Number);
+    if (!y || !m || m < 1 || m > 12) return null;
+    return new Date(y, m - 1, 1);
+}
+
 export default function Journal() {
     const { store, addShifts, ensureCodesAndTypes, deleteShifts, toggleShiftBonus } = useStore();
     const navigate = useNavigate();
-    const [currentDate, setCurrentDate] = useState(new Date());
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const [currentDate, setCurrentDate] = useState(() => {
+        const paramMonth = searchParams.get('month');
+        const fromParam = parseYearMonthToDate(paramMonth);
+        if (fromParam) return fromParam;
+
+        try {
+            const savedMonth = sessionStorage.getItem(JOURNAL_MONTH_STORAGE_KEY);
+            const fromStorage = parseYearMonthToDate(savedMonth);
+            if (fromStorage) return fromStorage;
+        } catch { /* ignore storage errors */ }
+
+        return new Date();
+    });
     const [selectedDate, setSelectedDate] = useState(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(false);
@@ -63,6 +86,25 @@ export default function Journal() {
 
     const currentYearMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
     const currentMonthLabel = currentDate.toLocaleString('de-DE', { month: 'long', year: 'numeric' });
+    const nowDate = new Date();
+    const isCurrentMonth = currentDate.getFullYear() === nowDate.getFullYear() && currentDate.getMonth() === nowDate.getMonth();
+
+    // Persist selected month in sessionStorage so returning from Edit/Entry stays in the same month
+    useEffect(() => {
+        try {
+            sessionStorage.setItem(JOURNAL_MONTH_STORAGE_KEY, currentYearMonthStr);
+        } catch { /* ignore storage errors */ }
+    }, [currentYearMonthStr]);
+
+    // Sync if ?month=YYYY-MM query param is passed on navigation
+    useEffect(() => {
+        const paramMonth = searchParams.get('month');
+        const parsed = parseYearMonthToDate(paramMonth);
+        if (parsed && (parsed.getFullYear() !== currentDate.getFullYear() || parsed.getMonth() !== currentDate.getMonth())) {
+            setCurrentDate(parsed);
+            setSelectedDate(null);
+        }
+    }, [searchParams]);
 
     // --- Multi-Select & Delete Actions ---
     const toggleSelectShift = (id) => {
@@ -238,10 +280,36 @@ export default function Journal() {
                 <button className="btn-icon" onClick={() => changeMonth(-1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
                     <ChevronLeft size={20} />
                 </button>
-                <div style={{ textAlign: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'center' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '15px' }}>
                         {currentMonthLabel}
                     </span>
+                    {!isCurrentMonth && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const today = new Date();
+                                setCurrentDate(today);
+                                setSelectedDate(null);
+                                if (searchParams.get('month')) {
+                                    setSearchParams({});
+                                }
+                            }}
+                            style={{
+                                background: 'rgba(249, 115, 22, 0.14)',
+                                border: '1px solid rgba(249, 115, 22, 0.35)',
+                                color: 'var(--color-primary)',
+                                borderRadius: '6px',
+                                padding: '2px 8px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                            }}
+                            title="Zum aktuellen Monat springen"
+                        >
+                            Heute
+                        </button>
+                    )}
                 </div>
                 <button className="btn-icon" onClick={() => changeMonth(1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
                     <ChevronRight size={20} />
@@ -472,7 +540,7 @@ export default function Journal() {
                                     if (isSelectMode) {
                                         toggleSelectShift(shift.id);
                                     } else {
-                                        navigate(`/add?id=${shift.id}`);
+                                        navigate(`/add?id=${shift.id}&month=${currentYearMonthStr}`);
                                     }
                                 }}
                                 style={{

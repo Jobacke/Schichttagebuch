@@ -118,6 +118,18 @@ export default function Entry() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const navigateToJournalMonth = (dateOrMonthStr) => {
+        const ym = (dateOrMonthStr || searchParams.get('month') || formData.date || '').slice(0, 7);
+        if (ym && /^\d{4}-\d{2}$/.test(ym)) {
+            try {
+                sessionStorage.setItem('schichttagebuch_journal_month', ym);
+            } catch { /* ignore storage errors */ }
+            navigate(`/journal?month=${ym}`);
+        } else {
+            navigate('/journal');
+        }
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         const selectedCode = store.settings.shiftCodes.find(c => c.id === formData.codeId);
@@ -131,16 +143,18 @@ export default function Entry() {
             bonusAmount: validBonusAmount,
             code: selectedCode ? selectedCode.code : (formData.code || ''),
             id: editId || crypto.randomUUID(),
-            timestamp: editId ? formData.timestamp : Date.now()
+            timestamp: editId ? formData.timestamp : Date.now(),
+            updatedAt: Date.now()
         };
         addShift(shiftData);
-        navigate('/journal');
+        navigateToJournalMonth(shiftData.date);
     };
 
     const handleDelete = () => {
         if (confirm('Möchtest du diesen Eintrag wirklich unwiderruflich löschen?')) {
+            const targetMonth = (formData.date || searchParams.get('month') || '').slice(0, 7);
             deleteShift(editId);
-            navigate('/journal');
+            navigateToJournalMonth(targetMonth);
         }
     };
 
@@ -521,7 +535,7 @@ export default function Entry() {
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 onImportSuccess={(yearMonth, count) => {
-                    navigate('/journal');
+                    navigateToJournalMonth(yearMonth);
                 }}
                 store={store}
                 addShifts={addShifts}

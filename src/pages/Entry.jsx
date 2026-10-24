@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { APP_VERSION } from '../version';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
+import { getPartnersForShiftFromRoster } from '../utils/teamRosterParser';
 import CareManImportModal from '../components/CareManImportModal';
 import { Sparkles } from 'lucide-react';
 
@@ -42,8 +43,15 @@ export default function Entry() {
         if (editId && store.shifts.length > 0) {
             const shiftToEdit = store.shifts.find(s => s.id === editId);
             if (shiftToEdit) {
+                const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === shiftToEdit.codeId || c.code === shiftToEdit.code);
+                const codeStr = shiftToEdit.code || codeObj?.code || '';
+                const autoPartner = (!shiftToEdit.partner || !shiftToEdit.partner.trim())
+                    ? getPartnersForShiftFromRoster(shiftToEdit.date, codeStr)
+                    : shiftToEdit.partner;
+
                 setFormData({
                     ...shiftToEdit,
+                    partner: autoPartner || '',
                     hasBonus: Boolean(shiftToEdit.hasBonus),
                     bonusAmount: shiftToEdit.bonusAmount !== undefined && shiftToEdit.bonusAmount !== null
                         ? shiftToEdit.bonusAmount
@@ -53,13 +61,16 @@ export default function Entry() {
         } else {
             // Set defaults only for new entries
             if (store.settings.shiftTypes.length > 0 && !formData.typeId) {
+                const firstCode = store.settings.shiftCodes[0];
+                const autoPartner = firstCode ? getPartnersForShiftFromRoster(today, firstCode.code) : '';
                 setFormData(prev => ({
                     ...prev,
                     typeId: store.settings.shiftTypes[0]?.id,
-                    codeId: store.settings.shiftCodes[0]?.id,
+                    codeId: firstCode?.id,
                     station: store.settings.stations[0],
                     vehicle: store.settings.vehicles[0],
                     callSign: store.settings.callSigns[0],
+                    partner: prev.partner || autoPartner || '',
                     bonusAmount: store.settings?.defaultBonusAmount ?? 75
                 }));
             }
@@ -68,6 +79,17 @@ export default function Entry() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        if (name === 'date') {
+            const selectedCode = store.settings.shiftCodes.find(c => c.id === formData.codeId);
+            const codeStr = selectedCode ? selectedCode.code : (formData.code || '');
+            const autoPartner = codeStr ? getPartnersForShiftFromRoster(value, codeStr) : '';
+            setFormData(prev => ({
+                ...prev,
+                date: value,
+                partner: (!prev.partner || prev.partner.startsWith('mit ')) ? (autoPartner || prev.partner) : prev.partner
+            }));
+            return;
+        }
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
@@ -83,6 +105,7 @@ export default function Entry() {
                 const vehicle = selectedCode.vehicle || preset.vehicle;
                 const callSign = selectedCode.callSign || preset.callSign;
                 const typeName = selectedCode.shiftTypeName || preset.shiftTypeName;
+                const autoPartner = getPartnersForShiftFromRoster(formData.date, selectedCode.code);
 
                 let typeId = formData.typeId;
                 if (selectedCode.typeId) {
@@ -105,7 +128,8 @@ export default function Entry() {
                         endTime: endTime || prev.endTime,
                         station: station || prev.station,
                         vehicle: vehicle || prev.vehicle,
-                        callSign: callSign || prev.callSign
+                        callSign: callSign || prev.callSign,
+                        partner: (!prev.partner || prev.partner.startsWith('mit ')) ? (autoPartner || '') : prev.partner
                     }));
                     setIsPresetActive(true);
                     return;

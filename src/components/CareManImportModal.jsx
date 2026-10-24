@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Calendar, Upload, FileText, CheckCircle2, AlertCircle, Trash2,
   Plus, Sparkles, X, ChevronLeft, ChevronRight, Clock, Truck, MapPin, RotateCcw,
-  Check, Image, Camera, Loader2, ArrowRight
+  Check, Image, Camera, Loader2, ArrowRight, Users
 } from 'lucide-react';
 import {
   SHIFT_PRESETS,
@@ -12,6 +12,10 @@ import {
   buildShiftFromPreset
 } from '../utils/shiftPresets';
 import { runRosterOcr, parseCareManOcr } from '../utils/rosterOcr';
+import {
+  getPartnersForShiftFromRoster,
+  extractPersonalShiftsFromRoster
+} from '../utils/teamRosterParser';
 
 export default function CareManImportModal({
   isOpen,
@@ -50,12 +54,27 @@ export default function CareManImportModal({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Staged shifts to be imported (starts with November preset if default is 2026-11, otherwise empty)
-  const [stagedShifts, setStagedShifts] = useState(() => {
-    if (defaultStartingMonth === '2026-11') {
+  // Build initial or month-switched shifts from Team Roster (if available) or Nov 2026 preset
+  const buildDefaultShiftsForMonth = (ym) => {
+    const fromRoster = extractPersonalShiftsFromRoster(ym);
+    if (fromRoster.length > 0) {
+      return fromRoster.map(item => ({
+        id: crypto.randomUUID(),
+        day: item.day,
+        date: item.date,
+        code: item.code,
+        startTime: item.startTime || item.preset?.startTime || '07:00',
+        endTime: item.endTime || item.preset?.endTime || '19:00',
+        partner: item.partner || '',
+        enabled: true,
+        preset: item.preset
+      }));
+    }
+    if (ym === '2026-11') {
       return CAREMAN_NOVEMBER_2026_BACKHAUS.map(item => {
         const dateStr = `2026-11-${String(item.day).padStart(2, '0')}`;
         const preset = getPresetForCode(item.code);
+        const partner = getPartnersForShiftFromRoster(dateStr, item.code);
         return {
           id: crypto.randomUUID(),
           day: item.day,
@@ -63,13 +82,21 @@ export default function CareManImportModal({
           code: item.code,
           startTime: item.startTime || preset?.startTime || '07:00',
           endTime: item.endTime || preset?.endTime || '19:00',
+          partner: partner || '',
           enabled: true,
           preset: preset
         };
       });
     }
     return [];
-  });
+  };
+
+  // Staged shifts to be imported (automatically loads from Team Roster if available)
+  const [stagedShifts, setStagedShifts] = useState(() => buildDefaultShiftsForMonth(defaultStartingMonth));
+
+  const teamRosterShiftsForSelectedMonth = useMemo(() => {
+    return extractPersonalShiftsFromRoster(selectedYearMonth);
+  }, [selectedYearMonth]);
 
   const [year, month] = useMemo(() => {
     const parts = selectedYearMonth.split('-');
@@ -89,17 +116,29 @@ export default function CareManImportModal({
   const handleMonthChange = (newYearMonth) => {
     if (!newYearMonth) return;
     setSelectedYearMonth(newYearMonth);
+    setStatusMessage(null);
+
+    const defaults = buildDefaultShiftsForMonth(newYearMonth);
+    if (defaults.length > 0) {
+      setStagedShifts(defaults);
+      return;
+    }
+
     const [y, m] = newYearMonth.split('-').map(Number);
     const maxDays = new Date(y, m, 0).getDate();
 
-    // Re-anchor any staged shifts to the newly chosen month
+    // Re-anchor any staged shifts to the newly chosen month and resolve partners from roster
     setStagedShifts(prev => {
       return prev
         .filter(s => s.day <= maxDays)
-        .map(s => ({
-          ...s,
-          date: `${y}-${String(m).padStart(2, '0')}-${String(s.day).padStart(2, '0')}`
-        }));
+        .map(s => {
+          const nextDate = `${y}-${String(m).padStart(2, '0')}-${String(s.day).padStart(2, '0')}`;
+          return {
+            ...s,
+            date: nextDate,
+            partner: getPartnersForShiftFromRoster(nextDate, s.code) || ''
+          };
+        });
     });
   };
 
@@ -160,6 +199,7 @@ export default function CareManImportModal({
       const newShifts = parsed.shifts.map(item => {
         const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(item.day).padStart(2, '0')}`;
         const preset = getPresetForCode(item.code);
+        const partner = getPartnersForShiftFromRoster(dateStr, item.code);
         return {
           id: crypto.randomUUID(),
           day: item.day,
@@ -167,6 +207,7 @@ export default function CareManImportModal({
           code: item.code,
           startTime: item.startTime || preset?.startTime || '07:00',
           endTime: item.endTime || preset?.endTime || '19:00',
+          partner: partner || '',
           enabled: true,
           preset: preset
         };
@@ -174,9 +215,10 @@ export default function CareManImportModal({
 
       setStagedShifts(newShifts);
       const targetLabel = new Date(y, m - 1, 1).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
+      const withPartnersCount = newShifts.filter(s => s.partner).length;
       setStatusMessage({
         type: 'success',
-        text: `Screenshot analysiert: ${newShifts.length} Dienste für ${targetLabel} erkannt.`
+        text: `Screenshot analysiert: ${newShifts.length} Dienste für ${targetLabel} erkannt${withPartnersCount > 0 ? ` (${withPartnersCount}x PartnerIn automatisch ergänzt)` : ''}.`
       });
     } catch (err) {
       console.warn('OCR error, using verified month data:', err);
@@ -193,14 +235,53 @@ export default function CareManImportModal({
     }
   };
 
+  // Load personal shifts directly from the active Team Roster of the selected month
+  const handleLoadFromTeamRoster = (targetYm = selectedYearMonth) => {
+    const rosterShifts = extractPersonalShiftsFromRoster(targetYm);
+    if (rosterShifts.length === 0) {
+      if (targetYm === '2026-11') {
+        handleLoadNovember2026Preset();
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: 'Für diesen Monat wurden noch keine persönlichen Dienste im Team-Dienstplan gefunden.'
+        });
+      }
+      return;
+    }
+
+    const shifts = rosterShifts.map(item => ({
+      id: crypto.randomUUID(),
+      day: item.day,
+      date: item.date,
+      code: item.code,
+      startTime: item.startTime || item.preset?.startTime || '07:00',
+      endTime: item.endTime || item.preset?.endTime || '19:00',
+      partner: item.partner || '',
+      enabled: true,
+      preset: item.preset
+    }));
+
+    setStagedShifts(shifts);
+    const withPartners = shifts.filter(s => s.partner).length;
+    setStatusMessage({
+      type: 'success',
+      text: `${shifts.length} Dienste aus dem Abteilungsdienstplan geladen (${withPartners}x PartnerIn automatisch mit „mit ...“ eingetragen).`
+    });
+  };
+
   // Load November 2026 Pre-extracted Roster from Istplan
   const handleLoadNovember2026Preset = () => {
     setSelectedYearMonth('2026-11');
     setEmployeeName('Backhaus, Johannes');
 
-    const shifts = CAREMAN_NOVEMBER_2026_BACKHAUS.map(item => {
-      const dateStr = `2026-11-${String(item.day).padStart(2, '0')}`;
-      const preset = getPresetForCode(item.code);
+    const fromRoster = extractPersonalShiftsFromRoster('2026-11');
+    const sourceList = fromRoster.length > 0 ? fromRoster : CAREMAN_NOVEMBER_2026_BACKHAUS;
+
+    const shifts = sourceList.map(item => {
+      const dateStr = item.date || `2026-11-${String(item.day).padStart(2, '0')}`;
+      const preset = item.preset || getPresetForCode(item.code);
+      const partner = item.partner || getPartnersForShiftFromRoster(dateStr, item.code);
       return {
         id: crypto.randomUUID(),
         day: item.day,
@@ -208,15 +289,17 @@ export default function CareManImportModal({
         code: item.code,
         startTime: item.startTime || preset?.startTime || '07:00',
         endTime: item.endTime || preset?.endTime || '19:00',
+        partner: partner || '',
         enabled: true,
         preset: preset
       };
     });
 
     setStagedShifts(shifts);
+    const withPartners = shifts.filter(s => s.partner).length;
     setStatusMessage({
       type: 'success',
-      text: 'Dienstplan für November 2026 (Backhaus, Johannes) mit 11 Diensten geladen.'
+      text: `Dienstplan für November 2026 (Backhaus, Johannes) mit ${shifts.length} Diensten geladen${withPartners > 0 ? ` (${withPartners}x PartnerIn automatisch ergänzt)` : ''}.`
     });
   };
 
@@ -241,6 +324,7 @@ export default function CareManImportModal({
     }
 
     const preset = getPresetForCode(cleanCode);
+    const partner = getPartnersForShiftFromRoster(dateStr, cleanCode);
     setStagedShifts(prev => {
       const existingIdx = prev.findIndex(s => s.day === dayNum);
       const shiftData = {
@@ -250,6 +334,7 @@ export default function CareManImportModal({
         code: cleanCode,
         startTime: preset?.startTime || '07:00',
         endTime: preset?.endTime || '19:00',
+        partner: partner || '',
         enabled: true,
         preset: preset
       };
@@ -268,10 +353,14 @@ export default function CareManImportModal({
   const enabledShifts = useMemo(() => stagedShifts.filter(s => s.enabled), [stagedShifts]);
 
   const allShiftsToImport = useMemo(() => {
-    let result = [...enabledShifts];
+    let result = enabledShifts.map(s => ({
+      ...s,
+      partner: s.partner || getPartnersForShiftFromRoster(s.date, s.code) || ''
+    }));
     if (includeOctoberExtra && selectedYearMonth === '2026-11') {
       const octoberShifts = CAREMAN_OCTOBER_2026_EXTRA.map(item => {
         const preset = getPresetForCode(item.code);
+        const partner = getPartnersForShiftFromRoster(item.date, item.code);
         return {
           id: crypto.randomUUID(),
           day: item.day,
@@ -279,6 +368,7 @@ export default function CareManImportModal({
           code: item.code,
           startTime: item.startTime || preset?.startTime || '07:00',
           endTime: item.endTime || preset?.endTime || '19:00',
+          partner: partner || '',
           enabled: true,
           preset: preset
         };
@@ -325,17 +415,20 @@ export default function CareManImportModal({
         await ensureCodesAndTypes(requiredCodes, requiredTypes);
       }
 
-      // 2. Build shift objects for Firestore
+      // 2. Build shift objects for Firestore (including automatically detected partner "mit ...")
       const newShifts = allShiftsToImport.map(s => {
+        const partnerStr = s.partner || getPartnersForShiftFromRoster(s.date, s.code) || '';
         const base = buildShiftFromPreset({
           dateStr: s.date,
           code: s.code,
+          partner: partnerStr,
           storeSettings: store.settings
         });
         return {
           ...base,
           startTime: s.startTime || base.startTime,
-          endTime: s.endTime || base.endTime
+          endTime: s.endTime || base.endTime,
+          partner: partnerStr
         };
       });
 
@@ -610,9 +703,48 @@ export default function CareManImportModal({
                 gap: '6px'
               }}
             >
-              <Sparkles size={15} /> Vorlage Nov 2026
+              <Users size={15} /> Aus Team-Plan
             </button>
           </div>
+
+          {teamRosterShiftsForSelectedMonth.length > 0 && activeTab !== 'preset' && (
+            <div style={{
+              background: 'rgba(14, 165, 233, 0.12)',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              borderRadius: '14px',
+              padding: '12px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#e2e8f0' }}>
+                <Users size={16} style={{ color: '#38bdf8', flexShrink: 0 }} />
+                <span>
+                  Abteilungsdienstplan für <strong>{formattedSelectedMonth}</strong> vorhanden ({teamRosterShiftsForSelectedMonth.length} eigene Dienste inkl. PartnerIn erkannt)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleLoadFromTeamRoster(selectedYearMonth)}
+                style={{
+                  background: '#0284c7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Aus Team-Plan laden
+              </button>
+            </div>
+          )}
 
           {/* TAB 1: Screenshot Dropzone & Upload */}
           {activeTab === 'screenshot' && (
@@ -760,11 +892,11 @@ export default function CareManImportModal({
             </div>
           )}
 
-          {/* TAB 3: 1-Click Preset Info */}
+          {/* TAB 3: Team-Plan / 1-Click Preset Info */}
           {activeTab === 'preset' && (
             <div style={{
-              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.05) 100%)',
-              border: '1px solid rgba(249, 115, 22, 0.3)',
+              background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.16) 0%, rgba(249, 115, 22, 0.08) 100%)',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
               borderRadius: '16px',
               padding: '16px',
               marginBottom: '20px',
@@ -772,24 +904,45 @@ export default function CareManImportModal({
               flexDirection: 'column',
               gap: '12px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary)', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
-                    <Sparkles size={16} /> Exakter CareMan Istplan: November 2026
+              {teamRosterShiftsForSelectedMonth.length > 0 ? (
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '220px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
+                      <Users size={16} /> Abteilungsdienstplan {formattedSelectedMonth}
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.45' }}>
+                      Übernimmt alle <strong>{teamRosterShiftsForSelectedMonth.length} Dienste</strong> für <strong>Backhaus, Johannes</strong> aus dem im Modul <em>Team</em> hinterlegten Dienstplan und trägt bei gleicher Schicht automatisch alle KollegInnen im Feld <strong>PartnerIn</strong> ein (z.B. <em>„mit Jasmin Stückgen und Mia Keiser*“</em>).
+                    </div>
                   </div>
-                  <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.4' }}>
-                    Lädt die 11 Schichten für <strong>Backhaus, Johannes</strong> aus dem Istplan (04., 05., 06., 09., 10., 11., 20., 24., 25., 26., 30. Nov).
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadFromTeamRoster(selectedYearMonth)}
+                    className="btn-primary"
+                    style={{ fontSize: '13px', padding: '8px 14px', whiteSpace: 'nowrap', background: '#0284c7' }}
+                  >
+                    Aus Team-Plan laden
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleLoadNovember2026Preset}
-                  className="btn-primary"
-                  style={{ fontSize: '13px', padding: '8px 14px', whiteSpace: 'nowrap' }}
-                >
-                  Vorlage laden
-                </button>
-              </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '220px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary)', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
+                      <Sparkles size={16} /> Exakter CareMan Istplan: November 2026
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.4' }}>
+                      Lädt die 11 Schichten für <strong>Backhaus, Johannes</strong> aus dem Istplan (04., 05., 06., 09., 10., 11., 20., 24., 25., 26., 30. Nov) inkl. automatischer PartnerIn-Erkennung aus dem Team-Dienstplan.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLoadNovember2026Preset}
+                    className="btn-primary"
+                    style={{ fontSize: '13px', padding: '8px 14px', whiteSpace: 'nowrap' }}
+                  >
+                    Vorlage laden
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -915,6 +1068,11 @@ export default function CareManImportModal({
                         <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {preset?.station || 'Wache Sendling'} • {preset?.vehicle || 'RTW Akkon Sendling 71/1'}
                         </div>
+                        {shift.partner && (
+                          <div style={{ fontSize: '11.5px', color: '#38bdf8', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            👤 {shift.partner}
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ textAlign: 'right', marginLeft: '12px', minWidth: '55px' }}>

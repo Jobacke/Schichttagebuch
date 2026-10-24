@@ -18,9 +18,13 @@ import {
   deleteStationTeamRosterFromCloud,
   deleteTeamRosterFromCloud,
   syncTeamRostersWithCloud,
-  subscribeToCloudTeamRosters
+  subscribeToCloudTeamRosters,
+  getPartnersForShiftFromRoster,
+  extractPersonalShiftsFromRoster
 } from '../utils/teamRosterParser';
 import { useAuth } from '../context/AuthContext';
+import { useStore } from '../context/StoreContext';
+import { buildShiftFromPreset, getPresetForCode } from '../utils/shiftPresets';
 import { parseCareManPdf } from '../utils/teamRosterPdfParser';
 import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
 import { getShiftColor, detectStation } from '../utils/shiftColors';
@@ -120,7 +124,9 @@ const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=wind
 
 export default function TeamRoster() {
   const { currentUser } = useAuth();
+  const { store, addShifts, ensureCodesAndTypes } = useStore();
   const [cloudSyncing, setCloudSyncing] = useState(false);
+  const [isSyncingPersonal, setIsSyncingPersonal] = useState(false);
 
   // Stored rosters list
   const [savedRosters, setSavedRosters] = useState(() => getSavedRosterSummaries());
@@ -604,6 +610,89 @@ export default function TeamRoster() {
     setTimeout(() => setCopiedBookmarklet(false), 3000);
   };
 
+  // Personal shifts for Backhaus, Johannes in the currently viewed month
+  const myRosterShifts = useMemo(() => {
+    return extractPersonalShiftsFromRoster(yearMonth, roster);
+  }, [yearMonth, roster]);
+
+  // Automatically update partner field ("mit ...") on existing shifts in Journal for a given month
+  const autoSyncExistingJournalPartners = async (targetYearMonth, activeRoster) => {
+    if (!store?.shifts || !addShifts || !targetYearMonth) return 0;
+    const monthShifts = store.shifts.filter(s => s.date && s.date.startsWith(targetYearMonth));
+    if (monthShifts.length === 0) return 0;
+
+    const toUpdate = [];
+    monthShifts.forEach(s => {
+      const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
+      const codeStr = s.code || codeObj?.code || '';
+      if (!codeStr) return;
+      const detectedPartner = getPartnersForShiftFromRoster(s.date, codeStr, activeRoster);
+      if (detectedPartner && s.partner !== detectedPartner) {
+        toUpdate.push({
+          ...s,
+          partner: detectedPartner
+        });
+      }
+    });
+
+    if (toUpdate.length > 0) {
+      await addShifts(toUpdate, false);
+    }
+    return toUpdate.length;
+  };
+
+  // 1-Click: Transfer personal shifts (including automatic "mit ..." PartnerIn) into Journal
+  const handleTransferPersonalScheduleToJournal = async () => {
+    if (myRosterShifts.length === 0 || isSyncingPersonal) return;
+    setIsSyncingPersonal(true);
+    try {
+      const requiredCodes = [];
+      const requiredTypes = [];
+
+      myRosterShifts.forEach(s => {
+        const preset = s.preset || getPresetForCode(s.code);
+        if (s.code) {
+          requiredCodes.push({ code: s.code, hours: preset?.hours || 8.2 });
+        }
+        if (preset?.shiftTypeName) {
+          requiredTypes.push({ name: preset.shiftTypeName });
+        }
+      });
+
+      if (ensureCodesAndTypes) {
+        await ensureCodesAndTypes(requiredCodes, requiredTypes);
+      }
+
+      const newShifts = myRosterShifts.map(s => {
+        const partnerStr = s.partner || getPartnersForShiftFromRoster(s.date, s.code, roster) || '';
+        const base = buildShiftFromPreset({
+          dateStr: s.date,
+          code: s.code,
+          partner: partnerStr,
+          storeSettings: store.settings
+        });
+        return {
+          ...base,
+          startTime: s.startTime || base.startTime,
+          endTime: s.endTime || base.endTime,
+          partner: partnerStr
+        };
+      });
+
+      const ok = await addShifts(newShifts, true);
+      if (ok) {
+        const withPartners = newShifts.filter(s => s.partner).length;
+        setToastMessage(
+          `✅ ${newShifts.length} eigene Dienste für ${roster.monthLabel} ins Journal übernommen (${withPartners}x PartnerIn „mit ...“ automatisch eingetragen)!`
+        );
+      }
+    } catch (err) {
+      console.error('Error transferring personal schedule:', err);
+    } finally {
+      setIsSyncingPersonal(false);
+    }
+  };
+
   // Handle File Upload (HTML, PDF or Image)
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -647,8 +736,12 @@ export default function TeamRoster() {
       }
       setCurrentYearMonth(parsedRoster.yearMonth);
       localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
-      setRoster(getActiveTeamRoster(parsedRoster.yearMonth));
+      const activeCombined = getActiveTeamRoster(parsedRoster.yearMonth);
+      setRoster(activeCombined);
       setSavedRosters(getSavedRosterSummaries());
+
+      // Automatically sync partner names ("mit ...") onto any existing Journal shifts in this month
+      const updatedPartnerCount = await autoSyncExistingJournalPartners(parsedRoster.yearMonth, activeCombined);
 
       if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
         const today = new Date();
@@ -663,7 +756,9 @@ export default function TeamRoster() {
       setIsUploadOpen(false);
       setIsProcessing(false);
       setUploadProgress(null);
-      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) gespeichert (${parsedRoster.totalShifts} Schichten)!`);
+      setToastMessage(
+        `Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) gespeichert (${parsedRoster.totalShifts} Schichten${updatedPartnerCount > 0 ? `, ${updatedPartnerCount}x PartnerIn im Journal ergänzt` : ''})!`
+      );
     } catch (err) {
       console.error('Upload Error:', err);
       setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe das Dateiformat.'));
@@ -690,8 +785,12 @@ export default function TeamRoster() {
       }
       setCurrentYearMonth(parsedRoster.yearMonth);
       localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
-      setRoster(getActiveTeamRoster(parsedRoster.yearMonth));
+      const activeCombined = getActiveTeamRoster(parsedRoster.yearMonth);
+      setRoster(activeCombined);
       setSavedRosters(getSavedRosterSummaries());
+
+      // Automatically sync partner names ("mit ...") onto any existing Journal shifts in this month
+      const updatedPartnerCount = await autoSyncExistingJournalPartners(parsedRoster.yearMonth, activeCombined);
 
       if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
         const today = new Date();
@@ -708,7 +807,9 @@ export default function TeamRoster() {
       setUploadProgress(null);
       setPasteText('');
       setActiveModalTab('paste');
-      setToastMessage(`Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) übernommen (${parsedRoster.totalShifts} Schichten)!`);
+      setToastMessage(
+        `Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) übernommen (${parsedRoster.totalShifts} Schichten${updatedPartnerCount > 0 ? `, ${updatedPartnerCount}x PartnerIn im Journal ergänzt` : ''})!`
+      );
     } catch (err) {
       console.error('Paste Error:', err);
       setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe den kopierten Inhalt.'));
@@ -994,6 +1095,53 @@ export default function TeamRoster() {
         </div>
       )}
 
+      {/* 1-Click Personal Schedule + Automatic PartnerIn Sync Bar */}
+      {myRosterShifts.length > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(15, 23, 42, 0.85))',
+          border: '1px solid rgba(56, 189, 248, 0.35)',
+          borderRadius: '14px',
+          padding: '10px 14px',
+          marginBottom: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            <Sparkles size={16} style={{ color: '#38bdf8', flexShrink: 0 }} />
+            <div style={{ fontSize: '12.5px', color: 'var(--color-text-main)', lineHeight: 1.35 }}>
+              <strong>Dein Dienstplan ({roster.monthLabel}):</strong> {myRosterShifts.length} Dienste inkl. automatischer <em>PartnerIn („mit ...“)</em>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={isSyncingPersonal}
+            onClick={handleTransferPersonalScheduleToJournal}
+            style={{
+              background: '#0284c7',
+              color: 'white',
+              border: 'none',
+              borderRadius: '9px',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: isSyncingPersonal ? 'default' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+            }}
+            title="Persönliche Schichten inklusive automatisch ermittelter PartnerIn ('mit ...') ins Journal eintragen"
+          >
+            <Check size={14} />
+            <span>{isSyncingPersonal ? 'Wird übertragen...' : 'Ins Journal übernehmen'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Shifts List: Grouped & Sorted */}
       <div>
         {currentDayShifts.length === 0 ? (
@@ -1035,6 +1183,7 @@ export default function TeamRoster() {
               const isNewGroup = group !== prevGroup;
               const colorInfo = getShiftColor('', shift.code);
               const isJohannes = shift.name.toLowerCase().includes('backhaus');
+              const johannesPartnerStr = isJohannes ? getPartnersForShiftFromRoster(selectedDate, shift.code, roster) : '';
 
               return (
                 <React.Fragment key={`${shift.name}-${idx}`}>
@@ -1045,28 +1194,43 @@ export default function TeamRoster() {
                   )}
                   <div className={`team-roster-row ${isJohannes ? 'is-user' : ''}`}>
                     {/* Colleague Name */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, paddingRight: '8px' }}>
-                      <span style={{
-                        fontSize: '14px',
-                        fontWeight: isJohannes ? 700 : 500,
-                        color: isJohannes ? '#38bdf8' : 'var(--color-text-main)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}>
-                        {shift.name}
-                      </span>
-                      {isJohannes && (
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingRight: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                         <span style={{
-                          fontSize: '10px',
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          background: '#0284c7',
-                          color: 'white',
-                          fontWeight: 800,
-                          flexShrink: 0
+                          fontSize: '14px',
+                          fontWeight: isJohannes ? 700 : 500,
+                          color: isJohannes ? '#38bdf8' : 'var(--color-text-main)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
                         }}>
-                          Du
+                          {shift.name}
+                        </span>
+                        {isJohannes && (
+                          <span style={{
+                            fontSize: '10px',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: '#0284c7',
+                            color: 'white',
+                            fontWeight: 800,
+                            flexShrink: 0
+                          }}>
+                            Du
+                          </span>
+                        )}
+                      </div>
+                      {isJohannes && johannesPartnerStr && (
+                        <span style={{
+                          fontSize: '11.5px',
+                          color: '#7dd3fc',
+                          fontWeight: 600,
+                          marginTop: '2px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          👤 {johannesPartnerStr}
                         </span>
                       )}
                     </div>

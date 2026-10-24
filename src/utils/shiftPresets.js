@@ -183,7 +183,7 @@ export function getPresetForCode(rawCode) {
   return SHIFT_PRESETS[clean] || null;
 }
 
-export function buildShiftFromPreset({ dateStr, code, storeSettings = {} }) {
+export function buildShiftFromPreset({ dateStr, code, partner = '', storeSettings = {} }) {
   const preset = getPresetForCode(code);
   const cleanCode = code ? code.trim().toUpperCase() : '';
 
@@ -212,7 +212,7 @@ export function buildShiftFromPreset({ dateStr, code, storeSettings = {} }) {
     station: preset?.station || storeSettings.stations?.[0] || 'Wache Sendling',
     vehicle: preset?.vehicle || storeSettings.vehicles?.[0] || 'RTW Akkon Sendling 71/1',
     callSign: preset?.callSign || storeSettings.callSigns?.[0] || 'Akkon Sendling 71/1',
-    partner: '',
+    partner: partner || '',
     timestamp: Date.now()
   };
 }

@@ -10,6 +10,7 @@ import {
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import { getShiftColor } from '../utils/shiftColors';
+import { getPartnersForShiftFromRoster } from '../utils/teamRosterParser';
 
 const JOURNAL_MONTH_STORAGE_KEY = 'schichttagebuch_journal_month';
 
@@ -105,6 +106,28 @@ export default function Journal() {
             setSelectedDate(null);
         }
     }, [searchParams]);
+
+    // Auto-fill missing PartnerIn ("mit ...") on shifts in the viewed month from the active Team Roster
+    useEffect(() => {
+        if (!monthShifts || monthShifts.length === 0 || !addShifts) return;
+        const shiftsToEnrich = [];
+        monthShifts.forEach(s => {
+            if (s.partner && s.partner.trim()) return;
+            const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
+            const codeStr = s.code || codeObj?.code || '';
+            if (!codeStr) return;
+            const detected = getPartnersForShiftFromRoster(s.date, codeStr);
+            if (detected) {
+                shiftsToEnrich.push({
+                    ...s,
+                    partner: detected
+                });
+            }
+        });
+        if (shiftsToEnrich.length > 0) {
+            addShifts(shiftsToEnrich, false);
+        }
+    }, [currentYearMonthStr, monthShifts.length]);
 
     // --- Multi-Select & Delete Actions ---
     const toggleSelectShift = (id) => {
@@ -527,6 +550,7 @@ export default function Journal() {
                     .map(shift => {
                         const code = store.settings.shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
                         const displayCode = code ? code.code : (shift.code || 'Schicht');
+                        const partnerDisplay = shift.partner || getPartnersForShiftFromRoster(shift.date, displayCode);
                         const dayName = new Date(shift.date).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
                         const dayNum = new Date(shift.date).getDate();
                         const isSelected = selectedShiftIds.has(shift.id);
@@ -631,9 +655,9 @@ export default function Journal() {
                                             {shift.vehicle && <span>{shift.vehicle}</span>}
                                         </div>
                                     )}
-                                    {shift.partner && (
+                                    {partnerDisplay && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#38bdf8', fontWeight: 500, marginTop: '3px' }}>
-                                            <span>👤 {shift.partner}</span>
+                                            <span>👤 {partnerDisplay}</span>
                                         </div>
                                     )}
                                 </div>

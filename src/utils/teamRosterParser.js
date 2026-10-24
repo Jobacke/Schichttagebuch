@@ -769,4 +769,132 @@ export function subscribeToCloudTeamRosters(currentUser, onChange) {
   });
 }
 
+/**
+ * Formats a colleague name from "Nachname, Vorname" into "Vorname Nachname"
+ * and appends '*' if their shift code on that day was marked with '*' (e.g. "Mia Keiser*").
+ */
+export function formatColleagueName(rawName = '', hasAsterisk = false) {
+  const cleanRaw = String(rawName || '').replace(/\*+$/, '').trim();
+  if (!cleanRaw) return '';
+  let display = cleanRaw;
+  if (cleanRaw.includes(',')) {
+    const parts = cleanRaw.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      display = `${parts.slice(1).join(' ')} ${parts[0]}`;
+    }
+  }
+  return hasAsterisk ? `${display}*` : display;
+}
+
+/**
+ * Checks whether a shift code is an absence/vacation/non-crew code
+ */
+export function isNonPartnerShiftCode(rawCode = '') {
+  const clean = String(rawCode || '').replace(/\*+$/, '').trim().toUpperCase();
+  if (!clean || clean === '/' || clean === '-' || clean === '00' || clean === 'FREI') return true;
+  if (['V030', 'VS30', 'V-B', 'V07', 'VFU', 'UDN', 'KRANK', 'U', 'K', 'BV', 'EZ', 'FZ'].includes(clean)) return true;
+  if (clean.startsWith('V0') || clean.startsWith('VS') || clean.startsWith('V-') || clean.startsWith('VF') || clean.startsWith('UD')) return true;
+  return false;
+}
+
+/**
+ * Automatically finds all colleagues on the same shift (`baseCode` match, e.g. RFM + RFM*)
+ * on `dateStr` and returns a formatted partner string like:
+ * - "mit Jasmin Stückgen"
+ * - "mit Jasmin Stückgen und Mia Keiser*"
+ * - "mit Name1, Name2 und Name3*"
+ */
+export function getPartnersForShiftFromRoster(dateStr, shiftCode, rosterOverride = null, selfNameQuery = 'backhaus') {
+  if (!dateStr || !shiftCode) return '';
+  const targetBase = String(shiftCode).replace(/\*+$/, '').trim().toUpperCase();
+  if (!targetBase || isNonPartnerShiftCode(targetBase)) return '';
+
+  const ym = dateStr.slice(0, 7);
+  const roster = rosterOverride || getActiveTeamRoster(ym);
+  if (!roster || !roster.shiftsByDate) return '';
+
+  const dayShifts = roster.shiftsByDate[dateStr] || [];
+  if (dayShifts.length === 0) return '';
+
+  const selfLower = String(selfNameQuery || 'backhaus').toLowerCase();
+  const regularList = [];
+  const starList = [];
+  const seenNames = new Set();
+
+  dayShifts.forEach(entry => {
+    if (!entry || !entry.name || !entry.code) return;
+    const nameLower = entry.name.toLowerCase();
+    if (nameLower.includes(selfLower)) return;
+
+    const rawCode = String(entry.code).trim();
+    const entryBase = rawCode.replace(/\*+$/, '').trim().toUpperCase();
+    if (entryBase !== targetBase) return;
+
+    const hasStar = rawCode.includes('*') || entry.name.includes('*');
+    const formatted = formatColleagueName(entry.name, hasStar);
+    const dedupeKey = formatted.replace(/\*+$/, '').toLowerCase();
+    if (!formatted || seenNames.has(dedupeKey)) return;
+    seenNames.add(dedupeKey);
+
+    if (hasStar) {
+      starList.push(formatted);
+    } else {
+      regularList.push(formatted);
+    }
+  });
+
+  const allPartners = [...regularList, ...starList];
+  if (allPartners.length === 0) return '';
+  if (allPartners.length === 1) return `mit ${allPartners[0]}`;
+  if (allPartners.length === 2) return `mit ${allPartners[0]} und ${allPartners[1]}`;
+  return `mit ${allPartners.slice(0, -1).join(', ')} und ${allPartners[allPartners.length - 1]}`;
+}
+
+/**
+ * Extracts the personal operational shifts for "Backhaus, Johannes" from the Team Roster
+ * of a given month (`yearMonth`), with `partner` ("mit ...") already populated automatically.
+ */
+export function extractPersonalShiftsFromRoster(yearMonth, rosterOverride = null, selfNameQuery = 'backhaus') {
+  if (!yearMonth) return [];
+  const roster = rosterOverride || getActiveTeamRoster(yearMonth);
+  if (!roster || !roster.shiftsByDate) return [];
+
+  const selfLower = String(selfNameQuery || 'backhaus').toLowerCase();
+  const results = [];
+
+  Object.entries(roster.shiftsByDate)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([dateStr, dayShifts]) => {
+      if (!dateStr.startsWith(yearMonth) || !Array.isArray(dayShifts)) return;
+      const myEntry = dayShifts.find(s => s && s.name && s.name.toLowerCase().includes(selfLower));
+      if (!myEntry || !myEntry.code) return;
+
+      const rawCode = String(myEntry.code).trim();
+      const baseCode = rawCode.replace(/\*+$/, '').trim().toUpperCase();
+      if (!baseCode || isNonPartnerShiftCode(baseCode)) return;
+
+      const preset = getPresetForCode(baseCode);
+      const shiftTypeName = preset?.shiftTypeName || getShiftTypeForCode(baseCode);
+      if (shiftTypeName === 'Urlaub / Freistellung') return;
+
+      const times = getTimesForCode(baseCode, shiftTypeName);
+      const partner = getPartnersForShiftFromRoster(dateStr, baseCode, roster, selfNameQuery);
+      const dayNum = parseInt(dateStr.split('-')[2], 10);
+
+      results.push({
+        date: dateStr,
+        day: dayNum,
+        code: baseCode,
+        rawCode,
+        startTime: preset?.startTime || times.startTime,
+        endTime: preset?.endTime || times.endTime,
+        partner,
+        preset
+      });
+    });
+
+  return results;
+}
+
+
 

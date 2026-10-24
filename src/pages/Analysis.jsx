@@ -5,7 +5,7 @@ import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { exportToPDF } from '../utils/pdfExport';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { getShiftColor, STATION_THEMES, detectStation } from '../utils/shiftColors';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, SlidersHorizontal } from 'lucide-react';
 
 // Helper for CSS Date controls
 const addMonths = (date, n) => {
@@ -522,9 +522,13 @@ export default function Analysis() {
         });
     };
 
+    const [showFilterModal, setShowFilterModal] = useState(false);
+    const [showBonusModal, setShowBonusModal] = useState(false);
+
     if (loading) return <div className="page-content center">Lade Daten...</div>;
 
     const hasActiveFilters = selectedTypes.length > 0 || selectedVehicles.length > 0 || selectedStations.length > 0 || onlyBonus;
+    const activeFilterCount = selectedTypes.length + selectedVehicles.length + selectedStations.length + (onlyBonus ? 1 : 0);
 
     return (
         <div className="page-content">
@@ -535,33 +539,11 @@ export default function Analysis() {
                         Auswertung <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>v{APP_VERSION}</span>
                     </h1>
                 </div>
-                <button
-                    onClick={handleExportPDF}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: 'rgba(56, 189, 248, 0.12)',
-                        border: '1px solid rgba(56, 189, 248, 0.35)',
-                        color: '#38bdf8',
-                        padding: '8px 14px',
-                        borderRadius: '10px',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                    }}
-                    title="Monatsdienstplan als PDF exportieren"
-                >
-                    <span>📄</span>
-                    <span>Dienstplan PDF</span>
-                </button>
             </div>
 
-            {/* Modern Inline Period & Filter Command Bar */}
-            <div className="card-premium" style={{ padding: '14px 16px', marginBottom: '18px' }}>
-                {/* Row 1: Mode Switcher & Direct Date Navigation */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+            {/* Compact Period & Filter Command Bar */}
+            <div className="card-premium" style={{ padding: '12px 14px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                     
                     {/* Segmented Mode Selector: Monat | Jahr | Zeitraum */}
                     <div style={{
@@ -581,7 +563,7 @@ export default function Analysis() {
                                 type="button"
                                 onClick={() => setFilterMode(m.id)}
                                 style={{
-                                    padding: '6px 14px',
+                                    padding: '6px 13px',
                                     borderRadius: '7px',
                                     border: 'none',
                                     background: filterMode === m.id ? 'var(--color-primary)' : 'transparent',
@@ -597,620 +579,837 @@ export default function Analysis() {
                         ))}
                     </div>
 
-                    {/* Period Navigation Controls */}
-                    {filterMode === 'month' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                                type="button"
-                                onClick={() => setBaseDate(addMonths(baseDate, -1))}
-                                style={{
-                                    background: '#0f172a',
-                                    border: '1px solid #334155',
-                                    color: '#cbd5e1',
-                                    borderRadius: '8px',
-                                    padding: '6px 10px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                }}
-                                title="Vorheriger Monat"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-
-                            <div style={{
-                                fontWeight: 700,
-                                fontSize: '15px',
-                                color: '#f8fafc',
-                                minWidth: '130px',
-                                textAlign: 'center'
-                            }}>
-                                {baseDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => setBaseDate(addMonths(baseDate, 1))}
-                                style={{
-                                    background: '#0f172a',
-                                    border: '1px solid #334155',
-                                    color: '#cbd5e1',
-                                    borderRadius: '8px',
-                                    padding: '6px 10px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                }}
-                                title="Nächster Monat"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-
-                            {!isCurrentMonth && (
+                    {/* Right Side: Period Navigation + Filter PopUp Trigger */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+                        {filterMode === 'month' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <button
                                     type="button"
-                                    onClick={() => setBaseDate(new Date())}
+                                    onClick={() => setBaseDate(addMonths(baseDate, -1))}
                                     style={{
-                                        background: 'rgba(249, 115, 22, 0.12)',
-                                        border: '1px solid rgba(249, 115, 22, 0.3)',
-                                        color: '#f97316',
+                                        background: '#0f172a',
+                                        border: '1px solid #334155',
+                                        color: '#cbd5e1',
                                         borderRadius: '8px',
-                                        padding: '5px 9px',
-                                        fontSize: '11px',
-                                        fontWeight: 700,
-                                        cursor: 'pointer'
+                                        padding: '6px 9px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center'
                                     }}
-                                    title="Zum aktuellen Monat springen"
+                                    title="Vorheriger Monat"
                                 >
-                                    Heute
+                                    <ChevronLeft size={16} />
                                 </button>
-                            )}
-                        </div>
-                    )}
 
-                    {filterMode === 'year' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                                type="button"
-                                onClick={() => setBaseDate(addMonths(baseDate, -12))}
-                                style={{
-                                    background: '#0f172a',
-                                    border: '1px solid #334155',
-                                    color: '#cbd5e1',
-                                    borderRadius: '8px',
-                                    padding: '6px 10px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                }}
-                                title="Vorheriges Jahr"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
+                                <div style={{
+                                    fontWeight: 700,
+                                    fontSize: '14px',
+                                    color: '#f8fafc',
+                                    minWidth: '122px',
+                                    textAlign: 'center'
+                                }}>
+                                    {baseDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
+                                </div>
 
-                            <div style={{
-                                fontWeight: 700,
-                                fontSize: '15px',
-                                color: '#f8fafc',
-                                minWidth: '70px',
-                                textAlign: 'center'
-                            }}>
-                                {baseDate.getFullYear()}
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => setBaseDate(addMonths(baseDate, 12))}
-                                style={{
-                                    background: '#0f172a',
-                                    border: '1px solid #334155',
-                                    color: '#cbd5e1',
-                                    borderRadius: '8px',
-                                    padding: '6px 10px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                }}
-                                title="Nächstes Jahr"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-
-                            {!isCurrentYear && (
                                 <button
                                     type="button"
-                                    onClick={() => setBaseDate(new Date())}
+                                    onClick={() => setBaseDate(addMonths(baseDate, 1))}
                                     style={{
-                                        background: 'rgba(249, 115, 22, 0.12)',
-                                        border: '1px solid rgba(249, 115, 22, 0.3)',
-                                        color: '#f97316',
+                                        background: '#0f172a',
+                                        border: '1px solid #334155',
+                                        color: '#cbd5e1',
                                         borderRadius: '8px',
-                                        padding: '5px 9px',
-                                        fontSize: '11px',
-                                        fontWeight: 700,
-                                        cursor: 'pointer'
+                                        padding: '6px 9px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center'
                                     }}
+                                    title="Nächster Monat"
                                 >
-                                    Dieses Jahr
+                                    <ChevronRight size={16} />
                                 </button>
-                            )}
-                        </div>
-                    )}
 
-                    {filterMode === 'custom' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <input
-                                type="date"
-                                value={customStart}
-                                onChange={(e) => setCustomStart(e.target.value)}
-                                style={{
-                                    background: '#0f172a',
-                                    border: '1px solid #334155',
-                                    color: '#fff',
-                                    borderRadius: '8px',
-                                    padding: '6px 10px',
-                                    fontSize: '12px'
-                                }}
-                            />
-                            <span style={{ color: '#64748b' }}>bis</span>
-                            <input
-                                type="date"
-                                value={customEnd}
-                                onChange={(e) => setCustomEnd(e.target.value)}
-                                style={{
-                                    background: '#0f172a',
-                                    border: '1px solid #334155',
-                                    color: '#fff',
-                                    borderRadius: '8px',
-                                    padding: '6px 10px',
-                                    fontSize: '12px'
-                                }}
-                            />
-                        </div>
-                    )}
-                </div>
-
-                {/* Row 2: Instant Filter Chips Bar (Shift Types & Vehicles) */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '8px',
-                    paddingTop: '10px',
-                    borderTop: '1px solid #334155'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginRight: '2px' }}>
-                            Schichten:
-                        </span>
-
-                        {/* "Alle" Chip */}
-                        <button
-                            type="button"
-                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); setOnlyBonus(false); }}
-                            style={{
-                                padding: '4px 10px',
-                                borderRadius: '20px',
-                                fontSize: '12px',
-                                fontWeight: !hasActiveFilters ? 700 : 500,
-                                background: !hasActiveFilters ? '#334155' : 'transparent',
-                                border: !hasActiveFilters ? '1px solid #475569' : '1px solid #334155',
-                                color: !hasActiveFilters ? '#f8fafc' : '#94a3b8',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                            }}
-                        >
-                            Alle
-                        </button>
-
-                        {/* "💰 Nur Bonus" Chip */}
-                        <button
-                            type="button"
-                            onClick={() => setOnlyBonus(!onlyBonus)}
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 10px',
-                                borderRadius: '20px',
-                                fontSize: '12px',
-                                fontWeight: onlyBonus ? 800 : 600,
-                                background: onlyBonus ? 'rgba(250, 204, 21, 0.18)' : 'transparent',
-                                border: onlyBonus ? '1px solid #facc15' : '1px solid #334155',
-                                color: onlyBonus ? '#facc15' : '#94a3b8',
-                                boxShadow: onlyBonus ? '0 0 8px rgba(250, 204, 21, 0.3)' : 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                            }}
-                            title="Nur Schichten mit gesetztem Bonus-Haken anzeigen"
-                        >
-                            <span>💰</span>
-                            <span>Nur Bonus</span>
-                            {onlyBonus && <span style={{ fontSize: '10px' }}>✓</span>}
-                        </button>
-
-                        {/* Wachen Chips */}
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Wachen:</span>
-                            {['Sendling', 'Hohenbrunn', 'Obersendling'].map(stName => {
-                                const theme = STATION_THEMES[stName];
-                                const active = selectedStations.includes(stName);
-                                return (
+                                {!isCurrentMonth && (
                                     <button
-                                        key={stName}
                                         type="button"
-                                        onClick={() => setSelectedStations(active ? selectedStations.filter(x => x !== stName) : [...selectedStations, stName])}
+                                        onClick={() => setBaseDate(new Date())}
                                         style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            padding: '3px 8px',
-                                            borderRadius: '16px',
+                                            background: 'rgba(249, 115, 22, 0.12)',
+                                            border: '1px solid rgba(249, 115, 22, 0.3)',
+                                            color: '#f97316',
+                                            borderRadius: '8px',
+                                            padding: '5px 8px',
                                             fontSize: '11px',
-                                            fontWeight: active ? 700 : 500,
-                                            background: active ? theme.badgeBg : 'transparent',
-                                            border: active ? `1px solid ${theme.primaryHex}` : '1px solid #334155',
-                                            color: active ? theme.primaryHex : '#94a3b8',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.15s ease'
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                        title="Zum aktuellen Monat springen"
+                                    >
+                                        Heute
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {filterMode === 'year' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setBaseDate(addMonths(baseDate, -12))}
+                                    style={{
+                                        background: '#0f172a',
+                                        border: '1px solid #334155',
+                                        color: '#cbd5e1',
+                                        borderRadius: '8px',
+                                        padding: '6px 9px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                    }}
+                                    title="Vorheriges Jahr"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+
+                                <div style={{
+                                    fontWeight: 700,
+                                    fontSize: '15px',
+                                    color: '#f8fafc',
+                                    minWidth: '64px',
+                                    textAlign: 'center'
+                                }}>
+                                    {baseDate.getFullYear()}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setBaseDate(addMonths(baseDate, 12))}
+                                    style={{
+                                        background: '#0f172a',
+                                        border: '1px solid #334155',
+                                        color: '#cbd5e1',
+                                        borderRadius: '8px',
+                                        padding: '6px 9px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                    }}
+                                    title="Nächstes Jahr"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+
+                                {!isCurrentYear && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setBaseDate(new Date())}
+                                        style={{
+                                            background: 'rgba(249, 115, 22, 0.12)',
+                                            border: '1px solid rgba(249, 115, 22, 0.3)',
+                                            color: '#f97316',
+                                            borderRadius: '8px',
+                                            padding: '5px 8px',
+                                            fontSize: '11px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
                                         }}
                                     >
-                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.primaryHex }} />
-                                        <span>{stName}</span>
-                                        {active && <span style={{ fontSize: '10px' }}>✓</span>}
+                                        Dieses Jahr
                                     </button>
-                                );
-                            })}
+                                )}
+                            </div>
+                        )}
+
+                        {filterMode === 'custom' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <input
+                                    type="date"
+                                    value={customStart}
+                                    onChange={(e) => setCustomStart(e.target.value)}
+                                    style={{
+                                        background: '#0f172a',
+                                        border: '1px solid #334155',
+                                        color: '#fff',
+                                        borderRadius: '8px',
+                                        padding: '6px 8px',
+                                        fontSize: '12px'
+                                    }}
+                                />
+                                <span style={{ color: '#64748b', fontSize: '12px' }}>bis</span>
+                                <input
+                                    type="date"
+                                    value={customEnd}
+                                    onChange={(e) => setCustomEnd(e.target.value)}
+                                    style={{
+                                        background: '#0f172a',
+                                        border: '1px solid #334155',
+                                        color: '#fff',
+                                        borderRadius: '8px',
+                                        padding: '6px 8px',
+                                        fontSize: '12px'
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Filter PopUp Trigger Button */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowFilterModal(true)}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    background: hasActiveFilters ? 'rgba(249, 115, 22, 0.15)' : '#0f172a',
+                                    border: hasActiveFilters ? '1px solid rgba(249, 115, 22, 0.45)' : '1px solid #334155',
+                                    color: hasActiveFilters ? '#f97316' : '#cbd5e1',
+                                    borderRadius: '8px',
+                                    padding: '6px 10px',
+                                    fontSize: '12.5px',
+                                    fontWeight: hasActiveFilters ? 700 : 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                }}
+                                title="Schichten, Wachen & Fahrzeuge filtern"
+                            >
+                                <SlidersHorizontal size={14} />
+                                <span>Filter{hasActiveFilters ? ` (${activeFilterCount})` : ''}</span>
+                            </button>
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); setOnlyBonus(false); }}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: 'rgba(239, 68, 68, 0.12)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        color: '#ef4444',
+                                        borderRadius: '8px',
+                                        padding: '6px 7px',
+                                        cursor: 'pointer'
+                                    }}
+                                    title="Alle Filter zurücksetzen"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* KPI Cards Grid (Row 1: Geleistet | Schichten | Bonus, Row 2: Saldo | Dienstplan PDF) */}
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+                <div className="stat-card" style={{ padding: '14px 12px' }}>
+                    <span className="text-label">Geleistet</span>
+                    <span className="text-value" style={{ fontSize: '22px' }}>{stats.actual.toFixed(1)} h</span>
+                </div>
+                <div className="stat-card" style={{ padding: '14px 12px' }}>
+                    <span className="text-label">Schichten</span>
+                    <span className="text-value" style={{ fontSize: '22px' }}>{stats.count}</span>
+                </div>
+                <div
+                    className="stat-card"
+                    onClick={() => setShowBonusModal(true)}
+                    style={{
+                        padding: '14px 12px',
+                        cursor: 'pointer',
+                        border: stats.bonusCount > 0 || onlyBonus ? '1px solid rgba(250, 204, 21, 0.45)' : undefined,
+                        background: onlyBonus ? 'rgba(250, 204, 21, 0.12)' : undefined,
+                        position: 'relative',
+                        transition: 'all 0.15s ease'
+                    }}
+                    title="Klicken für detaillierte Bonus-Auswertung"
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                        <span className="text-label" style={{ color: stats.bonusCount > 0 ? '#facc15' : undefined, marginBottom: '4px' }}>
+                            💰 Bonus ({stats.bonusCount}x)
+                        </span>
+                        <span style={{
+                            fontSize: '10px',
+                            color: '#fde047',
+                            background: 'rgba(250, 204, 21, 0.14)',
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            fontWeight: 700
+                        }}>
+                            Details ↗
+                        </span>
+                    </div>
+                    <span className="text-value" style={{ fontSize: '22px', color: stats.bonusCount > 0 ? '#facc15' : '#64748b' }}>
+                        {stats.bonusTotalAmount.toFixed(0)} €
+                    </span>
+                </div>
+
+                {/* Row 2 Left (span 2): Saldo */}
+                <div className="stat-card" style={{ gridColumn: 'span 2', borderLeft: `4px solid ${colorClass}`, padding: '14px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <span className="text-label">Saldo (Soll: {target.toFixed(1)}h{filterMode === 'month' ? ` • ${weeklyRate}h/Woche` : ''})</span>
+                        <div className="text-value" style={{ fontSize: '22px', color: colorClass }}>
+                            {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
+                        </div>
+                    </div>
+                    <div style={{ fontSize: '22px' }}>{isPositive ? "📈" : "📉"}</div>
+                </div>
+
+                {/* Row 2 Right (span 1): Dienstplan PDF Button Card */}
+                <button
+                    type="button"
+                    onClick={handleExportPDF}
+                    className="stat-card"
+                    style={{
+                        gridColumn: 'span 1',
+                        padding: '12px 10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        color: '#38bdf8',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        textAlign: 'center'
+                    }}
+                    title="Monatsdienstplan als PDF exportieren"
+                >
+                    <span style={{ fontSize: '22px', lineHeight: 1 }}>📄</span>
+                    <span style={{ fontSize: '12.5px', fontWeight: 700, lineHeight: 1.2 }}>
+                        Dienstplan PDF
+                    </span>
+                </button>
+            </div>
+
+            {/* PopUp Modal 1: Schichtfilter */}
+            {showFilterModal && (
+                <div
+                    onClick={() => setShowFilterModal(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 2500,
+                        background: 'rgba(2, 6, 23, 0.78)',
+                        backdropFilter: 'blur(6px)',
+                        WebkitBackdropFilter: 'blur(6px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '16px',
+                        animation: 'fadeIn 0.18s ease-out'
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: '100%',
+                            maxWidth: '480px',
+                            maxHeight: '85vh',
+                            overflowY: 'auto',
+                            background: '#0f172a',
+                            border: '1px solid #334155',
+                            borderRadius: '18px',
+                            padding: '18px',
+                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)'
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #1e293b' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <SlidersHorizontal size={17} color="#f97316" />
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>
+                                    Schichtfilter
+                                </h3>
+                                {hasActiveFilters && (
+                                    <span style={{
+                                        fontSize: '11px',
+                                        background: 'rgba(249, 115, 22, 0.15)',
+                                        color: '#f97316',
+                                        padding: '2px 7px',
+                                        borderRadius: '10px',
+                                        fontWeight: 700
+                                    }}>
+                                        {activeFilterCount} aktiv
+                                    </span>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowFilterModal(false)}
+                                style={{
+                                    background: '#1e293b',
+                                    border: '1px solid #334155',
+                                    color: '#94a3b8',
+                                    borderRadius: '8px',
+                                    padding: '4px 8px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}
+                            >
+                                <X size={16} />
+                            </button>
                         </div>
 
-                        {/* Shift Type Chips */}
-                        {(store.settings?.shiftTypes || []).map(t => {
-                            const active = selectedTypes.includes(t.id);
-                            const shiftCol = getShiftColor(t.name, '');
-                            return (
+                        {/* Section 1: Schnellauswahl */}
+                        <div style={{ marginBottom: '14px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                Auswahl
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                 <button
-                                    key={t.id}
                                     type="button"
-                                    onClick={() => setSelectedTypes(active ? selectedTypes.filter(x => x !== t.id) : [...selectedTypes, t.id])}
+                                    onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); setOnlyBonus(false); }}
                                     style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        padding: '4px 10px',
+                                        padding: '6px 12px',
                                         borderRadius: '20px',
-                                        fontSize: '12px',
-                                        fontWeight: active ? 700 : 500,
-                                        background: active ? shiftCol.bg : 'transparent',
-                                        border: active ? `1px solid ${shiftCol.border}` : '1px solid #334155',
-                                        color: active ? shiftCol.color : '#94a3b8',
-                                        boxShadow: active ? `0 0 8px ${shiftCol.border}` : 'none',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.15s ease'
+                                        fontSize: '12.5px',
+                                        fontWeight: !hasActiveFilters ? 700 : 500,
+                                        background: !hasActiveFilters ? '#334155' : '#1e293b',
+                                        border: !hasActiveFilters ? '1px solid #64748b' : '1px solid #334155',
+                                        color: !hasActiveFilters ? '#f8fafc' : '#94a3b8',
+                                        cursor: 'pointer'
                                     }}
                                 >
-                                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: shiftCol.color }} />
-                                    <span>{t.name}</span>
-                                    {active && <span style={{ fontSize: '10px' }}>✓</span>}
+                                    Alle Schichten {!hasActiveFilters && '✓'}
                                 </button>
-                            );
-                        })}
 
-                        {/* Vehicles if configured */}
-                        {(store.settings?.vehicles || []).length > 0 && (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Fahrzeuge:</span>
-                                {(store.settings?.vehicles || []).map(v => {
-                                    const active = selectedVehicles.includes(v);
+                                <button
+                                    type="button"
+                                    onClick={() => setOnlyBonus(!onlyBonus)}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        padding: '6px 12px',
+                                        borderRadius: '20px',
+                                        fontSize: '12.5px',
+                                        fontWeight: onlyBonus ? 800 : 600,
+                                        background: onlyBonus ? 'rgba(250, 204, 21, 0.18)' : '#1e293b',
+                                        border: onlyBonus ? '1px solid #facc15' : '1px solid #334155',
+                                        color: onlyBonus ? '#facc15' : '#94a3b8',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <span>💰</span>
+                                    <span>Nur Bonus</span>
+                                    {onlyBonus && <span>✓</span>}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Section 2: Wachen */}
+                        <div style={{ marginBottom: '14px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                Wachen
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                {['Sendling', 'Hohenbrunn', 'Obersendling'].map(stName => {
+                                    const theme = STATION_THEMES[stName];
+                                    const active = selectedStations.includes(stName);
                                     return (
                                         <button
-                                            key={v}
+                                            key={stName}
                                             type="button"
-                                            onClick={() => setSelectedVehicles(active ? selectedVehicles.filter(x => x !== v) : [...selectedVehicles, v])}
+                                            onClick={() => setSelectedStations(active ? selectedStations.filter(x => x !== stName) : [...selectedStations, stName])}
                                             style={{
-                                                padding: '3px 8px',
-                                                borderRadius: '16px',
-                                                fontSize: '11px',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '6px 12px',
+                                                borderRadius: '20px',
+                                                fontSize: '12.5px',
                                                 fontWeight: active ? 700 : 500,
-                                                background: active ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
-                                                border: active ? '1px solid #22c55e' : '1px solid #334155',
-                                                color: active ? '#22c55e' : '#64748b',
+                                                background: active ? theme.badgeBg : '#1e293b',
+                                                border: active ? `1px solid ${theme.primaryHex}` : '1px solid #334155',
+                                                color: active ? theme.primaryHex : '#cbd5e1',
                                                 cursor: 'pointer'
                                             }}
                                         >
-                                            {v} {active && '✓'}
+                                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: theme.primaryHex }} />
+                                            <span>{stName}</span>
+                                            {active && <span>✓</span>}
                                         </button>
                                     );
                                 })}
                             </div>
-                        )}
-                    </div>
+                        </div>
 
-                    {/* Reset Button (Visible when filters are active) */}
-                    {hasActiveFilters && (
-                        <button
-                            type="button"
-                            onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); setOnlyBonus(false); }}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: 'rgba(239, 68, 68, 0.1)',
-                                border: '1px solid rgba(239, 68, 68, 0.25)',
-                                color: '#ef4444',
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                fontSize: '11px',
-                                cursor: 'pointer'
-                            }}
-                            title="Alle Filter zurücksetzen"
-                        >
-                            <X size={12} />
-                            <span>Filter aufheben ({selectedTypes.length + selectedVehicles.length + selectedStations.length + (onlyBonus ? 1 : 0)})</span>
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))' }}>
-                <div className="stat-card">
-                    <span className="text-label">Geleistet</span>
-                    <span className="text-value">{stats.actual.toFixed(1)} h</span>
-                </div>
-                <div className="stat-card">
-                    <span className="text-label">Schichten</span>
-                    <span className="text-value">{stats.count}</span>
-                </div>
-                <div
-                    className="stat-card"
-                    onClick={() => setOnlyBonus(!onlyBonus)}
-                    style={{
-                        cursor: 'pointer',
-                        border: stats.bonusCount > 0 || onlyBonus ? '1px solid rgba(250, 204, 21, 0.45)' : undefined,
-                        background: onlyBonus ? 'rgba(250, 204, 21, 0.12)' : undefined
-                    }}
-                    title="Klicken, um nach Bonus-Schichten zu filtern"
-                >
-                    <span className="text-label" style={{ color: stats.bonusCount > 0 ? '#facc15' : undefined }}>
-                        💰 Bonus ({stats.bonusCount}x)
-                    </span>
-                    <span className="text-value" style={{ color: stats.bonusCount > 0 ? '#facc15' : '#64748b' }}>
-                        {stats.bonusTotalAmount.toFixed(0)} €
-                    </span>
-                </div>
-                <div className="stat-card full-width" style={{ borderLeft: `4px solid ${colorClass}` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <div>
-                            <span className="text-label">Saldo (Soll: {target.toFixed(1)}h{filterMode === 'month' ? ` • ${weeklyRate}h/Woche` : ''})</span>
-                            <div className="text-value" style={{ color: colorClass }}>
-                                {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
+                        {/* Section 3: Schichtarten */}
+                        <div style={{ marginBottom: '14px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                Schichtarten
                             </div>
-                        </div>
-                        <div style={{ fontSize: '24px' }}>{isPositive ? "📈" : "📉"}</div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Dedicated 💰 Bonus-Auswertung Section */}
-            <div
-                className="card-premium"
-                style={{
-                    border: stats.bonusCount > 0 || bonusOverview.yearBonusCount > 0
-                        ? '1px solid rgba(250, 204, 21, 0.35)'
-                        : '1px solid #334155',
-                    background: stats.bonusCount > 0
-                        ? 'linear-gradient(180deg, rgba(250, 204, 21, 0.06) 0%, rgba(15, 23, 42, 0.95) 100%)'
-                        : undefined
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-                    <div>
-                        <h3 className="text-label" style={{ margin: 0, color: '#facc15', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>💰 Bonus-Auswertung</span>
-                            <span style={{
-                                fontSize: '10.5px',
-                                background: 'rgba(250, 204, 21, 0.15)',
-                                color: '#fde047',
-                                padding: '2px 7px',
-                                borderRadius: '6px',
-                                fontWeight: 700,
-                                textTransform: 'none'
-                            }}>
-                                Standard: {store.settings?.defaultBonusAmount ?? 75} €
-                            </span>
-                        </h3>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={() => setOnlyBonus(!onlyBonus)}
-                        style={{
-                            background: onlyBonus ? '#facc15' : 'rgba(250, 204, 21, 0.12)',
-                            color: onlyBonus ? '#0f172a' : '#facc15',
-                            border: '1px solid rgba(250, 204, 21, 0.4)',
-                            borderRadius: '8px',
-                            padding: '4px 10px',
-                            fontSize: '11.5px',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                        }}
-                    >
-                        {onlyBonus ? '✓ Filter: Nur Bonus aktiv' : '🔍 Nur Bonus-Schichten filtern'}
-                    </button>
-                </div>
-
-                {/* Top Summary Boxes: Zeitraum | Jahr | Gesamt */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', marginBottom: '14px' }}>
-                    {/* Box 1: Gewählter Zeitraum */}
-                    <div style={{
-                        background: '#1e293b',
-                        border: '1px solid rgba(250, 204, 21, 0.3)',
-                        borderRadius: '8px',
-                        padding: '10px 12px'
-                    }}>
-                        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
-                            Gewählter Zeitraum ({label})
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                            <span style={{ fontSize: '20px', fontWeight: 800, color: '#facc15' }}>
-                                {stats.bonusTotalAmount.toFixed(0)} €
-                            </span>
-                            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
-                                {stats.bonusCount} {stats.bonusCount === 1 ? 'Schicht' : 'Schichten'}
-                            </span>
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
-                            {stats.bonusHours.toFixed(1)} Std. in Bonus-Schichten
-                        </div>
-                    </div>
-
-                    {/* Box 2: Laufendes Jahr */}
-                    <div style={{
-                        background: '#1e293b',
-                        border: '1px solid #334155',
-                        borderRadius: '8px',
-                        padding: '10px 12px'
-                    }}>
-                        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
-                            Jahressumme {bonusOverview.year}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                            <span style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8' }}>
-                                {bonusOverview.yearBonusAmount.toFixed(0)} €
-                            </span>
-                            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
-                                {bonusOverview.yearBonusCount} {bonusOverview.yearBonusCount === 1 ? 'Schicht' : 'Schichten'}
-                            </span>
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
-                            {bonusOverview.yearBonusHours.toFixed(1)} Std. im Jahr {bonusOverview.year}
-                        </div>
-                    </div>
-
-                    {/* Box 3: Alle Jahre / Gesamt */}
-                    <div style={{
-                        background: '#1e293b',
-                        border: '1px solid #334155',
-                        borderRadius: '8px',
-                        padding: '10px 12px'
-                    }}>
-                        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
-                            Gesamt (Alle Jahre)
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                            <span style={{ fontSize: '20px', fontWeight: 800, color: '#4ade80' }}>
-                                {bonusOverview.allTimeBonusAmount.toFixed(0)} €
-                            </span>
-                            <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
-                                {bonusOverview.allTimeBonusCount} {bonusOverview.allTimeBonusCount === 1 ? 'Schicht' : 'Schichten'}
-                            </span>
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
-                            {bonusOverview.byYear.length > 0
-                                ? bonusOverview.byYear.map(y => `${y.year}: ${y.amount.toFixed(0)}€ (${y.count}x)`).join(' • ')
-                                : 'Noch keine Bonus-Schichten markiert'}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Monthly Breakdown Grid (Jan - Dez for selected Year) */}
-                <div style={{ marginBottom: (stats.bonusByStation.length > 0 || stats.bonusByCode.length > 0) ? '12px' : 0 }}>
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                        Monatsübersicht Bonus {bonusOverview.year}:
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '6px' }}>
-                        {bonusOverview.months.map((m) => {
-                            const isSelectedMonth = filterMode === 'month' && baseDate.getMonth() === m.monthIndex;
-                            const hasB = m.count > 0;
-                            return (
-                                <div
-                                    key={m.key}
-                                    onClick={() => {
-                                        const newD = new Date(baseDate);
-                                        newD.setMonth(m.monthIndex);
-                                        setBaseDate(newD);
-                                        setFilterMode('month');
-                                    }}
-                                    style={{
-                                        background: hasB ? 'rgba(250, 204, 21, 0.1)' : '#0f172a',
-                                        border: isSelectedMonth
-                                            ? '1.5px solid #38bdf8'
-                                            : (hasB ? '1px solid rgba(250, 204, 21, 0.4)' : '1px solid #1e293b'),
-                                        borderRadius: '7px',
-                                        padding: '6px 6px',
-                                        textAlign: 'center',
-                                        cursor: 'pointer'
-                                    }}
-                                    title={`${m.monthName} ${bonusOverview.year}: ${m.count}x Bonus (${m.amount.toFixed(0)} €)`}
-                                >
-                                    <div style={{ fontSize: '11px', fontWeight: 700, color: hasB ? '#f8fafc' : '#64748b' }}>
-                                        {m.monthName}
-                                    </div>
-                                    <div style={{ fontSize: '12px', fontWeight: 800, color: hasB ? '#facc15' : '#334155', marginTop: '2px' }}>
-                                        {hasB ? `${m.amount.toFixed(0)} €` : '—'}
-                                    </div>
-                                    <div style={{ fontSize: '10px', color: hasB ? '#fde047' : '#475569' }}>
-                                        {hasB ? `${m.count}x` : '0x'}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Breakdown by Wache & Kürzel in current period (if bonus shifts exist) */}
-                {(stats.bonusByStation.length > 0 || stats.bonusByCode.length > 0) && (
-                    <div style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '12px',
-                        paddingTop: '10px',
-                        borderTop: '1px solid rgba(255,255,255,0.06)',
-                        fontSize: '12px'
-                    }}>
-                        {stats.bonusByStation.length > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                <span style={{ color: '#94a3b8', fontWeight: 600 }}>Nach Wache ({label}):</span>
-                                {stats.bonusByStation.map(bs => {
-                                    const th = STATION_THEMES[bs.station] || STATION_THEMES.Sendling;
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                {(store.settings?.shiftTypes || []).map(t => {
+                                    const active = selectedTypes.includes(t.id);
+                                    const shiftCol = getShiftColor(t.name, '');
                                     return (
-                                        <span key={bs.station} style={{
-                                            background: th.badgeBg,
-                                            color: th.primaryHex,
-                                            border: `1px solid ${th.badgeBorder}`,
-                                            padding: '2px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '11.5px',
-                                            fontWeight: 700
-                                        }}>
-                                            {bs.station}: {bs.count}x ({bs.amount.toFixed(0)} €)
-                                        </span>
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => setSelectedTypes(active ? selectedTypes.filter(x => x !== t.id) : [...selectedTypes, t.id])}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '6px 12px',
+                                                borderRadius: '20px',
+                                                fontSize: '12.5px',
+                                                fontWeight: active ? 700 : 500,
+                                                background: active ? shiftCol.bg : '#1e293b',
+                                                border: active ? `1px solid ${shiftCol.border}` : '1px solid #334155',
+                                                color: active ? shiftCol.color : '#cbd5e1',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: shiftCol.color }} />
+                                            <span>{t.name}</span>
+                                            {active && <span>✓</span>}
+                                        </button>
                                     );
                                 })}
                             </div>
+                        </div>
+
+                        {/* Section 4: Fahrzeuge */}
+                        {(store.settings?.vehicles || []).length > 0 && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                    Fahrzeuge
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    {(store.settings?.vehicles || []).map(v => {
+                                        const active = selectedVehicles.includes(v);
+                                        return (
+                                            <button
+                                                key={v}
+                                                type="button"
+                                                onClick={() => setSelectedVehicles(active ? selectedVehicles.filter(x => x !== v) : [...selectedVehicles, v])}
+                                                style={{
+                                                    padding: '6px 11px',
+                                                    borderRadius: '16px',
+                                                    fontSize: '12px',
+                                                    fontWeight: active ? 700 : 500,
+                                                    background: active ? 'rgba(34, 197, 94, 0.15)' : '#1e293b',
+                                                    border: active ? '1px solid #22c55e' : '1px solid #334155',
+                                                    color: active ? '#22c55e' : '#94a3b8',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {v} {active && '✓'}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         )}
-                        {stats.bonusByCode.length > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                <span style={{ color: '#94a3b8', fontWeight: 600 }}>Nach Kürzel:</span>
-                                {stats.bonusByCode.map(bc => (
-                                    <span key={bc.code} style={{
-                                        background: '#1e293b',
-                                        color: '#facc15',
-                                        border: '1px solid rgba(250, 204, 21, 0.3)',
-                                        padding: '2px 8px',
-                                        borderRadius: '6px',
+
+                        {/* Modal Footer */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', paddingTop: '12px', borderTop: '1px solid #1e293b' }}>
+                            {hasActiveFilters ? (
+                                <button
+                                    type="button"
+                                    onClick={() => { setSelectedTypes([]); setSelectedVehicles([]); setSelectedStations([]); setOnlyBonus(false); }}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: 'rgba(239, 68, 68, 0.12)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        color: '#ef4444',
+                                        padding: '8px 12px',
+                                        borderRadius: '10px',
+                                        fontSize: '12.5px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <X size={14} />
+                                    <span>Filter zurücksetzen</span>
+                                </button>
+                            ) : <div />}
+
+                            <button
+                                type="button"
+                                onClick={() => setShowFilterModal(false)}
+                                style={{
+                                    background: 'var(--color-primary)',
+                                    border: 'none',
+                                    color: '#ffffff',
+                                    padding: '8px 18px',
+                                    borderRadius: '10px',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Fertig ({filteredData.length} {filteredData.length === 1 ? 'Dienst' : 'Dienste'})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PopUp Modal 2: 💰 Bonus-Auswertung */}
+            {showBonusModal && (
+                <div
+                    onClick={() => setShowBonusModal(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 2500,
+                        background: 'rgba(2, 6, 23, 0.78)',
+                        backdropFilter: 'blur(6px)',
+                        WebkitBackdropFilter: 'blur(6px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '16px',
+                        animation: 'fadeIn 0.18s ease-out'
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: '100%',
+                            maxWidth: '540px',
+                            maxHeight: '85vh',
+                            overflowY: 'auto',
+                            background: '#0f172a',
+                            border: '1px solid rgba(250, 204, 21, 0.4)',
+                            borderRadius: '18px',
+                            padding: '18px',
+                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)'
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #1e293b' }}>
+                            <h3 className="text-label" style={{ margin: 0, color: '#facc15', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>💰 Bonus-Auswertung</span>
+                                <span style={{
+                                    fontSize: '11px',
+                                    background: 'rgba(250, 204, 21, 0.15)',
+                                    color: '#fde047',
+                                    padding: '2px 7px',
+                                    borderRadius: '6px',
+                                    fontWeight: 700,
+                                    textTransform: 'none'
+                                }}>
+                                    Standard: {store.settings?.defaultBonusAmount ?? 75} €
+                                </span>
+                            </h3>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setOnlyBonus(!onlyBonus)}
+                                    style={{
+                                        background: onlyBonus ? '#facc15' : 'rgba(250, 204, 21, 0.12)',
+                                        color: onlyBonus ? '#0f172a' : '#facc15',
+                                        border: '1px solid rgba(250, 204, 21, 0.4)',
+                                        borderRadius: '8px',
+                                        padding: '5px 10px',
                                         fontSize: '11.5px',
-                                        fontWeight: 700
-                                    }}>
-                                        {bc.code}: {bc.count}x ({bc.amount.toFixed(0)} €)
+                                        fontWeight: 700,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {onlyBonus ? '✓ Filter: Nur Bonus aktiv' : '🔍 Nur Bonus-Schichten filtern'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowBonusModal(false)}
+                                    style={{
+                                        background: '#1e293b',
+                                        border: '1px solid #334155',
+                                        color: '#94a3b8',
+                                        borderRadius: '8px',
+                                        padding: '5px 8px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                    }}
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Top Summary Boxes: Zeitraum | Jahr | Gesamt */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '8px', marginBottom: '14px' }}>
+                            {/* Box 1: Gewählter Zeitraum */}
+                            <div style={{
+                                background: '#1e293b',
+                                border: '1px solid rgba(250, 204, 21, 0.3)',
+                                borderRadius: '8px',
+                                padding: '10px 12px'
+                            }}>
+                                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                                    Gewählter Zeitraum ({label})
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#facc15' }}>
+                                        {stats.bonusTotalAmount.toFixed(0)} €
                                     </span>
-                                ))}
+                                    <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                        {stats.bonusCount} {stats.bonusCount === 1 ? 'Schicht' : 'Schichten'}
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                                    {stats.bonusHours.toFixed(1)} Std. in Bonus-Schichten
+                                </div>
+                            </div>
+
+                            {/* Box 2: Laufendes Jahr */}
+                            <div style={{
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                borderRadius: '8px',
+                                padding: '10px 12px'
+                            }}>
+                                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                                    Jahressumme {bonusOverview.year}
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8' }}>
+                                        {bonusOverview.yearBonusAmount.toFixed(0)} €
+                                    </span>
+                                    <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                        {bonusOverview.yearBonusCount} {bonusOverview.yearBonusCount === 1 ? 'Schicht' : 'Schichten'}
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                                    {bonusOverview.yearBonusHours.toFixed(1)} Std. im Jahr {bonusOverview.year}
+                                </div>
+                            </div>
+
+                            {/* Box 3: Alle Jahre / Gesamt */}
+                            <div style={{
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                borderRadius: '8px',
+                                padding: '10px 12px'
+                            }}>
+                                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                                    Gesamt (Alle Jahre)
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#4ade80' }}>
+                                        {bonusOverview.allTimeBonusAmount.toFixed(0)} €
+                                    </span>
+                                    <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                        {bonusOverview.allTimeBonusCount} {bonusOverview.allTimeBonusCount === 1 ? 'Schicht' : 'Schichten'}
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                                    {bonusOverview.byYear.length > 0
+                                        ? bonusOverview.byYear.map(y => `${y.year}: ${y.amount.toFixed(0)}€ (${y.count}x)`).join(' • ')
+                                        : 'Noch keine Bonus-Schichten markiert'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Monthly Breakdown Grid (Jan - Dez for selected Year) */}
+                        <div style={{ marginBottom: (stats.bonusByStation.length > 0 || stats.bonusByCode.length > 0) ? '12px' : 0 }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                Monatsübersicht Bonus {bonusOverview.year}:
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '6px' }}>
+                                {bonusOverview.months.map((m) => {
+                                    const isSelectedMonth = filterMode === 'month' && baseDate.getMonth() === m.monthIndex;
+                                    const hasB = m.count > 0;
+                                    return (
+                                        <div
+                                            key={m.key}
+                                            onClick={() => {
+                                                const newD = new Date(baseDate);
+                                                newD.setMonth(m.monthIndex);
+                                                setBaseDate(newD);
+                                                setFilterMode('month');
+                                            }}
+                                            style={{
+                                                background: hasB ? 'rgba(250, 204, 21, 0.1)' : '#1e293b',
+                                                border: isSelectedMonth
+                                                    ? '1.5px solid #38bdf8'
+                                                    : (hasB ? '1px solid rgba(250, 204, 21, 0.4)' : '1px solid #334155'),
+                                                borderRadius: '7px',
+                                                padding: '6px 6px',
+                                                textAlign: 'center',
+                                                cursor: 'pointer'
+                                            }}
+                                            title={`${m.monthName} ${bonusOverview.year}: ${m.count}x Bonus (${m.amount.toFixed(0)} €)`}
+                                        >
+                                            <div style={{ fontSize: '11px', fontWeight: 700, color: hasB ? '#f8fafc' : '#64748b' }}>
+                                                {m.monthName}
+                                            </div>
+                                            <div style={{ fontSize: '12px', fontWeight: 800, color: hasB ? '#facc15' : '#475569', marginTop: '2px' }}>
+                                                {hasB ? `${m.amount.toFixed(0)} €` : '—'}
+                                            </div>
+                                            <div style={{ fontSize: '10px', color: hasB ? '#fde047' : '#475569' }}>
+                                                {hasB ? `${m.count}x` : '0x'}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Breakdown by Wache & Kürzel in current period */}
+                        {(stats.bonusByStation.length > 0 || stats.bonusByCode.length > 0) && (
+                            <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '12px',
+                                paddingTop: '10px',
+                                borderTop: '1px solid rgba(255,255,255,0.06)',
+                                fontSize: '12px'
+                            }}>
+                                {stats.bonusByStation.length > 0 && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                        <span style={{ color: '#94a3b8', fontWeight: 600 }}>Nach Wache ({label}):</span>
+                                        {stats.bonusByStation.map(bs => {
+                                            const th = STATION_THEMES[bs.station] || STATION_THEMES.Sendling;
+                                            return (
+                                                <span key={bs.station} style={{
+                                                    background: th.badgeBg,
+                                                    color: th.primaryHex,
+                                                    border: `1px solid ${th.badgeBorder}`,
+                                                    padding: '2px 8px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '11.5px',
+                                                    fontWeight: 700
+                                                }}>
+                                                    {bs.station}: {bs.count}x ({bs.amount.toFixed(0)} €)
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {stats.bonusByCode.length > 0 && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                        <span style={{ color: '#94a3b8', fontWeight: 600 }}>Nach Kürzel:</span>
+                                        {stats.bonusByCode.map(bc => (
+                                            <span key={bc.code} style={{
+                                                background: '#1e293b',
+                                                color: '#facc15',
+                                                border: '1px solid rgba(250, 204, 21, 0.3)',
+                                                padding: '2px 8px',
+                                                borderRadius: '6px',
+                                                fontSize: '11.5px',
+                                                fontWeight: 700
+                                            }}>
+                                                {bc.code}: {bc.count}x ({bc.amount.toFixed(0)} €)
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* Charts */}
             {stats.count === 0 ? (

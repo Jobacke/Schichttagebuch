@@ -700,7 +700,9 @@ export default function Journal() {
                         borderRadius: '16px',
                         border: 'var(--glass-border)'
                     }}>
-                        <div style={{ fontSize: '14px' }}>Keine Einträge für diesen Monat vorhanden.</div>
+                        <div style={{ fontSize: '14px' }}>
+                            {selectedDate ? 'Keine Einträge für diesen Tag' : 'Keine Einträge für diesen Monat vorhanden.'}
+                        </div>
                     </div>
                 )}
             </div>

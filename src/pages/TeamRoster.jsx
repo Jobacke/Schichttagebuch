@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Search,
   UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, AlertTriangle, FileText, FileCode, Clipboard, Copy, Bookmark,
-  Calendar, Trash2, FolderOpen, Check, Cloud, RefreshCw
+  Calendar, Trash2, FolderOpen, Check, Cloud, RefreshCw, SlidersHorizontal
 } from 'lucide-react';
 import {
   getActiveTeamRoster,
@@ -27,7 +27,7 @@ import { useStore } from '../context/StoreContext';
 import { buildShiftFromPreset, getPresetForCode } from '../utils/shiftPresets';
 import { parseCareManPdf } from '../utils/teamRosterPdfParser';
 import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
-import { getShiftColor, detectStation } from '../utils/shiftColors';
+import { getShiftColor, detectStation, STATION_THEMES } from '../utils/shiftColors';
 
 const SIEDA_EXTRACTOR_SCRIPT = `(() => {
   let year = 2026;
@@ -203,6 +203,9 @@ export default function TeamRoster() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStation, setSelectedStation] = useState('ALL'); // 'ALL' | 'Sendling' | 'Hohenbrunn' | 'Obersendling'
+  const [selectedShiftGroup, setSelectedShiftGroup] = useState('ALL'); // 'ALL' | 'Frühdienst' | 'Tagschicht' | 'Spätdienst' | 'Nachtdienst' | 'Sonderdienste' | 'Fortbildung' | 'Urlaub / Abwesend'
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showJumpModal, setShowJumpModal] = useState(false);
   const [uploadStationOverride, setUploadStationOverride] = useState('AUTO'); // 'AUTO' | 'Sendling' | 'Obersendling' | 'Hohenbrunn'
   const [copiedScript, setCopiedScript] = useState(false);
   const [copiedBookmarklet, setCopiedBookmarklet] = useState(false);
@@ -455,7 +458,12 @@ export default function TeamRoster() {
         if (st !== selectedStation) return false;
       }
 
-      // 2. Search query filter
+      // 2. Shift group filter
+      if (selectedShiftGroup !== 'ALL') {
+        if (getShiftGroupName(shift.code) !== selectedShiftGroup) return false;
+      }
+
+      // 3. Search query filter
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
       return (
@@ -482,7 +490,7 @@ export default function TeamRoster() {
       // 4. Kollegenname alphabetisch (bei identischem Schichtkürzel)
       return a.name.localeCompare(b.name, 'de');
     });
-  }, [roster, selectedDate, searchQuery, selectedStation]);
+  }, [roster, selectedDate, searchQuery, selectedStation, selectedShiftGroup]);
 
   // Staffing Analysis: Jedes reguläre Schichtkürzel ohne '*' muss mindestens 2x vorkommen
   const staffingAnalysis = useMemo(() => {
@@ -908,7 +916,7 @@ export default function TeamRoster() {
         </div>
       </div>
 
-      {/* Single-Row Date Stepper */}
+      {/* Single-Row Date Stepper with "Springe zu" */}
       <div className="team-roster-stepper">
         <button
           type="button"
@@ -919,16 +927,42 @@ export default function TeamRoster() {
           <ChevronLeft size={20} />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)' }}>
+        <div
+          onClick={() => setShowJumpModal(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, cursor: 'pointer' }}
+          title="Klicken, um direkt zu einem Datum zu springen"
+        >
+          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
             {formattedSelectedDate}
           </span>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
             • {currentDayShifts.length} im Dienst
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => setShowJumpModal(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              background: 'rgba(249, 115, 22, 0.14)',
+              border: '1px solid rgba(249, 115, 22, 0.35)',
+              color: '#fb923c',
+              fontSize: '12px',
+              fontWeight: 700,
+              padding: '6px 10px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            title="Direkt zu einem bestimmten Datum springen"
+          >
+            <Calendar size={13} />
+            <span>Springe zu</span>
+          </button>
           <button
             type="button"
             onClick={handleToday}
@@ -947,80 +981,599 @@ export default function TeamRoster() {
         </div>
       </div>
 
-      {/* Station Filter Chips: Alle Wachen, Sendling, Hohenbrunn, Obersendling */}
-      <div className="team-roster-station-chips">
-        <button
-          type="button"
-          onClick={() => setSelectedStation('ALL')}
-          className={`team-roster-station-chip ${selectedStation === 'ALL' ? 'active' : ''}`}
-        >
-          Alle Wachen ({stationCounts.ALL})
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelectedStation('Sendling')}
-          className={`team-roster-station-chip ${selectedStation === 'Sendling' ? 'active' : ''}`}
-        >
-          Sendling ({stationCounts.Sendling})
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelectedStation('Hohenbrunn')}
-          className={`team-roster-station-chip ${selectedStation === 'Hohenbrunn' ? 'active' : ''}`}
-        >
-          Hohenbrunn ({stationCounts.Hohenbrunn})
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelectedStation('Obersendling')}
-          className={`team-roster-station-chip ${selectedStation === 'Obersendling' ? 'active' : ''}`}
-        >
-          Obersendling ({stationCounts.Obersendling})
-        </button>
-      </div>
+      {/* Slim Search + Filter PopUp Trigger Row */}
+      {(() => {
+        const hasTeamFilter = selectedStation !== 'ALL' || selectedShiftGroup !== 'ALL';
+        const activeCount = (selectedStation !== 'ALL' ? 1 : 0) + (selectedShiftGroup !== 'ALL' ? 1 : 0);
+        const filterLabel = selectedStation !== 'ALL' && selectedShiftGroup === 'ALL'
+          ? `Filter: ${selectedStation}`
+          : selectedStation === 'ALL' && selectedShiftGroup !== 'ALL'
+            ? `Filter: ${selectedShiftGroup}`
+            : hasTeamFilter
+              ? `Filter (${activeCount})`
+              : 'Filter';
 
-      {/* Slim Search Input */}
-      <div className="team-roster-search-box">
-        <Search
-          size={16}
-          style={{
-            position: 'absolute',
-            left: '12px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: 'var(--color-text-muted)',
-            pointerEvents: 'none'
-          }}
-        />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Kollege oder Kürzel suchen..."
-          className="team-roster-search-input"
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <div className="team-roster-search-box" style={{ flex: 1, marginBottom: 0 }}>
+              <Search
+                size={16}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--color-text-muted)',
+                  pointerEvents: 'none'
+                }}
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Kollege oder Kürzel suchen..."
+                className="team-roster-search-input"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--color-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowFilterModal(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: hasTeamFilter ? 'rgba(14, 165, 233, 0.18)' : 'var(--color-surface)',
+                border: hasTeamFilter ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid var(--color-border)',
+                color: hasTeamFilter ? '#38bdf8' : 'var(--color-text-main)',
+                padding: '10px 13px',
+                borderRadius: '12px',
+                fontSize: '13px',
+                fontWeight: hasTeamFilter ? 700 : 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
+              title="Nach Wache oder Schichtgruppe filtern"
+            >
+              <SlidersHorizontal size={15} />
+              <span>{filterLabel}</span>
+            </button>
+
+            {hasTeamFilter && (
+              <button
+                type="button"
+                onClick={() => { setSelectedStation('ALL'); setSelectedShiftGroup('ALL'); }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#ef4444',
+                  padding: '10px 10px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+                title="Filter zurücksetzen"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* PopUp Modal 1: "Springe zu" Datum-Auswahl */}
+      {showJumpModal && (() => {
+        const [y, m] = yearMonth.split('-').map(Number);
+        const totalDays = new Date(y, m, 0).getDate();
+        const firstWeekday = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Mo=0 ... So=6
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const myShiftsMap = {};
+        myRosterShifts.forEach(s => { myShiftsMap[s.date] = s.code; });
+
+        const calendarCells = [];
+        for (let i = 0; i < firstWeekday; i++) {
+          calendarCells.push({ empty: true, key: `e-${i}` });
+        }
+        for (let d = 1; d <= totalDays; d++) {
+          const dStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
+          const dayRosterShifts = roster.shiftsByDate?.[dStr] || [];
+          const myCode = myShiftsMap[dStr] || null;
+          const isWeekend = ((firstWeekday + d - 1) % 7) >= 5;
+          calendarCells.push({
+            empty: false,
+            dayNum: d,
+            dateStr: dStr,
+            shiftCount: dayRosterShifts.length,
+            myCode,
+            isWeekend,
+            isSelected: selectedDate === dStr,
+            isToday: todayStr === dStr,
+            key: dStr
+          });
+        }
+
+        return (
+          <div
+            onClick={() => setShowJumpModal(false)}
             style={{
-              position: 'absolute',
-              right: '10px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-text-muted)',
-              cursor: 'pointer',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 3100,
+              background: 'rgba(2, 6, 23, 0.78)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
               display: 'flex',
               alignItems: 'center',
-              padding: '4px'
+              justifyContent: 'center',
+              padding: '16px',
+              animation: 'fadeIn 0.18s ease-out'
             }}
           >
-            <X size={16} />
-          </button>
-        )}
-      </div>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '420px',
+                background: '#0f172a',
+                border: '1px solid #334155',
+                borderRadius: '18px',
+                padding: '18px',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)'
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #1e293b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={17} color="#fb923c" />
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>
+                    Springe zu Datum
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowJumpModal(false)}
+                  style={{
+                    background: '#1e293b',
+                    border: '1px solid #334155',
+                    color: '#94a3b8',
+                    borderRadius: '8px',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Month Bar inside Modal */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={handlePrevMonth}
+                    style={{
+                      background: '#1e293b',
+                      border: '1px solid #334155',
+                      color: '#cbd5e1',
+                      borderRadius: '8px',
+                      padding: '5px 8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', minWidth: '120px', textAlign: 'center' }}>
+                    {roster.monthLabel || yearMonth}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    style={{
+                      background: '#1e293b',
+                      border: '1px solid #334155',
+                      color: '#cbd5e1',
+                      borderRadius: '8px',
+                      padding: '5px 8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleToday();
+                    setShowJumpModal(false);
+                  }}
+                  style={{
+                    background: 'rgba(14, 165, 233, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    color: '#38bdf8',
+                    borderRadius: '8px',
+                    padding: '5px 10px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Heute
+                </button>
+              </div>
+
+              {/* Weekday Headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '6px' }}>
+                {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((wd, i) => (
+                  <div
+                    key={wd}
+                    style={{
+                      textAlign: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: i >= 5 ? '#fb923c' : '#64748b'
+                    }}
+                  >
+                    {wd}
+                  </div>
+                ))}
+              </div>
+
+              {/* 1-Click Day Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px', marginBottom: '14px' }}>
+                {calendarCells.map(cell => {
+                  if (cell.empty) {
+                    return <div key={cell.key} style={{ minHeight: '44px' }} />;
+                  }
+                  const myShiftColor = cell.myCode ? getShiftColor('', cell.myCode) : null;
+                  return (
+                    <button
+                      key={cell.key}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(cell.dateStr);
+                        setShowJumpModal(false);
+                      }}
+                      style={{
+                        minHeight: '44px',
+                        padding: '4px 2px',
+                        borderRadius: '9px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '2px',
+                        cursor: 'pointer',
+                        background: cell.isSelected
+                          ? 'rgba(14, 165, 233, 0.25)'
+                          : cell.myCode
+                            ? myShiftColor.bg
+                            : (cell.isWeekend ? 'rgba(30, 41, 59, 0.6)' : '#1e293b'),
+                        border: cell.isSelected
+                          ? '2px solid #38bdf8'
+                          : cell.isToday
+                            ? '1.5px solid #fb923c'
+                            : cell.myCode
+                              ? `1px solid ${myShiftColor.border}`
+                              : '1px solid #334155',
+                        color: '#f8fafc',
+                        transition: 'all 0.12s ease'
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '12.5px',
+                        fontWeight: cell.isSelected || cell.isToday || cell.myCode ? 800 : 600,
+                        color: cell.isSelected ? '#38bdf8' : (cell.isToday ? '#fb923c' : '#f8fafc'),
+                        lineHeight: 1.1
+                      }}>
+                        {cell.dayNum}
+                      </span>
+                      {cell.myCode ? (
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          color: myShiftColor.color,
+                          lineHeight: 1
+                        }}>
+                          {cell.myCode}
+                        </span>
+                      ) : cell.shiftCount > 0 ? (
+                        <span style={{
+                          fontSize: '9px',
+                          color: '#64748b',
+                          lineHeight: 1
+                        }}>
+                          {cell.shiftCount}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Direct Date Input Fallback */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                paddingTop: '10px',
+                borderTop: '1px solid #1e293b'
+              }}>
+                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
+                  Direktes Datum:
+                </span>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const targetYM = val.slice(0, 7);
+                    if (targetYM !== yearMonth) {
+                      switchMonth(targetYM, val);
+                    } else {
+                      setSelectedDate(val);
+                    }
+                    setShowJumpModal(false);
+                  }}
+                  style={{
+                    background: '#1e293b',
+                    border: '1px solid #334155',
+                    color: '#f8fafc',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    fontSize: '12.5px',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* PopUp Modal 2: Team-Filter (Wachen & Schichtgruppen) */}
+      {showFilterModal && (() => {
+        const hasTeamFilter = selectedStation !== 'ALL' || selectedShiftGroup !== 'ALL';
+        const shiftGroups = ['Frühdienst', 'Tagschicht', 'Spätdienst', 'Nachtdienst', 'Sonderdienste', 'Fortbildung', 'Urlaub / Abwesend'];
+
+        return (
+          <div
+            onClick={() => setShowFilterModal(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 3100,
+              background: 'rgba(2, 6, 23, 0.78)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+              animation: 'fadeIn 0.18s ease-out'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '440px',
+                background: '#0f172a',
+                border: '1px solid #334155',
+                borderRadius: '18px',
+                padding: '18px',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)'
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #1e293b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <SlidersHorizontal size={17} color="#38bdf8" />
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>
+                    Team-Filter
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFilterModal(false)}
+                  style={{
+                    background: '#1e293b',
+                    border: '1px solid #334155',
+                    color: '#94a3b8',
+                    borderRadius: '8px',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Section 1: Wachen */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  Wachen ({formattedSelectedDate})
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStation('ALL')}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '20px',
+                      fontSize: '12.5px',
+                      fontWeight: selectedStation === 'ALL' ? 700 : 500,
+                      background: selectedStation === 'ALL' ? 'rgba(14, 165, 233, 0.2)' : '#1e293b',
+                      border: selectedStation === 'ALL' ? '1px solid #38bdf8' : '1px solid #334155',
+                      color: selectedStation === 'ALL' ? '#38bdf8' : '#cbd5e1',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Alle Wachen ({stationCounts.ALL}) {selectedStation === 'ALL' && '✓'}
+                  </button>
+
+                  {['Sendling', 'Hohenbrunn', 'Obersendling'].map(stName => {
+                    const theme = STATION_THEMES[stName] || STATION_THEMES.Sendling;
+                    const active = selectedStation === stName;
+                    return (
+                      <button
+                        key={stName}
+                        type="button"
+                        onClick={() => setSelectedStation(active ? 'ALL' : stName)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '7px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12.5px',
+                          fontWeight: active ? 700 : 500,
+                          background: active ? theme.badgeBg : '#1e293b',
+                          border: active ? `1px solid ${theme.primaryHex}` : '1px solid #334155',
+                          color: active ? theme.primaryHex : '#cbd5e1',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: theme.primaryHex }} />
+                        <span>{stName} ({stationCounts[stName] || 0})</span>
+                        {active && <span>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Section 2: Schichtgruppen */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  Schichtgruppe
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedShiftGroup('ALL')}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      fontSize: '12.5px',
+                      fontWeight: selectedShiftGroup === 'ALL' ? 700 : 500,
+                      background: selectedShiftGroup === 'ALL' ? '#334155' : '#1e293b',
+                      border: selectedShiftGroup === 'ALL' ? '1px solid #64748b' : '1px solid #334155',
+                      color: selectedShiftGroup === 'ALL' ? '#f8fafc' : '#94a3b8',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Alle Gruppen {selectedShiftGroup === 'ALL' && '✓'}
+                  </button>
+
+                  {shiftGroups.map(grp => {
+                    const active = selectedShiftGroup === grp;
+                    return (
+                      <button
+                        key={grp}
+                        type="button"
+                        onClick={() => setSelectedShiftGroup(active ? 'ALL' : grp)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12.5px',
+                          fontWeight: active ? 700 : 500,
+                          background: active ? 'rgba(56, 189, 248, 0.18)' : '#1e293b',
+                          border: active ? '1px solid #38bdf8' : '1px solid #334155',
+                          color: active ? '#38bdf8' : '#cbd5e1',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {grp} {active && '✓'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', paddingTop: '12px', borderTop: '1px solid #1e293b' }}>
+                {hasTeamFilter ? (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedStation('ALL'); setSelectedShiftGroup('ALL'); }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#ef4444',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <X size={14} />
+                    <span>Filter zurücksetzen</span>
+                  </button>
+                ) : <div />}
+
+                <button
+                  type="button"
+                  onClick={() => setShowFilterModal(false)}
+                  style={{
+                    background: '#0284c7',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '8px 18px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Fertig ({currentDayShifts.length} im Dienst)
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Staffing Evaluation Box (Mind. 2x Besetzung pro regulärem Schichtkürzel ohne *) */}
       {staffingAnalysis.totalEvaluated > 0 && (

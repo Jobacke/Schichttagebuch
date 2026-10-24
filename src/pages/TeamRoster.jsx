@@ -916,173 +916,110 @@ export default function TeamRoster() {
         </div>
       </div>
 
-      {/* Single-Row Date Stepper with "Springe zu" */}
-      <div className="team-roster-stepper">
-        <button
-          type="button"
-          onClick={handlePrevDay}
-          className="team-roster-stepper-btn"
-          title="Vorheriger Tag"
-        >
-          <ChevronLeft size={20} />
-        </button>
-
-        <div
-          onClick={() => setShowJumpModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, cursor: 'pointer' }}
-          title="Klicken, um direkt zu einem Datum zu springen"
-        >
-          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
-            {formattedSelectedDate}
-          </span>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-            • {currentDayShifts.length} im Dienst
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <button
-            type="button"
-            onClick={() => setShowJumpModal(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              background: 'rgba(249, 115, 22, 0.14)',
-              border: '1px solid rgba(249, 115, 22, 0.35)',
-              color: '#fb923c',
-              fontSize: '12px',
-              fontWeight: 700,
-              padding: '6px 10px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-            title="Direkt zu einem bestimmten Datum springen"
-          >
-            <Calendar size={13} />
-            <span>Springe zu</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleToday}
-            className="team-roster-today-btn"
-          >
-            Heute
-          </button>
-          <button
-            type="button"
-            onClick={handleNextDay}
-            className="team-roster-stepper-btn"
-            title="Nächster Tag"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* Slim Search + Filter PopUp Trigger Row */}
+      {/* Single-Row Date Stepper (Click on Date = Jump Modal, Filter Button integrated) */}
       {(() => {
-        const hasTeamFilter = selectedStation !== 'ALL' || selectedShiftGroup !== 'ALL';
-        const activeCount = (selectedStation !== 'ALL' ? 1 : 0) + (selectedShiftGroup !== 'ALL' ? 1 : 0);
-        const filterLabel = selectedStation !== 'ALL' && selectedShiftGroup === 'ALL'
-          ? `Filter: ${selectedStation}`
-          : selectedStation === 'ALL' && selectedShiftGroup !== 'ALL'
-            ? `Filter: ${selectedShiftGroup}`
-            : hasTeamFilter
-              ? `Filter (${activeCount})`
-              : 'Filter';
+        const hasSearch = Boolean(searchQuery.trim());
+        const hasTeamFilter = selectedStation !== 'ALL' || selectedShiftGroup !== 'ALL' || hasSearch;
+        const activeCount = (selectedStation !== 'ALL' ? 1 : 0) + (selectedShiftGroup !== 'ALL' ? 1 : 0) + (hasSearch ? 1 : 0);
 
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <div className="team-roster-search-box" style={{ flex: 1, marginBottom: 0 }}>
-              <Search
-                size={16}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--color-text-muted)',
-                  pointerEvents: 'none'
-                }}
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Kollege oder Kürzel suchen..."
-                className="team-roster-search-input"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--color-text-muted)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px'
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-
+          <div className="team-roster-stepper">
             <button
               type="button"
-              onClick={() => setShowFilterModal(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: hasTeamFilter ? 'rgba(14, 165, 233, 0.18)' : 'var(--color-surface)',
-                border: hasTeamFilter ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid var(--color-border)',
-                color: hasTeamFilter ? '#38bdf8' : 'var(--color-text-main)',
-                padding: '10px 13px',
-                borderRadius: '12px',
-                fontSize: '13px',
-                fontWeight: hasTeamFilter ? 700 : 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                transition: 'all 0.15s ease'
-              }}
-              title="Nach Wache oder Schichtgruppe filtern"
+              onClick={handlePrevDay}
+              className="team-roster-stepper-btn"
+              title="Vorheriger Tag"
             >
-              <SlidersHorizontal size={15} />
-              <span>{filterLabel}</span>
+              <ChevronLeft size={20} />
             </button>
 
-            {hasTeamFilter && (
+            <div
+              onClick={() => setShowJumpModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                minWidth: 0,
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: '8px',
+                transition: 'background 0.15s ease'
+              }}
+              title="Klicken, um direkt zu einem Datum zu springen"
+            >
+              <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
+                {formattedSelectedDate}
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                • {currentDayShifts.length} im Dienst
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
               <button
                 type="button"
-                onClick={() => { setSelectedStation('ALL'); setSelectedShiftGroup('ALL'); }}
+                onClick={() => setShowFilterModal(true)}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#ef4444',
-                  padding: '10px 10px',
-                  borderRadius: '12px',
+                  gap: '5px',
+                  background: hasTeamFilter ? 'rgba(14, 165, 233, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+                  border: hasTeamFilter ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid var(--color-border)',
+                  color: hasTeamFilter ? '#38bdf8' : 'var(--color-text-main)',
+                  fontSize: '12px',
+                  fontWeight: hasTeamFilter ? 700 : 600,
+                  padding: '6px 10px',
+                  borderRadius: '8px',
                   cursor: 'pointer',
-                  flexShrink: 0
+                  transition: 'all 0.15s ease'
                 }}
-                title="Filter zurücksetzen"
+                title="Nach Kollege, Kürzel, Wache oder Schichtgruppe filtern"
               >
-                <X size={15} />
+                <SlidersHorizontal size={13} />
+                <span>Filter{hasTeamFilter ? ` (${activeCount})` : ''}</span>
               </button>
-            )}
+
+              {hasTeamFilter && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedStation('ALL');
+                    setSelectedShiftGroup('ALL');
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(239, 68, 68, 0.14)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    color: '#ef4444',
+                    padding: '6px 7px',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                  title="Alle Filter & Suche zurücksetzen"
+                >
+                  <X size={13} />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleToday}
+                className="team-roster-today-btn"
+              >
+                Heute
+              </button>
+              <button
+                type="button"
+                onClick={handleNextDay}
+                className="team-roster-stepper-btn"
+                title="Nächster Tag"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
           </div>
         );
       })()}
@@ -1366,9 +1303,9 @@ export default function TeamRoster() {
         );
       })()}
 
-      {/* PopUp Modal 2: Team-Filter (Wachen & Schichtgruppen) */}
+      {/* PopUp Modal 2: Team-Filter (Kollege/Kürzel, Wachen & Schichtgruppen) */}
       {showFilterModal && (() => {
-        const hasTeamFilter = selectedStation !== 'ALL' || selectedShiftGroup !== 'ALL';
+        const hasTeamFilter = selectedStation !== 'ALL' || selectedShiftGroup !== 'ALL' || Boolean(searchQuery.trim());
         const shiftGroups = ['Frühdienst', 'Tagschicht', 'Spätdienst', 'Nachtdienst', 'Sonderdienste', 'Fortbildung', 'Urlaub / Abwesend'];
 
         return (
@@ -1405,7 +1342,7 @@ export default function TeamRoster() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <SlidersHorizontal size={17} color="#38bdf8" />
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>
-                    Team-Filter
+                    Team-Filter & Suche
                   </h3>
                 </div>
                 <button
@@ -1424,6 +1361,65 @@ export default function TeamRoster() {
                 >
                   <X size={16} />
                 </button>
+              </div>
+
+              {/* Section 0: Kollege oder Kürzel suchen */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  Kollege oder Kürzel suchen
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <Search
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#64748b',
+                      pointerEvents: 'none'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Name oder Kürzel (z.B. RFM, RTH)..."
+                    style={{
+                      width: '100%',
+                      padding: '10px 34px 10px 36px',
+                      borderRadius: '12px',
+                      background: '#1e293b',
+                      border: searchQuery.trim() ? '1px solid #38bdf8' : '1px solid #334155',
+                      color: '#f8fafc',
+                      fontSize: '13.5px',
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px'
+                      }}
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Section 1: Wachen */}
@@ -1533,7 +1529,11 @@ export default function TeamRoster() {
                 {hasTeamFilter ? (
                   <button
                     type="button"
-                    onClick={() => { setSelectedStation('ALL'); setSelectedShiftGroup('ALL'); }}
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedStation('ALL');
+                      setSelectedShiftGroup('ALL');
+                    }}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',

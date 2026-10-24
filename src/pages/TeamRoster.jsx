@@ -1705,79 +1705,87 @@ export default function TeamRoster() {
       )}
 
       {/* 1-Click Personal Schedule + Automatic PartnerIn Sync & Calendar Export Bar */}
-      {(myRosterShifts.length > 0 || calendarExportShifts.length > 0) && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(15, 23, 42, 0.85))',
-          border: '1px solid rgba(56, 189, 248, 0.35)',
-          borderRadius: '14px',
-          padding: '10px 14px',
-          marginBottom: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '10px',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-            <Sparkles size={16} style={{ color: '#38bdf8', flexShrink: 0 }} />
-            <div style={{ fontSize: '12.5px', color: 'var(--color-text-main)', lineHeight: 1.35 }}>
-              <strong>Dein Dienstplan ({roster.monthLabel}):</strong> {myRosterShifts.length || calendarExportShifts.length} Dienste inkl. automatischer <em>PartnerIn („mit ...“)</em>
+      {(myRosterShifts.length > 0 || calendarExportShifts.length > 0) && (() => {
+        const count = myRosterShifts.length || calendarExportShifts.length;
+        const countText = `${count} ${count === 1 ? 'Dienst' : 'Dienste'}`;
+        return (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(15, 23, 42, 0.85))',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+            borderRadius: '14px',
+            padding: '12px 14px',
+            marginBottom: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={16} style={{ color: '#38bdf8', flexShrink: 0 }} />
+              <div style={{ fontSize: '13px', color: 'var(--color-text-main)', fontWeight: 600 }}>
+                Dein Dienstplan ({countText}, {roster.monthLabel})
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {calendarExportShifts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsCalendarExportModalOpen(true)}
+                  style={{
+                    flex: 1,
+                    minWidth: '150px',
+                    justifyContent: 'center',
+                    background: 'rgba(234, 179, 8, 0.14)',
+                    color: '#facc15',
+                    border: '1px solid rgba(234, 179, 8, 0.38)',
+                    borderRadius: '9px',
+                    padding: '8px 12px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Persönliche Dienste dieses Monats als .ics-Datei in den Kalender übertragen"
+                >
+                  <Calendar size={14} />
+                  <span>In Kalender übertragen</span>
+                </button>
+              )}
+              {myRosterShifts.length > 0 && (
+                <button
+                  type="button"
+                  disabled={isSyncingPersonal}
+                  onClick={handleTransferPersonalScheduleToJournal}
+                  style={{
+                    flex: 1,
+                    minWidth: '150px',
+                    justifyContent: 'center',
+                    background: '#0284c7',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '9px',
+                    padding: '8px 12px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: isSyncingPersonal ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+                  }}
+                  title="Persönliche Schichten inklusive PartnerIn ins Journal eintragen"
+                >
+                  <Check size={14} />
+                  <span>{isSyncingPersonal ? 'Wird übertragen...' : 'Ins Journal übernehmen'}</span>
+                </button>
+              )}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            {calendarExportShifts.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsCalendarExportModalOpen(true)}
-                style={{
-                  background: 'rgba(234, 179, 8, 0.14)',
-                  color: '#facc15',
-                  border: '1px solid rgba(234, 179, 8, 0.38)',
-                  borderRadius: '9px',
-                  padding: '6px 12px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  whiteSpace: 'nowrap'
-                }}
-                title="Persönliche Dienste dieses Monats als .ics-Datei in den Kalender übertragen"
-              >
-                <Calendar size={14} />
-                <span>In Kalender übertragen</span>
-              </button>
-            )}
-            {myRosterShifts.length > 0 && (
-              <button
-                type="button"
-                disabled={isSyncingPersonal}
-                onClick={handleTransferPersonalScheduleToJournal}
-                style={{
-                  background: '#0284c7',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '9px',
-                  padding: '6px 12px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: isSyncingPersonal ? 'default' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
-                }}
-                title="Persönliche Schichten inklusive automatisch ermittelter PartnerIn ('mit ...') ins Journal eintragen"
-              >
-                <Check size={14} />
-                <span>{isSyncingPersonal ? 'Wird übertragen...' : 'Ins Journal übernehmen'}</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Shifts List: Grouped & Sorted */}
       <div>

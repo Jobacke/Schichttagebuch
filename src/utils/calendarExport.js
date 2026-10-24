@@ -220,20 +220,7 @@ export function generateIcsCalendar(shifts, options = {}) {
 
   const prevHistory = yearMonth ? getCalendarExportHistory(yearMonth) : null;
   const prevItems = prevHistory?.items || {};
-  let resetVersion = prevHistory?.resetVersion || 1;
-
-  // If user is in 'update' mode and ALL selected shifts have already been exported with the exact same fingerprint,
-  // bump resetVersion if explicitly requested via forceBumpIfAllUnchanged
-  const allUnchanged = shifts.length > 0 && shifts.every(s => {
-    const prev = prevItems[s.id] || Object.values(prevItems).find(it => it.date === s.date);
-    if (!prev) return false;
-    return prev.fingerprint === buildShiftFingerprint(s, storeSettings, { titleFormat, alarmOption });
-  });
-
-  if (overwriteMode === 'update' && allUnchanged && options.bumpIfAllUnchanged) {
-    resetVersion += 1;
-  }
-
+  const resetVersion = prevHistory?.resetVersion || 1;
   const nextHistoryItems = { ...prevItems };
 
   let icsContent = [
@@ -297,15 +284,14 @@ export function generateIcsCalendar(shifts, options = {}) {
     const contentHash = hashString(fingerprint);
 
     // Determine UID:
-    // - In 'update' mode: deterministic Content-Hash UID (`<id>-<contentHash>-v<resetVersion>@schichttagebuch`).
-    //   Any changed shift (or changed title/alarm setting) gets a new contentHash so iOS Safari imports it,
-    //   while unchanged shifts keep their exact UID so iOS Safari skips them without duplicating!
+    // - In 'update' mode: stable UID per shift and resetVersion (`<id>-v<resetVersion>@schichttagebuch`).
+    //   resetVersion only increments when the calendar month is cleared via the iOS Shortcut.
     // - In 'forceNew' mode: fresh revision UID so iOS Safari imports every selected shift unconditionally.
     let uid;
     if (overwriteMode === 'forceNew') {
       uid = `${shift.id || shift.date}-rev${sequenceNum}@schichttagebuch`;
     } else {
-      uid = `${shift.id || shift.date}-${contentHash}-v${resetVersion}@schichttagebuch`;
+      uid = `${shift.id || shift.date}-v${resetVersion}@schichttagebuch`;
     }
 
     // Save into history for future change detection
@@ -450,7 +436,17 @@ export function runIosCalendarDeleteShortcut(yearMonth = '2026-11') {
   resetMonthExportHistory(yearMonth);
 
   const inputPayload = `${startStr}\n${endStr}`;
-  const returnUrl = window.location.href;
+  let returnUrl = window.location.href;
+  try {
+    const urlObj = new URL(window.location.href);
+    urlObj.searchParams.set('month', yearMonth);
+    urlObj.searchParams.set('openCalendarExport', '1');
+    urlObj.searchParams.set('cleared', '1');
+    returnUrl = urlObj.toString();
+  } catch {
+    // fallback to window.location.href
+  }
+
   const shortcutUrl = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent('Schichttagebuch-Kalender')}&input=text&text=${encodeURIComponent(inputPayload)}&x-success=${encodeURIComponent(returnUrl)}`;
 
   window.location.href = shortcutUrl;

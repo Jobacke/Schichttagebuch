@@ -19,7 +19,8 @@ export default function IosCalendarExportModal({
   shifts = [],
   currentMonthLabel = 'November 2026',
   yearMonth = '2026-11',
-  storeSettings = {}
+  storeSettings = {},
+  initialCleared = false
 }) {
   if (!isOpen) return null;
 
@@ -27,7 +28,7 @@ export default function IosCalendarExportModal({
   const [alarmOption, setAlarmOption] = useState('1440'); // Default: 1 Tag vorher!
   const [overwriteMode, setOverwriteMode] = useState('update'); // 'update' | 'forceNew'
   const [selectedIds, setSelectedIds] = useState(() => new Set(shifts.map(s => s.id)));
-  const [downloadSuccess, setDownloadSuccess] = useState(null); // null | 'export' | 'deleteShortcut' | 'installShortcut'
+  const [downloadSuccess, setDownloadSuccess] = useState(initialCleared ? 'deleteShortcut' : null); // null | 'export' | 'deleteShortcut' | 'installShortcut'
   const [exportVersionTick, setExportVersionTick] = useState(0);
   const [isTipPopupOpen, setIsTipPopupOpen] = useState(false);
 
@@ -47,6 +48,20 @@ export default function IosCalendarExportModal({
     return map;
   }, [shifts, yearMonth, storeSettings, titleFormat, alarmOption, exportVersionTick]);
 
+  const newOnlyIds = useMemo(() => {
+    if (!hasPreviousExport) return [];
+    return shifts
+      .filter(s => shiftStatuses[s.id] === 'new')
+      .map(s => s.id);
+  }, [shifts, shiftStatuses, hasPreviousExport]);
+
+  const modifiedIds = useMemo(() => {
+    if (!hasPreviousExport) return [];
+    return shifts
+      .filter(s => shiftStatuses[s.id] === 'modified')
+      .map(s => s.id);
+  }, [shifts, shiftStatuses, hasPreviousExport]);
+
   const changedOrNewIds = useMemo(() => {
     if (!hasPreviousExport) return [];
     return shifts
@@ -54,18 +69,31 @@ export default function IosCalendarExportModal({
       .map(s => s.id);
   }, [shifts, shiftStatuses, hasPreviousExport]);
 
-  // In 'update' mode, if some shifts are modified/new compared to last export, automatically pre-select them
+  // In 'update' mode:
+  // - If only brand-new days were added (no existing shifts modified), select ONLY the brand-new days so existing shifts are never re-exported.
+  // - Otherwise select all shifts (and require Shortcut clean before re-exporting already-exported shifts).
   useEffect(() => {
-    if (overwriteMode === 'update' && hasPreviousExport && changedOrNewIds.length > 0 && changedOrNewIds.length < shifts.length) {
-      setSelectedIds(new Set(changedOrNewIds));
-    } else if (overwriteMode === 'forceNew') {
+    if (overwriteMode === 'update' && hasPreviousExport) {
+      if (newOnlyIds.length > 0 && modifiedIds.length === 0) {
+        setSelectedIds(new Set(newOnlyIds));
+      } else {
+        setSelectedIds(new Set(shifts.map(s => s.id)));
+      }
+    } else {
       setSelectedIds(new Set(shifts.map(s => s.id)));
     }
-  }, [overwriteMode, hasPreviousExport, changedOrNewIds.length, shifts]);
+  }, [overwriteMode, hasPreviousExport, newOnlyIds.length, modifiedIds.length, shifts]);
 
   const selectedShifts = useMemo(() => {
     return shifts.filter(s => selectedIds.has(s.id));
   }, [shifts, selectedIds]);
+
+  // In 'update' mode, if any selected shift has ALREADY been exported to the calendar ('unchanged' or 'modified'),
+  // iOS Safari would duplicate it unless the old calendar entries of this month are deleted first via the iOS Shortcut!
+  const needsShortcutCleanBeforeExport = useMemo(() => {
+    if (overwriteMode !== 'update' || !hasPreviousExport) return false;
+    return selectedShifts.some(s => shiftStatuses[s.id] !== 'new');
+  }, [overwriteMode, hasPreviousExport, selectedShifts, shiftStatuses]);
 
   const toggleSelectAll = () => {
     if (selectedIds.size === shifts.length) {
@@ -93,9 +121,12 @@ export default function IosCalendarExportModal({
   const handleExport = () => {
     if (selectedShifts.length === 0) return;
 
-    // In 'update' mode, if the user explicitly selected only changed/new shifts (or if all selected shifts are unchanged and they want to re-import),
-    // export with Content-Hash UIDs (and bump resetVersion if all selected shifts were unchanged so iOS doesn't skip them).
-    const allSelectedUnchanged = hasPreviousExport && selectedShifts.every(s => shiftStatuses[s.id] === 'unchanged');
+    // If 'update' mode is active and selected shifts are already in the iPhone calendar,
+    // Step 1 deletes the old entries via the iOS Shortcut first so 0 duplicates can occur!
+    if (needsShortcutCleanBeforeExport) {
+      handleRunDeleteShortcut();
+      return;
+    }
 
     downloadIcsFile(selectedShifts, {
       calendarName: 'Dienstplan',
@@ -103,7 +134,6 @@ export default function IosCalendarExportModal({
       alarmOption,
       alarmMinutes: alarmOption === '1440' ? 1440 : (Number(alarmOption) || 1440),
       overwriteMode,
-      bumpIfAllUnchanged: allSelectedUnchanged,
       yearMonth,
       storeSettings
     });
@@ -314,9 +344,9 @@ export default function IosCalendarExportModal({
 
           {downloadSuccess === 'deleteShortcut' && (
             <div style={{
-              background: 'rgba(56, 189, 248, 0.14)',
-              border: '1px solid rgba(56, 189, 248, 0.4)',
-              color: '#38bdf8',
+              background: 'rgba(16, 185, 129, 0.14)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              color: '#34d399',
               padding: '10px 14px',
               borderRadius: '12px',
               fontSize: '12.5px',
@@ -326,9 +356,9 @@ export default function IosCalendarExportModal({
               gap: '10px',
               flexShrink: 0
             }}>
-              <Trash2 size={17} style={{ flexShrink: 0 }} />
+              <CheckCircle2 size={17} style={{ flexShrink: 0 }} />
               <div>
-                <strong>Kalender-Bereinigung gestartet!</strong> Der Kurzbefehl entfernt alle bisherigen Dienste für {currentMonthLabel} aus dem iPhone-Kalender. (Falls der Kurzbefehl noch fehlt: einmalig rechts auf <strong>„Kurzbefehl (1×)“</strong> tippen).
+                <strong>Schritt 1 erledigt: Alte Termine für {currentMonthLabel} im Kalender gelöscht!</strong> Tippe jetzt unten auf den gelben Button (Schritt 2), um die aktuellen Dienste frisch und ohne Duplikate einzutragen.
               </div>
             </div>
           )}
@@ -898,9 +928,11 @@ export default function IosCalendarExportModal({
             style={{
               flex: 2.5,
               background: selectedShifts.length > 0
-                ? 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)'
+                ? (needsShortcutCleanBeforeExport
+                    ? 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)'
+                    : 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)')
                 : 'rgba(234, 179, 8, 0.3)',
-              color: '#0f172a',
+              color: needsShortcutCleanBeforeExport ? '#ffffff' : '#0f172a',
               border: 'none',
               padding: '11px 18px',
               borderRadius: '12px',
@@ -911,15 +943,31 @@ export default function IosCalendarExportModal({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: selectedShifts.length > 0 ? '0 8px 20px -4px rgba(234, 179, 8, 0.4)' : 'none',
+              boxShadow: selectedShifts.length > 0
+                ? (needsShortcutCleanBeforeExport
+                    ? '0 8px 20px -4px rgba(14, 165, 233, 0.4)'
+                    : '0 8px 20px -4px rgba(234, 179, 8, 0.4)')
+                : 'none',
               opacity: selectedShifts.length > 0 ? 1 : 0.5,
               transition: 'all 0.15s ease'
             }}
           >
-            <Download size={18} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-            <span>
-              {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'} als ics-Datei zum Import in Kalender exportieren
-            </span>
+            {needsShortcutCleanBeforeExport ? (
+              <>
+                <Trash2 size={18} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                <span>
+                  Schritt 1/2: Alte Termine im Kalender bereinigen (Kurzbefehl)
+                </span>
+              </>
+            ) : (
+              <>
+                <Download size={18} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                <span>
+                  {downloadSuccess === 'deleteShortcut' ? 'Schritt 2/2: ' : ''}
+                  {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'} als ics-Datei zum Import in Kalender exportieren
+                </span>
+              </>
+            )}
           </button>
         </div>
 

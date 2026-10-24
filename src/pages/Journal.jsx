@@ -41,7 +41,8 @@ export default function Journal() {
     });
     const [selectedDate, setSelectedDate] = useState(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(false);
+    const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(() => searchParams.get('openCalendarExport') === '1');
+    const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') === '1');
     const [toastMessage, setToastMessage] = useState(null);
 
     // Multi-Selection & Bulk Delete State
@@ -97,13 +98,19 @@ export default function Journal() {
         } catch { /* ignore storage errors */ }
     }, [currentYearMonthStr]);
 
-    // Sync if ?month=YYYY-MM query param is passed on navigation
+    // Sync if ?month=YYYY-MM or ?openCalendarExport=1 query param is passed on navigation
     useEffect(() => {
         const paramMonth = searchParams.get('month');
         const parsed = parseYearMonthToDate(paramMonth);
         if (parsed && (parsed.getFullYear() !== currentDate.getFullYear() || parsed.getMonth() !== currentDate.getMonth())) {
             setCurrentDate(parsed);
             setSelectedDate(null);
+        }
+        if (searchParams.get('openCalendarExport') === '1') {
+            setIsCalendarExportModalOpen(true);
+            if (searchParams.get('cleared') === '1') {
+                setCalendarJustCleared(true);
+            }
         }
     }, [searchParams]);
 
@@ -824,11 +831,18 @@ export default function Journal() {
             {/* iOS Calendar Export Modal */}
             <IosCalendarExportModal
                 isOpen={isCalendarExportModalOpen}
-                onClose={() => setIsCalendarExportModalOpen(false)}
+                onClose={() => {
+                    setIsCalendarExportModalOpen(false);
+                    setCalendarJustCleared(false);
+                    if (searchParams.get('openCalendarExport') || searchParams.get('cleared')) {
+                        setSearchParams({ month: currentYearMonthStr });
+                    }
+                }}
                 shifts={monthShifts}
                 currentMonthLabel={currentMonthLabel}
                 yearMonth={currentYearMonthStr}
                 storeSettings={store.settings}
+                initialCleared={calendarJustCleared}
             />
         </div>
     );

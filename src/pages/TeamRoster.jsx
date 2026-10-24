@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Users, ChevronLeft, ChevronRight, Search,
   UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, AlertTriangle, FileText, FileCode, Clipboard, Copy, Bookmark,
   Calendar, Trash2, FolderOpen, Check, Cloud, RefreshCw, SlidersHorizontal
 } from 'lucide-react';
+import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import {
   getActiveTeamRoster,
   saveStationTeamRoster,
@@ -125,14 +127,19 @@ const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=wind
 export default function TeamRoster() {
   const { currentUser } = useAuth();
   const { store, addShifts, ensureCodesAndTypes } = useStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [cloudSyncing, setCloudSyncing] = useState(false);
   const [isSyncingPersonal, setIsSyncingPersonal] = useState(false);
+  const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(() => searchParams.get('openCalendarExport') === '1');
+  const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') === '1');
 
   // Stored rosters list
   const [savedRosters, setSavedRosters] = useState(() => getSavedRosterSummaries());
 
-  // Current active yearMonth (defaults to saved user choice or October 2026)
+  // Current active yearMonth (defaults to URL param, saved user choice or October 2026)
   const [currentYearMonth, setCurrentYearMonth] = useState(() => {
+    const paramMonth = searchParams.get('month');
+    if (paramMonth && /^\d{4}-\d{2}$/.test(paramMonth)) return paramMonth;
     const saved = localStorage.getItem('schichten_selected_year_month');
     if (saved) {
       const r = getActiveTeamRoster(saved);
@@ -618,10 +625,59 @@ export default function TeamRoster() {
     setTimeout(() => setCopiedBookmarklet(false), 3000);
   };
 
+  // Sync URL query params when returning from iOS Shortcut (?month=YYYY-MM&openCalendarExport=1&cleared=1)
+  useEffect(() => {
+    const paramMonth = searchParams.get('month');
+    if (paramMonth && /^\d{4}-\d{2}$/.test(paramMonth) && paramMonth !== currentYearMonth) {
+      setCurrentYearMonth(paramMonth);
+      localStorage.setItem('schichten_selected_year_month', paramMonth);
+      setRoster(getActiveTeamRoster(paramMonth));
+    }
+    if (searchParams.get('openCalendarExport') === '1') {
+      setIsCalendarExportModalOpen(true);
+      if (searchParams.get('cleared') === '1') {
+        setCalendarJustCleared(true);
+      }
+    }
+  }, [searchParams]);
+
   // Personal shifts for Backhaus, Johannes in the currently viewed month
   const myRosterShifts = useMemo(() => {
     return extractPersonalShiftsFromRoster(yearMonth, roster);
   }, [yearMonth, roster]);
+
+  // Shifts prepared for the iOS Calendar Export Modal (uses Journal shifts if already transferred, or builds from Team Roster)
+  const calendarExportShifts = useMemo(() => {
+    const journalMonthShifts = (store?.shifts || []).filter(s => s.date && s.date.startsWith(yearMonth));
+    if (journalMonthShifts.length > 0) {
+      return journalMonthShifts.map(s => {
+        const codeObj = (store?.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
+        const codeStr = s.code || codeObj?.code || '';
+        const detectedPartner = codeStr ? getPartnersForShiftFromRoster(s.date, codeStr, roster) : '';
+        return {
+          ...s,
+          partner: s.partner || detectedPartner || ''
+        };
+      });
+    }
+
+    return myRosterShifts.map(s => {
+      const partnerStr = s.partner || getPartnersForShiftFromRoster(s.date, s.code, roster) || '';
+      const base = buildShiftFromPreset({
+        dateStr: s.date,
+        code: s.code,
+        partner: partnerStr,
+        storeSettings: store?.settings
+      });
+      return {
+        ...base,
+        id: `shift_${s.date}_${s.code}`,
+        startTime: s.startTime || base.startTime,
+        endTime: s.endTime || base.endTime,
+        partner: partnerStr
+      };
+    });
+  }, [store?.shifts, store?.settings, yearMonth, myRosterShifts, roster]);
 
   // Automatically update partner field ("mit ...") on existing shifts in Journal for a given month
   const autoSyncExistingJournalPartners = async (targetYearMonth, activeRoster) => {
@@ -1648,8 +1704,8 @@ export default function TeamRoster() {
         </div>
       )}
 
-      {/* 1-Click Personal Schedule + Automatic PartnerIn Sync Bar */}
-      {myRosterShifts.length > 0 && (
+      {/* 1-Click Personal Schedule + Automatic PartnerIn Sync & Calendar Export Bar */}
+      {(myRosterShifts.length > 0 || calendarExportShifts.length > 0) && (
         <div style={{
           background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(15, 23, 42, 0.85))',
           border: '1px solid rgba(56, 189, 248, 0.35)',
@@ -1665,33 +1721,61 @@ export default function TeamRoster() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
             <Sparkles size={16} style={{ color: '#38bdf8', flexShrink: 0 }} />
             <div style={{ fontSize: '12.5px', color: 'var(--color-text-main)', lineHeight: 1.35 }}>
-              <strong>Dein Dienstplan ({roster.monthLabel}):</strong> {myRosterShifts.length} Dienste inkl. automatischer <em>PartnerIn („mit ...“)</em>
+              <strong>Dein Dienstplan ({roster.monthLabel}):</strong> {myRosterShifts.length || calendarExportShifts.length} Dienste inkl. automatischer <em>PartnerIn („mit ...“)</em>
             </div>
           </div>
-          <button
-            type="button"
-            disabled={isSyncingPersonal}
-            onClick={handleTransferPersonalScheduleToJournal}
-            style={{
-              background: '#0284c7',
-              color: 'white',
-              border: 'none',
-              borderRadius: '9px',
-              padding: '6px 12px',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: isSyncingPersonal ? 'default' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
-            }}
-            title="Persönliche Schichten inklusive automatisch ermittelter PartnerIn ('mit ...') ins Journal eintragen"
-          >
-            <Check size={14} />
-            <span>{isSyncingPersonal ? 'Wird übertragen...' : 'Ins Journal übernehmen'}</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {calendarExportShifts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsCalendarExportModalOpen(true)}
+                style={{
+                  background: 'rgba(234, 179, 8, 0.14)',
+                  color: '#facc15',
+                  border: '1px solid rgba(234, 179, 8, 0.38)',
+                  borderRadius: '9px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Persönliche Dienste dieses Monats als .ics-Datei in den Kalender übertragen"
+              >
+                <Calendar size={14} />
+                <span>In Kalender übertragen</span>
+              </button>
+            )}
+            {myRosterShifts.length > 0 && (
+              <button
+                type="button"
+                disabled={isSyncingPersonal}
+                onClick={handleTransferPersonalScheduleToJournal}
+                style={{
+                  background: '#0284c7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '9px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: isSyncingPersonal ? 'default' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+                }}
+                title="Persönliche Schichten inklusive automatisch ermittelter PartnerIn ('mit ...') ins Journal eintragen"
+              >
+                <Check size={14} />
+                <span>{isSyncingPersonal ? 'Wird übertragen...' : 'Ins Journal übernehmen'}</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -2392,6 +2476,23 @@ export default function TeamRoster() {
           </div>
         </div>
       )}
+
+      {/* iOS Calendar Export Modal */}
+      <IosCalendarExportModal
+        isOpen={isCalendarExportModalOpen}
+        onClose={() => {
+          setIsCalendarExportModalOpen(false);
+          setCalendarJustCleared(false);
+          if (searchParams.get('openCalendarExport') || searchParams.get('cleared')) {
+            setSearchParams({ month: yearMonth });
+          }
+        }}
+        shifts={calendarExportShifts}
+        currentMonthLabel={roster.monthLabel || yearMonth}
+        yearMonth={yearMonth}
+        storeSettings={store?.settings}
+        initialCleared={calendarJustCleared}
+      />
     </div>
   );
 }

@@ -254,47 +254,6 @@ export default function Journal() {
                         </div>
                     </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    {monthShifts.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={() => setIsCalendarExportModalOpen(true)}
-                            className="btn-secondary"
-                            style={{
-                                fontSize: '13px',
-                                padding: '8px 12px',
-                                borderRadius: '10px',
-                                gap: '6px',
-                                background: 'rgba(234, 179, 8, 0.14)',
-                                color: '#facc15',
-                                border: '1px solid rgba(234, 179, 8, 0.35)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                fontWeight: 600,
-                                cursor: 'pointer'
-                            }}
-                            title="Dienste als .ics-Datei für den Kalender exportieren"
-                        >
-                            <CalendarIcon size={16} />
-                            In Kalender übertragen
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="btn-primary"
-                        style={{
-                            fontSize: '13px',
-                            padding: '8px 12px',
-                            borderRadius: '10px',
-                            gap: '6px'
-                        }}
-                        title="Persönlichen Dienstplan inkl. PartnerIn aus dem Team-Plan übernehmen"
-                    >
-                        <Sparkles size={16} />
-                        Dienstplan übernehmen
-                    </button>
-                </div>
             </div>
 
             {/* Month Switcher Bar with Month Clear Option */}
@@ -741,16 +700,7 @@ export default function Journal() {
                         borderRadius: '16px',
                         border: 'var(--glass-border)'
                     }}>
-                        <div style={{ marginBottom: '12px', fontSize: '14px' }}>Keine Einträge für diesen Monat vorhanden.</div>
-                        <button
-                            type="button"
-                            className="btn-primary"
-                            onClick={() => setIsImportModalOpen(true)}
-                            style={{ margin: '0 auto', fontSize: '13px', padding: '8px 16px' }}
-                        >
-                            <Sparkles size={16} />
-                            Dienstplan für diesen Monat importieren
-                        </button>
+                        <div style={{ fontSize: '14px' }}>Keine Einträge für diesen Monat vorhanden.</div>
                     </div>
                 )}
             </div>

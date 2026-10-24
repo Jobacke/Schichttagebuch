@@ -1,12 +1,33 @@
 /**
- * iCalendar (.ics) generator for iOS Calendar and other calendar applications.
- * Formats shifts with exact start/end timestamps (handling midnight crossings),
- * location, description, reminders, target calendar name ("Familie"),
- * and RFC 5545 SEQUENCE + LAST-MODIFIED versioning so existing calendar entries
- * can be updated/overwritten.
+ * iCalendar (.ics) generator & iOS Shortcut bridge for Apple Calendar on iPhone/Mac.
+ *
+ * Why iOS Safari (.ics) needs special handling:
+ * - iOS Safari's native .ics previewer (EKICSPreviewController) is an "Add-Only" importer:
+ *   1. Any VEVENT whose UID already exists in the iPhone Calendar is silently skipped ("importedEvents").
+ *   2. METHOD:CANCEL / STATUS:CANCELLED inside a .ics file is ignored by iOS Safari and never deletes events.
+ *
+ * Solution implemented here:
+ * 1. Content-Hash UIDs in 'update' mode (`<shiftId>-<contentHash>-v<resetVersion>@schichttagebuch`):
+ *    - Unchanged shifts keep their exact UID -> iOS Safari automatically skips them (0 duplicates).
+ *    - Modified shifts (or changed Title/Reminder settings) get a new contentHash UID -> iOS Safari imports them!
+ * 2. Native iOS Shortcut bridge (`Schichttagebuch-Kalender`) for deleting old entries on iPhone:
+ *    - Deletes all `Dienst:` events of the selected month in 1 second via Apple Shortcuts (EventKit)
+ *      and increments `resetVersion` so the subsequent .ics export starts fresh.
  */
 
 const EXPORT_HISTORY_STORAGE_KEY = 'schichttagebuch_ics_export_history_v1';
+const SHORTCUT_INSTALLED_STORAGE_KEY = 'schichttagebuch_ios_shortcut_installed_v1';
+
+// Fast deterministic 32-bit FNV-1a hash -> 8-char hex string
+function hashString(str) {
+  let h = 0x811c9dc5;
+  const s = String(str || '');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
 
 // Format ISO date (YYYYMMDD) and time (HHMMSS)
 function formatIcsDateTime(dateStr, timeStr) {
@@ -38,7 +59,7 @@ function escapeIcsText(str) {
 
 /**
  * Load export history from localStorage
- * Structure: { [yearMonth]: { exportedAt, items: { [shiftIdOrDate]: { uid, id, date, fingerprint, summary, dtStart, dtEnd } } } }
+ * Structure: { [yearMonth]: { exportedAt, resetVersion, titleFormat, alarmOption, items: { [shiftId]: { uid, id, date, fingerprint, ... } } } }
  */
 export function getCalendarExportHistory(yearMonth) {
   try {
@@ -51,11 +72,15 @@ export function getCalendarExportHistory(yearMonth) {
   }
 }
 
-function saveCalendarExportHistory(yearMonth, itemsMap) {
+function saveCalendarExportHistory(yearMonth, itemsMap, meta = {}) {
   try {
     const raw = localStorage.getItem(EXPORT_HISTORY_STORAGE_KEY);
     const all = raw ? JSON.parse(raw) : {};
+    const prev = all[yearMonth] || {};
     all[yearMonth] = {
+      ...prev,
+      ...meta,
+      resetVersion: meta.resetVersion || prev.resetVersion || 1,
       exportedAt: Date.now(),
       items: itemsMap
     };
@@ -65,7 +90,46 @@ function saveCalendarExportHistory(yearMonth, itemsMap) {
   }
 }
 
-export function buildShiftFingerprint(shift, storeSettings = {}) {
+/**
+ * Increments resetVersion and clears exported items for a month
+ * so that after deleting events from the calendar, all shifts can be exported fresh.
+ */
+export function resetMonthExportHistory(yearMonth) {
+  if (!yearMonth) return 1;
+  try {
+    const raw = localStorage.getItem(EXPORT_HISTORY_STORAGE_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    const prev = all[yearMonth] || {};
+    const nextVersion = (prev.resetVersion || 1) + 1;
+    all[yearMonth] = {
+      exportedAt: null,
+      resetVersion: nextVersion,
+      items: {}
+    };
+    localStorage.setItem(EXPORT_HISTORY_STORAGE_KEY, JSON.stringify(all));
+    return nextVersion;
+  } catch {
+    return 2;
+  }
+}
+
+export function isIosShortcutMarkedInstalled() {
+  try {
+    return localStorage.getItem(SHORTCUT_INSTALLED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markIosShortcutInstalled() {
+  try {
+    localStorage.setItem(SHORTCUT_INSTALLED_STORAGE_KEY, '1');
+  } catch {
+    // ignore
+  }
+}
+
+export function buildShiftFingerprint(shift, storeSettings = {}, exportOptions = {}) {
   const shiftCodeObj = (storeSettings.shiftCodes || []).find(
     c => c.id === shift.codeId || c.code === shift.code
   );
@@ -74,6 +138,9 @@ export function buildShiftFingerprint(shift, storeSettings = {}) {
     t => t.id === shift.typeId
   );
   const typeName = shift.shiftTypeName || shiftTypeObj?.name || 'Dienst';
+
+  const titleFormat = exportOptions.titleFormat || 'codeAndType';
+  const alarmOption = String(exportOptions.alarmOption ?? '1440');
 
   return [
     shift.date || '',
@@ -84,7 +151,9 @@ export function buildShiftFingerprint(shift, storeSettings = {}) {
     shift.station || '',
     shift.vehicle || '',
     shift.callSign || '',
-    shift.partner || ''
+    shift.partner || '',
+    titleFormat,
+    alarmOption
   ].join('|');
 }
 
@@ -92,16 +161,16 @@ export function buildShiftFingerprint(shift, storeSettings = {}) {
  * Determine export status of a shift compared to last export of this month:
  * 'new' | 'modified' | 'unchanged'
  */
-export function getShiftExportStatus(shift, yearMonth, storeSettings = {}) {
+export function getShiftExportStatus(shift, yearMonth, storeSettings = {}, exportOptions = {}) {
   const history = getCalendarExportHistory(yearMonth);
-  if (!history || !history.items) return 'new';
+  if (!history || !history.items || Object.keys(history.items).length === 0) return 'new';
 
   const prevById = history.items[shift.id];
   const prevByDate = Object.values(history.items).find(item => item.date === shift.date);
   const prev = prevById || prevByDate;
 
   if (!prev) return 'new';
-  const currentFp = buildShiftFingerprint(shift, storeSettings);
+  const currentFp = buildShiftFingerprint(shift, storeSettings, exportOptions);
   if (prev.fingerprint !== currentFp) return 'modified';
   return 'unchanged';
 }
@@ -137,21 +206,34 @@ function getTimezoneLines() {
  */
 export function generateIcsCalendar(shifts, options = {}) {
   const {
-    calendarName = 'Familie',
+    calendarName = 'Dienstplan',
     alarmMinutes = 1440,
     alarmOption = '1440',
     titleFormat = 'codeAndType', // 'codeAndType', 'codeOnly', 'typeAndTimes'
-    overwriteMode = 'update',    // 'update' (same UID + incremented SEQUENCE) | 'forceNew' (fresh UID so iOS never skips)
+    overwriteMode = 'update',    // 'update' (content-hash UID) | 'forceNew' (fresh revision UID)
     yearMonth = '',
     storeSettings = {}
   } = options;
 
   const nowIso = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  // Strictly increasing integer sequence (seconds since 2026-01-01) so every export has a higher SEQUENCE than any previous one
   const sequenceNum = Math.max(1, Math.floor((Date.now() - 1767225600000) / 1000));
 
   const prevHistory = yearMonth ? getCalendarExportHistory(yearMonth) : null;
   const prevItems = prevHistory?.items || {};
+  let resetVersion = prevHistory?.resetVersion || 1;
+
+  // If user is in 'update' mode and ALL selected shifts have already been exported with the exact same fingerprint,
+  // bump resetVersion if explicitly requested via forceBumpIfAllUnchanged
+  const allUnchanged = shifts.length > 0 && shifts.every(s => {
+    const prev = prevItems[s.id] || Object.values(prevItems).find(it => it.date === s.date);
+    if (!prev) return false;
+    return prev.fingerprint === buildShiftFingerprint(s, storeSettings, { titleFormat, alarmOption });
+  });
+
+  if (overwriteMode === 'update' && allUnchanged && options.bumpIfAllUnchanged) {
+    resetVersion += 1;
+  }
+
   const nextHistoryItems = { ...prevItems };
 
   let icsContent = [
@@ -163,8 +245,6 @@ export function generateIcsCalendar(shifts, options = {}) {
     `X-WR-CALNAME:${escapeIcsText(calendarName)}`,
     ...getTimezoneLines()
   ];
-
-  const exportedUidsInThisBatch = new Set();
 
   shifts.forEach(shift => {
     const shiftCodeObj = (storeSettings.shiftCodes || []).find(
@@ -200,7 +280,7 @@ export function generateIcsCalendar(shifts, options = {}) {
     const dtStart = formatIcsDateTime(startDateStr, startTimeStr);
     const dtEnd = formatIcsDateTime(endDateStr, endTimeStr);
 
-    // Build description
+    // Build description (starts with "Dienst:" so the iOS Shortcut can always identify Schichttagebuch entries)
     const descParts = [
       `Dienst: ${code} - ${typeName}`,
       `Zeiten: ${startTimeStr} bis ${endTimeStr} Uhr`,
@@ -213,20 +293,22 @@ export function generateIcsCalendar(shifts, options = {}) {
     const description = escapeIcsText(descParts.join('\n'));
     const location = escapeIcsText(shift.station || '');
 
+    const fingerprint = buildShiftFingerprint(shift, storeSettings, { titleFormat, alarmOption });
+    const contentHash = hashString(fingerprint);
+
     // Determine UID:
-    // In 'update' mode: reuse previously exported UID for this shift (or same date) so Apple Calendar matches the existing entry
-    // In 'forceNew' mode: generate a fresh revision UID so iOS Safari's "Add All" never skips the event
-    const prevRecord = prevItems[shift.id] || Object.values(prevItems).find(it => it.date === shift.date);
+    // - In 'update' mode: deterministic Content-Hash UID (`<id>-<contentHash>-v<resetVersion>@schichttagebuch`).
+    //   Any changed shift (or changed title/alarm setting) gets a new contentHash so iOS Safari imports it,
+    //   while unchanged shifts keep their exact UID so iOS Safari skips them without duplicating!
+    // - In 'forceNew' mode: fresh revision UID so iOS Safari imports every selected shift unconditionally.
     let uid;
     if (overwriteMode === 'forceNew') {
       uid = `${shift.id || shift.date}-rev${sequenceNum}@schichttagebuch`;
     } else {
-      uid = prevRecord?.uid || `${shift.id || crypto.randomUUID()}@schichttagebuch`;
+      uid = `${shift.id || shift.date}-${contentHash}-v${resetVersion}@schichttagebuch`;
     }
 
-    exportedUidsInThisBatch.add(uid);
-
-    // Save into history for future updates / cancellations
+    // Save into history for future change detection
     nextHistoryItems[shift.id || shift.date] = {
       uid,
       id: shift.id,
@@ -236,7 +318,8 @@ export function generateIcsCalendar(shifts, options = {}) {
       dtEnd,
       location: shift.station || '',
       sequence: sequenceNum,
-      fingerprint: buildShiftFingerprint(shift, storeSettings),
+      fingerprint,
+      contentHash,
       exportedAt: Date.now()
     };
 
@@ -253,7 +336,7 @@ export function generateIcsCalendar(shifts, options = {}) {
     icsContent.push('STATUS:CONFIRMED');
     icsContent.push('TRANSP:OPAQUE');
 
-    // Optional Alarm / Reminder (supports 1 Tag vorher, multiple alarms, custom times)
+    // Optional Alarm / Reminder
     const effectiveAlarm = String(alarmOption || alarmMinutes || '1440');
 
     if (effectiveAlarm === '1440' || effectiveAlarm === 'day_before') {
@@ -263,13 +346,11 @@ export function generateIcsCalendar(shifts, options = {}) {
       icsContent.push(`DESCRIPTION:Erinnerung: Morgen Dienst ${escapeIcsText(code)} (${startTimeStr} - ${endTimeStr} Uhr)`);
       icsContent.push('END:VALARM');
     } else if (effectiveAlarm === '1440_60') {
-      // 1. Alarm: 1 Tag vorher
       icsContent.push('BEGIN:VALARM');
       icsContent.push('TRIGGER:-P1D');
       icsContent.push('ACTION:DISPLAY');
       icsContent.push(`DESCRIPTION:Erinnerung: Morgen Dienst ${escapeIcsText(code)} (${startTimeStr} - ${endTimeStr} Uhr)`);
       icsContent.push('END:VALARM');
-      // 2. Alarm: 1 Stunde vorher
       icsContent.push('BEGIN:VALARM');
       icsContent.push('TRIGGER:-PT1H');
       icsContent.push('ACTION:DISPLAY');
@@ -317,108 +398,12 @@ export function generateIcsCalendar(shifts, options = {}) {
   });
 
   if (yearMonth) {
-    saveCalendarExportHistory(yearMonth, nextHistoryItems);
-  }
-
-  icsContent.push('END:VCALENDAR');
-  return icsContent.join('\r\n');
-}
-
-/**
- * Generates a Cancellation .ics file (METHOD:CANCEL + STATUS:CANCELLED)
- * to remove previously exported events of the given shifts/month from Apple Calendar.
- */
-export function generateCancelIcsCalendar(shifts = [], options = {}) {
-  const {
-    calendarName = 'Familie',
-    titleFormat = 'codeAndType',
-    yearMonth = '',
-    storeSettings = {}
-  } = options;
-
-  const nowIso = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const sequenceNum = Math.max(2, Math.floor((Date.now() - 1767225600000) / 1000) + 1);
-
-  const prevHistory = yearMonth ? getCalendarExportHistory(yearMonth) : null;
-  const prevItems = prevHistory?.items || {};
-
-  let icsContent = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Schichttagebuch//DE',
-    'CALSCALE:GREGORIAN',
-    'METHOD:CANCEL',
-    `X-WR-CALNAME:${escapeIcsText(calendarName)}`,
-    ...getTimezoneLines()
-  ];
-
-  const cancelledUids = new Set();
-
-  // 1. Cancel all selected current shifts (using both their current shift.id UID and any previously stored UID)
-  shifts.forEach(shift => {
-    const shiftCodeObj = (storeSettings.shiftCodes || []).find(
-      c => c.id === shift.codeId || c.code === shift.code
-    );
-    const code = shift.code || shiftCodeObj?.code || 'Schicht';
-    const shiftTypeObj = (storeSettings.shiftTypes || []).find(
-      t => t.id === shift.typeId
-    );
-    const typeName = shift.shiftTypeName || shiftTypeObj?.name || 'Dienst';
-
-    let summary = `${code} (${typeName})`;
-    if (titleFormat === 'codeOnly') summary = code;
-    else if (titleFormat === 'typeAndTimes') summary = `${typeName} (${shift.startTime || '07:00'} - ${shift.endTime || '19:00'})`;
-
-    const startDateStr = shift.date;
-    const startTimeStr = shift.startTime || '07:00';
-    const endTimeStr = shift.endTime || '19:00';
-    const [startH, startM] = startTimeStr.split(':').map(Number);
-    const [endH, endM] = endTimeStr.split(':').map(Number);
-    const isOvernight = endH < startH || (endH === startH && endM < startM);
-    const endDateStr = isOvernight ? addDaysToDateStr(startDateStr, 1) : startDateStr;
-
-    const dtStart = formatIcsDateTime(startDateStr, startTimeStr);
-    const dtEnd = formatIcsDateTime(endDateStr, endTimeStr);
-
-    const candidateUids = new Set([`${shift.id}@schichttagebuch`]);
-    const prevById = prevItems[shift.id];
-    if (prevById?.uid) candidateUids.add(prevById.uid);
-    const prevByDate = Object.values(prevItems).find(it => it.date === shift.date);
-    if (prevByDate?.uid) candidateUids.add(prevByDate.uid);
-
-    candidateUids.forEach(uid => {
-      if (!uid || cancelledUids.has(uid)) return;
-      cancelledUids.add(uid);
-
-      icsContent.push('BEGIN:VEVENT');
-      icsContent.push(`UID:${uid}`);
-      icsContent.push(`SEQUENCE:${sequenceNum}`);
-      icsContent.push(`DTSTAMP:${nowIso}`);
-      icsContent.push(`LAST-MODIFIED:${nowIso}`);
-      icsContent.push(`DTSTART;TZID=Europe/Berlin:${dtStart}`);
-      icsContent.push(`DTEND;TZID=Europe/Berlin:${dtEnd}`);
-      icsContent.push(`SUMMARY:${escapeIcsText(summary)}`);
-      icsContent.push('STATUS:CANCELLED');
-      icsContent.push('END:VEVENT');
+    saveCalendarExportHistory(yearMonth, nextHistoryItems, {
+      resetVersion,
+      titleFormat,
+      alarmOption: String(alarmOption)
     });
-  });
-
-  // 2. Also cancel any orphaned shifts from previous exports of this month that were since deleted in the app
-  Object.values(prevItems).forEach(item => {
-    if (!item?.uid || cancelledUids.has(item.uid)) return;
-    cancelledUids.add(item.uid);
-
-    icsContent.push('BEGIN:VEVENT');
-    icsContent.push(`UID:${item.uid}`);
-    icsContent.push(`SEQUENCE:${sequenceNum}`);
-    icsContent.push(`DTSTAMP:${nowIso}`);
-    icsContent.push(`LAST-MODIFIED:${nowIso}`);
-    icsContent.push(`DTSTART;TZID=Europe/Berlin:${item.dtStart}`);
-    icsContent.push(`DTEND;TZID=Europe/Berlin:${item.dtEnd}`);
-    icsContent.push(`SUMMARY:${escapeIcsText(item.summary || 'Dienst')}`);
-    icsContent.push('STATUS:CANCELLED');
-    icsContent.push('END:VEVENT');
-  });
+  }
 
   icsContent.push('END:VCALENDAR');
   return icsContent.join('\r\n');
@@ -429,7 +414,7 @@ export function generateCancelIcsCalendar(shifts = [], options = {}) {
  */
 export function downloadIcsFile(shifts, options = {}) {
   const {
-    calendarName = 'Familie',
+    calendarName = 'Dienstplan',
     yearMonth = '2026-11',
     overwriteMode = 'update'
   } = options;
@@ -440,7 +425,6 @@ export function downloadIcsFile(shifts, options = {}) {
   const suffix = overwriteMode === 'forceNew' ? '_Neu' : '';
   const fileName = `Dienstplan_${yearMonth}_${calendarName}${suffix}.ics`;
 
-  // Standard anchor download
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.setAttribute('download', fileName);
@@ -452,25 +436,38 @@ export function downloadIcsFile(shifts, options = {}) {
 }
 
 /**
- * Triggers download of a cancellation .ics file to remove old events from Apple Calendar
+ * Triggers the native iOS Shortcut ("Schichttagebuch-Kalender") to delete all
+ * exported Schichttagebuch shifts ("Dienst:") of the given month from the iPhone Calendar,
+ * and resets the export history version so the next .ics export imports cleanly.
  */
-export function downloadCancelIcsFile(shifts, options = {}) {
-  const {
-    calendarName = 'Familie',
-    yearMonth = '2026-11'
-  } = options;
+export function runIosCalendarDeleteShortcut(yearMonth = '2026-11') {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const startStr = `${yearMonth}-01T00:00:00`;
+  const endStr = `${yearMonth}-${String(lastDay).padStart(2, '0')}T23:59:59`;
 
-  const icsString = generateCancelIcsCalendar(shifts, options);
-  const blob = new Blob([icsString], { type: 'text/calendar;charset=utf-8' });
+  // Reset export history & increment resetVersion so subsequent exports have fresh UIDs
+  resetMonthExportHistory(yearMonth);
 
-  const fileName = `Dienstplan_${yearMonth}_${calendarName}_Loeschen.ics`;
+  const inputPayload = `${startStr}\n${endStr}`;
+  const returnUrl = window.location.href;
+  const shortcutUrl = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent('Schichttagebuch-Kalender')}&input=text&text=${encodeURIComponent(inputPayload)}&x-success=${encodeURIComponent(returnUrl)}`;
 
+  window.location.href = shortcutUrl;
+  return true;
+}
+
+/**
+ * Downloads the pre-signed Apple Shortcut ("Schichttagebuch-Kalender.shortcut")
+ * for 1-time installation in the iOS Shortcuts app.
+ */
+export function downloadIosDeleteShortcutFile() {
+  markIosShortcutInstalled();
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.setAttribute('download', fileName);
+  link.href = '/Schichttagebuch-Kalender.shortcut';
+  link.setAttribute('download', 'Schichttagebuch-Kalender.shortcut');
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-
   return true;
 }

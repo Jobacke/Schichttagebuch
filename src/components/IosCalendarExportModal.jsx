@@ -1,12 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calendar, Check, Download, X,
   Smartphone, CheckCircle2, Trash2,
-  Users, MapPin, Truck, HelpCircle, ChevronDown
+  Users, MapPin, Truck, HelpCircle, ChevronDown, Sparkles
 } from 'lucide-react';
 import {
   downloadIcsFile,
-  downloadCancelIcsFile,
+  runIosCalendarDeleteShortcut,
+  downloadIosDeleteShortcutFile,
   getShiftExportStatus,
   getCalendarExportHistory
 } from '../utils/calendarExport';
@@ -26,7 +27,7 @@ export default function IosCalendarExportModal({
   const [alarmOption, setAlarmOption] = useState('1440'); // Default: 1 Tag vorher!
   const [overwriteMode, setOverwriteMode] = useState('update'); // 'update' | 'forceNew'
   const [selectedIds, setSelectedIds] = useState(() => new Set(shifts.map(s => s.id)));
-  const [downloadSuccess, setDownloadSuccess] = useState(null); // null | 'export' | 'cancel'
+  const [downloadSuccess, setDownloadSuccess] = useState(null); // null | 'export' | 'deleteShortcut' | 'installShortcut'
   const [exportVersionTick, setExportVersionTick] = useState(0);
   const [isTipPopupOpen, setIsTipPopupOpen] = useState(false);
 
@@ -34,20 +35,33 @@ export default function IosCalendarExportModal({
     return getCalendarExportHistory(yearMonth);
   }, [yearMonth, exportVersionTick]);
 
+  const hasPreviousExport = useMemo(() => {
+    return Boolean(exportHistory?.items && Object.keys(exportHistory.items).length > 0);
+  }, [exportHistory]);
+
   const shiftStatuses = useMemo(() => {
     const map = {};
     shifts.forEach(s => {
-      map[s.id] = getShiftExportStatus(s, yearMonth, storeSettings);
+      map[s.id] = getShiftExportStatus(s, yearMonth, storeSettings, { titleFormat, alarmOption });
     });
     return map;
-  }, [shifts, yearMonth, storeSettings, exportVersionTick]);
+  }, [shifts, yearMonth, storeSettings, titleFormat, alarmOption, exportVersionTick]);
 
   const changedOrNewIds = useMemo(() => {
-    if (!exportHistory) return [];
+    if (!hasPreviousExport) return [];
     return shifts
       .filter(s => shiftStatuses[s.id] === 'modified' || shiftStatuses[s.id] === 'new')
       .map(s => s.id);
-  }, [shifts, shiftStatuses, exportHistory]);
+  }, [shifts, shiftStatuses, hasPreviousExport]);
+
+  // In 'update' mode, if some shifts are modified/new compared to last export, automatically pre-select them
+  useEffect(() => {
+    if (overwriteMode === 'update' && hasPreviousExport && changedOrNewIds.length > 0 && changedOrNewIds.length < shifts.length) {
+      setSelectedIds(new Set(changedOrNewIds));
+    } else if (overwriteMode === 'forceNew') {
+      setSelectedIds(new Set(shifts.map(s => s.id)));
+    }
+  }, [overwriteMode, hasPreviousExport, changedOrNewIds.length, shifts]);
 
   const selectedShifts = useMemo(() => {
     return shifts.filter(s => selectedIds.has(s.id));
@@ -79,12 +93,17 @@ export default function IosCalendarExportModal({
   const handleExport = () => {
     if (selectedShifts.length === 0) return;
 
+    // In 'update' mode, if the user explicitly selected only changed/new shifts (or if all selected shifts are unchanged and they want to re-import),
+    // export with Content-Hash UIDs (and bump resetVersion if all selected shifts were unchanged so iOS doesn't skip them).
+    const allSelectedUnchanged = hasPreviousExport && selectedShifts.every(s => shiftStatuses[s.id] === 'unchanged');
+
     downloadIcsFile(selectedShifts, {
       calendarName: 'Dienstplan',
       titleFormat,
       alarmOption,
       alarmMinutes: alarmOption === '1440' ? 1440 : (Number(alarmOption) || 1440),
       overwriteMode,
+      bumpIfAllUnchanged: allSelectedUnchanged,
       yearMonth,
       storeSettings
     });
@@ -94,16 +113,18 @@ export default function IosCalendarExportModal({
     setTimeout(() => setDownloadSuccess(null), 9000);
   };
 
-  const handleDownloadCancelIcs = () => {
-    if (shifts.length === 0) return;
-    downloadCancelIcsFile(selectedShifts.length > 0 ? selectedShifts : shifts, {
-      calendarName: 'Dienstplan',
-      titleFormat,
-      yearMonth,
-      storeSettings
-    });
-    setDownloadSuccess('cancel');
-    setTimeout(() => setDownloadSuccess(null), 9000);
+  const handleRunDeleteShortcut = () => {
+    runIosCalendarDeleteShortcut(yearMonth);
+    setExportVersionTick(t => t + 1);
+    setSelectedIds(new Set(shifts.map(s => s.id)));
+    setDownloadSuccess('deleteShortcut');
+    setTimeout(() => setDownloadSuccess(null), 12000);
+  };
+
+  const handleInstallShortcut = () => {
+    downloadIosDeleteShortcutFile();
+    setDownloadSuccess('installShortcut');
+    setTimeout(() => setDownloadSuccess(null), 14000);
   };
 
   const sortedShifts = useMemo(() => {
@@ -230,7 +251,7 @@ export default function IosCalendarExportModal({
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
-              title="Hilfe & Tipp zum Überschreiben im Apple Kalender anzeigen"
+              title="Hilfe & Tipp zum Überschreiben und Löschen im Apple Kalender anzeigen"
             >
               <HelpCircle size={15} style={{ color: '#fbbf24' }} />
               <span>Tipp</span>
@@ -269,7 +290,7 @@ export default function IosCalendarExportModal({
           flex: 1,
           minHeight: 0
         }}>
-          {/* Feedback Banners after Download */}
+          {/* Feedback Banners */}
           {downloadSuccess === 'export' && (
             <div style={{
               background: 'rgba(16, 185, 129, 0.14)',
@@ -286,12 +307,12 @@ export default function IosCalendarExportModal({
             }}>
               <CheckCircle2 size={17} style={{ flexShrink: 0 }} />
               <div>
-                <strong>Kalenderdatei (.ics) erstellt!</strong> Öffne die Datei und wähle beim Import deinen gewünschten Ziel-Kalender aus.
+                <strong>Kalenderdatei (.ics) erstellt!</strong> Wähle beim Hinzufügen deinen Ziel-Kalender aus. Unveränderte Termine werden automatisch übersprungen, geänderte/neue Dienste frisch eingetragen.
               </div>
             </div>
           )}
 
-          {downloadSuccess === 'cancel' && (
+          {downloadSuccess === 'deleteShortcut' && (
             <div style={{
               background: 'rgba(56, 189, 248, 0.14)',
               border: '1px solid rgba(56, 189, 248, 0.4)',
@@ -307,7 +328,28 @@ export default function IosCalendarExportModal({
             }}>
               <Trash2 size={17} style={{ flexShrink: 0 }} />
               <div>
-                <strong>Lösch-Datei (.ics) geladen!</strong> Erst im Kalender öffnen, danach die Dienste unten neu exportieren.
+                <strong>Kalender-Bereinigung gestartet!</strong> Der Kurzbefehl entfernt alle bisherigen Dienste für {currentMonthLabel} aus dem iPhone-Kalender. (Falls der Kurzbefehl noch fehlt: einmalig rechts auf <strong>„Kurzbefehl (1×)“</strong> tippen).
+              </div>
+            </div>
+          )}
+
+          {downloadSuccess === 'installShortcut' && (
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.14)',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              color: '#fbbf24',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '12.5px',
+              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flexShrink: 0
+            }}>
+              <Sparkles size={17} style={{ flexShrink: 0 }} />
+              <div>
+                <strong>Kurzbefehl „Schichttagebuch-Kalender“ geladen!</strong> Öffne die geladene Datei in Safari und tippe auf <strong>„Kurzbefehl hinzufügen“</strong> (nur 1× nötig). Danach löscht <strong>„Termine löschen“</strong> alte Dienste sofort per Klick!
               </div>
             </div>
           )}
@@ -437,6 +479,7 @@ export default function IosCalendarExportModal({
                     transition: 'all 0.15s ease',
                     whiteSpace: 'nowrap'
                   }}
+                  title="Überträgt gezielt geänderte/neue Dienste mit aktualisierter Kennung und überspringt unveränderte Einträge"
                 >
                   Aktualisieren
                 </button>
@@ -454,40 +497,73 @@ export default function IosCalendarExportModal({
                     transition: 'all 0.15s ease',
                     whiteSpace: 'nowrap'
                   }}
+                  title="Vergibt für alle ausgewählten Dienste eine komplett neue Kalender-ID"
                 >
                   Neu erzwingen
                 </button>
               </div>
             </div>
 
-            {/* Cell 4 (Bottom-Right): Cancel .ics Action */}
+            {/* Cell 4 (Bottom-Right): Clean Calendar via Native iOS Shortcut */}
             <div>
               <label style={labelStyle}>Kalender bereinigen</label>
-              <button
-                type="button"
-                onClick={handleDownloadCancelIcs}
-                style={{
-                  width: '100%',
-                  height: controlHeight,
-                  background: '#1e293b',
-                  border: '1px solid rgba(148, 163, 184, 0.22)',
-                  color: '#cbd5e1',
-                  borderRadius: '10px',
-                  padding: '0 12px',
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '7px',
-                  transition: 'all 0.15s ease'
-                }}
-                title="Lädt eine .ics Storno-Datei herunter, die bereits übertragene Termine dieses Monats aus dem Kalender entfernt"
-              >
-                <Trash2 size={14} style={{ color: '#f87171' }} />
-                <span>Alte Termine per .ics löschen</span>
-              </button>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1.25fr 0.95fr',
+                gap: '4px',
+                height: controlHeight,
+                background: '#0f172a',
+                border: '1px solid rgba(148, 163, 184, 0.22)',
+                borderRadius: '10px',
+                padding: '3px'
+              }}>
+                <button
+                  type="button"
+                  onClick={handleRunDeleteShortcut}
+                  style={{
+                    border: 'none',
+                    borderRadius: '7px',
+                    background: '#1e293b',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Löscht alle bisherigen Dienste dieses Monats per iOS-Kurzbefehl aus dem iPhone-Kalender"
+                >
+                  <Trash2 size={13} style={{ color: '#f87171', flexShrink: 0 }} />
+                  <span>Termine löschen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleInstallShortcut}
+                  style={{
+                    border: 'none',
+                    borderRadius: '7px',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    color: '#fbbf24',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Lädt einmalig den Apple-Kurzbefehl „Schichttagebuch-Kalender“ auf das iPhone, damit das Löschen im Kalender funktioniert"
+                >
+                  <Download size={12} style={{ flexShrink: 0 }} />
+                  <span>Kurzbefehl (1×)</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -590,7 +666,7 @@ export default function IosCalendarExportModal({
                   const weekday = dateObj.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
                   const rawDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }).replace(/\.$/, '');
                   const formattedDate = `${rawDate}.`;
-                  const status = exportHistory ? shiftStatuses[shift.id] : null;
+                  const status = hasPreviousExport ? shiftStatuses[shift.id] : null;
                   const cleanPartner = shift.partner
                     ? (shift.partner.trim().startsWith('mit ') ? shift.partner.trim() : `mit ${shift.partner.trim()}`)
                     : '';
@@ -717,6 +793,19 @@ export default function IosCalendarExportModal({
                                 borderRadius: '999px'
                               }}>
                                 Neu
+                              </span>
+                            )}
+                            {status === 'unchanged' && (
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: 600,
+                                background: 'rgba(16, 185, 129, 0.12)',
+                                border: '1px solid rgba(16, 185, 129, 0.28)',
+                                color: '#34d399',
+                                padding: '1px 7px',
+                                borderRadius: '999px'
+                              }}>
+                                Übertragen
                               </span>
                             )}
                           </div>
@@ -858,7 +947,7 @@ export default function IosCalendarExportModal({
                 border: '1px solid rgba(245, 158, 11, 0.35)',
                 borderRadius: '18px',
                 padding: '20px 22px',
-                maxWidth: '480px',
+                maxWidth: '490px',
                 width: '100%',
                 boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)'
               }}
@@ -883,7 +972,7 @@ export default function IosCalendarExportModal({
                     <Smartphone size={18} />
                   </div>
                   <h3 style={{ margin: 0, fontSize: '15.5px', fontWeight: 700, color: '#f8fafc', textTransform: 'none' }}>
-                    Tipp zum Überschreiben im Apple Kalender
+                    So funktionieren Aktualisieren & Löschen auf dem iPhone
                   </h3>
                 </div>
                 <button
@@ -908,16 +997,16 @@ export default function IosCalendarExportModal({
 
               <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
-                  <strong style={{ color: '#f8fafc' }}>1. Aktualisieren (Standard):</strong><br />
-                  Nutzt dieselbe Kalender-ID und sendet automatisch eine höhere <strong>Versionsnummer (SEQUENCE)</strong> mit, damit der Kalender vorhandene Termine aktualisiert.
+                  <strong style={{ color: '#f8fafc' }}>1. Aktualisieren (Intelligent ohne Duplikate):</strong><br />
+                  Berechnet für jeden Dienst einen <strong>Inhalts-Fingerabdruck</strong>. Unveränderte Dienste behalten ihre ID (iOS überspringt sie automatisch – <strong>keine Dopplungen</strong>), während geänderte oder neue Dienste automatisch eine neue ID erhalten und sofort übernommen werden.
                 </div>
                 <div>
-                  <strong style={{ color: '#f8fafc' }}>2. Neu erzwingen:</strong><br />
-                  Vergibt eine neue Kalender-ID – ideal, falls iOS Safari beim Tippen auf „Alle hinzufügen“ bereits bekannte IDs überspringt (z. B. wenn du nur einen geänderten Dienst überträgst).
+                  <strong style={{ color: '#f8fafc' }}>2. Termine löschen (per iOS-Kurzbefehl):</strong><br />
+                  Da Apple Safari das Löschen über normale .ics-Dateien blockiert, nutzt das iPhone dafür einen nativen Kurzbefehl: Tippe einmalig auf <strong>„Kurzbefehl (1×)“</strong> → <em>„Kurzbefehl hinzufügen“</em>. Danach entfernt <strong>„Termine löschen“</strong> mit 1 Klick alle bisherigen Monats-Dienste aus dem Kalender!
                 </div>
                 <div>
-                  <strong style={{ color: '#f8fafc' }}>3. Alte Termine per .ics löschen:</strong><br />
-                  Erzeugt eine Storno-Datei, die die bisherigen Monats-Einträge aus dem Kalender entfernt, bevor du den aktualisierten Plan frisch einträgst.
+                  <strong style={{ color: '#f8fafc' }}>3. Neu erzwingen:</strong><br />
+                  Vergibt für alle ausgewählten Dienste eine komplett neue ID, um alle Termine unabhängig vom bisherigen Status neu einzutragen.
                 </div>
               </div>
 

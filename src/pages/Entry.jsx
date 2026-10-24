@@ -4,15 +4,12 @@ import { useStore } from '../context/StoreContext';
 import { APP_VERSION } from '../version';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { getPartnersForShiftFromRoster } from '../utils/teamRosterParser';
-import CareManImportModal from '../components/CareManImportModal';
-import { Sparkles } from 'lucide-react';
 
 export default function Entry() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const editId = searchParams.get('id');
-    const { store, addShift, deleteShift, addShifts, ensureCodesAndTypes } = useStore();
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const { store, addShift, deleteShift } = useStore();
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -212,50 +209,6 @@ export default function Entry() {
                     </button>
                 )}
             </div>
-
-            {!editId && (
-                <div style={{
-                    background: 'rgba(249, 115, 22, 0.1)',
-                    border: '1px solid rgba(249, 115, 22, 0.25)',
-                    borderRadius: '16px',
-                    padding: '14px 16px',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                            background: 'rgba(249, 115, 22, 0.2)',
-                            color: 'var(--color-primary)',
-                            borderRadius: '10px',
-                            padding: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}>
-                            <Sparkles size={18} />
-                        </div>
-                        <div>
-                            <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-text-main)' }}>
-                                Monatsdienstplan importieren
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                                CareMan Dienstplan (z.B. Nov 2026) komplett eintragen
-                            </div>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="btn-primary"
-                        style={{ fontSize: '13px', padding: '8px 14px', whiteSpace: 'nowrap' }}
-                    >
-                        Importieren
-                    </button>
-                </div>
-            )}
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
@@ -554,18 +507,6 @@ export default function Entry() {
                     💾 {editId ? 'Änderungen speichern' : 'Speichern'}
                 </button>
             </form>
-
-            <CareManImportModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                onImportSuccess={(yearMonth, count) => {
-                    navigateToJournalMonth(yearMonth);
-                }}
-                store={store}
-                addShifts={addShifts}
-                ensureCodesAndTypes={ensureCodesAndTypes}
-                initialYearMonth={formData.date?.slice(0, 7) || new Date().toISOString().slice(0, 7)}
-            />
         </div>
     );
 }

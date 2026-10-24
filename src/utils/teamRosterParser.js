@@ -774,13 +774,16 @@ export function subscribeToCloudTeamRosters(currentUser, onChange) {
  * and appends '*' if their shift code on that day was marked with '*' (e.g. "Mia Keiser*").
  */
 export function formatColleagueName(rawName = '', hasAsterisk = false) {
-  const cleanRaw = String(rawName || '').replace(/\*+$/, '').trim();
+  const cleanRaw = String(rawName || '').replace(/\*+$/, '').replace(/[\s\-–]+$/, '').trim();
   if (!cleanRaw) return '';
   let display = cleanRaw;
   if (cleanRaw.includes(',')) {
-    const parts = cleanRaw.split(',').map(p => p.trim()).filter(Boolean);
+    const parts = cleanRaw
+      .split(',')
+      .map(p => p.replace(/[\s\-–]+$/, '').trim())
+      .filter(Boolean);
     if (parts.length >= 2) {
-      display = `${parts.slice(1).join(' ')} ${parts[0]}`;
+      display = `${parts.slice(1).join(' ')} ${parts[0]}`.replace(/[\s\-–]+$/, '').trim();
     }
   }
   return hasAsterisk ? `${display}*` : display;

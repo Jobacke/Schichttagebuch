@@ -107,17 +107,18 @@ export default function Journal() {
         }
     }, [searchParams]);
 
-    // Auto-fill missing PartnerIn ("mit ...") on shifts in the viewed month from the active Team Roster
+    // Auto-fill or update PartnerIn ("mit ...") on shifts in the viewed month from the active Team Roster
     useEffect(() => {
         if (!monthShifts || monthShifts.length === 0 || !addShifts) return;
         const shiftsToEnrich = [];
         monthShifts.forEach(s => {
-            if (s.partner && s.partner.trim()) return;
+            const currentPartner = (s.partner || '').trim();
+            if (currentPartner && !currentPartner.startsWith('mit ')) return;
             const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
             const codeStr = s.code || codeObj?.code || '';
             if (!codeStr) return;
             const detected = getPartnersForShiftFromRoster(s.date, codeStr);
-            if (detected) {
+            if (detected && detected !== currentPartner) {
                 shiftsToEnrich.push({
                     ...s,
                     partner: detected
@@ -281,10 +282,10 @@ export default function Journal() {
                             borderRadius: '10px',
                             gap: '6px'
                         }}
-                        title="Dienstplan aus Screenshot oder Vorlage importieren"
+                        title="Persönlichen Dienstplan inkl. PartnerIn aus dem Team-Plan übernehmen"
                     >
                         <Sparkles size={16} />
-                        Dienstplan importieren
+                        Dienstplan übernehmen
                     </button>
                 </div>
             </div>

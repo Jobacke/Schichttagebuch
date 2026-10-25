@@ -326,13 +326,15 @@ export default function Journal() {
                         const hasShift = dayShifts.length > 0;
                         const hasBonusShift = dayShifts.some(s => s.hasBonus);
                         const isSelected = selectedDate && isSameDay(date, selectedDate);
+                        const isCurrentDay = isSameDay(date, new Date());
 
                         return (
                             <div
                                 key={dayNum}
-                                className={`day-cell ${hasShift ? 'has-shift' : ''} ${isSelected ? 'selected' : ''}`}
+                                className={`day-cell ${hasShift ? 'has-shift' : ''} ${isSelected ? 'selected' : ''} ${isCurrentDay ? 'today' : ''}`}
                                 onClick={() => setSelectedDate(date)}
                                 style={{ position: 'relative' }}
+                                title={isCurrentDay ? `Tag ${dayNum} (Heute)` : undefined}
                             >
                                 {dayNum}
                                 {hasBonusShift && (
@@ -368,7 +370,7 @@ export default function Journal() {
                 <div>
                     <h2 style={{ margin: 0 }}>
                         {selectedDate
-                            ? `Dienste am ${selectedDate.toLocaleDateString('de-DE')}`
+                            ? `Dienste am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`
                             : 'Alle Dienste im Monat'
                         }
                     </h2>

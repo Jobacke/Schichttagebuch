@@ -81,9 +81,14 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
         return map;
     }, [filteredData]);
 
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
     // Handle YEAR mode
     if (filterMode === 'year') {
         const year = baseDate.getFullYear();
+        const currentYear = now.getFullYear();
+        const currentMonthIdx = now.getMonth();
         const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
         return (
             <div>
@@ -114,19 +119,30 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                         const monthlyWeekly = storeSettings?.monthlyWeeklyHours?.[prefix] ?? storeSettings?.defaultWeeklyHours ?? 20;
                         const mTarget = (daysInM / 7) * Number(monthlyWeekly);
                         const hasShifts = monthShifts.length > 0;
+                        const isCurrentMonth = year === currentYear && mIdx === currentMonthIdx;
 
                         return (
                             <div
                                 key={mName}
                                 style={{
                                     background: hasShifts ? '#1e293b' : '#0f172a',
-                                    border: mBonusCount > 0 ? '1px solid rgba(250, 204, 21, 0.4)' : (hasShifts ? '1px solid #334155' : '1px solid rgba(255,255,255,0.03)'),
+                                    border: isCurrentMonth
+                                        ? '1.5px solid #f97316'
+                                        : (mBonusCount > 0 ? '1px solid rgba(250, 204, 21, 0.4)' : (hasShifts ? '1px solid #334155' : '1px solid rgba(255,255,255,0.03)')),
+                                    boxShadow: isCurrentMonth ? '0 0 10px rgba(249, 115, 22, 0.25)' : 'none',
                                     borderRadius: '8px',
                                     padding: '8px 10px'
                                 }}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '13px', color: hasShifts ? '#f8fafc' : '#64748b' }}>{mName}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '13px', color: isCurrentMonth ? '#f97316' : (hasShifts ? '#f8fafc' : '#64748b') }}>{mName}</span>
+                                        {isCurrentMonth && (
+                                            <span style={{ fontSize: '9px', background: '#f97316', color: '#fff', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>
+                                                Jetzt
+                                            </span>
+                                        )}
+                                    </div>
                                     {hasShifts && (
                                         <span style={{ fontSize: '11px', background: '#334155', color: '#facc15', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
                                             {monthShifts.length} {monthShifts.length === 1 ? 'Dst' : 'Dste'}
@@ -167,12 +183,14 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const dayShifts = shiftsByDate[dateStr] || [];
         const isWeekend = ((firstDay + d - 1) % 7) >= 5;
+        const isToday = dateStr === todayStr;
         days.push({
             empty: false,
             dayNum: d,
             dateStr,
             shifts: dayShifts,
             isWeekend,
+            isToday,
             key: dateStr
         });
     }
@@ -250,6 +268,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                     const resolved = hasShift ? resolveShiftDetails(firstShift, storeSettings) : null;
                     const shiftColor = resolved?.colorInfo;
                     const isSelected = selectedDateStr === item.dateStr;
+                    const isToday = item.isToday;
                     const hasBonusDay = hasShift && item.shifts.some(sh => sh.hasBonus);
 
                     return (
@@ -269,21 +288,44 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                 background: hasShift ? shiftColor.bg : (item.isWeekend ? 'rgba(30, 41, 59, 0.4)' : '#0f172a'),
                                 border: isSelected
                                     ? '2px solid #38bdf8'
-                                    : (hasBonusDay ? '1px solid #facc15' : (hasShift ? `1px solid ${shiftColor.border}` : '1px solid #1e293b')),
-                                boxShadow: isSelected ? '0 0 10px rgba(56, 189, 248, 0.35)' : 'none'
+                                    : (isToday
+                                        ? '2px solid #f97316'
+                                        : (hasBonusDay ? '1px solid #facc15' : (hasShift ? `1px solid ${shiftColor.border}` : '1px solid #1e293b'))),
+                                boxShadow: isSelected
+                                    ? '0 0 10px rgba(56, 189, 248, 0.35)'
+                                    : (isToday ? '0 0 10px rgba(249, 115, 22, 0.45)' : 'none')
                             }}
-                            title={hasShift ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})${hasBonusDay ? ' • 💰 Bonus' : ''}` : `Tag ${item.dayNum}: Frei`}
+                            title={hasShift ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})${hasBonusDay ? ' • 💰 Bonus' : ''}${isToday ? ' • Heute' : ''}` : `Tag ${item.dayNum}: Frei${isToday ? ' • Heute' : ''}`}
                         >
                             {/* Day Number & Station Badge */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 2px' }}>
-                                <span style={{
-                                    fontSize: '11px',
-                                    fontWeight: hasShift ? 800 : (item.isWeekend ? 600 : 500),
-                                    color: hasShift ? '#f8fafc' : (item.isWeekend ? '#94a3b8' : '#475569'),
-                                    lineHeight: 1
-                                }}>
-                                    {item.dayNum}
-                                </span>
+                                {isToday ? (
+                                    <span style={{
+                                        background: '#f97316',
+                                        color: '#ffffff',
+                                        borderRadius: '50%',
+                                        width: '18px',
+                                        height: '18px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '10.5px',
+                                        fontWeight: 800,
+                                        lineHeight: 1,
+                                        boxShadow: '0 2px 5px rgba(249, 115, 22, 0.6)'
+                                    }}>
+                                        {item.dayNum}
+                                    </span>
+                                ) : (
+                                    <span style={{
+                                        fontSize: '11px',
+                                        fontWeight: hasShift ? 800 : (item.isWeekend ? 600 : 500),
+                                        color: hasShift ? '#f8fafc' : (item.isWeekend ? '#94a3b8' : '#475569'),
+                                        lineHeight: 1
+                                    }}>
+                                        {item.dayNum}
+                                    </span>
+                                )}
                                 {hasShift && (
                                     <span style={{
                                         fontSize: '8px',
@@ -299,7 +341,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                 )}
                             </div>
 
-                            {/* Shift Badge or Free Dot */}
+                            {/* Shift Badge or Free Dot / Heute */}
                             {hasShift ? (
                                 <div style={{
                                     fontSize: '10px',
@@ -314,6 +356,16 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                     textAlign: 'center'
                                 }}>
                                     {resolved.code}{hasBonusDay ? '💰' : ''}
+                                </div>
+                            ) : isToday ? (
+                                <div style={{
+                                    fontSize: '9px',
+                                    fontWeight: 800,
+                                    color: '#f97316',
+                                    lineHeight: 1,
+                                    letterSpacing: '0.2px'
+                                }}>
+                                    Heute
                                 </div>
                             ) : (
                                 <div style={{
@@ -340,7 +392,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: selectedDayInfo.shifts.length > 0 ? '8px' : 0 }}>
                         <span style={{ fontWeight: 700, fontSize: '13px', color: '#f8fafc' }}>
-                            📅 {selectedDayInfo.dateFormatted}
+                            📅 {selectedDayInfo.dateFormatted}{selectedDayInfo.dateStr === todayStr ? ' (Heute)' : ''}
                         </span>
                         <button
                             type="button"

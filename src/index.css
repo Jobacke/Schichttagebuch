@@ -246,6 +246,21 @@ h2 {
   box-shadow: 0 4px 12px var(--color-primary-glow);
 }
 
+.day-cell.today:not(.selected) {
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 800;
+  box-shadow: 0 0 10px var(--color-primary-glow);
+  background: rgba(249, 115, 22, 0.12);
+}
+
+.day-cell.today.selected {
+  outline: 2.5px solid white;
+  outline-offset: -2.5px;
+  font-weight: 800;
+  box-shadow: 0 0 14px var(--color-primary-glow);
+}
+
 .day-cell.has-shift::after {
   content: '';
   width: 4px;

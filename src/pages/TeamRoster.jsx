@@ -199,6 +199,10 @@ export default function TeamRoster() {
     }
   };
   
+  // Current real-world today string (YYYY-MM-DD)
+  const todayNow = new Date();
+  const currentTodayStr = `${todayNow.getFullYear()}-${String(todayNow.getMonth() + 1).padStart(2, '0')}-${String(todayNow.getDate()).padStart(2, '0')}`;
+
   // Selected date
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
@@ -1006,9 +1010,25 @@ export default function TeamRoster() {
               }}
               title="Klicken, um direkt zu einem Datum zu springen"
             >
-              <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
-                {formattedSelectedDate}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
+                  {formattedSelectedDate}
+                </span>
+                {selectedDate === currentTodayStr && (
+                  <span style={{
+                    background: 'rgba(249, 115, 22, 0.2)',
+                    color: '#f97316',
+                    border: '1px solid rgba(249, 115, 22, 0.45)',
+                    padding: '1px 5px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    lineHeight: 1
+                  }}>
+                    Heute
+                  </span>
+                )}
+              </div>
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                 • {currentDayShifts.length} im Dienst
               </span>
@@ -1281,22 +1301,46 @@ export default function TeamRoster() {
                         border: cell.isSelected
                           ? '2px solid #38bdf8'
                           : cell.isToday
-                            ? '1.5px solid #fb923c'
+                            ? '2px solid #f97316'
                             : cell.myCode
                               ? `1px solid ${myShiftColor.border}`
                               : '1px solid #334155',
+                        boxShadow: cell.isSelected
+                          ? '0 0 10px rgba(56, 189, 248, 0.35)'
+                          : cell.isToday
+                            ? '0 0 10px rgba(249, 115, 22, 0.45)'
+                            : 'none',
                         color: '#f8fafc',
                         transition: 'all 0.12s ease'
                       }}
                     >
-                      <span style={{
-                        fontSize: '12.5px',
-                        fontWeight: cell.isSelected || cell.isToday || cell.myCode ? 800 : 600,
-                        color: cell.isSelected ? '#38bdf8' : (cell.isToday ? '#fb923c' : '#f8fafc'),
-                        lineHeight: 1.1
-                      }}>
-                        {cell.dayNum}
-                      </span>
+                      {cell.isToday ? (
+                        <span style={{
+                          background: '#f97316',
+                          color: '#ffffff',
+                          borderRadius: '50%',
+                          width: '18px',
+                          height: '18px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          lineHeight: 1,
+                          boxShadow: '0 2px 5px rgba(249, 115, 22, 0.6)'
+                        }}>
+                          {cell.dayNum}
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontSize: '12.5px',
+                          fontWeight: cell.isSelected || cell.myCode ? 800 : 600,
+                          color: cell.isSelected ? '#38bdf8' : '#f8fafc',
+                          lineHeight: 1.1
+                        }}>
+                          {cell.dayNum}
+                        </span>
+                      )}
                       {cell.myCode ? (
                         <span style={{
                           fontSize: '9px',
@@ -1305,6 +1349,15 @@ export default function TeamRoster() {
                           lineHeight: 1
                         }}>
                           {cell.myCode}
+                        </span>
+                      ) : cell.isToday ? (
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          color: '#f97316',
+                          lineHeight: 1
+                        }}>
+                          Heute
                         </span>
                       ) : cell.shiftCount > 0 ? (
                         <span style={{

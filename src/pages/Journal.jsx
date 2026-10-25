@@ -370,7 +370,7 @@ export default function Journal() {
                 <div>
                     <h2 style={{ margin: 0 }}>
                         {selectedDate
-                            ? `Dienste am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`
+                            ? `${visibleShifts.length > 1 ? 'Dienste' : 'Dienst'} am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`
                             : 'Alle Dienste im Monat'
                         }
                     </h2>
@@ -702,9 +702,15 @@ export default function Journal() {
                         borderRadius: '16px',
                         border: 'var(--glass-border)'
                     }}>
-                        <div style={{ fontSize: '14px' }}>
-                            {selectedDate ? 'Keine Einträge für diesen Tag' : 'Keine Einträge für diesen Monat vorhanden.'}
-                        </div>
+                        {selectedDate ? (
+                            <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', letterSpacing: '1.5px' }}>
+                                FREI
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: '14px' }}>
+                                Keine Einträge für diesen Monat vorhanden.
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

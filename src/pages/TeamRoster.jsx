@@ -1004,34 +1004,29 @@ export default function TeamRoster() {
                 gap: '6px',
                 minWidth: 0,
                 cursor: 'pointer',
-                padding: '4px 8px',
+                padding: '4px 6px',
                 borderRadius: '8px',
                 transition: 'background 0.15s ease'
               }}
               title="Klicken, um direkt zu einem Datum zu springen"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
-                  {formattedSelectedDate}
-                </span>
-                {selectedDate === currentTodayStr && (
-                  <span style={{
-                    background: 'rgba(249, 115, 22, 0.2)',
-                    color: '#f97316',
-                    border: '1px solid rgba(249, 115, 22, 0.45)',
-                    padding: '1px 5px',
-                    borderRadius: '5px',
-                    fontSize: '11px',
-                    fontWeight: 800,
-                    lineHeight: 1
-                  }}>
-                    Heute
-                  </span>
-                )}
-              </div>
-              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                • {currentDayShifts.length} im Dienst
+              <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
+                {formattedSelectedDate}
               </span>
+              {selectedDate === currentTodayStr && (
+                <span style={{
+                  background: 'rgba(249, 115, 22, 0.2)',
+                  color: '#f97316',
+                  border: '1px solid rgba(249, 115, 22, 0.45)',
+                  padding: '1px 5px',
+                  borderRadius: '5px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  lineHeight: 1
+                }}>
+                  Heute
+                </span>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -1083,13 +1078,16 @@ export default function TeamRoster() {
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={handleToday}
-                className="team-roster-today-btn"
-              >
-                Heute
-              </button>
+              {selectedDate !== currentTodayStr && (
+                <button
+                  type="button"
+                  onClick={handleToday}
+                  className="team-roster-today-btn"
+                  title="Zu heute springen"
+                >
+                  Heute
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleNextDay}
@@ -1900,7 +1898,21 @@ export default function TeamRoster() {
             )}
           </div>
         ) : (
-          <div className="team-roster-card">
+          <div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '0 4px 6px 4px',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--color-text-muted)'
+            }}>
+              <span>
+                {currentDayShifts.length} {currentDayShifts.length === 1 ? 'Kollege' : 'Kollegen'} im Dienst
+              </span>
+            </div>
+            <div className="team-roster-card">
             {currentDayShifts.map((shift, idx) => {
               const group = getShiftGroupName(shift.code);
               const prevGroup = idx > 0 ? getShiftGroupName(currentDayShifts[idx - 1].code) : null;
@@ -1984,6 +1996,7 @@ export default function TeamRoster() {
                 </React.Fragment>
               );
             })}
+            </div>
           </div>
         )}
       </div>

@@ -801,6 +801,16 @@ export default function Analysis() {
                 </div>
             </div>
 
+            {/* Kalender / Schicht-Rhythmus direkt über den statistischen Werten */}
+            <div className="card-premium">
+                <ShiftRhythmCalendar
+                    baseDate={baseDate}
+                    filterMode={filterMode}
+                    filteredData={filteredData}
+                    storeSettings={store.settings}
+                />
+            </div>
+
             {/* KPI Cards Grid (Row 1: Geleistet | Schichten | Bonus, Row 2: Saldo | Dienstplan PDF) */}
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
                 <div className="stat-card" style={{ padding: '14px 12px' }}>
@@ -1411,23 +1421,14 @@ export default function Analysis() {
                 </div>
             )}
 
-            {/* Charts */}
+            {/* Charts & Verteilung */}
             {stats.count === 0 ? (
                 <div className="card-premium center" style={{ padding: '40px', color: '#64748b' }}>
                     <div style={{ fontSize: '40px', marginBottom: '10px' }}>📊</div>
-                    Keine Daten für diesen Zeitraum.
+                    Keine weiteren Daten für diesen Zeitraum vorhanden.
                 </div>
             ) : (
                 <>
-                    <div className="card-premium">
-                        <ShiftRhythmCalendar
-                            baseDate={baseDate}
-                            filterMode={filterMode}
-                            filteredData={filteredData}
-                            storeSettings={store.settings}
-                        />
-                    </div>
-
                     <div className="card-premium">
                         <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>🍰 Verteilung</h3>
 

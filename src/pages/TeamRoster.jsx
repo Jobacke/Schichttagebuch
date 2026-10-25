@@ -908,68 +908,71 @@ export default function TeamRoster() {
         </div>
       )}
 
-      {/* Top Header: Title, Month Selector & Upload Button */}
-      <div className="team-roster-header">
-        <h1 className="team-roster-title">
+      {/* Top Header: Title & Upload Button */}
+      <div className="team-roster-header" style={{ marginBottom: '8px', paddingBottom: '0' }}>
+        <h1 className="team-roster-title" style={{ whiteSpace: 'nowrap' }}>
           <Users style={{ color: '#38bdf8' }} size={24} />
           <span>Wer hat Dienst?</span>
         </h1>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Month Stepper with Interactive Month Picker */}
-          <div className="team-roster-month-stepper">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="team-roster-month-btn"
-              title="Vorheriger Monat"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <select
-              value={yearMonth}
-              onChange={e => switchMonth(e.target.value)}
-              className="team-roster-month-select"
-              title="Monat auswählen"
-            >
-              {allDisplayMonths.map(m => (
-                <option key={m.yearMonth} value={m.yearMonth}>
-                  {m.monthLabel} {m.hasData ? `(${m.totalColleagues} Kollege${m.totalColleagues === 1 ? '' : 'n'})` : ''}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="team-roster-month-btn"
-              title="Nächster Monat"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
+        <button
+          type="button"
+          onClick={() => setIsUploadOpen(true)}
+          style={{
+            background: 'rgba(14, 165, 233, 0.18)',
+            color: '#38bdf8',
+            border: '1px solid rgba(56, 189, 248, 0.45)',
+            fontWeight: 700,
+            padding: '7px 14px',
+            borderRadius: '12px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)',
+            transition: 'all 0.15s ease'
+          }}
+          title="Dienstplan importieren (SIEDA einfügen oder Datei)"
+        >
+          <UploadCloud size={16} />
+          <span>Plan laden</span>
+        </button>
+      </div>
 
-          <button
-            type="button"
-            onClick={() => setIsUploadOpen(true)}
-            className="filter-chip"
-            style={{
-              background: 'rgba(14, 165, 233, 0.15)',
-              color: '#38bdf8',
-              borderColor: 'rgba(14, 165, 233, 0.3)',
-              fontWeight: 600,
-              padding: '7px 12px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer'
-            }}
-            title="Dienstplan importieren"
-          >
-            <UploadCloud size={16} />
-            <span>Plan laden</span>
-          </button>
-        </div>
+      {/* Month Stepper Bar (Full width, spacious & thumb-friendly in portrait) */}
+      <div className="team-roster-month-stepper" style={{ marginBottom: '10px', padding: '6px 10px', borderRadius: '14px', justifyContent: 'space-between', width: '100%' }}>
+        <button
+          type="button"
+          onClick={handlePrevMonth}
+          className="team-roster-month-btn"
+          title="Vorheriger Monat"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <select
+          value={yearMonth}
+          onChange={e => switchMonth(e.target.value)}
+          className="team-roster-month-select"
+          style={{ flex: 1, maxWidth: '100%', fontSize: '14px', fontWeight: 700 }}
+          title="Monat auswählen"
+        >
+          {allDisplayMonths.map(m => (
+            <option key={m.yearMonth} value={m.yearMonth}>
+              {m.monthLabel} {m.hasData ? `(${m.totalColleagues} Kollege${m.totalColleagues === 1 ? '' : 'n'})` : ''}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={handleNextMonth}
+          className="team-roster-month-btn"
+          title="Nächster Monat"
+        >
+          <ChevronRight size={18} />
+        </button>
       </div>
 
       {/* Single-Row Date Stepper (Click on Date = Jump Modal, Filter Button integrated) */}
@@ -1797,27 +1800,50 @@ export default function TeamRoster() {
             border: '1px solid var(--color-border)',
             borderRadius: '16px'
           }}>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: 0 }}>
-              {searchQuery
-                ? `Keine Treffer für "${searchQuery}".`
-                : 'Für diesen Tag sind keine Dienste eingetragen.'}
-            </p>
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                style={{
-                  marginTop: '10px',
-                  background: 'none',
-                  border: 'none',
-                  color: '#38bdf8',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  textDecoration: 'underline'
-                }}
-              >
-                Suche zurücksetzen
-              </button>
+            {roster.totalShifts === 0 ? (
+              <div>
+                <UploadCloud size={32} style={{ color: '#38bdf8', marginBottom: '8px' }} />
+                <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-main)', margin: '0 0 6px 0' }}>
+                  Noch kein Dienstplan für {roster.monthLabel || yearMonth} geladen
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 16px 0', lineHeight: 1.4 }}>
+                  Kopiere den Dienstplan mit deinem Lesezeichen im Safari und füge ihn hier ein.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsUploadOpen(true)}
+                  className="btn-primary"
+                  style={{ margin: '0 auto', fontSize: '13px', padding: '9px 18px', borderRadius: '10px' }}
+                >
+                  <UploadCloud size={16} />
+                  <span>Dienstplan jetzt einfügen</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: 0 }}>
+                  {searchQuery
+                    ? `Keine Treffer für "${searchQuery}".`
+                    : 'Für diesen Tag sind keine Dienste eingetragen.'}
+                </p>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      marginTop: '10px',
+                      background: 'none',
+                      border: 'none',
+                      color: '#38bdf8',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Suche zurücksetzen
+                  </button>
+                )}
+              </>
             )}
           </div>
         ) : (

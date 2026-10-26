@@ -135,7 +135,7 @@ export default function Journal() {
         if (shiftsToEnrich.length > 0) {
             addShifts(shiftsToEnrich, false);
         }
-    }, [currentYearMonthStr, monthShifts.length]);
+    }, [currentYearMonthStr, monthShifts.length, store.rosterVersion]);
 
     // --- Multi-Select & Delete Actions ---
     const toggleSelectShift = (id) => {
@@ -519,7 +519,10 @@ export default function Journal() {
                     .map(shift => {
                         const code = store.settings.shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
                         const displayCode = code ? code.code : (shift.code || 'Schicht');
-                        const partnerDisplay = shift.partner || getPartnersForShiftFromRoster(shift.date, displayCode);
+                        const autoPartner = getPartnersForShiftFromRoster(shift.date, displayCode);
+                        const partnerDisplay = (autoPartner && (!shift.partner || shift.partner.startsWith('mit ')))
+                            ? autoPartner
+                            : (shift.partner || autoPartner);
                         const dayName = new Date(shift.date).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
                         const dayNum = new Date(shift.date).getDate();
                         const isSelected = selectedShiftIds.has(shift.id);

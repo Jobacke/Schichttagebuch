@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { collection, doc, setDoc, onSnapshot, query, orderBy, deleteDoc, writeBatch } from 'firebase/firestore';
+import { syncTeamRostersWithCloud, subscribeToCloudTeamRosters } from '../utils/teamRosterParser';
 
 const StoreContext = createContext();
 
@@ -39,6 +40,7 @@ export function StoreProvider({ children }) {
   const [shifts, setShifts] = useState([]);
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const [rosterVersion, setRosterVersion] = useState(0);
 
   // --- Listener: Shifts ---
   useEffect(() => {
@@ -78,6 +80,23 @@ export function StoreProvider({ children }) {
         // Init if empty
         setDoc(settingsRef, INITIAL_SETTINGS).catch(e => console.error("Init Settings Failed", e));
       }
+    });
+
+    return unsubscribe;
+  }, [currentUser]);
+
+  // --- Listener: Cloud Team Rosters Real-Time Sync ---
+  useEffect(() => {
+    if (!currentUser || !db) return;
+
+    // 1. Initial sync of rosters from Cloud Firestore into localStorage
+    syncTeamRostersWithCloud(currentUser)
+      .then(() => setRosterVersion(v => v + 1))
+      .catch(err => console.error('Initial team rosters sync error:', err));
+
+    // 2. Real-time subscription to team_rosters collection
+    const unsubscribe = subscribeToCloudTeamRosters(currentUser, () => {
+      setRosterVersion(v => v + 1);
     });
 
     return unsubscribe;
@@ -361,12 +380,14 @@ export function StoreProvider({ children }) {
       defaultWeeklyHours: settings?.defaultWeeklyHours !== undefined ? settings.defaultWeeklyHours : INITIAL_SETTINGS.defaultWeeklyHours,
       monthlyWeeklyHours: settings?.monthlyWeeklyHours || settings?.monthlyTargets || INITIAL_SETTINGS.monthlyWeeklyHours,
       defaultBonusAmount: settings?.defaultBonusAmount !== undefined ? Number(settings.defaultBonusAmount) : INITIAL_SETTINGS.defaultBonusAmount
-    }
+    },
+    rosterVersion
   };
 
   return (
     <StoreContext.Provider value={{
       store: safeStore,
+      rosterVersion,
       addShift,
       addShifts,
       ensureCodesAndTypes,

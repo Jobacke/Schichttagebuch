@@ -678,7 +678,8 @@ export async function syncTeamRostersWithCloud(currentUser) {
         try {
           const localData = JSON.parse(localStorage.getItem(key));
           if (localData && (localData.totalShifts > 0 || (localData.colleagues && localData.colleagues.length > 0))) {
-            if (!cloudDocs.has(docId)) {
+            const cloudDoc = cloudDocs.get(docId);
+            if (!cloudDoc || (localData.totalShifts > (cloudDoc.totalShifts || 0))) {
               await saveStationTeamRosterToCloud(localData, parts[1], currentUser);
               uploaded++;
             }
@@ -694,7 +695,8 @@ export async function syncTeamRostersWithCloud(currentUser) {
           if (localData && (localData.totalShifts > 0 || (localData.colleagues && localData.colleagues.length > 0))) {
             const detected = detectRosterStation(localData);
             const docId = `${ym}_${detected}`;
-            if (!cloudDocs.has(docId)) {
+            const cloudDoc = cloudDocs.get(docId);
+            if (!cloudDoc || (localData.totalShifts > (cloudDoc.totalShifts || 0))) {
               await saveStationTeamRosterToCloud(localData, detected, currentUser);
               uploaded++;
             }
@@ -707,11 +709,12 @@ export async function syncTeamRostersWithCloud(currentUser) {
     cloudDocs.forEach((cData, docId) => {
       const localKey = `${STORAGE_KEY_PREFIX}${docId}`;
       const existing = localStorage.getItem(localKey);
-      if (!existing) {
-        const roster = cData.roster || cData;
-        localStorage.setItem(localKey, JSON.stringify(roster));
-        if (cData.station === 'Sendling') {
-          localStorage.setItem(`${STORAGE_KEY_PREFIX}${cData.yearMonth}`, JSON.stringify(roster));
+      const roster = cData.roster || cData;
+      const newStr = JSON.stringify(roster);
+      if (!existing || existing !== newStr) {
+        localStorage.setItem(localKey, newStr);
+        if (cData.station === 'Sendling' || !cData.station) {
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}${cData.yearMonth}`, newStr);
         }
         downloaded++;
       }
@@ -748,7 +751,7 @@ export function subscribeToCloudTeamRosters(currentUser, onChange) {
         const newStr = JSON.stringify(roster);
         if (currentLocal !== newStr) {
           localStorage.setItem(localKey, newStr);
-          if (cData.station === 'Sendling') {
+          if (cData.station === 'Sendling' || !cData.station) {
             localStorage.setItem(`${STORAGE_KEY_PREFIX}${cData.yearMonth}`, newStr);
           }
           hasChanges = true;

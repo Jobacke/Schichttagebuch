@@ -67,11 +67,25 @@ export async function runTeamRosterOcr(imageSource, onProgress) {
 }
 
 /**
+ * Cleans a single shift code and normalizes truncated codes (e.g. "RD" -> "RDÜ")
+ */
+export function cleanSingleShiftCode(c) {
+  if (!c) return '';
+  let code = String(c).trim().toUpperCase().replace(/[^A-ZÄÖÜ0-9\-*]/g, '');
+  if (code === 'RD') return 'RDÜ';
+  if (code === 'RD*') return 'RDÜ*';
+  return code;
+}
+
+/**
  * Splits and cleans multiple shift codes from a single cell string or array.
  * Supports delimiters: comma, slash, semicolon, plus, pipe, newline, whitespace.
+ * Also splits non-delimited compound codes (e.g. "RDRT2M", "RDÜRT2M", "RT2MRD", "RT2MRDÜ").
  * Preserves German characters (ÄÖÜ) and asterisks (*).
+ * Normalizes "RD" to "RDÜ".
  * Example: "RDÜ,RT2M" -> ["RDÜ", "RT2M"]
- * Example: "RFM*" -> ["RFM*"]
+ * Example: "RDRT2M"   -> ["RDÜ", "RT2M"]
+ * Example: "RD"       -> ["RDÜ"]
  */
 export function splitShiftCodes(raw) {
   if (!raw) return [];
@@ -82,6 +96,9 @@ export function splitShiftCodes(raw) {
   if (!str) return [];
   const tokens = str.split(/[,;/+|\\\n\r]+/);
   const result = [];
+
+  const stdPattern = '(?:RF[MHO]|RS[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MH]|RH[MH]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
+
   tokens.forEach(tok => {
     let t = tok.trim();
     if (!t) return;
@@ -90,17 +107,46 @@ export function splitShiftCodes(raw) {
       let code = st.trim().toUpperCase();
       if (!code || code === '-' || code === '/' || code === '0' || code === '00' || code === 'FREI') return;
       code = code.replace(/[^A-ZÄÖÜ0-9\-*]/g, '');
-      if (code.length >= 2) {
-        result.push(code);
+      if (code.length < 2) return;
+
+      // 1. Prefix compound: (RD|RDÜ|ÜB) + standard shift (e.g. "RDRT2M", "RDÜRT2M*")
+      const prefixMatch = code.match(new RegExp('^(RD|RDÜ|ÜB)(' + stdPattern + ')(\\*?)$'));
+      if (prefixMatch) {
+        const c1 = prefixMatch[1] === 'RD' ? 'RDÜ' : prefixMatch[1];
+        const c2 = prefixMatch[2] + (prefixMatch[3] || '');
+        result.push(cleanSingleShiftCode(c1));
+        result.push(cleanSingleShiftCode(c2));
+        return;
       }
+
+      // 2. Suffix compound: standard shift + (RD|RDÜ|ÜB) (e.g. "RT2MRD", "RT2MRDÜ*")
+      const suffixMatch = code.match(new RegExp('^(' + stdPattern + ')(RD|RDÜ|ÜB)(\\*?)$'));
+      if (suffixMatch) {
+        const c1 = suffixMatch[1];
+        const c2 = (suffixMatch[2] === 'RD' ? 'RDÜ' : suffixMatch[2]) + (suffixMatch[3] || '');
+        result.push(cleanSingleShiftCode(c1));
+        result.push(cleanSingleShiftCode(c2));
+        return;
+      }
+
+      // 3. Two standard shifts concatenated without delimiter: e.g. "RFMRT2M"
+      const twoStdMatch = code.match(new RegExp('^(' + stdPattern + ')(' + stdPattern + ')(\\*?)$'));
+      if (twoStdMatch) {
+        result.push(cleanSingleShiftCode(twoStdMatch[1]));
+        result.push(cleanSingleShiftCode(twoStdMatch[2] + (twoStdMatch[3] || '')));
+        return;
+      }
+
+      result.push(cleanSingleShiftCode(code));
     });
   });
+
   return result;
 }
 
 /**
  * Normalizes all shifts in a roster, ensuring any cell or entry with multiple shift codes
- * (e.g. "RDÜ,RT2M") is automatically split into separate individual shift objects for that day.
+ * (e.g. "RDÜ,RT2M" or un-delimited "RDRT2M") is automatically split into separate individual shift objects for that day.
  * Applies as a universal check to all days, colleagues and shifts.
  */
 export function normalizeRosterMultipleShifts(roster) {
@@ -124,9 +170,9 @@ export function normalizeRosterMultipleShifts(roster) {
           if (seenShiftsByDate[dateStr].has(dedupeKey)) return;
           seenShiftsByDate[dateStr].add(dedupeKey);
 
-          const st = shift.shiftTypeName || getShiftTypeForCode(c);
+          const st = getShiftTypeForCode(c);
           const station = shift.station || getStationForCode(c);
-          const times = (shift.startTime && shift.endTime && codes.length <= 1)
+          const times = (shift.startTime && shift.endTime && codes.length <= 1 && c === shift.code)
             ? { startTime: shift.startTime, endTime: shift.endTime }
             : getTimesForCode(c, st);
 
@@ -146,9 +192,28 @@ export function normalizeRosterMultipleShifts(roster) {
     }
   });
 
+  // Also normalize roster.colleagues entries so they reflect split & cleaned codes
+  const normalizedColleagues = Array.isArray(roster.colleagues)
+    ? roster.colleagues.map(c => {
+        if (!c || !c.shifts) return c;
+        const newShifts = {};
+        Object.entries(c.shifts).forEach(([dStr, codeVal]) => {
+          const codes = splitShiftCodes(codeVal);
+          if (codes.length > 0) {
+            newShifts[dStr] = codes.join(', ');
+          }
+        });
+        return {
+          ...c,
+          shifts: newShifts
+        };
+      })
+    : roster.colleagues;
+
   return {
     ...roster,
     totalShifts,
+    colleagues: normalizedColleagues,
     shiftsByDate: normalizedShiftsByDate
   };
 }
@@ -174,7 +239,7 @@ export function getShiftTypeForCode(code = '') {
   const preset = getPresetForCode(c) || getPresetForCode(clean);
   if (preset?.shiftTypeName) return preset.shiftTypeName;
 
-  if (['PALS', 'ACLS', 'SMT', 'RAJ'].some(k => clean.includes(k))) return 'Fortbildung';
+  if (['PALS', 'ACLS', 'SMT', 'RAJ', 'LGI'].some(k => clean.includes(k))) return 'Fortbildung';
   if (['V030', 'V-B', 'V07', 'VFU', 'UDN'].some(k => clean.includes(k))) return 'Urlaub / Freistellung';
   if (['IO', 'F-M', 'C-M', 'SW1', 'RZF', 'R-SAN'].some(k => clean.includes(k)) || clean.startsWith('RD') || clean.startsWith('ÜB')) return 'Sonderdienst';
   if (clean.includes('RN') || clean.endsWith('NM') || clean.endsWith('NH')) return 'Nachtschicht';
@@ -448,7 +513,8 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
     try {
       const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${preferredYearMonth}_${st}`);
       if (stored) {
-        stationRosters[st] = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        stationRosters[st] = normalizeRosterMultipleShifts(parsed);
       }
     } catch (e) {}
   });
@@ -459,8 +525,9 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
       const legacy = localStorage.getItem(`${STORAGE_KEY_PREFIX}${preferredYearMonth}`);
       if (legacy) {
         const parsed = JSON.parse(legacy);
-        const detected = detectRosterStation(parsed);
-        stationRosters[detected] = parsed;
+        const normalized = normalizeRosterMultipleShifts(parsed);
+        const detected = detectRosterStation(normalized);
+        stationRosters[detected] = normalized;
       }
     } catch (e) {}
   }

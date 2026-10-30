@@ -152,6 +152,16 @@ export const SHIFT_PRESETS = {
     station: 'Wache Obersendling',
     vehicle: 'RTW Akkon Obersendling 71/1',
     callSign: 'Akkon Obersendling 71/1'
+  },
+  'RDÜ': {
+    code: 'RDÜ',
+    shiftTypeName: 'Sonderdienst',
+    startTime: '08:00',
+    endTime: '16:00',
+    hours: 8.0,
+    station: 'Wache Sendling',
+    vehicle: 'Sonderdienst',
+    callSign: 'Sonderdienst'
   }
 };
 
@@ -179,7 +189,8 @@ export const CAREMAN_OCTOBER_2026_EXTRA = [
 
 export function getPresetForCode(rawCode) {
   if (!rawCode) return null;
-  const clean = rawCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const clean = rawCode.trim().toUpperCase().replace(/[^A-ZÄÖÜ0-9\-]/g, '');
+  if (clean === 'RD') return SHIFT_PRESETS['RDÜ'] || null;
   return SHIFT_PRESETS[clean] || null;
 }
 

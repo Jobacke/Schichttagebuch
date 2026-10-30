@@ -123,27 +123,60 @@ export function StoreProvider({ children }) {
     if (!currentUser || !shiftsArray || shiftsArray.length === 0) return true;
     try {
       const batch = writeBatch(db);
-      const reusedIdsByDate = {};
+      const dateToMatchedPairs = {};
 
       if (overwriteExistingDates) {
         const datesToOverwrite = new Set(shiftsArray.map(s => s.date));
-        const existingOnDates = (shifts || []).filter(s => datesToOverwrite.has(s.date));
-        existingOnDates.forEach(s => {
-          if (!reusedIdsByDate[s.date]) {
-            // Reuse first existing shift ID on that date so iOS Calendar UID stays identical!
-            reusedIdsByDate[s.date] = s;
-          } else {
-            // Delete any extra shifts on that same date
-            batch.delete(doc(db, `users/${currentUser.uid}/shifts`, s.id));
-          }
+        
+        // Group existing shifts by date
+        const existingByDate = {};
+        (shifts || []).filter(s => datesToOverwrite.has(s.date)).forEach(s => {
+          if (!existingByDate[s.date]) existingByDate[s.date] = [];
+          existingByDate[s.date].push(s);
+        });
+
+        // Group incoming shifts by date
+        const incomingByDate = {};
+        shiftsArray.forEach(s => {
+          if (!incomingByDate[s.date]) incomingByDate[s.date] = [];
+          incomingByDate[s.date].push(s);
+        });
+
+        Object.keys(incomingByDate).forEach(date => {
+          const existingList = existingByDate[date] ? [...existingByDate[date]] : [];
+          const incomingList = incomingByDate[date];
+          const matchedPairs = [];
+
+          incomingList.forEach(inc => {
+            // First try to match existing shift with identical code to keep IDs / bonus settings
+            const matchIdx = existingList.findIndex(e => e.code === inc.code);
+            if (matchIdx !== -1) {
+              matchedPairs.push({ incoming: inc, prev: existingList.splice(matchIdx, 1)[0] });
+            } else if (existingList.length > 0) {
+              matchedPairs.push({ incoming: inc, prev: existingList.shift() });
+            } else {
+              matchedPairs.push({ incoming: inc, prev: null });
+            }
+          });
+
+          // Any remaining existing shifts on this date not present in incoming list are deleted
+          existingList.forEach(extra => {
+            batch.delete(doc(db, `users/${currentUser.uid}/shifts`, extra.id));
+          });
+
+          dateToMatchedPairs[date] = matchedPairs;
         });
       }
 
       shiftsArray.forEach(shift => {
-        const prevShift = overwriteExistingDates ? reusedIdsByDate[shift.date] : null;
-        if (prevShift) {
-          delete reusedIdsByDate[shift.date];
+        let prevShift = null;
+        if (overwriteExistingDates && dateToMatchedPairs[shift.date]) {
+          const matchIdx = dateToMatchedPairs[shift.date].findIndex(p => p.incoming === shift);
+          if (matchIdx !== -1) {
+            prevShift = dateToMatchedPairs[shift.date].splice(matchIdx, 1)[0].prev;
+          }
         }
+
         const id = prevShift?.id || shift.id || crypto.randomUUID();
         const ref = doc(db, `users/${currentUser.uid}/shifts`, id);
         batch.set(ref, {

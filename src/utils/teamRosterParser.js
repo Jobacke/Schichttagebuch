@@ -67,6 +67,93 @@ export async function runTeamRosterOcr(imageSource, onProgress) {
 }
 
 /**
+ * Splits and cleans multiple shift codes from a single cell string or array.
+ * Supports delimiters: comma, slash, semicolon, plus, pipe, newline, whitespace.
+ * Preserves German characters (ÄÖÜ) and asterisks (*).
+ * Example: "RDÜ,RT2M" -> ["RDÜ", "RT2M"]
+ * Example: "RFM*" -> ["RFM*"]
+ */
+export function splitShiftCodes(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.flatMap(r => splitShiftCodes(r));
+  }
+  const str = String(raw).trim();
+  if (!str) return [];
+  const tokens = str.split(/[,;/+|\\\n\r]+/);
+  const result = [];
+  tokens.forEach(tok => {
+    let t = tok.trim();
+    if (!t) return;
+    const subTokens = t.split(/\s+/);
+    subTokens.forEach(st => {
+      let code = st.trim().toUpperCase();
+      if (!code || code === '-' || code === '/' || code === '0' || code === '00' || code === 'FREI') return;
+      code = code.replace(/[^A-ZÄÖÜ0-9\-*]/g, '');
+      if (code.length >= 2) {
+        result.push(code);
+      }
+    });
+  });
+  return result;
+}
+
+/**
+ * Normalizes all shifts in a roster, ensuring any cell or entry with multiple shift codes
+ * (e.g. "RDÜ,RT2M") is automatically split into separate individual shift objects for that day.
+ * Applies as a universal check to all days, colleagues and shifts.
+ */
+export function normalizeRosterMultipleShifts(roster) {
+  if (!roster || !roster.shiftsByDate) return roster;
+
+  let totalShifts = 0;
+  const normalizedShiftsByDate = {};
+  const seenShiftsByDate = {};
+
+  Object.entries(roster.shiftsByDate).forEach(([dateStr, list]) => {
+    normalizedShiftsByDate[dateStr] = [];
+    seenShiftsByDate[dateStr] = new Set();
+    if (Array.isArray(list)) {
+      list.forEach(shift => {
+        if (!shift || !shift.code) return;
+        const codes = splitShiftCodes(shift.code);
+        if (codes.length === 0) return;
+
+        codes.forEach(c => {
+          const dedupeKey = `${(shift.name || '').toLowerCase()}_${c}`;
+          if (seenShiftsByDate[dateStr].has(dedupeKey)) return;
+          seenShiftsByDate[dateStr].add(dedupeKey);
+
+          const st = shift.shiftTypeName || getShiftTypeForCode(c);
+          const station = shift.station || getStationForCode(c);
+          const times = (shift.startTime && shift.endTime && codes.length <= 1)
+            ? { startTime: shift.startTime, endTime: shift.endTime }
+            : getTimesForCode(c, st);
+
+          normalizedShiftsByDate[dateStr].push({
+            ...shift,
+            code: c,
+            shiftTypeName: st,
+            station: station,
+            startTime: times.startTime,
+            endTime: times.endTime,
+            isTraining: st === 'Fortbildung',
+            isVacation: st.includes('Urlaub') || st.includes('Freistellung')
+          });
+          totalShifts++;
+        });
+      });
+    }
+  });
+
+  return {
+    ...roster,
+    totalShifts,
+    shiftsByDate: normalizedShiftsByDate
+  };
+}
+
+/**
  * Helper to determine station from code or text
  */
 export function getStationForCode(code = '') {
@@ -89,7 +176,7 @@ export function getShiftTypeForCode(code = '') {
 
   if (['PALS', 'ACLS', 'SMT', 'RAJ'].some(k => clean.includes(k))) return 'Fortbildung';
   if (['V030', 'V-B', 'V07', 'VFU', 'UDN'].some(k => clean.includes(k))) return 'Urlaub / Freistellung';
-  if (['IO', 'F-M', 'C-M', 'SW1', 'RZF', 'R-SAN'].some(k => clean.includes(k))) return 'Sonderdienst';
+  if (['IO', 'F-M', 'C-M', 'SW1', 'RZF', 'R-SAN'].some(k => clean.includes(k)) || clean.startsWith('RD') || clean.startsWith('ÜB')) return 'Sonderdienst';
   if (clean.includes('RN') || clean.endsWith('NM') || clean.endsWith('NH')) return 'Nachtschicht';
   if (clean.includes('RF') || clean.endsWith('FM') || clean.endsWith('FH') || clean.endsWith('FO')) return 'Frühschicht';
   if (clean.includes('RS') || clean.endsWith('SM') || clean.endsWith('SH') || clean.endsWith('SO')) return 'Spätschicht';
@@ -311,9 +398,10 @@ export function detectRosterStation(rosterData) {
  */
 export function saveStationTeamRoster(rosterData, stationOverride) {
   if (!rosterData || !rosterData.yearMonth) return 'Sendling';
-  const station = stationOverride || rosterData.station || detectRosterStation(rosterData);
+  const normalized = normalizeRosterMultipleShifts(rosterData);
+  const station = stationOverride || normalized.station || detectRosterStation(normalized);
   const updatedRoster = {
-    ...rosterData,
+    ...normalized,
     station
   };
 
@@ -380,7 +468,7 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
   // 3. Fallback to preloaded October 2026 data if no saved station rosters exist for October
   if (Object.keys(stationRosters).length === 0 && preferredYearMonth === '2026-10') {
     const preset = getPresetRosterForMonth('2026-10');
-    if (preset) return preset;
+    if (preset) return normalizeRosterMultipleShifts(preset);
   }
 
   // 4. Merge all available station rosters for this month into one unified view
@@ -428,7 +516,7 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
       }
     });
 
-    return {
+    return normalizeRosterMultipleShifts({
       yearMonth: preferredYearMonth,
       monthLabel,
       daysInMonth,
@@ -439,7 +527,7 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
       stationsPresent: stationKeys,
       stationRosters,
       isVerified: true
-    };
+    });
   }
 
   // 5. Empty template fallback
@@ -872,30 +960,32 @@ export function extractPersonalShiftsFromRoster(yearMonth, rosterOverride = null
     .sort(([a], [b]) => a.localeCompare(b))
     .forEach(([dateStr, dayShifts]) => {
       if (!dateStr.startsWith(yearMonth) || !Array.isArray(dayShifts)) return;
-      const myEntry = dayShifts.find(s => s && s.name && s.name.toLowerCase().includes(selfLower));
-      if (!myEntry || !myEntry.code) return;
+      const myEntries = dayShifts.filter(s => s && s.name && s.name.toLowerCase().includes(selfLower));
+      myEntries.forEach(myEntry => {
+        if (!myEntry || !myEntry.code) return;
 
-      const rawCode = String(myEntry.code).trim();
-      const baseCode = rawCode.replace(/\*+$/, '').trim().toUpperCase();
-      if (!baseCode || isNonPartnerShiftCode(baseCode)) return;
+        const rawCode = String(myEntry.code).trim();
+        const baseCode = rawCode.replace(/\*+$/, '').trim().toUpperCase();
+        if (!baseCode || isNonPartnerShiftCode(baseCode)) return;
 
-      const preset = getPresetForCode(baseCode);
-      const shiftTypeName = preset?.shiftTypeName || getShiftTypeForCode(baseCode);
-      if (shiftTypeName === 'Urlaub / Freistellung') return;
+        const preset = getPresetForCode(baseCode);
+        const shiftTypeName = preset?.shiftTypeName || getShiftTypeForCode(baseCode);
+        if (shiftTypeName === 'Urlaub / Freistellung') return;
 
-      const times = getTimesForCode(baseCode, shiftTypeName);
-      const partner = getPartnersForShiftFromRoster(dateStr, baseCode, roster, selfNameQuery);
-      const dayNum = parseInt(dateStr.split('-')[2], 10);
+        const times = getTimesForCode(baseCode, shiftTypeName);
+        const partner = getPartnersForShiftFromRoster(dateStr, baseCode, roster, selfNameQuery);
+        const dayNum = parseInt(dateStr.split('-')[2], 10);
 
-      results.push({
-        date: dateStr,
-        day: dayNum,
-        code: baseCode,
-        rawCode,
-        startTime: preset?.startTime || times.startTime,
-        endTime: preset?.endTime || times.endTime,
-        partner,
-        preset
+        results.push({
+          date: dateStr,
+          day: dayNum,
+          code: baseCode,
+          rawCode,
+          startTime: preset?.startTime || myEntry.startTime || times.startTime,
+          endTime: preset?.endTime || myEntry.endTime || times.endTime,
+          partner,
+          preset
+        });
       });
     });
 

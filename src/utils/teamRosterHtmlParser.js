@@ -1,5 +1,5 @@
 import { cleanColleagueName, isVehicleOrDummyRow } from './teamRosterPdfParser.js';
-import { getShiftTypeForCode, getStationForCode, getTimesForCode } from './teamRosterParser.js';
+import { getShiftTypeForCode, getStationForCode, getTimesForCode, splitShiftCodes } from './teamRosterParser.js';
 
 /**
  * Universal multi-strategy CareMan HTML & Text parser
@@ -70,8 +70,8 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
         const normalizedShifts = {};
         Object.entries(c.shifts).forEach(([k, v]) => {
           if (!v) return;
-          const cleanCode = String(v).replace(/\s+/g, '').toUpperCase();
-          if (cleanCode.length < 2 || cleanCode === '-' || cleanCode === '/' || cleanCode === '0') return;
+          const codes = splitShiftCodes(v);
+          if (codes.length === 0) return;
 
           let dateStr = k;
           if (!k.includes('-')) {
@@ -82,20 +82,22 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
           }
 
           if (shiftsByDateMap[dateStr]) {
-            normalizedShifts[dateStr] = cleanCode;
-            const st = getShiftTypeForCode(cleanCode);
-            const station = getStationForCode(cleanCode);
-            const times = getTimesForCode(cleanCode, st);
+            normalizedShifts[dateStr] = codes.join(', ');
+            codes.forEach(cleanCode => {
+              const st = getShiftTypeForCode(cleanCode);
+              const station = getStationForCode(cleanCode);
+              const times = getTimesForCode(cleanCode, st);
 
-            shiftsByDateMap[dateStr].push({
-              name: name,
-              code: cleanCode,
-              shiftTypeName: st,
-              station: station,
-              startTime: times.startTime,
-              endTime: times.endTime,
-              isTraining: st === 'Fortbildung',
-              isVacation: st.includes('Urlaub') || st.includes('Freistellung')
+              shiftsByDateMap[dateStr].push({
+                name: name,
+                code: cleanCode,
+                shiftTypeName: st,
+                station: station,
+                startTime: times.startTime,
+                endTime: times.endTime,
+                isTraining: st === 'Fortbildung',
+                isVacation: st.includes('Urlaub') || st.includes('Freistellung')
+              });
             });
           }
         });
@@ -184,25 +186,27 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
   const colleaguesList = [];
   const processedColleagues = new Set();
 
-  function registerShift(name, dayNum, code) {
-    if (!name || !code || dayNum < 1 || dayNum > daysInMonth) return;
-    const cleanCode = code.toUpperCase().trim();
-    if (cleanCode.length < 2 || cleanCode === '-' || cleanCode === '/' || cleanCode === '0' || cleanCode === 'FREI') return;
+  function registerShift(name, dayNum, codeOrCodes) {
+    if (!name || !codeOrCodes || dayNum < 1 || dayNum > daysInMonth) return;
+    const codes = splitShiftCodes(codeOrCodes);
+    if (codes.length === 0) return;
 
     const dateStr = `${yearMonth}-${String(dayNum).padStart(2, '0')}`;
-    const st = getShiftTypeForCode(cleanCode);
-    const station = getStationForCode(cleanCode);
-    const times = getTimesForCode(cleanCode, st);
+    codes.forEach(cleanCode => {
+      const st = getShiftTypeForCode(cleanCode);
+      const station = getStationForCode(cleanCode);
+      const times = getTimesForCode(cleanCode, st);
 
-    shiftsByDate[dateStr].push({
-      name: name,
-      code: cleanCode,
-      shiftTypeName: st,
-      station: station,
-      startTime: times.startTime,
-      endTime: times.endTime,
-      isTraining: st === 'Fortbildung',
-      isVacation: st.includes('Urlaub') || st.includes('Freistellung')
+      shiftsByDate[dateStr].push({
+        name: name,
+        code: cleanCode,
+        shiftTypeName: st,
+        station: station,
+        startTime: times.startTime,
+        endTime: times.endTime,
+        isTraining: st === 'Fortbildung',
+        isVacation: st.includes('Urlaub') || st.includes('Freistellung')
+      });
     });
   }
 
@@ -273,12 +277,10 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
                 const attr = badge.getAttribute('data-shift') || badge.getAttribute('title');
                 if (attr) code = attr.trim();
               }
-              const tokens = code.split(/[\s\r\n]+/).filter(Boolean);
-              const validToken = tokens.find(t => /^[A-Z0-9\-*]{2,10}$/i.test(t));
-              if (validToken) {
-                const cleanCode = validToken.toUpperCase();
-                colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = cleanCode;
-                registerShift(colleagueName, dayNum, cleanCode);
+              const codes = splitShiftCodes(code);
+              if (codes.length > 0) {
+                colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = codes.join(', ');
+                registerShift(colleagueName, dayNum, codes);
               }
             }
           });
@@ -340,13 +342,11 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
 
           splitDayColMap.forEach((dayNum, cIdx) => {
             if (cIdx < shiftCells.length) {
-              const code = shiftCells[cIdx].textContent.trim().toUpperCase();
-              const tokens = code.split(/[\s\r\n]+/).filter(Boolean);
-              const validToken = tokens.find(t => /^[A-Z0-9\-*]{2,10}$/i.test(t));
-              if (validToken) {
-                const cleanCode = validToken.toUpperCase();
-                colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = cleanCode;
-                registerShift(colleagueName, dayNum, cleanCode);
+              const code = shiftCells[cIdx].textContent.trim();
+              const codes = splitShiftCodes(code);
+              if (codes.length > 0) {
+                colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = codes.join(', ');
+                registerShift(colleagueName, dayNum, codes);
               }
             }
           });
@@ -407,11 +407,11 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
         // Explicit column index to day number mapping
         dayColMap.forEach((dayNum, colIdx) => {
           if (colIdx < parts.length) {
-            const token = parts[colIdx].trim().toUpperCase();
-            if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
-              const cleanCode = token.split(/[\s,]+/)[0];
-              colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = cleanCode;
-              registerShift(colleagueName, dayNum, cleanCode);
+            const token = parts[colIdx].trim();
+            const codes = splitShiftCodes(token);
+            if (codes.length > 0) {
+              colleagueShifts[`${yearMonth}-${String(dayNum).padStart(2, '0')}`] = codes.join(', ');
+              registerShift(colleagueName, dayNum, codes);
             }
           }
         });
@@ -420,11 +420,11 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
         for (let d = 1; d <= daysInMonth; d++) {
           const colIdx = nameIdx + d;
           if (colIdx < parts.length) {
-            const token = parts[colIdx].trim().toUpperCase();
-            if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
-              const cleanCode = token.split(/[\s,]+/)[0];
-              colleagueShifts[`${yearMonth}-${String(d).padStart(2, '0')}`] = cleanCode;
-              registerShift(colleagueName, d, cleanCode);
+            const token = parts[colIdx].trim();
+            const codes = splitShiftCodes(token);
+            if (codes.length > 0) {
+              colleagueShifts[`${yearMonth}-${String(d).padStart(2, '0')}`] = codes.join(', ');
+              registerShift(colleagueName, d, codes);
             }
           }
         }
@@ -459,26 +459,22 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
 
         const lineParts = line.split('\t').slice(1);
         lineParts.forEach(p => {
-          const token = p.trim().toUpperCase();
-          if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
-            const cleanCode = token.split(/[\s,]+/)[0];
-            if (dayIndex <= daysInMonth) {
-              colleagueShifts[`${yearMonth}-${String(dayIndex).padStart(2, '0')}`] = cleanCode;
-              registerShift(currentColleague, dayIndex, cleanCode);
-            }
+          const token = p.trim();
+          const codes = splitShiftCodes(token);
+          if (codes.length > 0 && dayIndex <= daysInMonth) {
+            colleagueShifts[`${yearMonth}-${String(dayIndex).padStart(2, '0')}`] = codes.join(', ');
+            registerShift(currentColleague, dayIndex, codes);
           }
           dayIndex++;
         });
       } else if (currentColleague) {
         const parts = line.split('\t');
         parts.forEach(p => {
-          const token = p.trim().toUpperCase();
-          if (token && token.length >= 2 && token !== '-' && token !== '/' && token !== 'FREI' && token !== '0') {
-            const cleanCode = token.split(/[\s,]+/)[0];
-            if (dayIndex <= daysInMonth) {
-              colleagueShifts[`${yearMonth}-${String(dayIndex).padStart(2, '0')}`] = cleanCode;
-              registerShift(currentColleague, dayIndex, cleanCode);
-            }
+          const token = p.trim();
+          const codes = splitShiftCodes(token);
+          if (codes.length > 0 && dayIndex <= daysInMonth) {
+            colleagueShifts[`${yearMonth}-${String(dayIndex).padStart(2, '0')}`] = codes.join(', ');
+            registerShift(currentColleague, dayIndex, codes);
           }
           dayIndex++;
         });

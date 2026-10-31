@@ -5,6 +5,7 @@ import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { exportToPDF } from '../utils/pdfExport';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { getShiftColor, STATION_THEMES, detectStation } from '../utils/shiftColors';
+import { getIncomingNightShiftForDate } from '../utils/teamRosterParser';
 import { ChevronLeft, ChevronRight, X, SlidersHorizontal } from 'lucide-react';
 
 // Helper for CSS Date controls
@@ -67,7 +68,7 @@ const resolveShiftDetails = (s, storeSettings) => {
 };
 
 // Component: Modern Month Calendar & Shift Rhythm Grid
-function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings }) {
+function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, storeSettings }) {
     const [selectedDateStr, setSelectedDateStr] = useState(null);
 
     // Group shifts by date string YYYY-MM-DD
@@ -184,11 +185,13 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
         const dayShifts = shiftsByDate[dateStr] || [];
         const isWeekend = ((firstDay + d - 1) % 7) >= 5;
         const isToday = dateStr === todayStr;
+        const incomingNightShift = dayShifts.length === 0 ? getIncomingNightShiftForDate(dateStr, allShifts) : null;
         days.push({
             empty: false,
             dayNum: d,
             dateStr,
             shifts: dayShifts,
+            incomingNightShift,
             isWeekend,
             isToday,
             key: dateStr
@@ -197,6 +200,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
 
     const shiftDaysCount = Object.keys(shiftsByDate).length;
     const freeDaysCount = Math.max(0, daysInMonth - shiftDaysCount);
+    const nightShiftEndDaysCount = days.filter(d => !d.empty && d.incomingNightShift && (!d.shifts || d.shifts.length === 0)).length;
 
     const selectedDayData = selectedDateStr ? days.find(d => !d.empty && d.dateStr === selectedDateStr) : null;
     let selectedDayInfo = null;
@@ -205,7 +209,8 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
         selectedDayInfo = {
             dateStr: selectedDayData.dateStr,
             dateFormatted: dObj.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }),
-            shifts: selectedDayData.shifts
+            shifts: selectedDayData.shifts,
+            incomingNightShift: selectedDayData.incomingNightShift
         };
     }
 
@@ -225,6 +230,19 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                     }}>
                         {filteredData.length} {filteredData.length === 1 ? 'Schicht' : 'Schichten'}
                     </span>
+                    {nightShiftEndDaysCount > 0 && (
+                        <span style={{
+                            background: 'rgba(168, 85, 247, 0.15)',
+                            color: '#c084fc',
+                            border: '1px solid rgba(168, 85, 247, 0.35)',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 700
+                        }}>
+                            🌙 {nightShiftEndDaysCount}x Nacht-Ende
+                        </span>
+                    )}
                     <span style={{
                         background: 'rgba(148, 163, 184, 0.12)',
                         color: '#94a3b8',
@@ -233,7 +251,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                         fontSize: '12px',
                         fontWeight: 600
                     }}>
-                        {freeDaysCount} Tage frei
+                        {Math.max(0, freeDaysCount - nightShiftEndDaysCount)} Tage frei
                     </span>
                 </div>
             </div>
@@ -270,6 +288,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                     const isSelected = selectedDateStr === item.dateStr;
                     const isToday = item.isToday;
                     const hasBonusDay = hasShift && item.shifts.some(sh => sh.hasBonus);
+                    const incomingNightShift = item.incomingNightShift;
 
                     return (
                         <div
@@ -285,17 +304,29 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                 justifyContent: 'space-between',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease',
-                                background: hasShift ? shiftColor.bg : (item.isWeekend ? 'rgba(30, 41, 59, 0.4)' : '#0f172a'),
+                                background: hasShift
+                                    ? shiftColor.bg
+                                    : (incomingNightShift ? 'rgba(88, 28, 135, 0.22)' : (item.isWeekend ? 'rgba(30, 41, 59, 0.4)' : '#0f172a')),
                                 border: isSelected
                                     ? '2px solid #38bdf8'
                                     : (isToday
                                         ? '2px solid #f97316'
-                                        : (hasBonusDay ? '1px solid #facc15' : (hasShift ? `1px solid ${shiftColor.border}` : '1px solid #1e293b'))),
+                                        : (hasBonusDay
+                                            ? '1px solid #facc15'
+                                            : (hasShift
+                                                ? `1px solid ${shiftColor.border}`
+                                                : (incomingNightShift ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid #1e293b')))),
                                 boxShadow: isSelected
                                     ? '0 0 10px rgba(56, 189, 248, 0.35)'
-                                    : (isToday ? '0 0 10px rgba(249, 115, 22, 0.45)' : 'none')
+                                    : (isToday
+                                        ? '0 0 10px rgba(249, 115, 22, 0.45)'
+                                        : (incomingNightShift ? '0 0 6px rgba(168, 85, 247, 0.15)' : 'none'))
                             }}
-                            title={hasShift ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})${hasBonusDay ? ' • 💰 Bonus' : ''}${isToday ? ' • Heute' : ''}` : `Tag ${item.dayNum}: Frei${isToday ? ' • Heute' : ''}`}
+                            title={hasShift
+                                ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})${hasBonusDay ? ' • 💰 Bonus' : ''}${isToday ? ' • Heute' : ''}`
+                                : (incomingNightShift
+                                    ? `Tag ${item.dayNum}: Nachtschicht-Ende bis ${incomingNightShift.endTime} Uhr (${incomingNightShift.code} vom Vortag, danach frei)${isToday ? ' • Heute' : ''}`
+                                    : `Tag ${item.dayNum}: Frei${isToday ? ' • Heute' : ''}`)}
                         >
                             {/* Day Number & Station Badge */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 2px' }}>
@@ -339,6 +370,19 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                         {resolved.stationShort}
                                     </span>
                                 )}
+                                {!hasShift && incomingNightShift && (
+                                    <span style={{
+                                        fontSize: '7.5px',
+                                        fontWeight: 800,
+                                        color: '#c084fc',
+                                        background: 'rgba(168, 85, 247, 0.2)',
+                                        padding: '1px 3px',
+                                        borderRadius: '3px',
+                                        lineHeight: 1
+                                    }}>
+                                        ENDE
+                                    </span>
+                                )}
                             </div>
 
                             {/* Shift Badge or Free Dot / Heute */}
@@ -356,6 +400,21 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                                     textAlign: 'center'
                                 }}>
                                     {resolved.code}{hasBonusDay ? '💰' : ''}
+                                </div>
+                            ) : incomingNightShift ? (
+                                <div style={{
+                                    fontSize: '8.5px',
+                                    fontWeight: 700,
+                                    color: '#c084fc',
+                                    lineHeight: 1,
+                                    marginTop: '2px',
+                                    textAlign: 'center',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: '100%'
+                                }}>
+                                    🌙 {incomingNightShift.endTime}
                                 </div>
                             ) : isToday ? (
                                 <div style={{
@@ -387,10 +446,14 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                     marginTop: '12px',
                     padding: '12px 14px',
                     borderRadius: '10px',
-                    background: selectedDayInfo.shifts.length > 0 ? '#1e293b' : 'rgba(15, 23, 42, 0.6)',
-                    border: selectedDayInfo.shifts.length > 0 ? '1px solid #334155' : '1px dashed #334155'
+                    background: selectedDayInfo.shifts.length > 0
+                        ? '#1e293b'
+                        : (selectedDayInfo.incomingNightShift ? 'rgba(88, 28, 135, 0.25)' : 'rgba(15, 23, 42, 0.6)'),
+                    border: selectedDayInfo.shifts.length > 0
+                        ? '1px solid #334155'
+                        : (selectedDayInfo.incomingNightShift ? '1px solid rgba(168, 85, 247, 0.4)' : '1px dashed #334155')
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: selectedDayInfo.shifts.length > 0 ? '8px' : 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (selectedDayInfo.shifts.length > 0 || selectedDayInfo.incomingNightShift) ? '8px' : 0 }}>
                         <span style={{ fontWeight: 700, fontSize: '13px', color: '#f8fafc' }}>
                             📅 {selectedDayInfo.dateFormatted}{selectedDayInfo.dateStr === todayStr ? ' (Heute)' : ''}
                         </span>
@@ -405,9 +468,49 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                     </div>
 
                     {selectedDayInfo.shifts.length === 0 ? (
-                        <div style={{ fontSize: '12.5px', color: '#94a3b8', fontStyle: 'italic', paddingTop: '4px' }}>
-                            🌴 Dienstfrei – kein Einsatz an diesem Tag
-                        </div>
+                        selectedDayInfo.incomingNightShift ? (
+                            <div style={{ fontSize: '12.5px', color: '#cbd5e1', paddingTop: '2px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                                    <span style={{
+                                        background: 'rgba(168, 85, 247, 0.25)',
+                                        color: '#c084fc',
+                                        border: '1px solid rgba(168, 85, 247, 0.45)',
+                                        padding: '2px 8px',
+                                        borderRadius: '5px',
+                                        fontSize: '12px',
+                                        fontWeight: 800
+                                    }}>
+                                        🌙 {selectedDayInfo.incomingNightShift.code}
+                                    </span>
+                                    <span style={{ fontWeight: 700, fontSize: '13px', color: '#f1f5f9' }}>
+                                        Nachtschicht-Folgetag
+                                    </span>
+                                    <span style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                                        🕒 Dienstende um {selectedDayInfo.incomingNightShift.endTime} Uhr{selectedDayInfo.incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''}
+                                    </span>
+                                    {selectedDayInfo.incomingNightShift.station && (
+                                        <span style={{
+                                            background: 'rgba(15, 23, 42, 0.8)',
+                                            color: '#94a3b8',
+                                            border: '1px solid #334155',
+                                            padding: '1px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 600
+                                        }}>
+                                            📍 {selectedDayInfo.incomingNightShift.station}
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                    🛌 Dienstende der Nachtschicht vom Vortag um {selectedDayInfo.incomingNightShift.endTime} Uhr – danach frei
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: '12.5px', color: '#94a3b8', fontStyle: 'italic', paddingTop: '4px' }}>
+                                🌴 Dienstfrei – kein Einsatz an diesem Tag
+                            </div>
+                        )
                     ) : (
                         selectedDayInfo.shifts.map((s, idx) => {
                             const dur = calcDuration(s.startTime, s.endTime);
@@ -501,6 +604,10 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, storeSettings
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Obersendling.primaryHex }} />
                     <span>Obersendling (Orange)</span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#a855f7' }} />
+                    <span>Nacht-Ende (Lila)</span>
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#334155' }} />
@@ -859,6 +966,7 @@ export default function Analysis() {
                     baseDate={baseDate}
                     filterMode={filterMode}
                     filteredData={filteredData}
+                    allShifts={store.shifts}
                     storeSettings={store.settings}
                 />
             </div>

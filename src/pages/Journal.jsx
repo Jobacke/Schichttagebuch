@@ -10,7 +10,7 @@ import {
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import { getShiftColor } from '../utils/shiftColors';
-import { getPartnersForShiftFromRoster } from '../utils/teamRosterParser';
+import { getPartnersForShiftFromRoster, getIncomingNightShiftForDate } from '../utils/teamRosterParser';
 
 const JOURNAL_MONTH_STORAGE_KEY = 'schichttagebuch_journal_month';
 
@@ -67,6 +67,11 @@ export default function Journal() {
         : [];
 
     const visibleShifts = selectedDate ? shiftsOnSelectedDate : monthShifts;
+
+    const selectedDateStr = selectedDate
+        ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+        : null;
+    const incomingNightShift = selectedDateStr ? getIncomingNightShiftForDate(selectedDateStr, store.shifts) : null;
 
     const changeMonth = (delta) => {
         const newDate = new Date(currentDate);
@@ -327,6 +332,8 @@ export default function Journal() {
                         const hasBonusShift = dayShifts.some(s => s.hasBonus);
                         const isSelected = selectedDate && isSameDay(date, selectedDate);
                         const isCurrentDay = isSameDay(date, new Date());
+                        const dayDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                        const dayIncomingNight = !hasShift ? getIncomingNightShiftForDate(dayDateStr, store.shifts) : null;
 
                         return (
                             <div
@@ -334,7 +341,9 @@ export default function Journal() {
                                 className={`day-cell ${hasShift ? 'has-shift' : ''} ${isSelected ? 'selected' : ''} ${isCurrentDay ? 'today' : ''}`}
                                 onClick={() => setSelectedDate(date)}
                                 style={{ position: 'relative' }}
-                                title={isCurrentDay ? `Tag ${dayNum} (Heute)` : undefined}
+                                title={isCurrentDay
+                                    ? `Tag ${dayNum} (Heute)`
+                                    : (dayIncomingNight ? `Tag ${dayNum}: Nachtschicht-Ende bis ${dayIncomingNight.endTime} Uhr` : undefined)}
                             >
                                 {dayNum}
                                 {hasBonusShift && (
@@ -349,6 +358,20 @@ export default function Journal() {
                                         }}
                                     >
                                         💰
+                                    </span>
+                                )}
+                                {dayIncomingNight && (
+                                    <span
+                                        title={`Nachtschicht-Ende bis ${dayIncomingNight.endTime} Uhr`}
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: '2px',
+                                            right: '2px',
+                                            fontSize: '8px',
+                                            lineHeight: 1
+                                        }}
+                                    >
+                                        🌙
                                     </span>
                                 )}
                             </div>
@@ -370,7 +393,9 @@ export default function Journal() {
                 <div>
                     <h2 style={{ margin: 0 }}>
                         {selectedDate
-                            ? `${visibleShifts.length > 1 ? 'Dienste' : 'Dienst'} am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`
+                            ? (visibleShifts.length === 0 && incomingNightShift
+                                ? `Nachtschicht-Ende am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`
+                                : `${visibleShifts.length > 1 ? 'Dienste' : 'Dienst'} am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`)
                             : 'Alle Dienste im Monat'
                         }
                     </h2>
@@ -706,9 +731,23 @@ export default function Journal() {
                         border: 'var(--glass-border)'
                     }}>
                         {selectedDate ? (
-                            <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', letterSpacing: '1.5px' }}>
-                                FREI
-                            </div>
+                            incomingNightShift ? (
+                                <div>
+                                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#c084fc', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                        🌙 NACHTSCHICHT-ENDE
+                                    </div>
+                                    <div style={{ fontSize: '13.5px', color: '#cbd5e1', marginBottom: '4px', fontWeight: 600 }}>
+                                        Dienstende um {incomingNightShift.endTime} Uhr{incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                        Aus Nachtschicht ({incomingNightShift.code}) vom Vortag • danach FREI
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', letterSpacing: '1.5px' }}>
+                                    FREI
+                                </div>
+                            )
                         ) : (
                             <div style={{ fontSize: '14px' }}>
                                 Keine Einträge für diesen Monat vorhanden.

@@ -1,5 +1,5 @@
 import { OCTOBER_2026_TEAM_ROSTER, getPresetRosterForMonth } from './teamRosterData.js';
-import { SHIFT_PRESETS, getPresetForCode } from './shiftPresets.js';
+import { SHIFT_PRESETS, getPresetForCode, CAREMAN_OCTOBER_2026_EXTRA } from './shiftPresets.js';
 import { detectStation } from './shiftColors.js';
 import { db } from '../firebase.js';
 import { collection, doc, setDoc, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
@@ -1058,6 +1058,98 @@ export function extractPersonalShiftsFromRoster(yearMonth, rosterOverride = null
 
   return results;
 }
+
+/**
+ * Checks if a night/overnight shift from the previous day ends on dateStr (e.g. 2026-11-01).
+ * Detects both scheduled end times (07:06) and actual overtime (e.g. 08:06).
+ * Returns the incoming night shift details or null.
+ */
+export function getIncomingNightShiftForDate(dateStr, allShifts = []) {
+  if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('-')) return null;
+
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return null;
+
+  const prevDateObj = new Date(y, m - 1, d - 1);
+  const prevDateStr = `${prevDateObj.getFullYear()}-${String(prevDateObj.getMonth() + 1).padStart(2, '0')}-${String(prevDateObj.getDate()).padStart(2, '0')}`;
+
+  // 1. Search in user's saved/journal shifts (allShifts)
+  if (Array.isArray(allShifts) && allShifts.length > 0) {
+    const prevUserShifts = allShifts.filter(s => s && s.date === prevDateStr);
+    for (const s of prevUserShifts) {
+      let isOvernight = false;
+      if (s.startTime && s.endTime) {
+        const [sh, sm] = s.startTime.split(':').map(Number);
+        const [eh, em] = s.endTime.split(':').map(Number);
+        if (sh * 60 + sm > eh * 60 + em) {
+          isOvernight = true;
+        }
+      }
+      const c = (s.code || '').toUpperCase();
+      const st = (s.shiftTypeName || '').toLowerCase();
+      if (isOvernight || c.includes('RN') || c.endsWith('NM') || c.endsWith('NH') || c.endsWith('NO') || c.startsWith('NF') || st.includes('nacht')) {
+        return {
+          prevDate: prevDateStr,
+          code: s.code || 'RNM',
+          shiftTypeName: s.shiftTypeName || 'Nachtschicht',
+          startTime: s.startTime || '22:54',
+          endTime: s.endTime || '07:06',
+          station: s.station || 'Wache Sendling',
+          isOvertime: Boolean(s.endTime && (s.endTime > '07:15' || s.endTime === '08:06')),
+          source: 'userShift'
+        };
+      }
+    }
+  }
+
+  // 2. Check team roster personal shifts for previous month/day
+  const prevYm = prevDateStr.slice(0, 7);
+  try {
+    const personalFromRoster = extractPersonalShiftsFromRoster(prevYm);
+    const matchInRoster = (personalFromRoster || []).find(s => s && s.date === prevDateStr);
+    if (matchInRoster) {
+      const c = (matchInRoster.code || '').toUpperCase();
+      let isOvernight = false;
+      if (matchInRoster.startTime && matchInRoster.endTime) {
+        const [sh, sm] = matchInRoster.startTime.split(':').map(Number);
+        const [eh, em] = matchInRoster.endTime.split(':').map(Number);
+        if (sh * 60 + sm > eh * 60 + em) isOvernight = true;
+      }
+      if (isOvernight || c.includes('RN') || c.endsWith('NM') || c.endsWith('NH') || c.endsWith('NO') || c.startsWith('NF')) {
+        return {
+          prevDate: prevDateStr,
+          code: matchInRoster.code,
+          shiftTypeName: 'Nachtschicht',
+          startTime: matchInRoster.startTime || '22:54',
+          endTime: matchInRoster.endTime || '07:06',
+          station: 'Wache Sendling',
+          isOvertime: false,
+          source: 'teamRoster'
+        };
+      }
+    }
+  } catch (e) {}
+
+  // 3. Fallback for 2026-11-01 from CAREMAN_OCTOBER_2026_EXTRA
+  if (dateStr === '2026-11-01') {
+    const oct31 = (CAREMAN_OCTOBER_2026_EXTRA || []).find(s => s.date === '2026-10-31');
+    if (oct31) {
+      return {
+        prevDate: '2026-10-31',
+        code: oct31.code,
+        shiftTypeName: 'Nachtschicht',
+        startTime: oct31.startTime || '22:54',
+        endTime: oct31.endTime || '07:06',
+        station: 'Wache Sendling',
+        isOvertime: false,
+        source: 'preset'
+      };
+    }
+  }
+
+  return null;
+}
+
 
 
 

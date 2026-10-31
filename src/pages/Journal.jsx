@@ -75,6 +75,7 @@ export default function Journal() {
 
     const changeMonth = (delta) => {
         const newDate = new Date(currentDate);
+        newDate.setDate(1); // Prevent month overflow when currentDate is on the 29th/30th/31st
         newDate.setMonth(newDate.getMonth() + delta);
         setCurrentDate(newDate);
         setSelectedDate(null);

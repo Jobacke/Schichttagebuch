@@ -11,6 +11,7 @@ import { ChevronLeft, ChevronRight, X, SlidersHorizontal } from 'lucide-react';
 // Helper for CSS Date controls
 const addMonths = (date, n) => {
     const d = new Date(date);
+    d.setDate(1);
     d.setMonth(d.getMonth() + n);
     return d;
 };
@@ -1496,6 +1497,7 @@ export default function Analysis() {
                                             key={m.key}
                                             onClick={() => {
                                                 const newD = new Date(baseDate);
+                                                newD.setDate(1);
                                                 newD.setMonth(m.monthIndex);
                                                 setBaseDate(newD);
                                                 setFilterMode('month');

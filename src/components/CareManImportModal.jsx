@@ -102,6 +102,7 @@ export default function CareManImportModal({
 
   const getRelativeYearMonth = (monthOffset) => {
     const d = new Date();
+    d.setDate(1); // Prevent month overflow on 29th/30th/31st
     d.setMonth(d.getMonth() + monthOffset);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   };

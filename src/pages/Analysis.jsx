@@ -703,16 +703,24 @@ export default function Analysis() {
             </div>
 
             {/* Compact Period & Filter Command Bar */}
-            <div className="card-premium" style={{ padding: '12px 14px', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <div className="card-premium" style={{ padding: '8px 12px', marginBottom: '16px', overflowX: 'auto' }}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '8px',
+                    flexWrap: 'nowrap',
+                    minWidth: 'fit-content'
+                }}>
                     
                     {/* Segmented Mode Selector: Monat | Jahr | Zeitraum */}
                     <div style={{
                         display: 'inline-flex',
                         background: '#0f172a',
                         padding: '3px',
-                        borderRadius: '10px',
-                        border: '1px solid #334155'
+                        borderRadius: '9px',
+                        border: '1px solid #334155',
+                        flexShrink: 0
                     }}>
                         {[
                             { id: 'month', label: 'Monat' },
@@ -724,14 +732,15 @@ export default function Analysis() {
                                 type="button"
                                 onClick={() => setFilterMode(m.id)}
                                 style={{
-                                    padding: '6px 13px',
+                                    padding: '5px 10px',
                                     borderRadius: '7px',
                                     border: 'none',
                                     background: filterMode === m.id ? 'var(--color-primary)' : 'transparent',
                                     color: filterMode === m.id ? '#ffffff' : '#94a3b8',
                                     fontWeight: filterMode === m.id ? 700 : 500,
-                                    fontSize: '13px',
+                                    fontSize: '12px',
                                     cursor: 'pointer',
+                                    whiteSpace: 'nowrap',
                                     transition: 'all 0.15s ease'
                                 }}
                             >
@@ -741,9 +750,9 @@ export default function Analysis() {
                     </div>
 
                     {/* Right Side: Period Navigation + Filter PopUp Trigger */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', marginLeft: 'auto', flexShrink: 0 }}>
                         {filterMode === 'month' && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                 <button
                                     type="button"
                                     onClick={() => setBaseDate(addMonths(baseDate, -1))}
@@ -751,22 +760,23 @@ export default function Analysis() {
                                         background: '#0f172a',
                                         border: '1px solid #334155',
                                         color: '#cbd5e1',
-                                        borderRadius: '8px',
-                                        padding: '6px 9px',
+                                        borderRadius: '7px',
+                                        padding: '5px 7px',
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center'
                                     }}
                                     title="Vorheriger Monat"
                                 >
-                                    <ChevronLeft size={16} />
+                                    <ChevronLeft size={15} />
                                 </button>
 
                                 <div style={{
                                     fontWeight: 700,
-                                    fontSize: '14px',
+                                    fontSize: '13.5px',
                                     color: '#f8fafc',
-                                    minWidth: '122px',
+                                    padding: '0 4px',
+                                    whiteSpace: 'nowrap',
                                     textAlign: 'center'
                                 }}>
                                     {baseDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
@@ -779,15 +789,15 @@ export default function Analysis() {
                                         background: '#0f172a',
                                         border: '1px solid #334155',
                                         color: '#cbd5e1',
-                                        borderRadius: '8px',
-                                        padding: '6px 9px',
+                                        borderRadius: '7px',
+                                        padding: '5px 7px',
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center'
                                     }}
                                     title="Nächster Monat"
                                 >
-                                    <ChevronRight size={16} />
+                                    <ChevronRight size={15} />
                                 </button>
 
                                 {!isCurrentMonth && (
@@ -798,10 +808,11 @@ export default function Analysis() {
                                             background: 'rgba(249, 115, 22, 0.12)',
                                             border: '1px solid rgba(249, 115, 22, 0.3)',
                                             color: '#f97316',
-                                            borderRadius: '8px',
-                                            padding: '5px 8px',
+                                            borderRadius: '7px',
+                                            padding: '4px 7px',
                                             fontSize: '11px',
                                             fontWeight: 700,
+                                            whiteSpace: 'nowrap',
                                             cursor: 'pointer'
                                         }}
                                         title="Zum aktuellen Monat springen"
@@ -813,7 +824,7 @@ export default function Analysis() {
                         )}
 
                         {filterMode === 'year' && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                 <button
                                     type="button"
                                     onClick={() => setBaseDate(addMonths(baseDate, -12))}
@@ -821,22 +832,23 @@ export default function Analysis() {
                                         background: '#0f172a',
                                         border: '1px solid #334155',
                                         color: '#cbd5e1',
-                                        borderRadius: '8px',
-                                        padding: '6px 9px',
+                                        borderRadius: '7px',
+                                        padding: '5px 7px',
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center'
                                     }}
                                     title="Vorheriges Jahr"
                                 >
-                                    <ChevronLeft size={16} />
+                                    <ChevronLeft size={15} />
                                 </button>
 
                                 <div style={{
                                     fontWeight: 700,
-                                    fontSize: '15px',
+                                    fontSize: '14px',
                                     color: '#f8fafc',
-                                    minWidth: '64px',
+                                    padding: '0 4px',
+                                    whiteSpace: 'nowrap',
                                     textAlign: 'center'
                                 }}>
                                     {baseDate.getFullYear()}
@@ -849,15 +861,15 @@ export default function Analysis() {
                                         background: '#0f172a',
                                         border: '1px solid #334155',
                                         color: '#cbd5e1',
-                                        borderRadius: '8px',
-                                        padding: '6px 9px',
+                                        borderRadius: '7px',
+                                        padding: '5px 7px',
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center'
                                     }}
                                     title="Nächstes Jahr"
                                 >
-                                    <ChevronRight size={16} />
+                                    <ChevronRight size={15} />
                                 </button>
 
                                 {!isCurrentYear && (
@@ -868,10 +880,11 @@ export default function Analysis() {
                                             background: 'rgba(249, 115, 22, 0.12)',
                                             border: '1px solid rgba(249, 115, 22, 0.3)',
                                             color: '#f97316',
-                                            borderRadius: '8px',
-                                            padding: '5px 8px',
+                                            borderRadius: '7px',
+                                            padding: '4px 7px',
                                             fontSize: '11px',
                                             fontWeight: 700,
+                                            whiteSpace: 'nowrap',
                                             cursor: 'pointer'
                                         }}
                                     >
@@ -914,27 +927,28 @@ export default function Analysis() {
                         )}
 
                         {/* Filter PopUp Trigger Button */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                             <button
                                 type="button"
                                 onClick={() => setShowFilterModal(true)}
                                 style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '6px',
+                                    gap: '5px',
                                     background: hasActiveFilters ? 'rgba(249, 115, 22, 0.15)' : '#0f172a',
                                     border: hasActiveFilters ? '1px solid rgba(249, 115, 22, 0.45)' : '1px solid #334155',
                                     color: hasActiveFilters ? '#f97316' : '#cbd5e1',
-                                    borderRadius: '8px',
-                                    padding: '6px 10px',
-                                    fontSize: '12.5px',
+                                    borderRadius: '7px',
+                                    padding: '5px 8px',
+                                    fontSize: '12px',
                                     fontWeight: hasActiveFilters ? 700 : 600,
+                                    whiteSpace: 'nowrap',
                                     cursor: 'pointer',
                                     transition: 'all 0.15s ease'
                                 }}
                                 title="Schichten, Wachen & Fahrzeuge filtern"
                             >
-                                <SlidersHorizontal size={14} />
+                                <SlidersHorizontal size={13} />
                                 <span>Filter{hasActiveFilters ? ` (${activeFilterCount})` : ''}</span>
                             </button>
                             {hasActiveFilters && (

@@ -677,7 +677,8 @@ export default function Analysis() {
             baseDate,
             storeSettings: store.settings,
             shiftTypes: store.settings?.shiftTypes || [],
-            shiftCodes: store.settings?.shiftCodes || []
+            shiftCodes: store.settings?.shiftCodes || [],
+            allShifts: store.shifts || []
         });
     };
 

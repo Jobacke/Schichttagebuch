@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { SHIFT_PRESETS } from './shiftPresets';
 import { getShiftColorRGB, STATION_THEMES } from './shiftColors';
+import { getIncomingNightShiftForDate } from './teamRosterParser';
 
 // Helper to calculate duration (in hours)
 function calculateDuration(start, end) {
@@ -66,7 +67,8 @@ export function exportToPDF(data) {
         baseDate = new Date(),
         storeSettings = {},
         shiftTypes = [],
-        shiftCodes = []
+        shiftCodes = [],
+        allShifts = []
     } = data;
 
     // Use landscape orientation for clean 1-page European monthly duty roster view
@@ -108,13 +110,28 @@ export function exportToPDF(data) {
     const shiftDaysCount = Object.keys(shiftsByDate).length;
     const freeDaysCount = Math.max(0, daysInMonth - shiftDaysCount);
 
+    // Calculate how many free days have an incoming night shift ending in the morning
+    let nightShiftEndDaysCount = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const hasShift = (shiftsByDate[dStr] || []).length > 0;
+        if (!hasShift) {
+            const incoming = getIncomingNightShiftForDate(dStr, allShifts);
+            if (incoming) nightShiftEndDaysCount++;
+        }
+    }
+    const pureFreeDays = Math.max(0, freeDaysCount - nightShiftEndDaysCount);
+
     doc.setFontSize(8.5);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(100, 116, 139); // slate-500
     const bonusSummaryText = (stats?.bonusCount > 0)
         ? `   •   Bonus: ${stats.bonusCount}x (${stats.bonusTotalAmount.toFixed(0)} EUR)`
         : '';
-    doc.text(`${shiftCount} Schichten   •   ${freeDaysCount} Tage frei   •   ${stats.actual.toFixed(1)} h geleistet${bonusSummaryText}`, margin, yTop + 11.5);
+    const nightSummaryText = nightShiftEndDaysCount > 0
+        ? `   •   ${nightShiftEndDaysCount}x Nacht-Ende`
+        : '';
+    doc.text(`${shiftCount} Schichten${nightSummaryText}   •   ${pureFreeDays} Tage frei   •   ${stats.actual.toFixed(1)} h geleistet${bonusSummaryText}`, margin, yTop + 11.5);
 
     // KPI Badges on the Top Right
     const hasBonusKpi = stats?.bonusCount > 0;
@@ -215,27 +232,84 @@ export function exportToPDF(data) {
             const hasShift = dayShifts.length > 0;
 
             if (!hasShift) {
-                // Free Day
-                if (isWeekend) {
-                    doc.setFillColor(250, 250, 252);
+                const incoming = getIncomingNightShiftForDate(dateStr, allShifts);
+
+                if (incoming) {
+                    // Incoming Night Shift from previous day (Nachtschicht-Ende)
+                    doc.setFillColor(245, 243, 255); // soft purple
+                    doc.setDrawColor(216, 180, 254); // purple-300
+                    doc.setLineWidth(0.35);
+                    doc.rect(cellX, cellY, dayColW, dayRowH, 'FD');
+
+                    // Top Accent Stripe (Purple)
+                    doc.setFillColor(168, 85, 247);
+                    doc.rect(cellX, cellY, dayColW, 2.0, 'F');
+
+                    // Day Number (Top Right)
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(15, 23, 42);
+                    doc.text(String(dayNum), cellX + dayColW - 2.5, cellY + 6.5, { align: 'right' });
+
+                    // Shift Badge (Top Left) - purple badge "ENDE"
+                    doc.setFillColor(168, 85, 247);
+                    doc.roundedRect(cellX + 2.2, cellY + 3.2, 17, 4.8, 1, 1, 'F');
+                    doc.setFontSize(7.5);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(255, 255, 255);
+                    doc.text('ENDE', cellX + 10.7, cellY + 6.6, { align: 'center' });
+
+                    // Title: "Nachtschicht-Ende"
+                    doc.setFontSize(7.5);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(147, 51, 234);
+                    doc.text('Nachtschicht-Ende', cellX + 2.5, cellY + 11.5);
+
+                    // End time & info: e.g. "bis 07:06 Uhr" (or "bis 08:06 Uhr (Überstd.)")
+                    const timeLabel = incoming.isOvertime
+                        ? `bis ${incoming.endTime} Uhr (Überstd.)`
+                        : `bis ${incoming.endTime} Uhr`;
+                    doc.setFontSize(7.5);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(51, 65, 85);
+                    doc.text(timeLabel, cellX + 2.5, cellY + 15.5);
+
+                    // Origin details: "aus Vortag (RNM)" or station
+                    doc.setFontSize(6.2);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(147, 51, 234);
+                    const sourceText = `aus Vortag (${incoming.code})${incoming.station ? ` • ${incoming.station}` : ''}`;
+                    const truncSource = doc.splitTextToSize(sourceText, dayColW - 4.5)[0] || '';
+                    doc.text(truncSource, cellX + 2.2, cellY + 18.5);
+
+                    // Status note: danach dienstfrei
+                    doc.setFontSize(6.2);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(100, 116, 139);
+                    doc.text('danach dienstfrei', cellX + 2.2, cellY + 21.8);
                 } else {
-                    doc.setFillColor(255, 255, 255);
+                    // Regular Free Day
+                    if (isWeekend) {
+                        doc.setFillColor(250, 250, 252);
+                    } else {
+                        doc.setFillColor(255, 255, 255);
+                    }
+                    doc.setDrawColor(226, 232, 240);
+                    doc.setLineWidth(0.25);
+                    doc.rect(cellX, cellY, dayColW, dayRowH, 'FD');
+
+                    // Day number
+                    doc.setFontSize(9.5);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(isWeekend ? 148 : 100, isWeekend ? 163 : 116, isWeekend ? 184 : 139);
+                    doc.text(String(dayNum), cellX + dayColW - 2.5, cellY + 5.2, { align: 'right' });
+
+                    // Subtle "Frei"
+                    doc.setFontSize(7);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(203, 213, 225);
+                    doc.text('Frei', cellX + 2.5, cellY + 5.2);
                 }
-                doc.setDrawColor(226, 232, 240);
-                doc.setLineWidth(0.25);
-                doc.rect(cellX, cellY, dayColW, dayRowH, 'FD');
-
-                // Day number
-                doc.setFontSize(9.5);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(isWeekend ? 148 : 100, isWeekend ? 163 : 116, isWeekend ? 184 : 139);
-                doc.text(String(dayNum), cellX + dayColW - 2.5, cellY + 5.2, { align: 'right' });
-
-                // Subtle "Frei"
-                doc.setFontSize(7);
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(203, 213, 225);
-                doc.text('Frei', cellX + 2.5, cellY + 5.2);
             } else {
                 // Shift Day
                 const s = dayShifts[0];
@@ -311,11 +385,12 @@ export function exportToPDF(data) {
     doc.setLineWidth(0.2);
     doc.line(margin, footerY - 4.5, pageWidth - margin, footerY - 4.5);
 
-    // Legend items representing the independent station color structures
+    // Legend items representing the independent station color structures + Nacht-Ende + Dienstfrei
     const legendItems = [
         { label: 'Wache Sendling (Blau)', rgb: STATION_THEMES.Sendling.primaryRGB },
         { label: 'Wache Hohenbrunn (Grün)', rgb: STATION_THEMES.Hohenbrunn.primaryRGB },
         { label: 'Wache Obersendling (Orange)', rgb: STATION_THEMES.Obersendling.primaryRGB },
+        { label: 'Nacht-Ende (Lila)', rgb: [168, 85, 247] },
         { label: 'Dienstfrei', rgb: [148, 163, 184] }
     ];
 

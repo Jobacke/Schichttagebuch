@@ -56,6 +56,21 @@ const resolveShiftDetails = (s, storeSettings, shiftCodes = [], shiftTypes = [])
     };
 };
 
+function isSpätschichtEnd(incoming) {
+    if (!incoming) return false;
+    const type = (incoming.shiftTypeName || '').toLowerCase();
+    const code = (incoming.code || '').toUpperCase().trim();
+    if (type.includes('spät') || type.includes('spaet')) return true;
+    if (code.startsWith('RT') || code.includes('RT') || code.includes('SPÄT') || code.includes('SPAET')) return true;
+    if (incoming.endTime) {
+        const h = parseInt(incoming.endTime.split(':')[0], 10);
+        if (!isNaN(h) && h >= 0 && h < 5) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export function exportToPDF(data) {
     const {
         label,
@@ -70,6 +85,11 @@ export function exportToPDF(data) {
         shiftCodes = [],
         allShifts = []
     } = data;
+
+    // Ensure all user shifts and filtered data are available for overnight checks
+    const effectiveShifts = (Array.isArray(allShifts) && allShifts.length > 0)
+        ? [...allShifts, ...filteredData.filter(f => !allShifts.some(a => a && f && a.date === f.date && (a.id === f.id || a.code === f.code)))]
+        : filteredData;
 
     // Use landscape orientation for clean 1-page European monthly duty roster view
     const doc = new jsPDF({
@@ -116,7 +136,7 @@ export function exportToPDF(data) {
         const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const hasShift = (shiftsByDate[dStr] || []).length > 0;
         if (!hasShift) {
-            const incoming = getIncomingNightShiftForDate(dStr, allShifts);
+            const incoming = getIncomingNightShiftForDate(dStr, effectiveShifts);
             if (incoming) nightShiftEndDaysCount++;
         }
     }
@@ -230,8 +250,8 @@ export function exportToPDF(data) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
             const dayShifts = shiftsByDate[dateStr] || [];
             const hasShift = dayShifts.length > 0;
-            const incoming = getIncomingNightShiftForDate(dateStr, allShifts);
-            const isIncomingSpät = incoming && ((incoming.shiftTypeName || '').toLowerCase().includes('spät') || (incoming.code || '').startsWith('RT'));
+            const incoming = getIncomingNightShiftForDate(dateStr, effectiveShifts);
+            const isIncomingSpät = isSpätschichtEnd(incoming);
             const incomingTitle = isIncomingSpät ? 'Spätschicht-Ende' : 'Nachtschicht-Ende';
 
             if (!hasShift) {

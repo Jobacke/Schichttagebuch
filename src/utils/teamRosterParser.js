@@ -1077,15 +1077,6 @@ export function getIncomingNightShiftForDate(dateStr, allShifts = []) {
   if (Array.isArray(allShifts) && allShifts.length > 0) {
     const prevUserShifts = allShifts.filter(s => s && s.date === prevDateStr);
     for (const s of prevUserShifts) {
-      let isOvernight = false;
-      if (s.startTime && s.endTime) {
-        const [sh, sm] = s.startTime.split(':').map(Number);
-        const [eh, em] = s.endTime.split(':').map(Number);
-        if (sh * 60 + sm > eh * 60 + em) {
-          isOvernight = true;
-        }
-      }
-
       let rawCode = s.code || '';
       if (!rawCode && s.codeId && typeof s.codeId === 'string' && s.codeId.startsWith('preset_')) {
         rawCode = s.codeId.replace('preset_', '');
@@ -1097,36 +1088,52 @@ export function getIncomingNightShiftForDate(dateStr, allShifts = []) {
       const c = rawCode.toUpperCase().trim();
       const st = (s.shiftTypeName || preset.shiftTypeName || '').toLowerCase();
 
-      // Check if this is a Spätschicht that ends past midnight (e.g. RT4M ending at 00:06)
-      let isSpät = st.includes('spät') || st.includes('spaet') || c.startsWith('RT') || c.includes('RT');
-      if (s.endTime) {
-        const [eh] = s.endTime.split(':').map(Number);
+      const effectiveStartTime = s.startTime || preset.startTime || (c.includes('RN') ? '22:54' : '');
+      const effectiveEndTime = s.endTime || preset.endTime || (c.includes('RN') ? '07:06' : '');
+
+      // Check strictly if shift crosses midnight into the next day (e.g. 15:24 -> 00:06 or 22:54 -> 07:06)
+      let isOvernight = false;
+      if (effectiveStartTime && effectiveEndTime) {
+        const [sh, sm] = effectiveStartTime.split(':').map(Number);
+        const [eh, em] = effectiveEndTime.split(':').map(Number);
+        if (sh * 60 + sm > eh * 60 + em) {
+          isOvernight = true;
+        }
+      } else if (c.includes('RN') || c.endsWith('NM') || c.endsWith('NH') || c.endsWith('NO') || c.startsWith('NF') || st.includes('nacht')) {
+        isOvernight = true;
+      }
+
+      // ONLY continue if the shift ACTUALLY ends on the following day!
+      // Shifts ending before midnight (e.g. RT2M ending at 23:06) must NEVER appear on the following day!
+      if (!isOvernight) {
+        continue;
+      }
+
+      // Determine whether it's a Spätschicht ending shortly after midnight (e.g. 00:06)
+      // or a Nachtschicht ending in the morning (e.g. 07:06)
+      let isSpät = false;
+      if (effectiveEndTime) {
+        const [eh] = effectiveEndTime.split(':').map(Number);
         if (!isNaN(eh) && eh >= 0 && eh < 5) {
           isSpät = true;
         }
       }
-
-      if (isOvernight || c.includes('RN') || c.endsWith('NM') || c.endsWith('NH') || c.endsWith('NO') || c.startsWith('NF') || st.includes('nacht') || isSpät) {
-        let resolvedTypeName = s.shiftTypeName || preset.shiftTypeName;
-        if (!resolvedTypeName) {
-          if (isSpät) resolvedTypeName = 'Spätschicht';
-          else if (c.startsWith('RF') || st.includes('früh')) resolvedTypeName = 'Frühschicht';
-          else resolvedTypeName = 'Nachtschicht';
-        } else if (isSpät && !resolvedTypeName.toLowerCase().includes('spät')) {
-          resolvedTypeName = 'Spätschicht';
-        }
-
-        return {
-          prevDate: prevDateStr,
-          code: rawCode || (isSpät ? 'RT4M' : 'RNM'),
-          shiftTypeName: isSpät ? 'Spätschicht' : (resolvedTypeName || 'Nachtschicht'),
-          startTime: s.startTime || (isSpät ? '15:24' : '22:54'),
-          endTime: s.endTime || (isSpät ? '00:06' : '07:06'),
-          station: s.station || preset.station || 'Wache Sendling',
-          isOvertime: Boolean(s.endTime && (s.endTime > '07:15' || s.endTime === '08:06')),
-          source: 'userShift'
-        };
+      if (c.startsWith('RT') || st.includes('spät') || st.includes('spaet')) {
+        isSpät = true;
       }
+
+      let resolvedTypeName = isSpät ? 'Spätschicht' : (s.shiftTypeName || preset.shiftTypeName || 'Nachtschicht');
+
+      return {
+        prevDate: prevDateStr,
+        code: rawCode || (isSpät ? 'RT4M' : 'RNM'),
+        shiftTypeName: resolvedTypeName,
+        startTime: effectiveStartTime || (isSpät ? '15:24' : '22:54'),
+        endTime: effectiveEndTime || (isSpät ? '00:06' : '07:06'),
+        station: s.station || preset.station || 'Wache Sendling',
+        isOvertime: Boolean(effectiveEndTime && (effectiveEndTime > '07:15' || effectiveEndTime === '08:06')),
+        source: 'userShift'
+      };
     }
   }
 
@@ -1136,26 +1143,44 @@ export function getIncomingNightShiftForDate(dateStr, allShifts = []) {
     const personalFromRoster = extractPersonalShiftsFromRoster(prevYm);
     const matchInRoster = (personalFromRoster || []).find(s => s && s.date === prevDateStr);
     if (matchInRoster) {
-      const c = (matchInRoster.code || '').toUpperCase();
+      const rawCode = matchInRoster.code || '';
+      const preset = rawCode ? (SHIFT_PRESETS[rawCode] || {}) : {};
+      const c = rawCode.toUpperCase().trim();
+      const st = (matchInRoster.shiftTypeName || preset.shiftTypeName || '').toLowerCase();
+
+      const effectiveStartTime = matchInRoster.startTime || preset.startTime || (c.includes('RN') ? '22:54' : '');
+      const effectiveEndTime = matchInRoster.endTime || preset.endTime || (c.includes('RN') ? '07:06' : '');
+
       let isOvernight = false;
-      if (matchInRoster.startTime && matchInRoster.endTime) {
-        const [sh, sm] = matchInRoster.startTime.split(':').map(Number);
-        const [eh, em] = matchInRoster.endTime.split(':').map(Number);
+      if (effectiveStartTime && effectiveEndTime) {
+        const [sh, sm] = effectiveStartTime.split(':').map(Number);
+        const [eh, em] = effectiveEndTime.split(':').map(Number);
         if (sh * 60 + sm > eh * 60 + em) isOvernight = true;
+      } else if (c.includes('RN') || c.endsWith('NM') || c.endsWith('NH') || c.endsWith('NO') || c.startsWith('NF') || c.includes('NACHT')) {
+        isOvernight = true;
       }
-      if (isOvernight || c.includes('RN') || c.endsWith('NM') || c.endsWith('NH') || c.endsWith('NO') || c.startsWith('NF')) {
-        let resolvedTypeName = matchInRoster.shiftTypeName || (matchInRoster.code && SHIFT_PRESETS[matchInRoster.code]?.shiftTypeName);
-        if (!resolvedTypeName) {
-          if (c.startsWith('RT') || c.includes('SPÄT')) resolvedTypeName = 'Spätschicht';
-          else resolvedTypeName = 'Nachtschicht';
+
+      if (isOvernight) {
+        let isSpät = false;
+        if (effectiveEndTime) {
+          const [eh] = effectiveEndTime.split(':').map(Number);
+          if (!isNaN(eh) && eh >= 0 && eh < 5) {
+            isSpät = true;
+          }
         }
+        if (c.startsWith('RT') || st.includes('spät') || st.includes('spaet')) {
+          isSpät = true;
+        }
+
+        let resolvedTypeName = isSpät ? 'Spätschicht' : (matchInRoster.shiftTypeName || preset.shiftTypeName || 'Nachtschicht');
+
         return {
           prevDate: prevDateStr,
-          code: matchInRoster.code,
+          code: rawCode || (isSpät ? 'RT4M' : 'RNM'),
           shiftTypeName: resolvedTypeName,
-          startTime: matchInRoster.startTime || '22:54',
-          endTime: matchInRoster.endTime || '07:06',
-          station: 'Wache Sendling',
+          startTime: effectiveStartTime || (isSpät ? '15:24' : '22:54'),
+          endTime: effectiveEndTime || (isSpät ? '00:06' : '07:06'),
+          station: matchInRoster.station || preset.station || 'Wache Sendling',
           isOvertime: false,
           source: 'teamRoster'
         };

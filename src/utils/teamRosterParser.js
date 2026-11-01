@@ -1088,10 +1088,16 @@ export function getIncomingNightShiftForDate(dateStr, allShifts = []) {
       const c = (s.code || '').toUpperCase();
       const st = (s.shiftTypeName || '').toLowerCase();
       if (isOvernight || c.includes('RN') || c.endsWith('NM') || c.endsWith('NH') || c.endsWith('NO') || c.startsWith('NF') || st.includes('nacht')) {
+        let resolvedTypeName = s.shiftTypeName || (s.code && SHIFT_PRESETS[s.code]?.shiftTypeName);
+        if (!resolvedTypeName) {
+          if (c.startsWith('RT') || st.includes('spät')) resolvedTypeName = 'Spätschicht';
+          else if (c.startsWith('RF') || st.includes('früh')) resolvedTypeName = 'Frühschicht';
+          else resolvedTypeName = 'Nachtschicht';
+        }
         return {
           prevDate: prevDateStr,
           code: s.code || 'RNM',
-          shiftTypeName: s.shiftTypeName || 'Nachtschicht',
+          shiftTypeName: resolvedTypeName,
           startTime: s.startTime || '22:54',
           endTime: s.endTime || '07:06',
           station: s.station || 'Wache Sendling',
@@ -1116,10 +1122,15 @@ export function getIncomingNightShiftForDate(dateStr, allShifts = []) {
         if (sh * 60 + sm > eh * 60 + em) isOvernight = true;
       }
       if (isOvernight || c.includes('RN') || c.endsWith('NM') || c.endsWith('NH') || c.endsWith('NO') || c.startsWith('NF')) {
+        let resolvedTypeName = matchInRoster.shiftTypeName || (matchInRoster.code && SHIFT_PRESETS[matchInRoster.code]?.shiftTypeName);
+        if (!resolvedTypeName) {
+          if (c.startsWith('RT') || c.includes('SPÄT')) resolvedTypeName = 'Spätschicht';
+          else resolvedTypeName = 'Nachtschicht';
+        }
         return {
           prevDate: prevDateStr,
           code: matchInRoster.code,
-          shiftTypeName: 'Nachtschicht',
+          shiftTypeName: resolvedTypeName,
           startTime: matchInRoster.startTime || '22:54',
           endTime: matchInRoster.endTime || '07:06',
           station: 'Wache Sendling',

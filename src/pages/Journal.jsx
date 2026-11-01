@@ -334,7 +334,9 @@ export default function Journal() {
                         const isSelected = selectedDate && isSameDay(date, selectedDate);
                         const isCurrentDay = isSameDay(date, new Date());
                         const dayDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                        const dayIncomingNight = !hasShift ? getIncomingNightShiftForDate(dayDateStr, store.shifts) : null;
+                        const dayIncomingNight = getIncomingNightShiftForDate(dayDateStr, store.shifts);
+                        const isDayIncSpät = dayIncomingNight && ((dayIncomingNight.shiftTypeName || '').toLowerCase().includes('spät') || (dayIncomingNight.code || '').startsWith('RT'));
+                        const dayIncTitle = isDayIncSpät ? 'Spätschicht-Ende' : 'Nachtschicht-Ende';
 
                         return (
                             <div
@@ -344,7 +346,7 @@ export default function Journal() {
                                 style={{ position: 'relative' }}
                                 title={isCurrentDay
                                     ? `Tag ${dayNum} (Heute)`
-                                    : (dayIncomingNight ? `Tag ${dayNum}: Nachtschicht-Ende bis ${dayIncomingNight.endTime} Uhr` : undefined)}
+                                    : (dayIncomingNight ? `Tag ${dayNum}: ${dayIncTitle} bis ${dayIncomingNight.endTime} Uhr` : undefined)}
                             >
                                 {dayNum}
                                 {hasBonusShift && (
@@ -361,9 +363,9 @@ export default function Journal() {
                                         💰
                                     </span>
                                 )}
-                                {dayIncomingNight && (
+                                {!hasShift && dayIncomingNight && (
                                     <span
-                                        title={`Nachtschicht-Ende bis ${dayIncomingNight.endTime} Uhr`}
+                                        title={`${dayIncTitle} bis ${dayIncomingNight.endTime} Uhr`}
                                         style={{
                                             position: 'absolute',
                                             bottom: '2px',
@@ -394,9 +396,13 @@ export default function Journal() {
                 <div>
                     <h2 style={{ margin: 0 }}>
                         {selectedDate
-                            ? (visibleShifts.length === 0 && incomingNightShift
-                                ? `Nachtschicht-Ende am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`
-                                : `${visibleShifts.length > 1 ? 'Dienste' : 'Dienst'} am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`)
+                            ? (() => {
+                                const isIncSpät = (incomingNightShift?.shiftTypeName || '').toLowerCase().includes('spät') || (incomingNightShift?.code || '').startsWith('RT');
+                                const incHeaderTitle = isIncSpät ? 'Spätschicht-Ende' : 'Nachtschicht-Ende';
+                                return visibleShifts.length === 0 && incomingNightShift
+                                    ? `${incHeaderTitle} am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`
+                                    : `${visibleShifts.length > 1 ? 'Dienste' : 'Dienst'} am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`;
+                            })()
                             : 'Alle Dienste im Monat'
                         }
                     </h2>

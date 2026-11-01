@@ -129,7 +129,7 @@ export function exportToPDF(data) {
         ? `   •   Bonus: ${stats.bonusCount}x (${stats.bonusTotalAmount.toFixed(0)} EUR)`
         : '';
     const nightSummaryText = nightShiftEndDaysCount > 0
-        ? `   •   ${nightShiftEndDaysCount}x Nacht-Ende`
+        ? `   •   ${nightShiftEndDaysCount}x Schicht-Ende`
         : '';
     doc.text(`${shiftCount} Schichten${nightSummaryText}   •   ${pureFreeDays} Tage frei   •   ${stats.actual.toFixed(1)} h geleistet${bonusSummaryText}`, margin, yTop + 11.5);
 
@@ -230,12 +230,13 @@ export function exportToPDF(data) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
             const dayShifts = shiftsByDate[dateStr] || [];
             const hasShift = dayShifts.length > 0;
+            const incoming = getIncomingNightShiftForDate(dateStr, allShifts);
+            const isIncomingSpät = incoming && ((incoming.shiftTypeName || '').toLowerCase().includes('spät') || (incoming.code || '').startsWith('RT'));
+            const incomingTitle = isIncomingSpät ? 'Spätschicht-Ende' : 'Nachtschicht-Ende';
 
             if (!hasShift) {
-                const incoming = getIncomingNightShiftForDate(dateStr, allShifts);
-
                 if (incoming) {
-                    // Incoming Night Shift from previous day (Nachtschicht-Ende)
+                    // Incoming Shift from previous day (Nachtschicht-Ende or Spätschicht-Ende)
                     doc.setFillColor(245, 243, 255); // soft purple
                     doc.setDrawColor(216, 180, 254); // purple-300
                     doc.setLineWidth(0.35);
@@ -259,22 +260,22 @@ export function exportToPDF(data) {
                     doc.setTextColor(255, 255, 255);
                     doc.text('ENDE', cellX + 10.7, cellY + 6.6, { align: 'center' });
 
-                    // Title: "Nachtschicht-Ende"
+                    // Title: "Spätschicht-Ende" or "Nachtschicht-Ende"
                     doc.setFontSize(7.5);
                     doc.setFont(undefined, 'bold');
                     doc.setTextColor(147, 51, 234);
-                    doc.text('Nachtschicht-Ende', cellX + 2.5, cellY + 11.5);
+                    doc.text(incomingTitle, cellX + 2.5, cellY + 11.5);
 
-                    // End time & info: e.g. "bis 07:06 Uhr" (or "bis 08:06 Uhr (Überstd.)")
+                    // End time & info: e.g. "um 00:06 Uhr" (or "um 08:06 Uhr (Überstd.)")
                     const timeLabel = incoming.isOvertime
-                        ? `bis ${incoming.endTime} Uhr (Überstd.)`
-                        : `bis ${incoming.endTime} Uhr`;
+                        ? `um ${incoming.endTime} Uhr (Überstd.)`
+                        : `um ${incoming.endTime} Uhr`;
                     doc.setFontSize(7.5);
                     doc.setFont(undefined, 'normal');
                     doc.setTextColor(51, 65, 85);
                     doc.text(timeLabel, cellX + 2.5, cellY + 15.5);
 
-                    // Origin details: "aus Vortag (RNM)" or station
+                    // Origin details: "aus Vortag (RT4M)" or station
                     doc.setFontSize(6.2);
                     doc.setFont(undefined, 'bold');
                     doc.setTextColor(147, 51, 234);
@@ -340,40 +341,88 @@ export function exportToPDF(data) {
                 doc.setTextColor(255, 255, 255);
                 doc.text(resolved.code, cellX + 10.7, cellY + 6.6, { align: 'center' });
 
-                // Shift Type Name
-                doc.setFontSize(7.5);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(colRGB.r, colRGB.g, colRGB.b);
-                doc.text(resolved.typeName, cellX + 2.5, cellY + 11.5);
+                if (incoming) {
+                    // Day has BOTH an incoming overnight shift ending in the morning AND a scheduled shift today (e.g. 26.11)
+                    const prevDateLabel = incoming.prevDate
+                        ? `${incoming.prevDate.split('-')[2]}.${incoming.prevDate.split('-')[1]}.`
+                        : 'Vortag';
 
-                // Exact Shift Times & Duration
-                const dur = calculateDuration(s.startTime, s.endTime);
-                doc.setFontSize(7.5);
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(51, 65, 85);
-                doc.text(`${s.startTime || '07:00'} - ${s.endTime || '19:00'} (${dur.toFixed(1)}h)`, cellX + 2.5, cellY + 15.5);
+                    // Morning incoming shift end note inside subtle purple pill
+                    doc.setFillColor(243, 232, 255);
+                    doc.roundedRect(cellX + 2.0, cellY + 8.4, dayColW - 4.0, 3.8, 0.8, 0.8, 'F');
 
-                // Station / Vehicle in station color
-                const stText = s.station || s.vehicle || '';
-                if (stText) {
-                    doc.setFontSize(6.2);
+                    doc.setFontSize(5.6);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(147, 51, 234);
+                    let incText = `${incomingTitle} um ${incoming.endTime} Uhr (aus ${prevDateLabel})`;
+                    if (doc.getTextWidth(incText) > dayColW - 5.0) {
+                        incText = `${incomingTitle} um ${incoming.endTime} Uhr`;
+                    }
+                    doc.text(incText, cellX + 3.0, cellY + 11.1);
+
+                    // Today's scheduled shift details (positioned cleanly underneath)
+                    doc.setFontSize(7.2);
                     doc.setFont(undefined, 'bold');
                     doc.setTextColor(colRGB.r, colRGB.g, colRGB.b);
-                    const truncSt = doc.splitTextToSize(stText, dayColW - 4.5)[0] || '';
-                    doc.text(truncSt, cellX + 2.2, cellY + 18.5);
-                }
+                    doc.text(resolved.typeName, cellX + 2.5, cellY + 14.5);
 
-                // Partner (Complete display, multi-line support)
-                if (s.partner) {
-                    const partnerClean = s.partner.trim().startsWith('mit ') ? s.partner.trim() : `mit ${s.partner.trim()}`;
-                    doc.setFontSize(6.2);
+                    const dur = calculateDuration(s.startTime, s.endTime);
+                    doc.setFontSize(7.0);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(51, 65, 85);
+                    doc.text(`${s.startTime || '07:00'} - ${s.endTime || '19:00'} (${dur.toFixed(1)}h)`, cellX + 2.5, cellY + 17.6);
+
+                    const stText = s.station || s.vehicle || '';
+                    if (stText) {
+                        doc.setFontSize(5.8);
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(colRGB.r, colRGB.g, colRGB.b);
+                        const truncSt = doc.splitTextToSize(stText, dayColW - 4.5)[0] || '';
+                        doc.text(truncSt, cellX + 2.2, cellY + 20.4);
+                    }
+
+                    if (s.partner) {
+                        const partnerClean = s.partner.trim().startsWith('mit ') ? s.partner.trim() : `mit ${s.partner.trim()}`;
+                        doc.setFontSize(5.8);
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(51, 65, 85);
+                        const partnerLine = doc.splitTextToSize(partnerClean, dayColW - 4.5)[0] || '';
+                        const pY = stText ? cellY + 23.3 : cellY + 20.5;
+                        doc.text(partnerLine, cellX + 2.2, pY);
+                    }
+                } else {
+                    // Standard shift rendering (no incoming shift)
+                    doc.setFontSize(7.5);
                     doc.setFont(undefined, 'bold');
-                    doc.setTextColor(51, 65, 85); // slate-700
-                    const partnerLines = doc.splitTextToSize(partnerClean, dayColW - 4.5);
-                    const pY = stText ? cellY + 21.8 : cellY + 19.2;
-                    partnerLines.slice(0, 2).forEach((line, pIdx) => {
-                        doc.text(line, cellX + 2.2, pY + pIdx * 2.8);
-                    });
+                    doc.setTextColor(colRGB.r, colRGB.g, colRGB.b);
+                    doc.text(resolved.typeName, cellX + 2.5, cellY + 11.5);
+
+                    const dur = calculateDuration(s.startTime, s.endTime);
+                    doc.setFontSize(7.5);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(51, 65, 85);
+                    doc.text(`${s.startTime || '07:00'} - ${s.endTime || '19:00'} (${dur.toFixed(1)}h)`, cellX + 2.5, cellY + 15.5);
+
+                    const stText = s.station || s.vehicle || '';
+                    if (stText) {
+                        doc.setFontSize(6.2);
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(colRGB.r, colRGB.g, colRGB.b);
+                        const truncSt = doc.splitTextToSize(stText, dayColW - 4.5)[0] || '';
+                        doc.text(truncSt, cellX + 2.2, cellY + 18.5);
+                    }
+
+                    if (s.partner) {
+                        const partnerClean = s.partner.trim().startsWith('mit ') ? s.partner.trim() : `mit ${s.partner.trim()}`;
+                        doc.setFontSize(6.2);
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(51, 65, 85);
+                        const partnerLines = doc.splitTextToSize(partnerClean, dayColW - 4.5);
+                        const pY = stText ? cellY + 21.8 : cellY + 19.2;
+                        partnerLines.slice(0, 2).forEach((line, pIdx) => {
+                            doc.text(line, cellX + 2.2, pY + pIdx * 2.8);
+                        });
+                    }
                 }
             }
         }
@@ -385,12 +434,12 @@ export function exportToPDF(data) {
     doc.setLineWidth(0.2);
     doc.line(margin, footerY - 4.5, pageWidth - margin, footerY - 4.5);
 
-    // Legend items representing the independent station color structures + Nacht-Ende + Dienstfrei
+    // Legend items representing the independent station color structures + Schicht-Ende + Dienstfrei
     const legendItems = [
         { label: 'Wache Sendling (Blau)', rgb: STATION_THEMES.Sendling.primaryRGB },
         { label: 'Wache Hohenbrunn (Grün)', rgb: STATION_THEMES.Hohenbrunn.primaryRGB },
         { label: 'Wache Obersendling (Orange)', rgb: STATION_THEMES.Obersendling.primaryRGB },
-        { label: 'Nacht-Ende (Lila)', rgb: [168, 85, 247] },
+        { label: 'Schicht-Ende (Lila)', rgb: [168, 85, 247] },
         { label: 'Dienstfrei', rgb: [148, 163, 184] }
     ];
 

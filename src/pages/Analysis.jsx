@@ -186,7 +186,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
         const dayShifts = shiftsByDate[dateStr] || [];
         const isWeekend = ((firstDay + d - 1) % 7) >= 5;
         const isToday = dateStr === todayStr;
-        const incomingNightShift = dayShifts.length === 0 ? getIncomingNightShiftForDate(dateStr, allShifts) : null;
+        const incomingNightShift = getIncomingNightShiftForDate(dateStr, allShifts);
         days.push({
             empty: false,
             dayNum: d,
@@ -468,46 +468,70 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                         </button>
                     </div>
 
+                    {selectedDayInfo.incomingNightShift && selectedDayInfo.shifts.length > 0 && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'rgba(168, 85, 247, 0.12)',
+                            border: '1px solid rgba(168, 85, 247, 0.3)',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            marginBottom: '10px',
+                            fontSize: '12px',
+                            color: '#c084fc'
+                        }}>
+                            <span style={{ fontWeight: 800 }}>🌙 {selectedDayInfo.incomingNightShift.code}</span>
+                            <span>{((selectedDayInfo.incomingNightShift.shiftTypeName || '').toLowerCase().includes('spät') || (selectedDayInfo.incomingNightShift.code || '').startsWith('RT')) ? 'Spätschicht-Ende' : 'Nachtschicht-Ende'} um {selectedDayInfo.incomingNightShift.endTime} Uhr (aus Vortag)</span>
+                        </div>
+                    )}
+
                     {selectedDayInfo.shifts.length === 0 ? (
-                        selectedDayInfo.incomingNightShift ? (
-                            <div style={{ fontSize: '12.5px', color: '#cbd5e1', paddingTop: '2px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                                    <span style={{
-                                        background: 'rgba(168, 85, 247, 0.25)',
-                                        color: '#c084fc',
-                                        border: '1px solid rgba(168, 85, 247, 0.45)',
-                                        padding: '2px 8px',
-                                        borderRadius: '5px',
-                                        fontSize: '12px',
-                                        fontWeight: 800
-                                    }}>
-                                        🌙 {selectedDayInfo.incomingNightShift.code}
-                                    </span>
-                                    <span style={{ fontWeight: 700, fontSize: '13px', color: '#f1f5f9' }}>
-                                        Nachtschicht-Folgetag
-                                    </span>
-                                    <span style={{ fontSize: '12px', color: '#cbd5e1' }}>
-                                        🕒 Dienstende um {selectedDayInfo.incomingNightShift.endTime} Uhr{selectedDayInfo.incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''}
-                                    </span>
-                                    {selectedDayInfo.incomingNightShift.station && (
+                        selectedDayInfo.incomingNightShift ? (() => {
+                            const isIncSpät = (selectedDayInfo.incomingNightShift.shiftTypeName || '').toLowerCase().includes('spät') || (selectedDayInfo.incomingNightShift.code || '').startsWith('RT');
+                            const folgetagTitle = isIncSpät ? 'Spätschicht-Folgetag' : 'Nachtschicht-Folgetag';
+                            const shiftWord = isIncSpät ? 'Spätschicht' : 'Nachtschicht';
+
+                            return (
+                                <div style={{ fontSize: '12.5px', color: '#cbd5e1', paddingTop: '2px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
                                         <span style={{
-                                            background: 'rgba(15, 23, 42, 0.8)',
-                                            color: '#94a3b8',
-                                            border: '1px solid #334155',
-                                            padding: '1px 6px',
-                                            borderRadius: '4px',
-                                            fontSize: '11px',
-                                            fontWeight: 600
+                                            background: 'rgba(168, 85, 247, 0.25)',
+                                            color: '#c084fc',
+                                            border: '1px solid rgba(168, 85, 247, 0.45)',
+                                            padding: '2px 8px',
+                                            borderRadius: '5px',
+                                            fontSize: '12px',
+                                            fontWeight: 800
                                         }}>
-                                            📍 {selectedDayInfo.incomingNightShift.station}
+                                            🌙 {selectedDayInfo.incomingNightShift.code}
                                         </span>
-                                    )}
+                                        <span style={{ fontWeight: 700, fontSize: '13px', color: '#f1f5f9' }}>
+                                            {folgetagTitle}
+                                        </span>
+                                        <span style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                                            🕒 Dienstende um {selectedDayInfo.incomingNightShift.endTime} Uhr{selectedDayInfo.incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''}
+                                        </span>
+                                        {selectedDayInfo.incomingNightShift.station && (
+                                            <span style={{
+                                                background: 'rgba(15, 23, 42, 0.8)',
+                                                color: '#94a3b8',
+                                                border: '1px solid #334155',
+                                                padding: '1px 6px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                fontWeight: 600
+                                            }}>
+                                                📍 {selectedDayInfo.incomingNightShift.station}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                        🛌 Dienstende der {shiftWord} vom Vortag um {selectedDayInfo.incomingNightShift.endTime} Uhr – danach frei
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
-                                    🛌 Dienstende der Nachtschicht vom Vortag um {selectedDayInfo.incomingNightShift.endTime} Uhr – danach frei
-                                </div>
-                            </div>
-                        ) : (
+                            );
+                        })() : (
                             <div style={{ fontSize: '12.5px', color: '#94a3b8', fontStyle: 'italic', paddingTop: '4px' }}>
                                 🌴 Dienstfrei – kein Einsatz an diesem Tag
                             </div>

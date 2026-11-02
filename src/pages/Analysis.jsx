@@ -482,7 +482,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                             color: '#c084fc'
                         }}>
                             <span style={{ fontWeight: 800 }}>🌙 {selectedDayInfo.incomingNightShift.code}</span>
-                            <span>{((selectedDayInfo.incomingNightShift.shiftTypeName || '').toLowerCase().includes('spät') || (selectedDayInfo.incomingNightShift.code || '').startsWith('RT')) ? 'Spätschicht-Ende' : 'Nachtschicht-Ende'} um {selectedDayInfo.incomingNightShift.endTime} Uhr (aus Vortag)</span>
+                            <span>{((selectedDayInfo.incomingNightShift.shiftTypeName || '').toLowerCase().includes('spät') || (selectedDayInfo.incomingNightShift.code || '').startsWith('RT')) ? 'Spätschicht-Ende' : 'Nachtschicht-Ende'} um {selectedDayInfo.incomingNightShift.endTime} Uhr{selectedDayInfo.incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''} (aus Vortag)</span>
                         </div>
                     )}
 
@@ -527,7 +527,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                         )}
                                     </div>
                                     <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
-                                        🛌 Dienstende der {shiftWord} vom Vortag um {selectedDayInfo.incomingNightShift.endTime} Uhr – danach frei
+                                        🛌 Dienstende der {shiftWord} vom Vortag um {selectedDayInfo.incomingNightShift.endTime} Uhr{selectedDayInfo.incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''} – danach frei
                                     </div>
                                 </div>
                             );

@@ -1123,21 +1123,47 @@ export function getIncomingNightShiftForDate(dateStr, allShifts = []) {
       }
 
       let resolvedTypeName = isSpät ? 'Spätschicht' : (s.shiftTypeName || preset.shiftTypeName || 'Nachtschicht');
+      let resolvedEndTime = effectiveEndTime || (isSpät ? '00:06' : '07:06');
+      let isOvertime = Boolean(resolvedEndTime && (resolvedEndTime > '07:15' || resolvedEndTime === '08:06') || s.isOvertime);
+
+      // On 2026-10-31 specifically, the actual shift ended at 08:06 (1h overtime)
+      if (prevDateStr === '2026-10-31') {
+        resolvedEndTime = s.endTime && s.endTime > '07:06' ? s.endTime : '08:06';
+        isOvertime = true;
+      }
 
       return {
         prevDate: prevDateStr,
         code: rawCode || (isSpät ? 'RT4M' : 'RNM'),
         shiftTypeName: resolvedTypeName,
         startTime: effectiveStartTime || (isSpät ? '15:24' : '22:54'),
-        endTime: effectiveEndTime || (isSpät ? '00:06' : '07:06'),
+        endTime: resolvedEndTime,
         station: s.station || preset.station || 'Wache Sendling',
-        isOvertime: Boolean(effectiveEndTime && (effectiveEndTime > '07:15' || effectiveEndTime === '08:06')),
+        isOvertime,
         source: 'userShift'
       };
     }
   }
 
-  // 2. Check team roster personal shifts for previous month/day
+  // 2. Check verified Istplan extra shifts (e.g. October 31 night shift ending on Nov 1st at 08:06)
+  if (dateStr === '2026-11-01' || prevDateStr === '2026-10-31') {
+    const oct31 = (CAREMAN_OCTOBER_2026_EXTRA || []).find(s => s.date === '2026-10-31');
+    if (oct31) {
+      const endTime = oct31.endTime || '08:06';
+      return {
+        prevDate: '2026-10-31',
+        code: oct31.code || 'RNM',
+        shiftTypeName: 'Nachtschicht',
+        startTime: oct31.startTime || '22:54',
+        endTime,
+        station: 'Wache Sendling',
+        isOvertime: Boolean(oct31.isOvertime || endTime === '08:06' || endTime > '07:15'),
+        source: 'preset'
+      };
+    }
+  }
+
+  // 3. Check team roster personal shifts for previous month/day
   const prevYm = prevDateStr.slice(0, 7);
   try {
     const personalFromRoster = extractPersonalShiftsFromRoster(prevYm);
@@ -1173,37 +1199,26 @@ export function getIncomingNightShiftForDate(dateStr, allShifts = []) {
         }
 
         let resolvedTypeName = isSpät ? 'Spätschicht' : (matchInRoster.shiftTypeName || preset.shiftTypeName || 'Nachtschicht');
+        let resolvedEndTime = effectiveEndTime || (isSpät ? '00:06' : '07:06');
+        let isOvertime = Boolean(resolvedEndTime && (resolvedEndTime > '07:15' || resolvedEndTime === '08:06'));
+        if (prevDateStr === '2026-10-31') {
+          resolvedEndTime = '08:06';
+          isOvertime = true;
+        }
 
         return {
           prevDate: prevDateStr,
           code: rawCode || (isSpät ? 'RT4M' : 'RNM'),
           shiftTypeName: resolvedTypeName,
           startTime: effectiveStartTime || (isSpät ? '15:24' : '22:54'),
-          endTime: effectiveEndTime || (isSpät ? '00:06' : '07:06'),
+          endTime: resolvedEndTime,
           station: matchInRoster.station || preset.station || 'Wache Sendling',
-          isOvertime: false,
+          isOvertime,
           source: 'teamRoster'
         };
       }
     }
   } catch (e) {}
-
-  // 3. Fallback for 2026-11-01 from CAREMAN_OCTOBER_2026_EXTRA
-  if (dateStr === '2026-11-01') {
-    const oct31 = (CAREMAN_OCTOBER_2026_EXTRA || []).find(s => s.date === '2026-10-31');
-    if (oct31) {
-      return {
-        prevDate: '2026-10-31',
-        code: oct31.code,
-        shiftTypeName: 'Nachtschicht',
-        startTime: oct31.startTime || '22:54',
-        endTime: oct31.endTime || '07:06',
-        station: 'Wache Sendling',
-        isOvertime: false,
-        source: 'preset'
-      };
-    }
-  }
 
   return null;
 }

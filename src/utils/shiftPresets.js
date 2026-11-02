@@ -184,7 +184,7 @@ export const CAREMAN_NOVEMBER_2026_BACKHAUS = [
 export const CAREMAN_OCTOBER_2026_EXTRA = [
   { date: '2026-10-29', day: 29, code: 'RFM', weekday: 'Do', startTime: '06:54', endTime: '15:06' },
   { date: '2026-10-30', day: 30, code: 'RFM', weekday: 'Fr', startTime: '06:54', endTime: '15:06' },
-  { date: '2026-10-31', day: 31, code: 'RNM', weekday: 'Sa', startTime: '22:54', endTime: '07:06' }
+  { date: '2026-10-31', day: 31, code: 'RNM', weekday: 'Sa', startTime: '22:54', endTime: '08:06', hours: 9.2, isOvertime: true }
 ];
 
 export function getPresetForCode(rawCode) {

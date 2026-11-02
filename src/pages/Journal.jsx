@@ -738,19 +738,24 @@ export default function Journal() {
                         border: 'var(--glass-border)'
                     }}>
                         {selectedDate ? (
-                            incomingNightShift ? (
-                                <div>
-                                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#c084fc', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                                        🌙 NACHTSCHICHT-ENDE
+                            incomingNightShift ? (() => {
+                                const isIncSpät = (incomingNightShift.shiftTypeName || '').toLowerCase().includes('spät') || (incomingNightShift.code || '').startsWith('RT');
+                                const incTitle = isIncSpät ? 'SPÄTSCHICHT-ENDE' : 'NACHTSCHICHT-ENDE';
+                                const shiftWord = isIncSpät ? 'Spätschicht' : 'Nachtschicht';
+                                return (
+                                    <div>
+                                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#c084fc', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                            🌙 {incTitle}
+                                        </div>
+                                        <div style={{ fontSize: '13.5px', color: '#cbd5e1', marginBottom: '4px', fontWeight: 600 }}>
+                                            Dienstende um {incomingNightShift.endTime} Uhr{incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                            Aus {shiftWord} ({incomingNightShift.code}) vom Vortag • danach FREI
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '13.5px', color: '#cbd5e1', marginBottom: '4px', fontWeight: 600 }}>
-                                        Dienstende um {incomingNightShift.endTime} Uhr{incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
-                                        Aus Nachtschicht ({incomingNightShift.code}) vom Vortag • danach FREI
-                                    </div>
-                                </div>
-                            ) : (
+                                );
+                            })() : (
                                 <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', letterSpacing: '1.5px' }}>
                                     FREI
                                 </div>

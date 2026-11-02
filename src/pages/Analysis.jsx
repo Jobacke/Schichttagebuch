@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { APP_VERSION } from '../version';
-import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
+import { useAnalysisLogic, resolveShiftTypeName } from '../hooks/useAnalysisLogic';
 import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { exportToPDF } from '../utils/pdfExport';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
@@ -42,7 +42,7 @@ const resolveShiftDetails = (s, storeSettings) => {
     }
 
     const preset = rawCode ? (SHIFT_PRESETS[rawCode] || {}) : {};
-    const rawType = s.shiftTypeName || typeObj?.name || codeObj?.shiftTypeName || preset.shiftTypeName || '';
+    const rawType = s.shiftTypeName || typeObj?.name || codeObj?.shiftTypeName || preset.shiftTypeName || resolveShiftTypeName(s, storeSettings) || '';
     const station = s.station || preset.station || '';
     const vehicle = s.vehicle || preset.vehicle || '';
 

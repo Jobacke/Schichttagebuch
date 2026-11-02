@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { detectStation } from '../utils/shiftColors';
+import { SHIFT_PRESETS } from '../utils/shiftPresets';
+import { getShiftTypeForCode } from '../utils/teamRosterParser';
 
 // --- Native Helpers ---
 const formatDate = (date, options) => new Intl.DateTimeFormat('de-DE', options).format(date);
@@ -35,6 +37,78 @@ function calculateDuration(start, end) {
         if (endMinutes < startMinutes) endMinutes += 24 * 60;
         return (endMinutes - startMinutes) / 60;
     } catch { return 0; }
+}
+
+export function resolveShiftTypeName(s, storeSettings) {
+    if (!s) return 'Tagdienst';
+
+    // 1. Direct match with shiftTypes in settings by id
+    const typeObj = (storeSettings?.shiftTypes || []).find(t => t.id === s.typeId);
+    if (typeObj?.name && typeObj.name.toLowerCase() !== 'unbekannt') {
+        return typeObj.name;
+    }
+
+    // 2. Direct name on shift object
+    if (s.shiftTypeName && typeof s.shiftTypeName === 'string' && s.shiftTypeName.trim()) {
+        const raw = s.shiftTypeName.trim();
+        if (raw.toLowerCase() !== 'unbekannt') {
+            const matchInSettings = (storeSettings?.shiftTypes || []).find(
+                t => t.name.toLowerCase() === raw.toLowerCase()
+            );
+            return matchInSettings?.name || raw;
+        }
+    }
+
+    // 3. Shift codes in settings
+    const codeObj = (storeSettings?.shiftCodes || []).find(
+        c => c.id === s.codeId || (s.code && c.code === s.code)
+    );
+    if (codeObj?.shiftTypeName && codeObj.shiftTypeName.toLowerCase() !== 'unbekannt') {
+        return codeObj.shiftTypeName;
+    }
+    if (codeObj?.typeId) {
+        const matchCodeType = (storeSettings?.shiftTypes || []).find(t => t.id === codeObj.typeId);
+        if (matchCodeType?.name && matchCodeType.name.toLowerCase() !== 'unbekannt') {
+            return matchCodeType.name;
+        }
+    }
+
+    // 4. SHIFT_PRESETS
+    let rawCode = s.code || codeObj?.code || '';
+    if (!rawCode && s.codeId && typeof s.codeId === 'string' && s.codeId.startsWith('preset_')) {
+        rawCode = s.codeId.replace('preset_', '');
+    }
+    const cleanCode = rawCode ? rawCode.trim().toUpperCase() : '';
+    const preset = cleanCode ? (SHIFT_PRESETS[cleanCode] || {}) : {};
+    if (preset?.shiftTypeName && preset.shiftTypeName.toLowerCase() !== 'unbekannt') {
+        const matchPresetType = (storeSettings?.shiftTypes || []).find(
+            t => t.name.toLowerCase() === preset.shiftTypeName.toLowerCase()
+        );
+        return matchPresetType?.name || preset.shiftTypeName;
+    }
+
+    // 5. Intelligent code-based deduction using getShiftTypeForCode
+    if (cleanCode) {
+        const deduced = getShiftTypeForCode(cleanCode);
+        if (deduced && deduced.toLowerCase() !== 'unbekannt') {
+            const matchDeduced = (storeSettings?.shiftTypes || []).find(
+                t => t.name.toLowerCase() === deduced.toLowerCase()
+            );
+            return matchDeduced?.name || deduced;
+        }
+    }
+
+    // 6. Deduce by times if available
+    if (s.startTime && s.endTime) {
+        const [sh] = s.startTime.split(':').map(Number);
+        if (!isNaN(sh)) {
+            if (sh >= 5 && sh < 12) return 'Frühschicht';
+            if (sh >= 12 && sh < 18) return 'Spätschicht';
+            if (sh >= 18 || sh < 5) return 'Nachtschicht';
+        }
+    }
+
+    return storeSettings?.shiftTypes?.[0]?.name || 'Tagdienst';
 }
 
 export const getMonthlyWeeklyHours = (year, monthIndex0, settings) => {
@@ -131,7 +205,15 @@ export function useAnalysisLogic() {
             if (onlyBonus && !s.hasBonus) return false;
 
             // Type Check
-            if (selectedTypes.length > 0 && !selectedTypes.includes(s.typeId)) return false;
+            if (selectedTypes.length > 0) {
+                const resolvedType = resolveShiftTypeName(s, store.settings);
+                const hasMatch = selectedTypes.some(typeId => {
+                    if (s.typeId === typeId) return true;
+                    const configuredType = (store.settings?.shiftTypes || []).find(t => t.id === typeId);
+                    return configuredType && configuredType.name.toLowerCase() === resolvedType.toLowerCase();
+                });
+                if (!hasMatch) return false;
+            }
 
             // Vehicle Check
             if (selectedVehicles.length > 0 && !selectedVehicles.includes(s.vehicle)) return false;
@@ -160,7 +242,7 @@ export function useAnalysisLogic() {
             const dur = calculateDuration(s.startTime, s.endTime);
             actual += dur;
 
-            const tName = (store.settings?.shiftTypes || []).find(t => t.id === s.typeId)?.name || 'Unbekannt';
+            const tName = resolveShiftTypeName(s, store.settings);
             typeCounts[tName] = (typeCounts[tName] || 0) + 1;
 
             shiftsByDate[s.date] = (shiftsByDate[s.date] || 0) + dur;
@@ -245,7 +327,15 @@ export function useAnalysisLogic() {
             if (!s.date) return;
 
             // Apply non-date filters if active (type, vehicle, station) so breakdown matches active resource filters
-            if (selectedTypes.length > 0 && !selectedTypes.includes(s.typeId)) return;
+            if (selectedTypes.length > 0) {
+                const resolvedType = resolveShiftTypeName(s, store.settings);
+                const hasMatch = selectedTypes.some(typeId => {
+                    if (s.typeId === typeId) return true;
+                    const configuredType = (store.settings?.shiftTypes || []).find(t => t.id === typeId);
+                    return configuredType && configuredType.name.toLowerCase() === resolvedType.toLowerCase();
+                });
+                if (!hasMatch) return;
+            }
             if (selectedVehicles.length > 0 && !selectedVehicles.includes(s.vehicle)) return;
             if (selectedStations.length > 0) {
                 const st = detectStation(s);

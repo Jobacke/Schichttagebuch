@@ -617,25 +617,43 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                 fontSize: '11px',
                 color: '#94a3b8'
             }}>
-                <span style={{ fontWeight: 600, color: '#64748b' }}>Farbstruktur:</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ fontWeight: 700, color: '#64748b' }}>Wachen:</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Sendling.primaryHex }} />
                     <span>Sendling (Blau)</span>
                 </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Hohenbrunn.primaryHex }} />
                     <span>Hohenbrunn (Grün)</span>
                 </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Obersendling.primaryHex }} />
-                    <span>Obersendling (Orange)</span>
+                    <span>Obersendling (Bernstein)</span>
                 </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#a855f7' }} />
-                    <span>Nacht-Ende (Lila)</span>
+
+                <span style={{ fontWeight: 700, color: '#64748b', marginLeft: '6px' }}>Schichten:</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#06b6d4' }} />
+                    <span>Früh (Cyan)</span>
                 </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#334155' }} />
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#f97316' }} />
+                    <span>Spät (Orange)</span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#a855f7' }} />
+                    <span>Nacht (Lila)</span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#3b82f6' }} />
+                    <span>Tag (Blau)</span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#c084fc' }} />
+                    <span>Nacht-Ende</span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#64748b' }} />
                     <span>Dienstfrei</span>
                 </span>
             </div>

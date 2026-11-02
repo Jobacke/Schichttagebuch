@@ -454,12 +454,13 @@ export function exportToPDF(data) {
     doc.setLineWidth(0.2);
     doc.line(margin, footerY - 4.5, pageWidth - margin, footerY - 4.5);
 
-    // Legend items representing the independent station color structures + Schicht-Ende + Dienstfrei
+    // Legend items representing high-contrast shift types + Schicht-Ende + Dienstfrei
     const legendItems = [
-        { label: 'Wache Sendling (Blau)', rgb: STATION_THEMES.Sendling.primaryRGB },
-        { label: 'Wache Hohenbrunn (Grün)', rgb: STATION_THEMES.Hohenbrunn.primaryRGB },
-        { label: 'Wache Obersendling (Orange)', rgb: STATION_THEMES.Obersendling.primaryRGB },
-        { label: 'Schicht-Ende (Lila)', rgb: [168, 85, 247] },
+        { label: 'Früh (Cyan)', rgb: [8, 145, 178] },
+        { label: 'Spät (Orange)', rgb: [234, 88, 12] },
+        { label: 'Nacht (Lila)', rgb: [147, 51, 234] },
+        { label: 'Tag (Blau)', rgb: [37, 99, 235] },
+        { label: 'Schicht-Ende', rgb: [168, 85, 247] },
         { label: 'Dienstfrei', rgb: [148, 163, 184] }
     ];
 

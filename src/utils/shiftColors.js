@@ -34,145 +34,146 @@ export function detectStation({ station = '', code = '', codeId = '', vehicle = 
 
 /**
  * Full Theme definitions for Wachen:
- * - Sendling: Blaue Farbstruktur (Klassisches Retterblau / Indigo)
- * - Hohenbrunn: Grüne Farbstruktur (Smaragd / Mint / Waldgrün)
- * - Obersendling: Orange / Bernstein Farbstruktur (Warmes Amber / Koralle)
+ * - Sendling: Retter-Blau (Klassisches Kobaltblau)
+ * - Hohenbrunn: Smaragd-Grün (Frisches Grün)
+ * - Obersendling: Bernstein-Gelb (Warmes Amber / Goldgelb)
  */
 export const STATION_THEMES = {
     Sendling: {
         id: 'sendling',
         name: 'Wache Sendling',
         short: 'SEN',
-        hueName: 'Blau / Indigo',
-        primaryHex: '#38bdf8',
+        hueName: 'Retter-Blau',
+        primaryHex: '#0284c7',
+        color: '#38bdf8',
         primaryRGB: [2, 132, 199],
-        badgeBg: 'rgba(56, 189, 248, 0.15)',
-        badgeBorder: 'rgba(56, 189, 248, 0.4)',
-        shifts: {
-            frueh: {
-                color: '#38bdf8',
-                bg: 'rgba(56, 189, 248, 0.18)',
-                border: 'rgba(56, 189, 248, 0.5)',
-                pdf: { r: 2, g: 132, b: 199, bgR: 240, bgG: 249, bgB: 255, borderR: 125, borderG: 211, borderB: 252 }
-            },
-            tag: {
-                color: '#60a5fa',
-                bg: 'rgba(96, 165, 250, 0.18)',
-                border: 'rgba(96, 165, 250, 0.5)',
-                pdf: { r: 37, g: 99, b: 235, bgR: 239, bgG: 246, bgB: 255, borderR: 147, borderG: 197, borderB: 253 }
-            },
-            spaat: {
-                color: '#818cf8',
-                bg: 'rgba(129, 140, 248, 0.18)',
-                border: 'rgba(129, 140, 248, 0.5)',
-                pdf: { r: 79, g: 70, b: 229, bgR: 238, bgG: 242, bgB: 255, borderR: 165, borderG: 180, borderB: 252 }
-            },
-            nacht: {
-                color: '#a78bfa',
-                bg: 'rgba(167, 139, 250, 0.18)',
-                border: 'rgba(167, 139, 250, 0.5)',
-                pdf: { r: 109, g: 40, b: 217, bgR: 245, bgG: 243, bgB: 255, borderR: 199, borderG: 210, borderB: 254 }
-            },
-            default: {
-                color: '#38bdf8',
-                bg: 'rgba(56, 189, 248, 0.18)',
-                border: 'rgba(56, 189, 248, 0.5)',
-                pdf: { r: 2, g: 132, b: 199, bgR: 240, bgG: 249, bgB: 255, borderR: 125, borderG: 211, borderB: 252 }
-            }
-        }
+        badgeBg: 'rgba(2, 132, 199, 0.18)',
+        badgeBorder: 'rgba(2, 132, 199, 0.45)'
     },
     Hohenbrunn: {
         id: 'hohenbrunn',
         name: 'Wache Hohenbrunn',
         short: 'HBN',
-        hueName: 'Smaragd / Grün',
+        hueName: 'Smaragd-Grün',
         primaryHex: '#10b981',
+        color: '#34d399',
         primaryRGB: [16, 185, 129],
-        badgeBg: 'rgba(16, 185, 129, 0.15)',
-        badgeBorder: 'rgba(16, 185, 129, 0.4)',
-        shifts: {
-            frueh: {
-                color: '#34d399',
-                bg: 'rgba(52, 211, 153, 0.18)',
-                border: 'rgba(52, 211, 153, 0.5)',
-                pdf: { r: 16, g: 185, b: 129, bgR: 236, bgG: 253, bgB: 245, borderR: 110, borderG: 231, borderB: 183 }
-            },
-            tag: {
-                color: '#10b981',
-                bg: 'rgba(16, 185, 129, 0.18)',
-                border: 'rgba(16, 185, 129, 0.5)',
-                pdf: { r: 5, g: 150, b: 105, bgR: 236, bgG: 253, bgB: 245, borderR: 110, borderG: 231, borderB: 183 }
-            },
-            spaat: {
-                color: '#059669',
-                bg: 'rgba(5, 150, 105, 0.20)',
-                border: 'rgba(5, 150, 105, 0.55)',
-                pdf: { r: 4, g: 120, b: 87, bgR: 236, bgG: 253, bgB: 245, borderR: 110, borderG: 231, borderB: 183 }
-            },
-            nacht: {
-                color: '#14b8a6',
-                bg: 'rgba(20, 184, 166, 0.18)',
-                border: 'rgba(20, 184, 166, 0.5)',
-                pdf: { r: 13, g: 148, b: 136, bgR: 240, bgG: 253, bgB: 250, borderR: 153, borderG: 246, borderB: 228 }
-            },
-            default: {
-                color: '#10b981',
-                bg: 'rgba(16, 185, 129, 0.18)',
-                border: 'rgba(16, 185, 129, 0.5)',
-                pdf: { r: 5, g: 150, b: 105, bgR: 236, bgG: 253, bgB: 245, borderR: 110, borderG: 231, borderB: 183 }
-            }
-        }
+        badgeBg: 'rgba(16, 185, 129, 0.18)',
+        badgeBorder: 'rgba(16, 185, 129, 0.45)'
     },
     Obersendling: {
         id: 'obersendling',
         name: 'Wache Obersendling',
         short: 'OBS',
-        hueName: 'Orange / Bernstein',
-        primaryHex: '#f97316',
-        primaryRGB: [234, 88, 12],
-        badgeBg: 'rgba(249, 115, 22, 0.15)',
-        badgeBorder: 'rgba(249, 115, 22, 0.4)',
-        shifts: {
-            frueh: {
-                color: '#fbbf24',
-                bg: 'rgba(251, 191, 36, 0.18)',
-                border: 'rgba(251, 191, 36, 0.5)',
-                pdf: { r: 217, g: 119, b: 6, bgR: 254, bgG: 252, bgB: 232, borderR: 253, borderG: 224, borderB: 71 }
-            },
-            tag: {
-                color: '#f59e0b',
-                bg: 'rgba(245, 158, 11, 0.18)',
-                border: 'rgba(245, 158, 11, 0.5)',
-                pdf: { r: 180, g: 83, b: 9, bgR: 254, bgG: 243, bgB: 199, borderR: 252, borderG: 211, borderB: 77 }
-            },
-            spaat: {
-                color: '#f97316',
-                bg: 'rgba(249, 115, 22, 0.18)',
-                border: 'rgba(249, 115, 22, 0.5)',
-                pdf: { r: 234, g: 88, b: 12, bgR: 255, bgG: 247, bgB: 237, borderR: 253, borderG: 186, borderB: 116 }
-            },
-            nacht: {
-                color: '#ea580c',
-                bg: 'rgba(234, 88, 12, 0.18)',
-                border: 'rgba(234, 88, 12, 0.5)',
-                pdf: { r: 194, g: 65, b: 12, bgR: 255, bgG: 241, bgB: 242, borderR: 254, borderG: 205, borderB: 211 }
-            },
-            default: {
-                color: '#f97316',
-                bg: 'rgba(249, 115, 22, 0.18)',
-                border: 'rgba(249, 115, 22, 0.5)',
-                pdf: { r: 234, g: 88, b: 12, bgR: 255, bgG: 247, bgB: 237, borderR: 253, borderG: 186, borderB: 116 }
-            }
-        }
+        hueName: 'Bernstein-Gelb',
+        primaryHex: '#eab308',
+        color: '#facc15',
+        primaryRGB: [234, 179, 8],
+        badgeBg: 'rgba(234, 179, 8, 0.18)',
+        badgeBorder: 'rgba(234, 179, 8, 0.45)'
     }
 };
 
+/**
+ * Universal, High-Contrast Shift Type Colors:
+ * - Frühschicht: Helles Türkis / Cyan (Morgendämmerung)
+ * - Tagschicht: Royalblau (Vollmond / Tag)
+ * - Spätschicht: Warmes Abend-Orange / Sunset (Abendrot)
+ * - Nachtschicht: Tiefes Nacht-Violett / Lila (Mondschein)
+ * - Nacht-Ende: Sanftes Flieder / Lavendel
+ * - Fortbildung: Koralle / Rose
+ * - Dienstfrei: Schiefergrau
+ */
+export const SHIFT_TYPE_COLORS = {
+    frueh: {
+        id: 'frueh',
+        name: 'Frühschicht',
+        color: '#06b6d4', // Vibrant Cyan / Türkis
+        bg: 'rgba(6, 182, 212, 0.16)',
+        border: 'rgba(6, 182, 212, 0.45)',
+        badgeBg: 'rgba(6, 182, 212, 0.22)',
+        pdf: { r: 8, g: 145, b: 178, bgR: 236, bgG: 254, bgB: 255, borderR: 103, borderG: 232, borderB: 249 }
+    },
+    tag: {
+        id: 'tag',
+        name: 'Tagschicht',
+        color: '#3b82f6', // Royal Blue
+        bg: 'rgba(59, 130, 246, 0.16)',
+        border: 'rgba(59, 130, 246, 0.45)',
+        badgeBg: 'rgba(59, 130, 246, 0.22)',
+        pdf: { r: 37, g: 99, b: 235, bgR: 239, bgG: 246, bgB: 255, borderR: 147, borderG: 197, borderB: 253 }
+    },
+    spaat: {
+        id: 'spaat',
+        name: 'Spätschicht',
+        color: '#f97316', // Warm Sunset Amber-Orange
+        bg: 'rgba(249, 115, 22, 0.16)',
+        border: 'rgba(249, 115, 22, 0.45)',
+        badgeBg: 'rgba(249, 115, 22, 0.22)',
+        pdf: { r: 234, g: 88, b: 12, bgR: 255, bgG: 247, bgB: 237, borderR: 253, borderG: 186, borderB: 116 }
+    },
+    nacht: {
+        id: 'nacht',
+        name: 'Nachtschicht',
+        color: '#a855f7', // Deep Midnight Purple
+        bg: 'rgba(168, 85, 247, 0.18)',
+        border: 'rgba(168, 85, 247, 0.48)',
+        badgeBg: 'rgba(168, 85, 247, 0.25)',
+        pdf: { r: 147, g: 51, b: 234, bgR: 245, bgG: 243, bgB: 255, borderR: 216, borderG: 180, borderB: 254 }
+    },
+    nachtEnde: {
+        id: 'nachtEnde',
+        name: 'Nachtschicht-Ende',
+        color: '#c084fc', // Soft Lilac / Lavendel
+        bg: 'rgba(168, 85, 247, 0.14)',
+        border: 'rgba(168, 85, 247, 0.35)',
+        badgeBg: 'rgba(168, 85, 247, 0.25)',
+        pdf: { r: 168, g: 85, b: 247, bgR: 250, bgG: 245, bgB: 255, borderR: 216, borderG: 180, borderB: 254 }
+    },
+    fortbildung: {
+        id: 'fortbildung',
+        name: 'Fortbildung',
+        color: '#ec4899', // Pink / Rose
+        bg: 'rgba(236, 72, 153, 0.16)',
+        border: 'rgba(236, 72, 153, 0.45)',
+        badgeBg: 'rgba(236, 72, 153, 0.22)',
+        pdf: { r: 219, g: 39, b: 119, bgR: 253, bgG: 242, bgB: 248, borderR: 244, borderG: 114, borderB: 182 }
+    },
+    default: {
+        id: 'default',
+        name: 'Dienst',
+        color: '#3b82f6',
+        bg: 'rgba(59, 130, 246, 0.16)',
+        border: 'rgba(59, 130, 246, 0.45)',
+        badgeBg: 'rgba(59, 130, 246, 0.22)',
+        pdf: { r: 37, g: 99, b: 235, bgR: 239, bgG: 246, bgB: 255, borderR: 147, borderG: 197, borderB: 253 }
+    }
+};
+
+// Backwards compatibility for any property accessing STATION_THEMES.shifts
+Object.values(STATION_THEMES).forEach(th => {
+    th.shifts = SHIFT_TYPE_COLORS;
+});
+
 export function getShiftThemeKey(typeName = '', code = '') {
-    const text = `${typeName} ${code}`.toLowerCase().replace(/\*+$/, '');
-    if (text.includes('früh') || text.includes('rf') || text.includes('fm') || text.includes('fh') || text.includes('fo')) return 'frueh';
-    if (text.includes('spät') || text.includes('rs') || text.includes('sm') || text.includes('sh') || text.includes('so')) return 'spaat';
-    if (text.includes('nacht') || text.includes('rn') || text.includes('nm') || text.includes('nh')) return 'nacht';
-    if (text.includes('tag') || text.includes('rt') || text.includes('t1') || text.includes('t2') || text.includes('t3') || text.includes('t4')) return 'tag';
+    const raw = `${typeName} ${code}`.toLowerCase().replace(/\*+$/, '').trim();
+    const cleanCode = (code || '').toUpperCase().replace(/\*+$/, '').trim();
+
+    if (raw.includes('nacht') || cleanCode.startsWith('RN') || cleanCode.endsWith('NM') || cleanCode.endsWith('NH') || cleanCode.endsWith('NO') || cleanCode.startsWith('NF')) {
+        return 'nacht';
+    }
+    if (raw.includes('spät') || cleanCode.startsWith('RS') || cleanCode.endsWith('SM') || cleanCode.endsWith('SH') || cleanCode.endsWith('SO') || ['RT2M', 'RT4M', 'RT2H', 'RT4H', 'RT2O', 'RT4O'].includes(cleanCode)) {
+        return 'spaat';
+    }
+    if (raw.includes('früh') || cleanCode.startsWith('RF') || cleanCode.endsWith('FM') || cleanCode.endsWith('FH') || cleanCode.endsWith('FO')) {
+        return 'frueh';
+    }
+    if (raw.includes('tag') || cleanCode.startsWith('RT') || cleanCode.startsWith('RD') || ['RT1M', 'RT3M', 'RT1H', 'RT3H', 'RTH'].includes(cleanCode)) {
+        return 'tag';
+    }
+    if (raw.includes('fortbildung') || ['PALS', 'ACLS', 'SMT', 'RAJ', 'LGI'].some(k => cleanCode.includes(k))) {
+        return 'fortbildung';
+    }
     return 'default';
 }
 
@@ -181,20 +182,20 @@ export function getShiftThemeKey(typeName = '', code = '') {
  */
 export function getShiftColor(typeName = '', code = '', station = '', vehicle = '') {
     const stName = detectStation({ station, code, vehicle });
-    const theme = STATION_THEMES[stName] || STATION_THEMES.Sendling;
+    const stationTheme = STATION_THEMES[stName] || STATION_THEMES.Sendling;
     const shiftKey = getShiftThemeKey(typeName, code);
-    const shiftTheme = theme.shifts[shiftKey] || theme.shifts.default;
+    const shiftTheme = SHIFT_TYPE_COLORS[shiftKey] || SHIFT_TYPE_COLORS.default;
 
     return {
         color: shiftTheme.color,
         bg: shiftTheme.bg,
         border: shiftTheme.border,
-        stationName: theme.name,
-        stationShort: theme.short,
-        stationColor: theme.primaryHex,
-        stationBg: theme.badgeBg,
-        stationBorder: theme.badgeBorder,
-        label: `${typeName || code} (${theme.short})`
+        stationName: stationTheme.name,
+        stationShort: stationTheme.short,
+        stationColor: stationTheme.color || stationTheme.primaryHex,
+        stationBg: stationTheme.badgeBg,
+        stationBorder: stationTheme.badgeBorder,
+        label: `${typeName || code} (${stationTheme.short})`
     };
 }
 
@@ -203,9 +204,9 @@ export function getShiftColor(typeName = '', code = '', station = '', vehicle = 
  */
 export function getShiftColorRGB(typeName = '', code = '', station = '', vehicle = '') {
     const stName = detectStation({ station, code, vehicle });
-    const theme = STATION_THEMES[stName] || STATION_THEMES.Sendling;
+    const stationTheme = STATION_THEMES[stName] || STATION_THEMES.Sendling;
     const shiftKey = getShiftThemeKey(typeName, code);
-    const shiftTheme = theme.shifts[shiftKey] || theme.shifts.default;
+    const shiftTheme = SHIFT_TYPE_COLORS[shiftKey] || SHIFT_TYPE_COLORS.default;
 
     return {
         r: shiftTheme.pdf.r,
@@ -217,9 +218,9 @@ export function getShiftColorRGB(typeName = '', code = '', station = '', vehicle
         borderR: shiftTheme.pdf.borderR,
         borderG: shiftTheme.pdf.borderG,
         borderB: shiftTheme.pdf.borderB,
-        stationName: theme.name,
-        stationShort: theme.short,
-        stationPrimaryRGB: theme.primaryRGB,
-        label: `${typeName || code} (${theme.short})`
+        stationName: stationTheme.name,
+        stationShort: stationTheme.short,
+        stationPrimaryRGB: stationTheme.primaryRGB,
+        label: `${typeName || code} (${stationTheme.short})`
     };
 }

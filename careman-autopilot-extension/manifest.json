@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Schichttagebuch – CareMan 3-Wachen Live Auto-Pilot",
+  "version": "2.2.14",
+  "description": "Automatisiert den CareMan-Abruf (Airlock 2FA Auswahl, Dienstplan BAYERN, Abteilungsdienstplan & alle 3 Wachen 61000/61010/61300) für das Schichttagebuch.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://my.secure.johanniter.de/*",
+        "https://dienstplan-bayern.secure.johanniter.de/*"
+      ],
+      "js": ["autopilot.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

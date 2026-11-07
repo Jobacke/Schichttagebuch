@@ -30,17 +30,42 @@ import { buildShiftFromPreset, getPresetForCode } from '../utils/shiftPresets';
 import { parseCareManPdf } from '../utils/teamRosterPdfParser';
 import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
 import { getShiftColor, detectStation, STATION_THEMES } from '../utils/shiftColors';
-import { runOneClickCareManSync, transferPersonalRosterToJournal } from '../utils/oneClickCareManSync';
+import {
+  runOneClickCareManSync,
+  transferPersonalRosterToJournal,
+  openCareManLiveWindow
+} from '../utils/oneClickCareManSync';
 
-const SIEDA_EXTRACTOR_SCRIPT = `(() => {
-  let year = 2026;
-  let month = 10;
-  const urlMatch = window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);
-  if (urlMatch) {
-    year = parseInt(urlMatch[1], 10);
-    month = parseInt(urlMatch[2], 10);
-  } else {
+const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;padding:12px 22px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;box-shadow:0 12px 32px rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.3);';
+  const setStatus = txt => { banner.textContent = txt; };
+  document.body.appendChild(banner);
+
+  try {
+    // 1. Falls noch auf der CareMan-Startseite (Istplan), persönlichen Istplan merken & Abteilungsdienstplan öffnen
+    const personalTimes = {};
+    if (!document.querySelector('table.mat-table')) {
+      const abtBtn = Array.from(document.querySelectorAll('a, button, div, span')).find(el => {
+        const t = (el.innerText || el.textContent || '').replace(/\\s+/g, '');
+        return t === 'Abteilungsdienstplan' || t === 'Abteilungs-dienstplan';
+      });
+      if (abtBtn) {
+        setStatus('⚡ Öffne Abteilungsdienstplan...');
+        abtBtn.click();
+        for (let i = 0; i < 25; i++) {
+          await sleep(250);
+          if (document.querySelector('table.mat-table') || document.querySelector('mat-select')) break;
+        }
+        await sleep(500);
+      }
+    }
+
+    // 2. Monat und Jahr ermitteln
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    let year = new Date().getFullYear();
+    let month = new Date().getMonth() + 1;
     const pageText = document.body ? document.body.innerText : '';
     const textMatch = pageText.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);
     if (textMatch) {
@@ -49,108 +74,217 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
         month = idx + 1;
         year = parseInt(textMatch[2], 10);
       }
+    } else {
+      const urlMatch = window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);
+      if (urlMatch) {
+        year = parseInt(urlMatch[1], 10);
+        month = parseInt(urlMatch[2], 10);
+      }
     }
-  }
 
-  const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-  const yearMonth = \`\${year}-\${String(month).padStart(2, '0')}\`;
-  const monthLabel = \`\${monthNames[month - 1]} \${year}\`;
+    const yearMonth = \`\${year}-\${String(month).padStart(2, '0')}\`;
+    const monthLabel = \`\${monthNames[month - 1]} \${year}\`;
 
-  const table = document.querySelector('table.mat-table') || document.querySelector('table');
-  const headerRow = table?.querySelector('thead tr') || table?.querySelector('tr');
-  const headers = Array.from(headerRow?.children || []).map(c => c.textContent.trim());
+    // Hilfsfunktion: Liest die aktuell sichtbare CareMan-Tabelle aus
+    const extractVisibleTable = (forcedStation) => {
+      const table = document.querySelector('table.mat-table') || document.querySelector('table');
+      const headerRow = table?.querySelector('thead tr') || table?.querySelector('tr');
+      const headers = Array.from(headerRow?.children || []).map(c => c.textContent.trim());
 
-  const colToDay = new Map();
-  headers.forEach((h, idx) => {
-    const m = h.match(/(\\d+)/);
-    if (m) {
-      const d = parseInt(m[1], 10);
-      if (d >= 1 && d <= 31) colToDay.set(idx, d);
-    }
-  });
+      const colToDay = new Map();
+      headers.forEach((h, idx) => {
+        const m = h.match(/(\\d+)/);
+        if (m) {
+          const d = parseInt(m[1], 10);
+          if (d >= 1 && d <= 31) colToDay.set(idx, d);
+        }
+      });
 
-  const rows = Array.from(document.querySelectorAll('tr')).filter(r => {
-    const nameEl = r.querySelector('.employee-cell') || r.children[0];
-    const txt = nameEl ? nameEl.textContent.trim() : '';
-    return txt.includes(',') && !txt.match(/\\d{2,}/);
-  });
+      const rows = Array.from(document.querySelectorAll('tr')).filter(r => {
+        const nameEl = r.querySelector('.employee-cell') || r.children[0];
+        const txt = nameEl ? nameEl.textContent.trim() : '';
+        if (!txt.includes(',') || txt.match(/\\d{2,}/)) return false;
+        if (/^M-J/i.test(txt) || /\\b(KTW|RTW|NEF|Ak\\.)\\b/i.test(txt)) return false;
+        return true;
+      });
 
-  const colleagues = [];
-  let mCount = 0, oCount = 0, hCount = 0;
+      const colleagues = [];
+      let mCount = 0, oCount = 0, hCount = 0;
 
-  rows.forEach(r => {
-    const nameEl = r.querySelector('.employee-cell') || r.children[0];
-    const name = nameEl.textContent.trim();
-    const cells = Array.from(r.children);
-    const shifts = {};
+      rows.forEach(r => {
+        const nameEl = r.querySelector('.employee-cell') || r.children[0];
+        const name = nameEl.textContent.trim().replace(/\\s+/g, ' ');
+        const cells = Array.from(r.children);
+        const shifts = {};
 
-    let asteriskCount = 0;
-    colToDay.forEach((dayNum, colIdx) => {
-      if (colIdx < cells.length) {
-        const cell = cells[colIdx];
-        const rawText = (cell.innerText || cell.textContent || '').trim();
-        if (!rawText) return;
-        const cellHasAsterisk = rawText.includes('*') ||
-          Boolean(cell.innerHTML && cell.innerHTML.includes('*')) ||
-          Boolean(cell.getAttribute('title') && cell.getAttribute('title').includes('*')) ||
-          Boolean(cell.getAttribute('aria-label') && cell.getAttribute('aria-label').includes('*')) ||
-          Boolean(cell.querySelector('[matbadge], .mat-badge, .mat-badge-content, [class*="star"], [class*="asterisk"]'));
+        colToDay.forEach((dayNum, colIdx) => {
+          if (colIdx < cells.length) {
+            const cell = cells[colIdx];
+            const rawText = (cell.innerText || cell.textContent || '').trim();
+            if (!rawText) return;
+            const cellHasAsterisk = rawText.includes('*') ||
+              Boolean(cell.innerHTML && cell.innerHTML.includes('*')) ||
+              Boolean(cell.getAttribute('title') && cell.getAttribute('title').includes('*')) ||
+              Boolean(cell.getAttribute('aria-label') && cell.getAttribute('aria-label').includes('*')) ||
+              Boolean(cell.querySelector('[matbadge], .mat-badge, .mat-badge-content, [class*="star"], [class*="asterisk"]'));
 
-        const parts = rawText.toUpperCase().split(/[,/;\n\r\t]+/).map(p => p.trim()).filter(Boolean);
-        const validCodes = [];
-        parts.forEach(part => {
-          const hasAsterisk = part.includes('*') || cellHasAsterisk;
-          let baseCode = part.replace(/[^A-ZÄÖÜ0-9\-]/g, '');
-          if (!baseCode || baseCode.length < 2 || baseCode === 'FREI' || baseCode === '00') return;
+            const parts = rawText.toUpperCase().split(/[,/;\\n\\r\\t]+/).map(p => p.trim()).filter(Boolean);
+            const validCodes = [];
+            parts.forEach(part => {
+              const hasAsterisk = part.includes('*') || cellHasAsterisk;
+              let baseCode = part.replace(/[^A-ZÄÖÜ0-9\\-]/g, '');
+              if (!baseCode || baseCode.length < 2 || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
 
-          // Check prefix compound (e.g. RDRT2M -> RDÜ, RT2M)
-          const stdPat = '(?:RF[MHO]|RS[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MH]|RH[MH]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
-          const pm = baseCode.match(new RegExp('^(RD|RDÜ|ÜB)(' + stdPat + ')(\\*?)$'));
-          if (pm) {
-            const sub1 = pm[1] === 'RD' ? 'RDÜ' : pm[1];
-            const sub2 = pm[2] + (pm[3] || (hasAsterisk ? '*' : ''));
-            validCodes.push(sub1);
-            validCodes.push(sub2);
-            if (sub2.includes('*')) asteriskCount++;
-            return;
+              const stdPat = '(?:RF[MHO]|RS[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MH]|RH[MH]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
+              const pm = baseCode.match(new RegExp('^(RD|RDÜ|ÜB)(' + stdPat + ')(\\\\*?)$'));
+              if (pm) {
+                const sub1 = pm[1] === 'RD' ? 'RDÜ' : pm[1];
+                const sub2 = pm[2] + (pm[3] || (hasAsterisk ? '*' : ''));
+                validCodes.push(sub1, sub2);
+                return;
+              }
+
+              if (baseCode === 'RD') baseCode = 'RDÜ';
+              const finalCode = hasAsterisk ? (baseCode + '*') : baseCode;
+              validCodes.push(finalCode);
+              if (baseCode.endsWith('M') || baseCode.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(baseCode)) mCount++;
+              else if (baseCode.endsWith('O') || baseCode === 'RFO' || baseCode === 'RSO' || baseCode.startsWith('NFO') || baseCode.startsWith('FFO')) oCount++;
+              else if (baseCode.endsWith('H') || baseCode.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(baseCode)) hCount++;
+            });
+
+            if (validCodes.length > 0) {
+              const dateStr = yearMonth + '-' + String(dayNum).padStart(2, '0');
+              shifts[dateStr] = validCodes.join(', ');
+            }
           }
-
-          if (baseCode === 'RD') baseCode = 'RDÜ';
-          const finalCode = hasAsterisk ? (baseCode + '*') : baseCode;
-          if (hasAsterisk) asteriskCount++;
-          validCodes.push(finalCode);
-          if (baseCode.endsWith('M') || baseCode.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(baseCode)) mCount++;
-          else if (baseCode.endsWith('O') || baseCode === 'RFO' || baseCode === 'RSO' || baseCode.startsWith('NFO') || baseCode.startsWith('FFO')) oCount++;
-          else if (baseCode.endsWith('H') || baseCode.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(baseCode)) hCount++;
         });
 
-        if (validCodes.length > 0) {
-          const dateStr = yearMonth + '-' + String(dayNum).padStart(2, '0');
-          shifts[dateStr] = validCodes.join(', ');
+        if (Object.keys(shifts).length > 0) {
+          colleagues.push({ name, shifts });
+        }
+      });
+
+      let station = forcedStation || 'Sendling';
+      if (!forcedStation) {
+        if (oCount > mCount && oCount > hCount) station = 'Obersendling';
+        else if (hCount > mCount && hCount > oCount) station = 'Hohenbrunn';
+      }
+      return { yearMonth, monthLabel, station, colleagues };
+    };
+
+    // Hilfsfunktion: Findet das Dropdown "Filter Planungsgruppe"
+    const findPlanungsgruppeSelect = () => {
+      const fields = Array.from(document.querySelectorAll('mat-form-field, .mat-form-field'));
+      const pgField = fields.find(f => /Planungsgruppe/i.test(f.innerText || f.textContent || ''));
+      if (pgField) {
+        const sel = pgField.querySelector('mat-select, .mat-select, [role="combobox"], [role="listbox"]');
+        if (sel) return sel;
+      }
+      return document.querySelectorAll('mat-select, .mat-select')[0] || null;
+    };
+
+    const TARGET_STATIONS = [
+      { key: '61000', pattern: /61000.*Rettungswache\\s+M[üu]nchen/i, station: 'Sendling', label: '61000 Rettungswache München' },
+      { key: '61010', pattern: /61010.*Obersendling/i, station: 'Obersendling', label: '61010 Rettungswache Obersendling' },
+      { key: '61300', pattern: /61300.*Hohenbrunn/i, station: 'Hohenbrunn', label: '61300 Rettungswache Hohenbrunn' }
+    ];
+
+    const rosters = [];
+    const pgSelect = findPlanungsgruppeSelect();
+
+    if (pgSelect) {
+      for (let i = 0; i < TARGET_STATIONS.length; i++) {
+        const target = TARGET_STATIONS[i];
+        setStatus(\`⚡ Lese Wache \${i + 1}/3: \${target.label}...\`);
+
+        const currentTriggerText = (pgSelect.innerText || pgSelect.textContent || '').trim();
+        const alreadySelected = target.pattern.test(currentTriggerText) &&
+          document.querySelectorAll('tr').length > 3 &&
+          !Array.from(document.querySelectorAll('tr')).some(r => /^M-J\\s*\\d/i.test((r.children[0]?.textContent || '').trim()));
+
+        if (!alreadySelected) {
+          const clickTarget = pgSelect.querySelector('.mat-select-trigger, .mat-mdc-select-trigger') || pgSelect;
+          clickTarget.click();
+
+          let options = [];
+          for (let w = 0; w < 15; w++) {
+            await sleep(120);
+            options = Array.from(document.querySelectorAll('mat-option, .mat-option, [role="option"]'));
+            if (options.length > 0) break;
+          }
+
+          const matchOpt = options.find(o => target.pattern.test((o.innerText || o.textContent || '').trim()));
+          if (matchOpt) {
+            const prevSig = Array.from(document.querySelectorAll('tr')).slice(1, 5).map(r => (r.children[0]?.textContent || '').trim()).join('|');
+            matchOpt.scrollIntoView({ block: 'nearest' });
+            matchOpt.click();
+
+            for (let w = 0; w < 25; w++) {
+              await sleep(160);
+              const newSig = Array.from(document.querySelectorAll('tr')).slice(1, 5).map(r => (r.children[0]?.textContent || '').trim()).join('|');
+              if (newSig && newSig !== prevSig && !/^M-J\\s*\\d/i.test(newSig)) break;
+            }
+            await sleep(250);
+          } else {
+            // Overlay schließen falls Option nicht gefunden
+            document.body.click();
+            await sleep(150);
+          }
+        }
+
+        const extracted = extractVisibleTable(target.station);
+        if (extracted.colleagues.length > 0) {
+          rosters.push(extracted);
         }
       }
-    });
-
-    if (Object.keys(shifts).length > 0) {
-      colleagues.push({ name, shifts });
     }
-  });
 
-  let station = 'Sendling';
-  if (oCount > mCount && oCount > hCount) station = 'Obersendling';
-  else if (hCount > mCount && hCount > oCount) station = 'Hohenbrunn';
+    if (rosters.length === 0) {
+      const single = extractVisibleTable(null);
+      if (single.colleagues.length > 0) rosters.push(single);
+    }
 
-  const result = { yearMonth, monthLabel, station, colleagues };
-  const json = JSON.stringify(result);
-  copy(json);
-  window.open('https://schicht.vjbackhaus.de/team#careman=' + encodeURIComponent(json), 'schichttagebuch_app');
+    const payload = rosters.length > 1
+      ? { multiStation: true, yearMonth, monthLabel, rosters, personalTimes }
+      : (rosters[0] || { yearMonth, monthLabel, station: 'Sendling', colleagues: [] });
+
+    const json = JSON.stringify(payload);
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = json;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) {}
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try { await navigator.clipboard.writeText(json); } catch (e) {}
+    }
+
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload }, '*');
+      } catch (e) {}
+    }
+
+    setStatus(\`✅ Alle \${rosters.length} Wachen (\${monthLabel}) live ans Schichttagebuch übertragen!\`);
+    banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+    window.open('https://schicht.vjbackhaus.de/team#careman=' + encodeURIComponent(json), 'schichttagebuch_app');
+    setTimeout(() => banner.remove(), 6000);
+  } catch (err) {
+    banner.style.background = '#dc2626';
+    setStatus('⚠️ Fehler: ' + err.message);
+    setTimeout(() => banner.remove(), 6000);
+  }
 })();`;
 
-const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];var mc=0,oc=0,hc=0,ac=0;rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var cl=cs[colIdx];var rt=(cl.innerText||cl.textContent||"").trim();if(rt){var ha=rt.indexOf("*")!==-1||(cl.innerHTML&&cl.innerHTML.indexOf("*")!==-1)||(cl.getAttribute("title")&&cl.getAttribute("title").indexOf("*")!==-1)||(cl.getAttribute("aria-label")&&cl.getAttribute("aria-label").indexOf("*")!==-1)||Boolean(cl.querySelector("[matbadge],.mat-badge,.mat-badge-content,[class*='star'],[class*='asterisk']"));var pts=rt.toUpperCase().split(/[,/;\n\r\t]+/).map(function(p){return p.trim();}).filter(Boolean);var vcs=[];pts.forEach(function(pt){var hasAst=pt.indexOf("*")!==-1||ha;var bc=pt.replace(/[^A-ZÄÖÜ0-9\\-]/g,"");if(bc&&bc.length>=2&&bc!=="FREI"&&bc!=="00"){var pm=bc.match(/^(RD|RDÜ|ÜB)((?:RF|RS|RN|RT|RC|RH|FF|NF|DD|T[1-4]|LGI|BDR)[0-9]?[MHO]?)(.*)$/);if(pm){var s1=pm[1]==="RD"?"RDÜ":pm[1];var s2=pm[2]+(hasAst?"*":"");vcs.push(s1);vcs.push(s2);if(hasAst)ac++;return;}if(bc==="RD")bc="RDÜ";var fc=hasAst?(bc+"*"):bc;if(hasAst)ac++;vcs.push(fc);if(bc.endsWith("M")||bc.indexOf("-M")!==-1)mc++;else if(bc.endsWith("O")||bc==="FFO"||bc==="NFO")oc++;else if(bc.endsWith("H")||["RFH","RTH","RT1H","RT2H","RSH","RNH","RHH"].indexOf(bc)!==-1)hc++;}});if(vcs.length>0){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=vcs.join(", ");}}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var st="Sendling";if(oc>mc&&oc>hc)st="Obersendling";else if(hc>mc&&hc>oc)st="Hohenbrunn";var json=JSON.stringify({yearMonth:ym,monthLabel:ml,station:st,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}var appWin=window.open("https://schicht.vjbackhaus.de/team#careman="+encodeURIComponent(json),"schichttagebuch_app");if(!appWin){alert("✅ "+cols.length+" Kollegen für "+ml+" (Wache "+st+") kopiert!\\nJetzt in der App einfach auf „⚡ 1-Klick CareMan“ klicken.");}}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
+const BOOKMARKLET_CODE = 'javascript:' + encodeURIComponent(SIEDA_EXTRACTOR_SCRIPT);
 
 export default function TeamRoster() {
   const { currentUser } = useAuth();
-  const { store, addShifts, ensureCodesAndTypes } = useStore();
+  const { store, addShifts, deleteShifts, ensureCodesAndTypes } = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const [cloudSyncing, setCloudSyncing] = useState(false);
   const [isSyncingPersonal, setIsSyncingPersonal] = useState(false);
@@ -818,6 +952,7 @@ export default function TeamRoster() {
         currentUser,
         store,
         addShifts,
+        deleteShifts,
         ensureCodesAndTypes,
         onProgress: p => setUploadProgress(p)
       });
@@ -828,8 +963,8 @@ export default function TeamRoster() {
         setIsProcessing(false);
         setIsSyncingPersonal(false);
         setUploadProgress(null);
-        setIsUploadOpen(true);
-        setUploadError('Kein CareMan-Dienstplan in der Zwischenablage gefunden. Bitte in CareMan auf das Lesezeichen klicken (oder Tabelle mit Cmd+A & Cmd+C kopieren) und dann auf „⚡ 1-Klick CareMan“ klicken!');
+        openCareManLiveWindow(yearMonth);
+        setToastMessage('🔄 CareMan Live-Fenster geöffnet: Nach 2FA-Freigabe 1x auf das Lesezeichen klicken – alle 3 Wachen werden automatisch übertragen!');
         return;
       }
 
@@ -917,6 +1052,7 @@ export default function TeamRoster() {
         activeRoster: activeCombined,
         store,
         addShifts,
+        deleteShifts,
         ensureCodesAndTypes
       });
       const updatedPartnerCount = await autoSyncExistingJournalPartners(parsedRoster.yearMonth, activeCombined);
@@ -976,6 +1112,7 @@ export default function TeamRoster() {
         activeRoster: activeCombined,
         store,
         addShifts,
+        deleteShifts,
         ensureCodesAndTypes
       });
       const updatedPartnerCount = await autoSyncExistingJournalPartners(parsedRoster.yearMonth, activeCombined);
@@ -2385,14 +2522,30 @@ export default function TeamRoster() {
 
                   {/* SIEDA Helper Card: Bookmarklet + Copy Command */}
                   <div className="team-roster-helper-card">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: '6px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8' }}>
-                        ⚡ 1-Klick Abgriff aus dem SIEDA-Portal (CareMan)
+                        ⚡ Live-Auto-Pilot für alle 3 Wachen (61000, 61010, 61300)
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => openCareManLiveWindow(yearMonth)}
+                        style={{
+                          background: 'rgba(14, 165, 233, 0.2)',
+                          color: '#38bdf8',
+                          border: '1px solid rgba(56, 189, 248, 0.45)',
+                          borderRadius: '8px',
+                          padding: '4px 9px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🔄 CareMan öffnen
+                      </button>
                     </div>
 
                     <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
-                      Ziehe diesen Button in Deine Lesezeichenleiste. Ein Klick darauf in CareMan überträgt den kompletten Monatsdienstplan <strong>vollautomatisch mit 1 Klick</strong> in Deine App & Dein Journal:
+                      Ziehe dieses neue Lesezeichen in Deine Lesezeichenleiste. Ein einziger Klick darauf in CareMan wählt <strong>vollautomatisch nacheinander 61000 München, 61010 Obersendling und 61300 Hohenbrunn</strong> aus und überträgt alle 3 Wachen + Deine aktuellen Dienste live in die App:
                     </p>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>

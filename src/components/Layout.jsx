@@ -4,7 +4,11 @@ import { CheckCircle2 } from 'lucide-react';
 import Navigation from './Navigation';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { runOneClickCareManSync, looksLikeCareManData } from '../utils/oneClickCareManSync';
+import {
+    runOneClickCareManSync,
+    importCareManPayloadAndSync,
+    looksLikeCareManData
+} from '../utils/oneClickCareManSync';
 
 // Capture #careman=... hash early before any route redirects
 if (typeof window !== 'undefined' && window.location.hash && window.location.hash.startsWith('#careman=')) {
@@ -22,7 +26,7 @@ if (typeof window !== 'undefined' && window.location.hash && window.location.has
 
 export default function Layout() {
     const { currentUser } = useAuth();
-    const { store, addShifts, ensureCodesAndTypes } = useStore();
+    const { store, addShifts, deleteShifts, ensureCodesAndTypes } = useStore();
     const [autoImportToast, setAutoImportToast] = useState(null);
 
     useEffect(() => {
@@ -43,20 +47,49 @@ export default function Layout() {
                     currentUser,
                     store,
                     addShifts,
+                    deleteShifts,
                     ensureCodesAndTypes
                 });
                 if (res && res.message) {
                     setAutoImportToast(res.message);
-                    setTimeout(() => setAutoImportToast(null), 6000);
+                    setTimeout(() => setAutoImportToast(null), 7000);
                 }
             } catch (err) {
                 console.error('Auto CareMan import failed:', err);
             }
         };
 
+        const handleWindowMessage = async (event) => {
+            const data = event?.data;
+            if (!data || data.type !== 'CAREMAN_LIVE_SYNC_RESULT' || !data.payload) return;
+            try {
+                const rawText = typeof data.payload === 'string' ? data.payload : JSON.stringify(data.payload);
+                if (!looksLikeCareManData(rawText)) return;
+                const res = await importCareManPayloadAndSync({
+                    rawText,
+                    sourceLabel: 'live-autopilot',
+                    currentUser,
+                    store,
+                    addShifts,
+                    deleteShifts,
+                    ensureCodesAndTypes
+                });
+                if (res && res.message) {
+                    setAutoImportToast(res.message);
+                    setTimeout(() => setAutoImportToast(null), 7000);
+                }
+            } catch (err) {
+                console.error('Live postMessage CareMan sync failed:', err);
+            }
+        };
+
         checkAndRunHashOrPending();
         window.addEventListener('hashchange', checkAndRunHashOrPending);
-        return () => window.removeEventListener('hashchange', checkAndRunHashOrPending);
+        window.addEventListener('message', handleWindowMessage);
+        return () => {
+            window.removeEventListener('hashchange', checkAndRunHashOrPending);
+            window.removeEventListener('message', handleWindowMessage);
+        };
     }, [currentUser, store?.loading]);
 
     return (

@@ -12,7 +12,7 @@ import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import { getShiftColor } from '../utils/shiftColors';
 import { getPartnersForShiftFromRoster, getIncomingNightShiftForDate } from '../utils/teamRosterParser';
 import { useAuth } from '../context/AuthContext';
-import { runOneClickCareManSync } from '../utils/oneClickCareManSync';
+import { runOneClickCareManSync, openCareManLiveWindow } from '../utils/oneClickCareManSync';
 
 const JOURNAL_MONTH_STORAGE_KEY = 'schichttagebuch_journal_month';
 
@@ -127,11 +127,14 @@ export default function Journal() {
                 currentUser,
                 store,
                 addShifts,
+                deleteShifts,
                 ensureCodesAndTypes
             });
 
             if (res.source === 'empty') {
-                setIsImportModalOpen(true);
+                openCareManLiveWindow(currentYearMonthStr);
+                setToastMessage('🔄 CareMan Live-Fenster geöffnet: Nach 2FA-Freigabe einfach 1x auf das Lesezeichen klicken, um alle 3 Wachen live zu übertragen!');
+                setTimeout(() => setToastMessage(null), 8000);
                 return;
             }
 

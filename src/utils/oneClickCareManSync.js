@@ -16,17 +16,18 @@ import {
 
 /**
  * Checks whether a string looks like CareMan roster data
- * (Bookmarklet JSON, CareMan HTML table, or copied CareMan table text).
+ * (Multi-station bundle, single-station Bookmarklet JSON, CareMan HTML table, or copied CareMan table text).
  */
 export function looksLikeCareManData(rawText) {
   if (!rawText || typeof rawText !== 'string') return false;
   const trimmed = rawText.trim();
   if (trimmed.length < 20) return false;
 
-  // 1. JSON from SIEDA/CareMan Bookmarklet
+  // 1. JSON from SIEDA/CareMan Bookmarklet (single station or 3-station multiStation bundle)
   if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
     try {
       const parsed = JSON.parse(trimmed);
+      if (parsed && parsed.multiStation && Array.isArray(parsed.rosters) && parsed.rosters.length > 0) return true;
       if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].shifts) return true;
       if (parsed && Array.isArray(parsed.colleagues) && parsed.colleagues.length > 0) return true;
     } catch {
@@ -51,17 +52,20 @@ export function looksLikeCareManData(rawText) {
 
 /**
  * Extracts personal shifts ("Backhaus, Johannes") from the active roster for a month
- * and writes them (including automatic "mit ..." PartnerIn) directly into the Journal.
+ * and synchronizes them 1:1 (including short-term changes, added/removed shifts,
+ * overtime times, and automatic "mit ..." PartnerIn) directly into the Journal.
  */
 export async function transferPersonalRosterToJournal({
   yearMonth,
   activeRoster,
+  personalTimesOverride = {},
   store,
   addShifts,
+  deleteShifts,
   ensureCodesAndTypes
 }) {
   if (!yearMonth || !addShifts) {
-    return { transferredCount: 0, withPartnersCount: 0, yearMonth };
+    return { transferredCount: 0, withPartnersCount: 0, removedCount: 0, yearMonth };
   }
 
   const rosterToUse = activeRoster || getActiveTeamRoster(yearMonth);
@@ -86,7 +90,7 @@ export async function transferPersonalRosterToJournal({
   }
 
   if (personalShifts.length === 0) {
-    return { transferredCount: 0, withPartnersCount: 0, yearMonth };
+    return { transferredCount: 0, withPartnersCount: 0, removedCount: 0, yearMonth };
   }
 
   const requiredCodes = [];
@@ -116,13 +120,29 @@ export async function transferPersonalRosterToJournal({
       partner: partnerStr,
       storeSettings: effectiveSettings
     });
+    const customTime = personalTimesOverride?.[s.date];
     return {
       ...base,
-      startTime: s.startTime || base.startTime,
-      endTime: s.endTime || base.endTime,
+      startTime: customTime?.startTime || s.startTime || base.startTime,
+      endTime: customTime?.endTime || s.endTime || base.endTime,
       partner: partnerStr
     };
   });
+
+  // Detect short-term cancelled/swapped shifts in this month that no longer exist in CareMan
+  let removedCount = 0;
+  if (deleteShifts && store?.shifts) {
+    const validDates = new Set(newShifts.map(s => s.date));
+    const obsoleteShiftIds = store.shifts
+      .filter(s => s.date && s.date.startsWith(yearMonth) && !validDates.has(s.date))
+      .map(s => s.id)
+      .filter(Boolean);
+
+    if (obsoleteShiftIds.length > 0) {
+      await deleteShifts(obsoleteShiftIds);
+      removedCount = obsoleteShiftIds.length;
+    }
+  }
 
   const ok = await addShifts(newShifts, true);
   if (!ok) {
@@ -133,14 +153,16 @@ export async function transferPersonalRosterToJournal({
   return {
     transferredCount: newShifts.length,
     withPartnersCount,
+    removedCount,
     yearMonth,
     shifts: newShifts
   };
 }
 
 /**
- * Parses a raw CareMan payload (JSON, HTML, or Text), saves the Station Team Roster
- * locally + in Firebase Cloud, and immediately transfers personal shifts + partners into the Journal.
+ * Parses a raw CareMan payload (3-station multiStation bundle, single JSON, HTML, or Text),
+ * saves all Station Team Rosters locally + in Firebase Cloud, and immediately synchronizes
+ * personal shifts + partners (including short-term changes) into the Journal.
  */
 export async function importCareManPayloadAndSync({
   rawText,
@@ -148,9 +170,103 @@ export async function importCareManPayloadAndSync({
   currentUser,
   store,
   addShifts,
+  deleteShifts,
   ensureCodesAndTypes,
   onProgress
 }) {
+  const trimmed = (rawText || '').trim();
+  let isMultiStation = false;
+  let parsedMulti = null;
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const candidate = JSON.parse(trimmed);
+      if (candidate && candidate.multiStation && Array.isArray(candidate.rosters) && candidate.rosters.length > 0) {
+        isMultiStation = true;
+        parsedMulti = candidate;
+      }
+    } catch {
+      /* not multiStation JSON */
+    }
+  }
+
+  if (isMultiStation && parsedMulti) {
+    const stationsImported = [];
+    let totalShiftsAll = 0;
+    let totalColleaguesAll = 0;
+    let targetYearMonth = parsedMulti.yearMonth || '2026-11';
+    let targetMonthLabel = parsedMulti.monthLabel || targetYearMonth;
+
+    for (let i = 0; i < parsedMulti.rosters.length; i++) {
+      const stRoster = parsedMulti.rosters[i];
+      if (!stRoster || !Array.isArray(stRoster.colleagues) || stRoster.colleagues.length === 0) continue;
+
+      if (onProgress) {
+        onProgress(Math.round(20 + ((i + 1) / parsedMulti.rosters.length) * 60));
+      }
+
+      const parsedRoster = await parseCareManHtml(JSON.stringify(stRoster));
+      if (!parsedRoster || !parsedRoster.yearMonth) continue;
+
+      targetYearMonth = parsedRoster.yearMonth;
+      targetMonthLabel = parsedRoster.monthLabel || targetMonthLabel;
+      const stName = stRoster.station || parsedRoster.station || detectRosterStation(parsedRoster);
+
+      saveStationTeamRoster(parsedRoster, stName);
+      if (currentUser) {
+        saveStationTeamRosterToCloud(parsedRoster, stName, currentUser).catch(err => {
+          console.error(`Cloud save failed for ${stName}:`, err);
+        });
+      }
+
+      stationsImported.push(stName);
+      totalShiftsAll += parsedRoster.totalShifts || 0;
+      totalColleaguesAll += parsedRoster.totalColleagues || 0;
+    }
+
+    localStorage.setItem('schichten_selected_year_month', targetYearMonth);
+    try {
+      sessionStorage.setItem('schichttagebuch_journal_month', targetYearMonth);
+    } catch {
+      /* ignore */
+    }
+
+    const activeCombined = getActiveTeamRoster(targetYearMonth);
+
+    const transferRes = await transferPersonalRosterToJournal({
+      yearMonth: targetYearMonth,
+      activeRoster: activeCombined,
+      personalTimesOverride: parsedMulti.personalTimes || {},
+      store,
+      addShifts,
+      deleteShifts,
+      ensureCodesAndTypes
+    });
+
+    if (onProgress) onProgress(100);
+
+    const detail = {
+      source: 'careman_multistation',
+      yearMonth: targetYearMonth,
+      monthLabel: targetMonthLabel,
+      targetStation: stationsImported.join(', '),
+      stationsImported,
+      totalColleagues: totalColleaguesAll,
+      totalShifts: totalShiftsAll,
+      transferredCount: transferRes.transferredCount,
+      withPartnersCount: transferRes.withPartnersCount,
+      removedCount: transferRes.removedCount,
+      activeCombined
+    };
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('careman-oneclick-synced', { detail }));
+    }
+
+    return detail;
+  }
+
+  // Single-station payload
   const parsedRoster = await parseCareManHtml(rawText, onProgress);
   if (!parsedRoster || !parsedRoster.yearMonth) {
     throw new Error('Dienstplan konnte nicht erkannt werden.');
@@ -186,10 +302,11 @@ export async function importCareManPayloadAndSync({
     activeRoster: activeCombined,
     store,
     addShifts,
+    deleteShifts,
     ensureCodesAndTypes
   });
 
-  // 5. Also enrich any existing shifts in that month with partner names if not part of personalShifts
+  // 5. Also enrich any existing shifts in that month with partner names
   if (store?.shifts && addShifts) {
     const monthShifts = store.shifts.filter(s => s.date && s.date.startsWith(parsedRoster.yearMonth));
     const toUpdate = [];
@@ -216,6 +333,7 @@ export async function importCareManPayloadAndSync({
     totalShifts: parsedRoster.totalShifts,
     transferredCount: transferRes.transferredCount,
     withPartnersCount: transferRes.withPartnersCount,
+    removedCount: transferRes.removedCount,
     activeCombined
   };
 
@@ -227,10 +345,22 @@ export async function importCareManPayloadAndSync({
 }
 
 /**
+ * Opens the live CareMan Bayern portal in a helper tab/window for the requested month
+ * so the Auto-Pilot / Bookmarklet can fetch all 3 stations (61000, 61010, 61300) live.
+ */
+export function openCareManLiveWindow(targetYearMonth) {
+  const now = new Date();
+  const ym = targetYearMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [y, m] = ym.split('-').map(Number);
+  const careManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/team-duty?date=${y}-${m}-1&schichten_autopilot=1`;
+  return window.open(careManUrl, 'careman_live_sync');
+}
+
+/**
  * 1-Click CareMan Master Action:
  * 1. Checks URL hash (#careman=...) or pending session import
- * 2. Automatically reads Clipboard (no Cmd+V needed!) if CareMan data is on clipboard
- * 3. Otherwise syncs with Cloud & transfers the active month's Team Roster directly into the Journal
+ * 2. Checks Clipboard for fresh CareMan data (if not already imported in this session)
+ * 3. If forceLiveFetch is true or no fresh clipboard data is present, can open CareMan Live Auto-Pilot
  */
 export async function runOneClickCareManSync({
   targetYearMonth,
@@ -238,8 +368,10 @@ export async function runOneClickCareManSync({
   currentUser,
   store,
   addShifts,
+  deleteShifts,
   ensureCodesAndTypes,
-  onProgress
+  onProgress,
+  openLivePortalIfNoNewClipboard = true
 }) {
   // 1. Check URL Hash or pending sessionStorage payload
   if (typeof window !== 'undefined') {
@@ -255,12 +387,13 @@ export async function runOneClickCareManSync({
           currentUser,
           store,
           addShifts,
+          deleteShifts,
           ensureCodesAndTypes,
           onProgress
         });
         return {
           ...res,
-          message: `✅ CareMan 1-Klick: ${res.monthLabel} (Wache ${res.targetStation}) eingelesen & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) direkt übernommen!`
+          message: `✅ CareMan Live-Sync: ${res.monthLabel} (${res.targetStation}) aktualisiert & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) übernommen!`
         };
       }
     }
@@ -275,12 +408,13 @@ export async function runOneClickCareManSync({
           currentUser,
           store,
           addShifts,
+          deleteShifts,
           ensureCodesAndTypes,
           onProgress
         });
         return {
           ...res,
-          message: `✅ CareMan 1-Klick: ${res.monthLabel} (Wache ${res.targetStation}) eingelesen & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) direkt übernommen!`
+          message: `✅ CareMan Live-Sync: ${res.monthLabel} (${res.targetStation}) aktualisiert & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) übernommen!`
         };
       }
     } catch {
@@ -288,44 +422,69 @@ export async function runOneClickCareManSync({
     }
   }
 
-  // 2. Try reading Clipboard directly (1-Click without Paste!)
+  // 2. Try reading Clipboard directly (if fresh CareMan data was copied)
   if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
     try {
       const clipText = await navigator.clipboard.readText();
       if (clipText && looksLikeCareManData(clipText)) {
-        const res = await importCareManPayloadAndSync({
-          rawText: clipText,
-          stationOverride,
-          currentUser,
-          store,
-          addShifts,
-          ensureCodesAndTypes,
-          onProgress
-        });
-
-        // Clear clipboard or remember signature so subsequent clicks on other months also work smoothly
+        let lastSig = null;
         try {
-          sessionStorage.setItem('last_imported_careman_clip', clipText.slice(0, 200));
+          lastSig = sessionStorage.getItem('last_imported_careman_sig');
         } catch {
           /* ignore */
         }
+        const currentSig = `${clipText.length}:${clipText.slice(0, 120)}:${clipText.slice(-120)}`;
+        const isFreshClipboard = currentSig !== lastSig;
 
-        const personalMsg =
-          res.transferredCount > 0
-            ? ` & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) direkt ins Journal übernommen!`
-            : ` (${res.totalShifts} Team-Dienste gespeichert)!`;
+        if (isFreshClipboard || !openLivePortalIfNoNewClipboard) {
+          const res = await importCareManPayloadAndSync({
+            rawText: clipText,
+            stationOverride,
+            currentUser,
+            store,
+            addShifts,
+            deleteShifts,
+            ensureCodesAndTypes,
+            onProgress
+          });
 
-        return {
-          ...res,
-          message: `✅ CareMan 1-Klick: ${res.monthLabel} (Wache ${res.targetStation}) automatisch eingelesen${personalMsg}`
-        };
+          try {
+            sessionStorage.setItem('last_imported_careman_sig', currentSig);
+          } catch {
+            /* ignore */
+          }
+
+          const personalMsg =
+            res.transferredCount > 0
+              ? ` & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) direkt ins Journal übernommen!`
+              : ` (${res.totalShifts} Team-Dienste gespeichert)!`;
+
+          return {
+            ...res,
+            message: `✅ CareMan Live-Sync: ${res.monthLabel} (Wache ${res.targetStation}) eingelesen${personalMsg}`
+          };
+        }
       }
     } catch {
-      // Clipboard permission denied or empty -> seamlessly continue to Step 3
+      // Clipboard permission denied or empty -> continue
     }
   }
 
-  // 3. Sync with Cloud & transfer from active Team Roster for targetYearMonth
+  // 3. If user clicked 1-Click to fetch live changes from CareMan, open CareMan Live Portal with Auto-Pilot
+  if (openLivePortalIfNoNewClipboard && typeof window !== 'undefined') {
+    const now = new Date();
+    const defaultYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const ym = targetYearMonth || localStorage.getItem('schichten_selected_year_month') || defaultYM;
+    openCareManLiveWindow(ym);
+    return {
+      source: 'live_portal_opened',
+      yearMonth: ym,
+      transferredCount: 0,
+      message: '🔄 CareMan Live-Abruf gestartet: Bitte im geöffneten CareMan-Tab (falls nötig Airlock bestätigen) 1x auf das Lesezeichen klicken – alle 3 Wachen (61000, 61010, 61300) werden automatisch übertragen!'
+    };
+  }
+
+  // 4. Fallback: Sync with Cloud & transfer from active Team Roster for targetYearMonth
   if (currentUser) {
     try {
       await syncTeamRostersWithCloud(currentUser);
@@ -344,6 +503,7 @@ export async function runOneClickCareManSync({
     activeRoster: activeCombined,
     store,
     addShifts,
+    deleteShifts,
     ensureCodesAndTypes
   });
 

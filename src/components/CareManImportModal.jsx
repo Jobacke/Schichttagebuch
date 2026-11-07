@@ -353,7 +353,7 @@ export default function CareManImportModal({
                 }}
               >
                 <Bookmark size={14} />
-                <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '⚡ CareMan 1-Klick (v2.2.21)'}</span>
+                <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '⚡ CareMan 1-Klick (v2.2.22)'}</span>
               </a>
               <button
                 type="button"

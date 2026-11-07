@@ -781,10 +781,21 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     if (wasOnIstplan) {
       try {
         const { yearMonth: istYm } = initialMonthInfo;
-        const istCells = Array.from(document.querySelectorAll('td, .calendar-cell, .day-cell, [class*="day"]')).filter(c => {
+        const rawCells = Array.from(document.querySelectorAll('td, div, mat-grid-tile')).filter(c => {
+          if (!c.getBoundingClientRect) return false;
           const r = c.getBoundingClientRect();
-          return r.width > 50 && r.height > 45 && /\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(c.innerText || '');
+          if (r.width < 55 || r.width > 300 || r.height < 45 || r.height > 230) return false;
+          const t = (c.innerText || '').trim();
+          return /^\\d{1,2}\\b/.test(t) && /\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(t);
         });
+        const istCells = rawCells
+          .filter(c => !rawCells.some(other => other !== c && c.contains(other)))
+          .sort((a, b) => {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            return Math.round(ra.top / 30) - Math.round(rb.top / 30) || ra.left - rb.left;
+          });
+
         let inMonth = false;
         let prevDay = 0;
         istCells.forEach(cell => {
@@ -820,7 +831,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const candidates = Array.from(document.querySelectorAll('a, button, div, span, p, li')).filter(el => {
           if (!el.getBoundingClientRect) return false;
           const r = el.getBoundingClientRect();
-          if (r.width < 25 || r.width > 280 || r.height < 12 || r.height > 200) return false;
+          if (r.width < 25 || r.width > 180 || r.height < 12 || r.height > 150) return false;
           const norm = (el.innerText || el.textContent || '').replace(/[\\s\\-\\u00AD\\u2010-\\u2015]+/g, '').toLowerCase();
           return norm === 'abteilungsdienstplan' || (norm.includes('abteilungsdienstplan') && norm.length < 32);
         });
@@ -842,35 +853,38 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       if (abtEl) {
         setStatus('⚡ Öffne Abteilungsdienstplan...');
         const r = abtEl.getBoundingClientRect();
-        let tile = abtEl.parentElement;
-        for (let d = 0; d < 3 && tile && tile !== document.body; d++) {
-          const tr = tile.getBoundingClientRect();
-          if (tr.height >= 60 && tr.height <= 200 && tr.width <= 240) break;
-          tile = tile.parentElement;
+        const cx = r.left + r.width / 2;
+
+        // Schritt 1: Klicke gezielt auf den orangenen Kreis direkt über dem Text "Abteilungs-dienstplan" (niemals auf das ganze Menü!)
+        const iconAbove = document.elementFromPoint(cx, Math.max(10, r.top - 30));
+        if (iconAbove && iconAbove !== document.body) {
+          const btnHost = iconAbove.closest('button, a, [role="button"]') || iconAbove;
+          btnHost.click();
+          await sleep(350);
         }
 
-        // Schritt 1: Klicke gezielt auf den orangenen Kreis-Button im Tile
-        const btnInTile = tile ? tile.querySelector('button, a, [role="button"], .mat-fab, .mat-mini-fab, .mat-icon-button, mat-icon, i, svg') : null;
-        if (btnInTile) {
-          btnInTile.click();
-          await sleep(300);
-        }
-
-        // Schritt 2: Falls noch auf Istplan, klicke auf den Punkt 30px über dem Text "Abteilungs-dienstplan"
+        // Schritt 2: Falls noch auf Istplan, prüfe ausschließlich das einzelne Tile-Elternelement (< 170px breit/hoch)
         if (!window.location.href.includes('team-duty') && !findPlanungsgruppeTrigger()) {
-          const iconAbove = document.elementFromPoint(r.left + r.width / 2, Math.max(10, r.top - 30));
-          if (iconAbove && iconAbove !== document.body) {
-            iconAbove.click();
-            await sleep(300);
-          }
+          const singleTile = abtEl.parentElement &&
+            abtEl.parentElement.getBoundingClientRect().width < 170 &&
+            abtEl.parentElement.getBoundingClientRect().height < 170
+            ? abtEl.parentElement
+            : null;
+          const tileBtn = singleTile ? singleTile.querySelector('button, a, [role="button"], mat-icon, i, svg') : null;
+          if (tileBtn) tileBtn.click();
+          else if (abtEl.previousElementSibling) abtEl.previousElementSibling.click();
+          else abtEl.click();
+          await sleep(350);
         }
 
-        // Schritt 3: Falls immer noch auf Istplan, klicke auf Tile bzw. Text
+        // Schritt 3: Falls immer noch auf Istplan, per Angular-Router direkt zu /app/team-duty wechseln
         if (!window.location.href.includes('team-duty') && !findPlanungsgruppeTrigger()) {
-          if (abtEl.previousElementSibling) abtEl.previousElementSibling.click();
-          abtEl.click();
-          if (tile && tile !== abtEl) tile.click();
-          await sleep(300);
+          const [wy, wm] = initialMonthInfo.yearMonth.split('-').map(Number);
+          try {
+            window.history.pushState({}, '', \`/app/team-duty?date=\${wy}-\${wm}-1\`);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            await sleep(450);
+          } catch (e) {}
         }
       }
     }
@@ -1114,15 +1128,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
     const targetUrl = 'https://schicht.vjbackhaus.de/?sync=' + Date.now() + '#careman=' + encodeURIComponent(json);
     banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-    setStatus(\`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) ans Schichttagebuch übertragen!\`);
-
-    const appWin = window.open(targetUrl, 'schichttagebuch_app');
-    if (!appWin) {
-      window.location.href = targetUrl;
-    } else {
-      try { appWin.focus(); } catch (e) {}
-      setTimeout(() => banner.remove(), 6000);
-    }
+    setStatus(\`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – öffne Schichttagebuch...\`);
+    await sleep(300);
+    window.location.href = targetUrl;
   } catch (err) {
     banner.style.background = '#dc2626';
     setStatus('⚠️ Fehler: ' + err.message);

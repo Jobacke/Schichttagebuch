@@ -1285,6 +1285,12 @@
 
     const json = JSON.stringify(payload);
     try { window.name = 'CAREMAN_SYNC:' + json; } catch (e) {}
+    if (window.__CAREMAN_DAEMON_MODE) {
+      window.__CAREMAN_DAEMON_RESULT = json;
+      banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+      setStatus(`✅ ${Math.max(1, rosters.length)} ${rosters.length === 1 ? 'Wache' : 'Wachen'} (${monthLabel}) übertragen – kehre zum Schichttagebuch zurück...`);
+      return;
+    }
     copySync(json);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try { await navigator.clipboard.writeText(json); } catch (e) {}

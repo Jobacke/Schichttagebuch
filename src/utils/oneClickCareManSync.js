@@ -505,8 +505,30 @@ export function openCareManLiveWindow(targetYearMonth) {
     /* ignore */
   }
 
-  const loginUrl = 'https://my.secure.johanniter.de/auth/ui/app/auth/flow/secure-portal/password';
-  window.location.href = loginUrl;
+  // On macOS (Safari / Chrome), trigger the local CareMan Auto-Pilot Daemon (http://127.0.0.1:3847)
+  // which controls the login window via CDP, fills username & password automatically, waits for manual Airlock 2FA,
+  // opens Dienstplan Bayern (?date=...), extracts all 3 stations, and returns straight back to the App in Safari!
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+  const isMacDesktop = /Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad|iPod|Mobile/i.test(ua);
+  if (isMacDesktop) {
+    const returnOrigin = (typeof window !== 'undefined' && window.location && window.location.origin)
+      ? window.location.origin
+      : 'https://schicht.vjbackhaus.de';
+    const daemonStartUrl =
+      `http://127.0.0.1:3847/start?ym=${encodeURIComponent(ym)}` +
+      `&date=${encodeURIComponent(targetDate)}` +
+      `&user=${encodeURIComponent(username)}` +
+      `&pass=${encodeURIComponent(password)}` +
+      `&returnOrigin=${encodeURIComponent(returnOrigin)}`;
+    window.location.href = daemonStartUrl;
+    return;
+  }
+
+  // On iPhone / mobile (or non-Mac environments): open the Dienstplan Bayern deep link directly.
+  // Airlock IAM automatically redirects to the Login page (/auth/ui/app/auth/flow/secure-portal/password)
+  // with Location=https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=...
+  // so after manual Airlock 2FA confirmation it opens Dienstplan Bayern at that exact date automatically!
+  window.location.href = targetCareManUrl;
 }
 
 /**
@@ -1959,6 +1981,12 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
     const json = JSON.stringify(payload);
     try { window.name = 'CAREMAN_SYNC:' + json; } catch (e) {}
+    if (window.__CAREMAN_DAEMON_MODE) {
+      window.__CAREMAN_DAEMON_RESULT = json;
+      banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+      setStatus(\`✅ \${Math.max(1, rosters.length)} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – kehre zum Schichttagebuch zurück...\`);
+      return;
+    }
     copySync(json);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try { await navigator.clipboard.writeText(json); } catch (e) {}

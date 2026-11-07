@@ -2550,7 +2550,7 @@ export default function TeamRoster() {
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                       <a
-                        href={BOOKMARKLET_CODE}
+                        ref={el => { if (el) el.setAttribute('href', BOOKMARKLET_CODE); }}
                         className="team-roster-bookmarklet-link"
                         title="Mit der Maus in die Lesezeichenleiste ziehen"
                         onClick={e => {

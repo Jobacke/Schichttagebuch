@@ -5,7 +5,7 @@ import { getDaysInMonth, startOfMonth, getDay, isSameDay, parseISO } from 'date-
 import {
     ChevronLeft, ChevronRight, PenSquare, MapPin, Sparkles,
     CheckCircle2, Trash2, CheckSquare, Square, X, AlertTriangle, Check,
-    Calendar as CalendarIcon
+    Calendar as CalendarIcon, Bookmark
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
@@ -323,31 +323,58 @@ export default function Journal() {
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    disabled={isOneClickSyncing}
-                    onClick={handleOneClickCareMan}
-                    style={{
-                        background: 'linear-gradient(135deg, #059669, #10b981)',
-                        color: '#ffffff',
-                        border: '1px solid rgba(52, 211, 153, 0.55)',
-                        fontWeight: 800,
-                        padding: '8px 13px',
-                        borderRadius: '12px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        cursor: isOneClickSyncing ? 'default' : 'pointer',
-                        fontSize: '12.5px',
-                        whiteSpace: 'nowrap',
-                        boxShadow: '0 3px 12px rgba(16, 185, 129, 0.3)',
-                        transition: 'all 0.15s ease'
-                    }}
-                    title="Monatsdienstplan aus CareMan mit 1 Klick vollautomatisch einlesen & direkt übernehmen"
-                >
-                    <Sparkles size={15} />
-                    <span>{isOneClickSyncing ? 'Übertrage...' : '⚡ 1-Klick CareMan'}</span>
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <button
+                        type="button"
+                        disabled={isOneClickSyncing}
+                        onClick={handleOneClickCareMan}
+                        style={{
+                            background: 'linear-gradient(135deg, #059669, #10b981)',
+                            color: '#ffffff',
+                            border: '1px solid rgba(52, 211, 153, 0.55)',
+                            fontWeight: 800,
+                            padding: '8px 13px',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            cursor: isOneClickSyncing ? 'default' : 'pointer',
+                            fontSize: '12.5px',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 3px 12px rgba(16, 185, 129, 0.3)',
+                            transition: 'all 0.15s ease'
+                        }}
+                        title="Monatsdienstplan aus CareMan mit 1 Klick vollautomatisch einlesen & direkt übernehmen"
+                    >
+                        <Sparkles size={15} />
+                        <span>{isOneClickSyncing ? 'Übertrage...' : '⚡ 1-Klick CareMan'}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsImportModalOpen(true)}
+                        style={{
+                            background: 'rgba(14, 165, 233, 0.18)',
+                            color: '#38bdf8',
+                            border: '1px solid rgba(56, 189, 248, 0.45)',
+                            fontWeight: 700,
+                            padding: '8px 11px',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            cursor: 'pointer',
+                            fontSize: '12.5px',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)',
+                            transition: 'all 0.15s ease'
+                        }}
+                        title="3-Wachen-Auto-Pilot Lesezeichen & Dienstplan-Vorschau öffnen"
+                    >
+                        <Bookmark size={14} />
+                        <span>Lesezeichen</span>
+                    </button>
+                </div>
             </div>
 
             {/* Month Switcher Bar with Month Clear Option */}

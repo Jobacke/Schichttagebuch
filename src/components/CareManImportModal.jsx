@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Calendar, CheckCircle2, AlertCircle, Trash2,
-  X, ChevronLeft, ChevronRight, Check, Users
+  X, ChevronLeft, ChevronRight, Check, Users, Bookmark, Copy, ExternalLink
 } from 'lucide-react';
 import {
   CAREMAN_NOVEMBER_2026_BACKHAUS,
@@ -12,6 +12,10 @@ import {
   getPartnersForShiftFromRoster,
   extractPersonalShiftsFromRoster
 } from '../utils/teamRosterParser';
+import {
+  BOOKMARKLET_CODE,
+  openCareManLiveWindow
+} from '../utils/oneClickCareManSync';
 
 export default function CareManImportModal({
   isOpen,
@@ -37,6 +41,13 @@ export default function CareManImportModal({
   const [overwriteExisting, setOverwriteExisting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
+  const [copiedBookmarklet, setCopiedBookmarklet] = useState(false);
+
+  const handleCopyBookmarklet = () => {
+    navigator.clipboard.writeText(BOOKMARKLET_CODE);
+    setCopiedBookmarklet(true);
+    setTimeout(() => setCopiedBookmarklet(false), 3000);
+  };
 
   // Build shifts for a month directly from the Team Roster (with Nov 2026 fallback if no roster stored)
   const buildShiftsForMonth = (ym) => {
@@ -232,6 +243,67 @@ export default function CareManImportModal({
 
         {/* Modal Body */}
         <div className="modal-body" style={{ padding: '20px 24px', overflowY: 'auto' }}>
+
+          {/* LIVE 3-WACHEN LESEZEICHEN BOX */}
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.85)',
+            border: '1px solid rgba(16, 185, 129, 0.45)',
+            borderRadius: '16px',
+            padding: '14px 16px',
+            marginBottom: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#34d399' }}>
+                ⚡ Neues 3-Wachen-Auto-Pilot Lesezeichen (61000, 61010, 61300)
+              </span>
+              <button
+                type="button"
+                onClick={() => openCareManLiveWindow(selectedYearMonth)}
+                style={{
+                  background: 'rgba(14, 165, 233, 0.2)',
+                  color: '#38bdf8',
+                  border: '1px solid rgba(56, 189, 248, 0.45)',
+                  borderRadius: '8px',
+                  padding: '5px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+              >
+                <ExternalLink size={12} />
+                <span>CareMan öffnen</span>
+              </button>
+            </div>
+            <p style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+              Ziehe diesen grünen Button mit gedrückter Maustaste oben in Deine Browser-Lesezeichenleiste. Ein Klick darauf in CareMan liest automatisch alle 3 Wachen (München, Obersendling, Hohenbrunn) live aus:
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
+              <a
+                ref={el => { if (el) el.setAttribute('href', BOOKMARKLET_CODE); }}
+                className="team-roster-bookmarklet-link"
+                title="Mit gedrückter Maustaste in die Lesezeichenleiste ziehen"
+                onClick={e => {
+                  e.preventDefault();
+                  handleCopyBookmarklet();
+                }}
+              >
+                <Bookmark size={14} />
+                <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '⚡ CareMan 1-Klick Übernahme'}</span>
+              </a>
+              <button
+                type="button"
+                onClick={handleCopyBookmarklet}
+                className="team-roster-station-chip"
+                style={{ fontSize: '11px', padding: '6px 10px' }}
+              >
+                <Copy size={13} />
+                <span>{copiedBookmarklet ? 'Code kopiert! ✅' : 'Lesezeichen-Code kopieren'}</span>
+              </button>
+            </div>
+          </div>
 
           {/* SCHRITT 1: ZIEL-MONAT AUSWÄHLEN */}
           <div style={{

@@ -245,6 +245,11 @@ export async function importCareManPayloadAndSync({
 
     if (onProgress) onProgress(100);
 
+    const personalMsg =
+      transferRes.transferredCount > 0
+        ? ` & ${transferRes.transferredCount} eigene Dienste (${transferRes.withPartnersCount}x mit PartnerIn) direkt ins Journal übernommen!`
+        : ` (${totalShiftsAll} Team-Dienste gespeichert)!`;
+
     const detail = {
       source: 'careman_multistation',
       yearMonth: targetYearMonth,
@@ -256,8 +261,15 @@ export async function importCareManPayloadAndSync({
       transferredCount: transferRes.transferredCount,
       withPartnersCount: transferRes.withPartnersCount,
       removedCount: transferRes.removedCount,
-      activeCombined
+      activeCombined,
+      message: `✅ CareMan Live-Sync: ${targetMonthLabel} (${stationsImported.join(', ')}) aktualisiert${personalMsg}`
     };
+
+    try {
+      localStorage.setItem('careman_last_imported_clip', trimmed);
+    } catch {
+      /* ignore */
+    }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('careman-oneclick-synced', { detail }));
@@ -324,6 +336,11 @@ export async function importCareManPayloadAndSync({
     }
   }
 
+  const personalSingleMsg =
+    transferRes.transferredCount > 0
+      ? ` & ${transferRes.transferredCount} eigene Dienste (${transferRes.withPartnersCount}x mit PartnerIn) direkt ins Journal übernommen!`
+      : ` (${parsedRoster.totalShifts} Team-Dienste gespeichert)!`;
+
   const detail = {
     source: 'careman_payload',
     yearMonth: parsedRoster.yearMonth,
@@ -334,8 +351,15 @@ export async function importCareManPayloadAndSync({
     transferredCount: transferRes.transferredCount,
     withPartnersCount: transferRes.withPartnersCount,
     removedCount: transferRes.removedCount,
-    activeCombined
+    activeCombined,
+    message: `✅ CareMan Live-Sync: ${parsedRoster.monthLabel} (Wache ${targetStation}) eingelesen${personalSingleMsg}`
   };
+
+  try {
+    localStorage.setItem('careman_last_imported_clip', trimmed);
+  } catch {
+    /* ignore */
+  }
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('careman-oneclick-synced', { detail }));
@@ -400,7 +424,6 @@ export async function runOneClickCareManSync({
     try {
       const pending = sessionStorage.getItem('pending_careman_import');
       if (pending && looksLikeCareManData(pending)) {
-        sessionStorage.removeItem('pending_careman_import');
         const res = await importCareManPayloadAndSync({
           rawText: pending,
           stationOverride,
@@ -411,6 +434,7 @@ export async function runOneClickCareManSync({
           ensureCodesAndTypes,
           onProgress
         });
+        sessionStorage.removeItem('pending_careman_import');
         return {
           ...res,
           message: `✅ CareMan Live-Sync: ${res.monthLabel} (${res.targetStation}) aktualisiert & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) übernommen!`
@@ -510,9 +534,25 @@ export async function runOneClickCareManSync({
 export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;padding:12px 22px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;box-shadow:0 12px 32px rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.3);';
+  banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;padding:12px 22px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;box-shadow:0 12px 32px rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.3);display:flex;align-items:center;gap:12px;';
   const setStatus = txt => { banner.textContent = txt; };
   document.body.appendChild(banner);
+
+  const copySync = (str) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = str;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  };
 
   const fireClick = (el) => {
     if (!el) return;
@@ -527,47 +567,33 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
   };
 
   try {
-    const personalTimes = {};
-    // 1. Falls noch auf der CareMan-Startseite (Istplan) und noch nicht im Abteilungsdienstplan
-    if (!window.location.href.includes('team-duty') && !/Planungsgruppe/i.test(document.body ? document.body.innerText : '')) {
-      const abtBtn = Array.from(document.querySelectorAll('a, button, div, span')).find(el => {
-        const t = (el.innerText || el.textContent || '').replace(/\\s+/g, '');
-        return t === 'Abteilungsdienstplan' || t === 'Abteilungs-dienstplan';
-      });
-      if (abtBtn) {
-        setStatus('⚡ Öffne Abteilungsdienstplan...');
-        fireClick(abtBtn);
-        for (let i = 0; i < 30; i++) {
-          await sleep(250);
-          if (window.location.href.includes('team-duty') || /Planungsgruppe/i.test(document.body ? document.body.innerText : '')) break;
-        }
-        await sleep(600);
-      }
-    }
-
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-    let year = new Date().getFullYear();
-    let month = new Date().getMonth() + 1;
-    const pageText = document.body ? document.body.innerText : '';
-    const textMatch = pageText.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);
-    if (textMatch) {
-      const idx = monthNames.findIndex(m => m.toLowerCase() === textMatch[1].toLowerCase());
-      if (idx !== -1) {
-        month = idx + 1;
-        year = parseInt(textMatch[2], 10);
+    const detectMonthYear = () => {
+      let year = new Date().getFullYear();
+      let month = new Date().getMonth() + 1;
+      const pageText = document.body ? document.body.innerText : '';
+      const textMatch = pageText.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);
+      if (textMatch) {
+        const idx = monthNames.findIndex(m => m.toLowerCase() === textMatch[1].toLowerCase());
+        if (idx !== -1) {
+          month = idx + 1;
+          year = parseInt(textMatch[2], 10);
+        }
+      } else {
+        const urlMatch = window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);
+        if (urlMatch) {
+          year = parseInt(urlMatch[1], 10);
+          month = parseInt(urlMatch[2], 10);
+        }
       }
-    } else {
-      const urlMatch = window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);
-      if (urlMatch) {
-        year = parseInt(urlMatch[1], 10);
-        month = parseInt(urlMatch[2], 10);
-      }
-    }
+      return {
+        yearMonth: \`\${year}-\${String(month).padStart(2, '0')}\`,
+        monthLabel: \`\${monthNames[month - 1]} \${year}\`
+      };
+    };
 
-    const yearMonth = \`\${year}-\${String(month).padStart(2, '0')}\`;
-    const monthLabel = \`\${monthNames[month - 1]} \${year}\`;
-
-    const extractVisibleTable = (forcedStation) => {
+    const extractVisibleTable = (forcedStation, ymOverride, labelOverride) => {
+      const { yearMonth: ym, monthLabel: ml } = ymOverride ? { yearMonth: ymOverride, monthLabel: labelOverride } : detectMonthYear();
       const table = document.querySelector('table.mat-table') || document.querySelector('table');
       const headerRow = table?.querySelector('thead tr') || table?.querySelector('tr');
       const headers = Array.from(headerRow?.children || []).map(c => c.textContent.trim());
@@ -634,7 +660,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             });
 
             if (validCodes.length > 0) {
-              const dateStr = yearMonth + '-' + String(dayNum).padStart(2, '0');
+              const dateStr = ym + '-' + String(dayNum).padStart(2, '0');
               shifts[dateStr] = validCodes.join(', ');
             }
           }
@@ -650,8 +676,34 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         if (oCount > mCount && oCount > hCount) station = 'Obersendling';
         else if (hCount > mCount && hCount > oCount) station = 'Hohenbrunn';
       }
-      return { yearMonth, monthLabel, station, colleagues };
+      return { extractedAt: Date.now(), yearMonth: ym, monthLabel: ml, station, colleagues };
     };
+
+    // MILLISECOND 0 (SYNCHRONOUS): Immediately copy the currently visible table while Chrome's user gesture is 100% active!
+    const initialSnap = extractVisibleTable(null);
+    if (initialSnap.colleagues.length > 0) {
+      copySync(JSON.stringify(initialSnap));
+    }
+
+    const personalTimes = {};
+    // 1. Falls noch auf der CareMan-Startseite (Istplan) und noch nicht im Abteilungsdienstplan
+    if (!window.location.href.includes('team-duty') && !/Planungsgruppe/i.test(document.body ? document.body.innerText : '')) {
+      const abtBtn = Array.from(document.querySelectorAll('a, button, div, span')).find(el => {
+        const t = (el.innerText || el.textContent || '').replace(/\\s+/g, '');
+        return t === 'Abteilungsdienstplan' || t === 'Abteilungs-dienstplan';
+      });
+      if (abtBtn) {
+        setStatus('⚡ Öffne Abteilungsdienstplan...');
+        fireClick(abtBtn);
+        for (let i = 0; i < 30; i++) {
+          await sleep(250);
+          if (window.location.href.includes('team-duty') || /Planungsgruppe/i.test(document.body ? document.body.innerText : '')) break;
+        }
+        await sleep(600);
+      }
+    }
+
+    const { yearMonth, monthLabel } = detectMonthYear();
 
     // Universeller Finder für das Dropdown "Filter Planungsgruppe" (egal ob mat-select, md-select, ng-select oder div)
     const findPlanungsgruppeTrigger = () => {
@@ -774,25 +826,17 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     }
 
     if (rosters.length === 0) {
-      const single = extractVisibleTable(null);
+      const single = extractVisibleTable(null, yearMonth, monthLabel);
       if (single.colleagues.length > 0) rosters.push(single);
+      else if (initialSnap.colleagues.length > 0) rosters.push(initialSnap);
     }
 
     const payload = rosters.length > 1
-      ? { multiStation: true, yearMonth, monthLabel, rosters, personalTimes }
-      : (rosters[0] || { yearMonth, monthLabel, station: 'Sendling', colleagues: [] });
+      ? { multiStation: true, extractedAt: Date.now(), yearMonth, monthLabel, rosters, personalTimes }
+      : { ...(rosters[0] || { yearMonth, monthLabel, station: 'Sendling', colleagues: [] }), extractedAt: Date.now() };
 
     const json = JSON.stringify(payload);
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = json;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    } catch (e) {}
+    copySync(json);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try { await navigator.clipboard.writeText(json); } catch (e) {}
     }
@@ -803,14 +847,27 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       } catch (e) {}
     }
 
-    setStatus(\`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) live ans Schichttagebuch übertragen!\`);
+    const targetUrl = 'https://schicht.vjbackhaus.de/journal#careman=' + encodeURIComponent(json);
     banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-    const targetUrl = 'https://schicht.vjbackhaus.de/#careman=' + encodeURIComponent(json);
+    banner.innerHTML = '';
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = \`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) bereit!\`;
+    const goBtn = document.createElement('button');
+    goBtn.textContent = '👉 Jetzt im Schichttagebuch eintragen';
+    goBtn.style.cssText = 'background:#fff;color:#065f46;border:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+    goBtn.onclick = () => {
+      copySync(json);
+      const w = window.open(targetUrl, 'schichttagebuch_app');
+      if (!w) window.location.href = targetUrl;
+    };
+    banner.appendChild(msgSpan);
+    banner.appendChild(goBtn);
+
     const appWin = window.open(targetUrl, 'schichttagebuch_app');
-    if (!appWin) {
-      window.location.href = targetUrl;
+    if (appWin) {
+      try { appWin.focus(); } catch (e) {}
+      setTimeout(() => banner.remove(), 8000);
     }
-    setTimeout(() => banner.remove(), 6000);
   } catch (err) {
     banner.style.background = '#dc2626';
     setStatus('⚠️ Fehler: ' + err.message);

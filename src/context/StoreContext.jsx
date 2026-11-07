@@ -260,6 +260,7 @@ export function StoreProvider({ children }) {
     if (!currentUser) return;
     try {
       await deleteDoc(doc(db, `users/${currentUser.uid}/shifts`, id));
+      try { sessionStorage.setItem('careman_allow_reimport_after_tab_switch', '1'); } catch {}
     } catch (e) {
       console.error("Delete Shift Failed", e);
     }
@@ -273,6 +274,7 @@ export function StoreProvider({ children }) {
         batch.delete(doc(db, `users/${currentUser.uid}/shifts`, id));
       });
       await batch.commit();
+      try { sessionStorage.setItem('careman_allow_reimport_after_tab_switch', '1'); } catch {}
       return true;
     } catch (e) {
       console.warn("Batch delete failed, attempting fallback:", e);

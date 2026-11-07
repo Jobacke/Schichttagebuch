@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import Navigation from './Navigation';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,7 @@ if (typeof window !== 'undefined' && window.location.hash && window.location.has
         const decoded = decodeURIComponent(rawEncoded);
         if (looksLikeCareManData(decoded)) {
             sessionStorage.setItem('pending_careman_import', decoded);
+            sessionStorage.setItem('pending_careman_redirect_journal', '1');
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }
     } catch (e) {
@@ -28,11 +29,28 @@ export default function Layout() {
     const { currentUser } = useAuth();
     const { store, addShifts, deleteShifts, ensureCodesAndTypes } = useStore();
     const [autoImportToast, setAutoImportToast] = useState(null);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    const latestRef = useRef({ currentUser, store, addShifts, deleteShifts, ensureCodesAndTypes, location, navigate });
+    useEffect(() => {
+        latestRef.current = { currentUser, store, addShifts, deleteShifts, ensureCodesAndTypes, location, navigate };
+    });
+
+    const isImportingRef = useRef(false);
+    const hasLeftTabRef = useRef(false);
 
     useEffect(() => {
         if (!currentUser || store?.loading) return;
 
+        const showToast = (msg) => {
+            if (!msg) return;
+            setAutoImportToast(msg);
+            setTimeout(() => setAutoImportToast(null), 7000);
+        };
+
         const checkAndRunHashOrPending = async () => {
+            if (isImportingRef.current) return;
             const hasHash = window.location.hash && window.location.hash.startsWith('#careman=');
             let hasPending = false;
             try {
@@ -42,53 +60,157 @@ export default function Layout() {
             }
             if (!hasHash && !hasPending) return;
 
+            isImportingRef.current = true;
             try {
+                const ctx = latestRef.current;
                 const res = await runOneClickCareManSync({
-                    currentUser,
-                    store,
-                    addShifts,
-                    deleteShifts,
-                    ensureCodesAndTypes
+                    currentUser: ctx.currentUser,
+                    store: ctx.store,
+                    addShifts: ctx.addShifts,
+                    deleteShifts: ctx.deleteShifts,
+                    ensureCodesAndTypes: ctx.ensureCodesAndTypes
                 });
                 if (res && res.message) {
-                    setAutoImportToast(res.message);
-                    setTimeout(() => setAutoImportToast(null), 7000);
+                    showToast(res.message);
+                }
+                const shouldRedirect = sessionStorage.getItem('pending_careman_redirect_journal') === '1';
+                sessionStorage.removeItem('pending_careman_redirect_journal');
+                if (res?.yearMonth && (shouldRedirect || ctx.location.pathname === '/analysis')) {
+                    ctx.navigate(`/journal?month=${res.yearMonth}`, { replace: true });
                 }
             } catch (err) {
                 console.error('Auto CareMan import failed:', err);
+            } finally {
+                isImportingRef.current = false;
+            }
+        };
+
+        const checkClipboardOnTabReturn = async (isInitialMount = false) => {
+            if (isImportingRef.current) return;
+            if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') return;
+
+            try {
+                const clipText = await navigator.clipboard.readText();
+                if (!clipText || !looksLikeCareManData(clipText)) return;
+
+                const trimmed = clipText.trim();
+                const lastImported = localStorage.getItem('careman_last_imported_clip') || '';
+                const ctx = latestRef.current;
+
+                // Determine target month in clipboard if JSON
+                let clipYearMonth = null;
+                if (trimmed.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        clipYearMonth = parsed?.yearMonth || parsed?.rosters?.[0]?.yearMonth || null;
+                    } catch {
+                        /* ignore */
+                    }
+                }
+
+                const monthShiftCount = clipYearMonth
+                    ? (ctx.store?.shifts || []).filter(s => s.date && s.date.startsWith(clipYearMonth)).length
+                    : -1;
+
+                let allowAfterDelete = false;
+                try {
+                    allowAfterDelete = sessionStorage.getItem('careman_allow_reimport_after_tab_switch') === '1';
+                } catch {
+                    /* ignore */
+                }
+
+                // Import if clipboard has new CareMan payload OR if month is empty on mount/return OR if returning after deleting shifts
+                const isNewPayload = trimmed !== lastImported;
+                const isEmptyMonth = (hasLeftTabRef.current || isInitialMount) && monthShiftCount === 0;
+                const isReturningAfterDelete = hasLeftTabRef.current && allowAfterDelete;
+
+                if (!isNewPayload && !isEmptyMonth && !isReturningAfterDelete) return;
+
+                isImportingRef.current = true;
+                hasLeftTabRef.current = false;
+                try {
+                    sessionStorage.removeItem('careman_allow_reimport_after_tab_switch');
+                } catch {
+                    /* ignore */
+                }
+
+                const res = await importCareManPayloadAndSync({
+                    rawText: trimmed,
+                    currentUser: ctx.currentUser,
+                    store: ctx.store,
+                    addShifts: ctx.addShifts,
+                    deleteShifts: ctx.deleteShifts,
+                    ensureCodesAndTypes: ctx.ensureCodesAndTypes
+                });
+
+                if (res && res.message) {
+                    showToast(res.message);
+                }
+            } catch {
+                // Clipboard read not permitted without click or empty -> ignore silently
+            } finally {
+                isImportingRef.current = false;
             }
         };
 
         const handleWindowMessage = async (event) => {
             const data = event?.data;
             if (!data || data.type !== 'CAREMAN_LIVE_SYNC_RESULT' || !data.payload) return;
+            if (isImportingRef.current) return;
+            isImportingRef.current = true;
             try {
                 const rawText = typeof data.payload === 'string' ? data.payload : JSON.stringify(data.payload);
                 if (!looksLikeCareManData(rawText)) return;
+                const ctx = latestRef.current;
                 const res = await importCareManPayloadAndSync({
                     rawText,
-                    sourceLabel: 'live-autopilot',
-                    currentUser,
-                    store,
-                    addShifts,
-                    deleteShifts,
-                    ensureCodesAndTypes
+                    currentUser: ctx.currentUser,
+                    store: ctx.store,
+                    addShifts: ctx.addShifts,
+                    deleteShifts: ctx.deleteShifts,
+                    ensureCodesAndTypes: ctx.ensureCodesAndTypes
                 });
                 if (res && res.message) {
-                    setAutoImportToast(res.message);
-                    setTimeout(() => setAutoImportToast(null), 7000);
+                    showToast(res.message);
                 }
             } catch (err) {
                 console.error('Live postMessage CareMan sync failed:', err);
+            } finally {
+                isImportingRef.current = false;
+            }
+        };
+
+        const onWindowBlur = () => {
+            hasLeftTabRef.current = true;
+        };
+
+        const onWindowFocus = () => {
+            checkAndRunHashOrPending();
+            checkClipboardOnTabReturn();
+        };
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                hasLeftTabRef.current = true;
+            } else if (document.visibilityState === 'visible') {
+                checkAndRunHashOrPending();
+                checkClipboardOnTabReturn();
             }
         };
 
         checkAndRunHashOrPending();
+        checkClipboardOnTabReturn(true);
         window.addEventListener('hashchange', checkAndRunHashOrPending);
         window.addEventListener('message', handleWindowMessage);
+        window.addEventListener('blur', onWindowBlur);
+        window.addEventListener('focus', onWindowFocus);
+        document.addEventListener('visibilitychange', onVisibilityChange);
         return () => {
             window.removeEventListener('hashchange', checkAndRunHashOrPending);
             window.removeEventListener('message', handleWindowMessage);
+            window.removeEventListener('blur', onWindowBlur);
+            window.removeEventListener('focus', onWindowFocus);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
         };
     }, [currentUser, store?.loading]);
 

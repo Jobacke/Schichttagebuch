@@ -565,17 +565,30 @@
       });
     };
 
-    // Das Popup ist genau dann offen, wenn entweder mindestens 2 sichtbare mat-option/[role="option"] Zeilen existieren
-    // ODER mindestens 3 verschiedene Zeilen mit Planungsgruppen gleichzeitig sichtbar sind!
+    // Das Popup ist genau dann offen, wenn mindestens 2 sichtbare mat-option/[role="option"] Zeilen existieren
+    // ODER mindestens 3 nicht-ineinander-verschachtelte Zeilen mit unterschiedlichen Planungsgruppen sichtbar sind!
     const isPopupOpen = () => {
       const visOpts = Array.from(document.querySelectorAll('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option')).filter(
         el => !el.closest('[data-careman-sync-banner], table') && isElementVisible(el)
       );
-      const optY = new Set(visOpts.map(el => Math.round(el.getBoundingClientRect().top / 14)));
+      const optY = new Set(visOpts.map(el => Math.round(el.getBoundingClientRect().top / 18)));
       if (optY.size >= 2) return true;
-      const vis = getVisiblePgElements();
-      const distinctY = new Set(vis.map(el => Math.round(el.getBoundingClientRect().top / 16)));
+      const rawVis = getVisiblePgElements();
+      const leafVis = rawVis.filter(el => !rawVis.some(other => other !== el && el.contains(other)));
+      const distinctY = new Set(leafVis.map(el => Math.round(el.getBoundingClientRect().top / 28)));
       return distinctY.size >= 3;
+    };
+
+    const dismissBlockingDialogs = () => {
+      try {
+        const dlgBtns = Array.from(document.querySelectorAll('mat-dialog-container button, .mat-dialog-container button, [role="dialog"] button'));
+        const okBtn = dlgBtns.find(b => /^(OK|Schlie[ßs]en|Verstanden|Ja)$/i.test((b.innerText || b.textContent || '').trim())) || dlgBtns[0];
+        if (okBtn && typeof okBtn.click === 'function') {
+          okBtn.click();
+          return true;
+        }
+      } catch (e) {}
+      return false;
     };
 
     // Universeller Finder für das geschlossene Dropdown "Filter Planungsgruppe"
@@ -784,6 +797,7 @@
       // WICHTIG: CareMan rendert die Überschrift (z.B. "Dezember 2024") sofort bei 0ms, lädt die Kalenderzellen (getSmartMyPlanRoster)
       // aber asynchron nach. Warte bis zu 4.5s, bis die Kalenderzellen (00:00 - 00:00 / 06:54 - 15:06) geladen sind!
       for (let w = 0; w < 30; w++) {
+        dismissBlockingDialogs();
         if (getIstplanRawCells().length > 0) break;
         setStatus(`⚡ Lade Istplan (${initialMonthInfo.monthLabel})...`);
         await sleep(140);
@@ -886,6 +900,7 @@
       let abtEl = findAbtTile(true);
       let triedOpeningMenuDrawer = false;
       for (let w = 0; w < 38 && !abtEl; w++) {
+        dismissBlockingDialogs();
         if (!triedOpeningMenuDrawer && !isMenuPanelVisible()) {
           triedOpeningMenuDrawer = true;
           let menuBtn = Array.from(document.querySelectorAll('button, a, [role="button"], div, span')).find(el => {
@@ -968,6 +983,7 @@
 
     // Warte bis zu 7.5 Sekunden, bis das Dropdown "Filter Planungsgruppe" (*ngIf="!isLoading") UND die Tabelle geladen sind
     for (let w = 0; w < 65; w++) {
+      dismissBlockingDialogs();
       if (findPlanungsgruppeTrigger() && document.querySelectorAll('table tr').length > 2) break;
       setStatus(`⚡ Lade Abteilungsdienstplan (${initialMonthInfo.monthLabel})...`);
       await sleep(115);
@@ -1102,11 +1118,14 @@
       }
 
       if (didStepMonth) {
-        // Warte nach dem Monatswechsel kurz, bis CareMan die Tabelle / Planungsgruppen (*ngIf="!isLoading") für den Zielmonat geladen hat
-        for (let w = 0; w < 45; w++) {
+        // Warte nach dem Monatswechsel, bis CareMan den Ladebalken (mat-progress-bar) beendet hat und die Planungsgruppen bereit sind
+        await sleep(120);
+        for (let w = 0; w < 90; w++) {
           await sleep(80);
+          const isBusy = Boolean(document.querySelector('mat-progress-bar, .mat-progress-bar, [role="progressbar"]'));
           const curSig = getAbtTableSig();
-          if (findPlanungsgruppeTrigger() && curSig && curSig !== sigBeforeMonthStep) break;
+          if (!isBusy && findPlanungsgruppeTrigger() && curSig && curSig !== sigBeforeMonthStep) break;
+          if (!isBusy && w >= 15 && findPlanungsgruppeTrigger()) break;
         }
         await sleep(100);
       }
@@ -1158,6 +1177,7 @@
     };
 
     const openDropdown = async (pgTrigger) => {
+      dismissBlockingDialogs();
       if (isPopupOpen()) return true;
       try { pgTrigger.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
       const rect = pgTrigger.getBoundingClientRect();
@@ -1282,8 +1302,12 @@
           }
         }
 
-        for (let w = 0; w < 55; w++) {
-          await sleep(65);
+        // Warte bis CareMan den Ladebalken (mat-progress-bar) beendet hat (61000 hat ~120 Mitarbeiter und braucht ca. 5-8s Server-Ladezeit)
+        await sleep(120);
+        for (let w = 0; w < 240; w++) {
+          await sleep(80);
+          const isBusy = Boolean(document.querySelector('mat-progress-bar, .mat-progress-bar, [role="progressbar"]'));
+          if (isBusy) continue;
           const newSig = getAbtTableSig();
           const checkSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
           const sigChanged = Boolean(newSig && newSig !== prevSig);

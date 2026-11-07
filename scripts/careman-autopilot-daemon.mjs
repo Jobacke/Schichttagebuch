@@ -630,7 +630,7 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, version: '2.2.42' }));
+    res.end(JSON.stringify({ ok: true, version: '2.2.43' }));
     return;
   }
 
@@ -692,6 +692,136 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
+// ============================================================================
+// CLOUD BRIDGE (FIRESTORE) FÜR IPHONE / MOBILE AUTO-PILOT (OHNE SAFARI-BLOCKADE)
+// ============================================================================
+const FB_API_KEY = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
+const FB_BRIDGE_EMAIL = 'careman-autopilot-bridge@vjbackhaus.de';
+const FB_BRIDGE_PASS = 'CareManBridge_2026!Secure';
+const FB_PROJECT_ID = 'schichttagebuch-da2c3';
+
+let fbBridgeAuth = { idToken: null, uid: null, expiresAt: 0 };
+let activeBridgeRequestId = null;
+let lastPublishedStep = '';
+let lastPublishedStatus = '';
+
+async function ensureBridgeAuth() {
+  if (fbBridgeAuth.idToken && fbBridgeAuth.uid && Date.now() < fbBridgeAuth.expiresAt) {
+    return fbBridgeAuth;
+  }
+  try {
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: FB_BRIDGE_EMAIL, password: FB_BRIDGE_PASS, returnSecureToken: true })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    fbBridgeAuth = {
+      idToken: data.idToken,
+      uid: data.localId,
+      expiresAt: Date.now() + 45 * 60 * 1000
+    };
+    return fbBridgeAuth;
+  } catch {
+    return null;
+  }
+}
+
+function getBridgeDocUrl(uid) {
+  return `https://firestore.googleapis.com/v1/projects/${FB_PROJECT_ID}/databases/(default)/documents/users/${uid}/team_rosters/autopilot_bridge`;
+}
+
+async function publishBridgeState(force = false) {
+  const auth = await ensureBridgeAuth();
+  if (!auth) return;
+  if (!force && currentJob.stepMessage === lastPublishedStep && currentJob.status === lastPublishedStatus) {
+    return;
+  }
+  lastPublishedStep = currentJob.stepMessage;
+  lastPublishedStatus = currentJob.status;
+
+  const creds = loadStoredCredentials();
+  const fields = {
+    requestId: { stringValue: String(activeBridgeRequestId || '') },
+    status: { stringValue: String(currentJob.status || 'idle') },
+    stepMessage: { stringValue: String(currentJob.stepMessage || '') },
+    ym: { stringValue: String(currentJob.ym || '2026-11') },
+    targetDate: { stringValue: String(currentJob.targetDate || '2026-11-7') },
+    resultJson: { stringValue: String(currentJob.resultJson || '') },
+    error: { stringValue: String(currentJob.error || '') },
+    credsUser: { stringValue: String(creds.username || 'johannes.backhaus@johanniter.de') },
+    credsPass: { stringValue: String(creds.password || '') },
+    daemonHeartbeat: { integerValue: String(Date.now()) },
+    updatedAt: { integerValue: String(Date.now()) }
+  };
+
+  try {
+    await fetch(getBridgeDocUrl(auth.uid), {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${auth.idToken}`
+      },
+      body: JSON.stringify({ fields })
+    });
+  } catch {}
+}
+
+async function pollCloudBridgeLoop() {
+  // Initial sync of credentials + heartbeat
+  await publishBridgeState(true);
+
+  while (true) {
+    try {
+      const auth = await ensureBridgeAuth();
+      if (auth) {
+        if (currentJob.status === 'running' || currentJob.status === 'done' || currentJob.status === 'error') {
+          await publishBridgeState(false);
+        }
+        const res = await fetch(getBridgeDocUrl(auth.uid), {
+          headers: { 'Authorization': `Bearer ${auth.idToken}` }
+        });
+        if (res.ok) {
+          const doc = await res.json();
+          const f = doc.fields || {};
+          const reqId = f.requestId?.stringValue || '';
+          const reqStatus = f.status?.stringValue || '';
+          const reqYm = f.ym?.stringValue || '2026-11';
+          const reqDate = f.targetDate?.stringValue || '2026-11-7';
+          const reqAt = Number(f.requestedAt?.integerValue || 0);
+
+          if (
+            reqStatus === 'requested' &&
+            reqId &&
+            reqId !== activeBridgeRequestId &&
+            Date.now() - reqAt < 90000
+          ) {
+            activeBridgeRequestId = reqId;
+            const creds = loadStoredCredentials();
+            runAutoPilotJob({
+              ym: reqYm,
+              targetDate: reqDate,
+              user: creds.username,
+              pass: creds.password,
+              returnOrigin: 'https://schicht.vjbackhaus.de'
+            });
+            await sleep(100);
+            await publishBridgeState(true);
+          } else if (reqStatus === 'cancelled' && currentJob.status === 'running') {
+            killHelperChrome();
+            currentJob.status = 'idle';
+            currentJob.stepMessage = 'Abgebrochen';
+            await publishBridgeState(true);
+          }
+        }
+      }
+    } catch {}
+    await sleep(900);
+  }
+}
+
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.42 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.43 listening on http://127.0.0.1:${PORT}`);
+  pollCloudBridgeLoop();
 });

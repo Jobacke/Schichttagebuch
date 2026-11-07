@@ -561,10 +561,164 @@ export function openCareManLiveWindow(targetYearMonth) {
     return;
   }
 
-  // On iPhone / mobile (or non-Mac environments): open the Dienstplan Bayern deep link directly.
-  // Airlock IAM automatically redirects to the Login page (/auth/ui/app/auth/flow/secure-portal/password)
-  // with Location=https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=...
-  // so after manual Airlock 2FA confirmation it opens Dienstplan Bayern at that exact date automatically!
+  // On iPhone / mobile (or non-Mac environments):
+  // Connect to the CareMan Auto-Pilot Cloud Bridge (Firestore) so the background Auto-Pilot
+  // automatically enters Username & Password, triggers the Airlock 2FA push on the iPhone,
+  // extracts all 3 stations (München, Obersendling, Hohenbrunn), and delivers the shifts
+  // live into the iPhone App without getting stuck on the Safari login screen!
+  if (typeof document !== 'undefined') {
+    const existingOverlay = document.getElementById('careman-iphone-autopilot-modal');
+    if (existingOverlay) existingOverlay.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'careman-iphone-autopilot-modal';
+    overlay.style.cssText =
+      'position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,0.92);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+
+    overlay.innerHTML = `
+      <div style="max-width:440px;width:100%;background:#1e293b;border:1px solid rgba(52,211,153,0.45);border-radius:22px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,0.6);text-align:center;color:#f8fafc;">
+        <div id="cm-ip-spin" style="width:42px;height:42px;border:4px solid rgba(52,211,153,0.2);border-top-color:#10b981;border-radius:50%;animation:cmipspin 0.9s linear infinite;margin:0 auto 16px auto;"></div>
+        <style>@keyframes cmipspin { to { transform: rotate(360deg); } }</style>
+        <div style="font-size:18px;font-weight:800;color:#34d399;margin-bottom:6px;">⚡ CareMan 3-Wachen Auto-Pilot</div>
+        <div style="font-size:12.5px;color:#94a3b8;margin-bottom:18px;">Rettungswache München · Obersendling · Hohenbrunn (${ym})</div>
+        <div id="cm-ip-msg" style="background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.35);border-radius:14px;padding:15px;font-size:14px;font-weight:700;color:#e2e8f0;line-height:1.45;margin-bottom:18px;">
+          🚀 Starte automatische Anmeldung & 3-Wachen-Abruf für ${ym}...
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button id="cm-ip-fallback" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);padding:10px 14px;border-radius:11px;font-size:12.5px;font-weight:700;cursor:pointer;">
+            Alternativ: Direkt im Browser mit Lesezeichen öffnen
+          </button>
+          <button id="cm-ip-cancel" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);padding:10px 14px;border-radius:11px;font-size:12.5px;font-weight:700;cursor:pointer;">
+            Abbrechen
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    let stopped = false;
+    const reqId = `ip_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const fbKey = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
+    const fbEmail = 'careman-autopilot-bridge@vjbackhaus.de';
+    const fbPass = 'CareManBridge_2026!Secure';
+    const fbProject = 'schichttagebuch-da2c3';
+
+    const msgEl = overlay.querySelector('#cm-ip-msg');
+    const spinEl = overlay.querySelector('#cm-ip-spin');
+    const cancelBtn = overlay.querySelector('#cm-ip-cancel');
+    const fallbackBtn = overlay.querySelector('#cm-ip-fallback');
+
+    let bridgeDocUrl = null;
+    let bridgeToken = null;
+
+    if (fallbackBtn) {
+      fallbackBtn.onclick = () => {
+        stopped = true;
+        overlay.remove();
+        window.location.href = targetCareManUrl;
+      };
+    }
+
+    if (cancelBtn) {
+      cancelBtn.onclick = async () => {
+        stopped = true;
+        overlay.remove();
+        if (bridgeDocUrl && bridgeToken) {
+          try {
+            await fetch(`${bridgeDocUrl}?updateMask.fieldPaths=status`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${bridgeToken}` },
+              body: JSON.stringify({ fields: { status: { stringValue: 'cancelled' } } })
+            });
+          } catch {}
+        }
+      };
+    }
+
+    (async () => {
+      try {
+        const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${fbKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: fbEmail, password: fbPass, returnSecureToken: true })
+        });
+        if (!authRes.ok) throw new Error('Cloud-Bridge Auth fehlgeschlagen');
+        const authData = await authRes.json();
+        bridgeToken = authData.idToken;
+        bridgeDocUrl = `https://firestore.googleapis.com/v1/projects/${fbProject}/databases/(default)/documents/users/${authData.localId}/team_rosters/autopilot_bridge`;
+
+        const mask = ['requestId', 'status', 'stepMessage', 'ym', 'targetDate', 'resultJson', 'error', 'requestedAt']
+          .map(f => `updateMask.fieldPaths=${f}`)
+          .join('&');
+
+        await fetch(`${bridgeDocUrl}?${mask}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${bridgeToken}` },
+          body: JSON.stringify({
+            fields: {
+              requestId: { stringValue: reqId },
+              status: { stringValue: 'requested' },
+              stepMessage: { stringValue: `🚀 Verbinde mit CareMan & trage Zugangsdaten für ${ym} automatisch ein...` },
+              ym: { stringValue: ym },
+              targetDate: { stringValue: targetDate },
+              resultJson: { stringValue: '' },
+              error: { stringValue: '' },
+              requestedAt: { integerValue: String(Date.now()) }
+            }
+          })
+        });
+
+        for (let tick = 0; tick < 220 && !stopped; tick++) {
+          await new Promise(r => setTimeout(r, 850));
+          if (stopped) break;
+
+          const pollRes = await fetch(bridgeDocUrl, {
+            headers: { 'Authorization': `Bearer ${bridgeToken}` }
+          });
+          if (!pollRes.ok) continue;
+          const doc = await pollRes.json();
+          const f = doc.fields || {};
+          const curReqId = f.requestId?.stringValue || '';
+          const curStatus = f.status?.stringValue || '';
+          const stepMsg = f.stepMessage?.stringValue || '';
+          const resJson = f.resultJson?.stringValue || '';
+
+          if (curReqId === reqId && stepMsg && msgEl) {
+            msgEl.textContent = stepMsg;
+          }
+
+          if (curReqId === reqId && curStatus === 'done' && resJson && resJson.length > 20) {
+            stopped = true;
+            if (msgEl) {
+              msgEl.style.borderColor = '#10b981';
+              msgEl.style.color = '#34d399';
+              msgEl.textContent = `✅ Alle 3 Wachen (${ym}) geladen – trage Dienste & PartnerInnen ins Journal ein...`;
+            }
+            window.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload: resJson }, '*');
+            setTimeout(() => overlay.remove(), 900);
+            return;
+          }
+
+          if (curReqId === reqId && curStatus === 'error') {
+            if (spinEl) spinEl.style.display = 'none';
+            if (msgEl) {
+              msgEl.style.borderColor = '#ef4444';
+              msgEl.style.color = '#f87171';
+              msgEl.textContent = stepMsg || '⚠️ Fehler beim Abruf.';
+            }
+            return;
+          }
+        }
+      } catch {
+        if (!stopped) {
+          overlay.remove();
+          window.location.href = targetCareManUrl;
+        }
+      }
+    })();
+    return;
+  }
+
   window.location.href = targetCareManUrl;
 }
 
@@ -778,9 +932,15 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       (!autoPilot.startedAt || (Date.now() - autoPilot.startedAt < 25 * 60 * 1000))
     );
 
-    const urlDateMatch = (window.location.href || '').match(/[?&]date=(20\\d{2})-(\\d{1,2})-(\\d{1,2})/);
+    const decodedHref = (() => {
+      try { return decodeURIComponent(window.location.href || ''); } catch (e) { return window.location.href || ''; }
+    })();
+    const urlDateMatch = decodedHref.match(/[?&]date=(20\\d{2})-(\\d{1,2})-(\\d{1,2})/);
     const urlYearMonth = urlDateMatch
       ? \`\${urlDateMatch[1]}-\${String(parseInt(urlDateMatch[2], 10)).padStart(2, '0')}\`
+      : null;
+    const urlTargetDate = urlDateMatch
+      ? \`\${urlDateMatch[1]}-\${parseInt(urlDateMatch[2], 10)}-\${parseInt(urlDateMatch[3], 10)}\`
       : null;
 
     const setNativeInputValue = (el, val) => {
@@ -808,11 +968,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     if (/my\\.secure\\.johanniter\\.de/i.test(window.location.hostname || '')) {
       const now = new Date();
       const fallbackDate = \`\${now.getFullYear()}-\${now.getMonth() + 1}-\${now.getDate()}\`;
-      const targetDate = (autoPilot && autoPilot.targetDate) || fallbackDate;
-      const targetYm = (autoPilot && autoPilot.targetYearMonth) ||
+      let targetDate = (autoPilot && autoPilot.targetDate) || urlTargetDate || fallbackDate;
+      let targetYm = (autoPilot && autoPilot.targetYearMonth) || urlYearMonth ||
         \`\${now.getFullYear()}-\${String(now.getMonth() + 1).padStart(2, '0')}\`;
-      const targetCareManUrl = (autoPilot && autoPilot.targetCareManUrl) ||
-        \`https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=\${targetDate}\`;
 
       let apUser = (autoPilot && autoPilot.username) || '';
       let apPass = (autoPilot && autoPilot.password) || '';
@@ -824,6 +982,38 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       } catch (e) {
         if (!apUser) apUser = 'johannes.backhaus@johanniter.de';
       }
+
+      if (!apPass) {
+        try {
+          const fbKey = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
+          const authRes = await fetch(\`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=\${fbKey}\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'careman-autopilot-bridge@vjbackhaus.de', password: 'CareManBridge_2026!Secure', returnSecureToken: true })
+          });
+          if (authRes.ok) {
+            const authData = await authRes.json();
+            const docRes = await fetch(\`https://firestore.googleapis.com/v1/projects/schichttagebuch-da2c3/databases/(default)/documents/users/\${authData.localId}/team_rosters/autopilot_bridge\`, {
+              headers: { 'Authorization': \`Bearer \${authData.idToken}\` }
+            });
+            if (docRes.ok) {
+              const doc = await docRes.json();
+              const f = doc.fields || {};
+              if (f.credsUser?.stringValue) apUser = f.credsUser.stringValue;
+              if (f.credsPass?.stringValue) apPass = f.credsPass.stringValue;
+              if (!urlYearMonth && f.ym?.stringValue) targetYm = f.ym.stringValue;
+              if (!urlTargetDate && f.targetDate?.stringValue) targetDate = f.targetDate.stringValue;
+              try {
+                if (apUser) localStorage.setItem('careman_ap_user', apUser);
+                if (apPass) localStorage.setItem('careman_ap_pass', apPass);
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }
+
+      const targetCareManUrl = (autoPilot && autoPilot.targetCareManUrl) ||
+        \`https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=\${targetDate}\`;
 
       try {
         window.name = 'CAREMAN_AUTOPILOT:' + JSON.stringify({

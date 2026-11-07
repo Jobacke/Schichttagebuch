@@ -1022,6 +1022,7 @@ export function extractPersonalShiftsFromRoster(yearMonth, rosterOverride = null
 
   const selfLower = String(selfNameQuery || 'backhaus').toLowerCase();
   const results = [];
+  const seenDateCodes = new Set();
 
   Object.entries(roster.shiftsByDate)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -1035,9 +1036,14 @@ export function extractPersonalShiftsFromRoster(yearMonth, rosterOverride = null
         const baseCode = rawCode.replace(/\*+$/, '').trim().toUpperCase();
         if (!baseCode || isNonPartnerShiftCode(baseCode)) return;
 
+        const dedupeKey = `${dateStr}_${baseCode}`;
+        if (seenDateCodes.has(dedupeKey)) return;
+
         const preset = getPresetForCode(baseCode);
         const shiftTypeName = preset?.shiftTypeName || getShiftTypeForCode(baseCode);
         if (shiftTypeName === 'Urlaub / Freistellung') return;
+
+        seenDateCodes.add(dedupeKey);
 
         const times = getTimesForCode(baseCode, shiftTypeName);
         const partner = getPartnersForShiftFromRoster(dateStr, baseCode, roster, selfNameQuery);

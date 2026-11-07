@@ -182,9 +182,10 @@ export default function Journal() {
 
     // Auto-fill or update PartnerIn ("mit ...") on shifts in the viewed month from the active Team Roster
     useEffect(() => {
-        if (!monthShifts || monthShifts.length === 0 || !addShifts) return;
+        if (!monthShifts || monthShifts.length === 0 || !addShifts || store?.loading) return;
         const shiftsToEnrich = [];
         monthShifts.forEach(s => {
+            if (!s.id) return;
             const currentPartner = (s.partner || '').trim();
             if (currentPartner && !currentPartner.startsWith('mit ')) return;
             const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
@@ -201,7 +202,7 @@ export default function Journal() {
         if (shiftsToEnrich.length > 0) {
             addShifts(shiftsToEnrich, false);
         }
-    }, [currentYearMonthStr, monthShifts.length, store.rosterVersion]);
+    }, [currentYearMonthStr, monthShifts.length, store.rosterVersion, store?.loading]);
 
     // --- Multi-Select & Delete Actions ---
     const toggleSelectShift = (id) => {

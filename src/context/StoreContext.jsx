@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { collection, doc, setDoc, onSnapshot, query, orderBy, deleteDoc, writeBatch } from 'firebase/firestore';
@@ -25,6 +25,24 @@ const INITIAL_SETTINGS = {
   defaultBonusAmount: 75
 };
 
+function resolveShiftCode(s, cfg) {
+  if (s?.code && String(s.code).trim()) {
+    return String(s.code).replace(/\*+$/, '').trim().toUpperCase();
+  }
+  if (s?.codeId && Array.isArray(cfg?.shiftCodes)) {
+    const found = cfg.shiftCodes.find(c => c.id === s.codeId);
+    if (found?.code) return String(found.code).replace(/\*+$/, '').trim().toUpperCase();
+  }
+  return '';
+}
+
+function getShiftDedupeKey(s, cfg) {
+  const dateStr = String(s?.date || '').trim();
+  const code = resolveShiftCode(s, cfg);
+  if (code) return `${dateStr}__CODE_${code}`;
+  return `${dateStr}__TIME_${s?.startTime || ''}_${s?.endTime || ''}_${s?.shiftTypeName || s?.typeId || ''}`;
+}
+
 export function getShiftBonusAmount(shift, settings) {
   if (!shift || !shift.hasBonus) return 0;
   const custom = parseFloat(shift.bonusAmount);
@@ -39,16 +57,26 @@ export function StoreProvider({ children }) {
   // State
   const [shifts, setShifts] = useState([]);
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
-  const [loading, setLoading] = useState(true);
+  const [shiftsLoaded, setShiftsLoaded] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [rosterVersion, setRosterVersion] = useState(0);
+
+  const shiftsRef = useRef([]);
+  const settingsRef = useRef(INITIAL_SETTINGS);
+  const isCleaningDuplicatesRef = useRef(false);
+
+  const loading = Boolean(currentUser) && (!shiftsLoaded || !settingsLoaded);
 
   // --- Listener: Shifts ---
   useEffect(() => {
     if (!currentUser || !db) {
+      shiftsRef.current = [];
       setShifts([]);
-      setLoading(false);
+      setShiftsLoaded(true);
       return;
     }
+
+    setShiftsLoaded(false);
 
     // Reference: users/{uid}/shifts
     const q = query(
@@ -57,11 +85,71 @@ export function StoreProvider({ children }) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setShifts(data);
-      setLoading(false);
+      const rawData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Group by (date, code) to automatically detect and clean any duplicate shifts
+      const groups = new Map();
+      rawData.forEach(item => {
+        const key = getShiftDedupeKey(item, settingsRef.current);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item);
+      });
+
+      const dedupedData = [];
+      const duplicateIdsToDelete = [];
+
+      groups.forEach(group => {
+        if (group.length === 1) {
+          dedupedData.push(group[0]);
+          return;
+        }
+
+        // Sort so the richest / most recently updated shift wins
+        group.sort((a, b) => {
+          const bonusDiff = Number(Boolean(b.hasBonus)) - Number(Boolean(a.hasBonus));
+          if (bonusDiff !== 0) return bonusDiff;
+          const partnerDiff = Number(Boolean(b.partner && b.partner.trim())) - Number(Boolean(a.partner && a.partner.trim()));
+          if (partnerDiff !== 0) return partnerDiff;
+          return (b.updatedAt || b.timestamp || 0) - (a.updatedAt || a.timestamp || 0);
+        });
+
+        const winner = { ...group[0] };
+        for (let i = 1; i < group.length; i++) {
+          const loser = group[i];
+          if (!winner.hasBonus && loser.hasBonus) {
+            winner.hasBonus = true;
+            winner.bonusAmount = loser.bonusAmount;
+          }
+          if ((!winner.partner || !winner.partner.trim()) && loser.partner && loser.partner.trim()) {
+            winner.partner = loser.partner;
+          }
+          if (loser.id && loser.id !== winner.id) {
+            duplicateIdsToDelete.push(loser.id);
+          }
+        }
+        dedupedData.push(winner);
+      });
+
+      shiftsRef.current = dedupedData;
+      setShifts(dedupedData);
+      setShiftsLoaded(true);
+
+      // Automatically remove duplicate documents from Firestore in the background
+      if (duplicateIdsToDelete.length > 0 && !isCleaningDuplicatesRef.current) {
+        isCleaningDuplicatesRef.current = true;
+        const cleanBatch = writeBatch(db);
+        duplicateIdsToDelete.forEach(dupId => {
+          cleanBatch.delete(doc(db, `users/${currentUser.uid}/shifts`, dupId));
+        });
+        cleanBatch.commit()
+          .catch(err => console.warn('Auto-deduplication batch warning:', err))
+          .finally(() => {
+            isCleaningDuplicatesRef.current = false;
+          });
+      }
     }, (error) => {
       console.error("Error fetching shifts:", error);
+      setShiftsLoaded(true);
     });
 
     return unsubscribe;
@@ -69,17 +157,28 @@ export function StoreProvider({ children }) {
 
   // --- Listener: Settings ---
   useEffect(() => {
-    if (!currentUser || !db) return;
+    if (!currentUser || !db) {
+      setSettingsLoaded(true);
+      return;
+    }
+
+    setSettingsLoaded(false);
 
     // Reference: users/{uid}/data/settings (Single Document)
-    const settingsRef = doc(db, `users/${currentUser.uid}/data`, 'settings');
-    const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+    const settingsRefDoc = doc(db, `users/${currentUser.uid}/data`, 'settings');
+    const unsubscribe = onSnapshot(settingsRefDoc, (docSnap) => {
       if (docSnap.exists()) {
-        setSettings(docSnap.data());
+        const data = docSnap.data();
+        settingsRef.current = data;
+        setSettings(data);
       } else {
         // Init if empty
-        setDoc(settingsRef, INITIAL_SETTINGS).catch(e => console.error("Init Settings Failed", e));
+        settingsRef.current = INITIAL_SETTINGS;
+        setDoc(settingsRefDoc, INITIAL_SETTINGS).catch(e => console.error("Init Settings Failed", e));
       }
+      setSettingsLoaded(true);
+    }, () => {
+      setSettingsLoaded(true);
     });
 
     return unsubscribe;
@@ -105,39 +204,87 @@ export function StoreProvider({ children }) {
   // --- Actions ---
 
   const addShift = async (shift) => {
-    if (!currentUser) return;
+    if (!currentUser || !shift) return;
     try {
-      const id = shift.id || crypto.randomUUID();
-      await setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), {
+      const currentShifts = shiftsRef.current || shifts || [];
+      const key = getShiftDedupeKey(shift, settingsRef.current);
+      const existingSame = !shift.id
+        ? currentShifts.find(e => getShiftDedupeKey(e, settingsRef.current) === key)
+        : null;
+      const id = shift.id || existingSame?.id || crypto.randomUUID();
+      const docData = {
         ...shift,
         id,
         updatedAt: Date.now()
-      });
+      };
+      // Optimistically update shiftsRef so back-to-back calls see this shift
+      const idx = currentShifts.findIndex(e => e.id === id);
+      if (idx !== -1) {
+        const copy = [...currentShifts];
+        copy[idx] = docData;
+        shiftsRef.current = copy;
+      } else {
+        shiftsRef.current = [docData, ...currentShifts];
+      }
+      await setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), docData);
     } catch (e) {
       console.error("Add Shift Failed", e);
       alert("Fehler beim Speichern: " + e.message);
     }
   };
 
-  const addShifts = async (shiftsArray, overwriteExistingDates = false) => {
+  const addShifts = async (shiftsArray, overwriteExistingDates = false, replaceMonthYearMonth = null) => {
     if (!currentUser || !shiftsArray || shiftsArray.length === 0) return true;
+
+    // 1. Deduplicate incoming shiftsArray by (date, code) so we never write duplicates from a single call
+    const dedupedIncomingMap = new Map();
+    shiftsArray.forEach(s => {
+      if (!s || !s.date) return;
+      const key = getShiftDedupeKey(s, settingsRef.current);
+      dedupedIncomingMap.set(key, s);
+    });
+    const cleanIncoming = Array.from(dedupedIncomingMap.values());
+    if (cleanIncoming.length === 0) return true;
+
+    const currentShifts = [...(shiftsRef.current || shifts || [])];
+    const currentSettings = settingsRef.current || settings || INITIAL_SETTINGS;
+
     try {
       const batch = writeBatch(db);
       const dateToMatchedPairs = {};
+      const deletedIds = new Set();
 
       if (overwriteExistingDates) {
-        const datesToOverwrite = new Set(shiftsArray.map(s => s.date));
-        
-        // Group existing shifts by date
+        const datesToOverwrite = new Set(cleanIncoming.map(s => s.date));
+
+        // If replaceMonthYearMonth is passed (or if all incoming shifts belong to a single YYYY-MM),
+        // also remove any obsolete shifts in that month whose dates are no longer in cleanIncoming.
+        const monthPrefix =
+          replaceMonthYearMonth && /^\d{4}-\d{2}$/.test(replaceMonthYearMonth)
+            ? replaceMonthYearMonth
+            : null;
+
+        if (monthPrefix) {
+          currentShifts.forEach(s => {
+            if (s.date && s.date.startsWith(monthPrefix) && !datesToOverwrite.has(s.date) && s.id) {
+              deletedIds.add(s.id);
+              batch.delete(doc(db, `users/${currentUser.uid}/shifts`, s.id));
+            }
+          });
+        }
+
+        // Group existing shifts on the target dates by date
         const existingByDate = {};
-        (shifts || []).filter(s => datesToOverwrite.has(s.date)).forEach(s => {
-          if (!existingByDate[s.date]) existingByDate[s.date] = [];
-          existingByDate[s.date].push(s);
-        });
+        currentShifts
+          .filter(s => datesToOverwrite.has(s.date) && !deletedIds.has(s.id))
+          .forEach(s => {
+            if (!existingByDate[s.date]) existingByDate[s.date] = [];
+            existingByDate[s.date].push(s);
+          });
 
         // Group incoming shifts by date
         const incomingByDate = {};
-        shiftsArray.forEach(s => {
+        cleanIncoming.forEach(s => {
           if (!incomingByDate[s.date]) incomingByDate[s.date] = [];
           incomingByDate[s.date].push(s);
         });
@@ -148,8 +295,11 @@ export function StoreProvider({ children }) {
           const matchedPairs = [];
 
           incomingList.forEach(inc => {
+            const incCode = resolveShiftCode(inc, currentSettings);
             // First try to match existing shift with identical code to keep IDs / bonus settings
-            const matchIdx = existingList.findIndex(e => e.code === inc.code);
+            const matchIdx = existingList.findIndex(
+              e => resolveShiftCode(e, currentSettings) === incCode
+            );
             if (matchIdx !== -1) {
               matchedPairs.push({ incoming: inc, prev: existingList.splice(matchIdx, 1)[0] });
             } else if (existingList.length > 0) {
@@ -159,44 +309,66 @@ export function StoreProvider({ children }) {
             }
           });
 
-          // Any remaining existing shifts on this date not present in incoming list are deleted
+          // Any remaining existing shifts (or old duplicates) on this date are deleted
           existingList.forEach(extra => {
-            batch.delete(doc(db, `users/${currentUser.uid}/shifts`, extra.id));
+            if (extra.id) {
+              deletedIds.add(extra.id);
+              batch.delete(doc(db, `users/${currentUser.uid}/shifts`, extra.id));
+            }
           });
 
           dateToMatchedPairs[date] = matchedPairs;
         });
       }
 
-      shiftsArray.forEach(shift => {
+      const writtenShiftsById = new Map();
+
+      cleanIncoming.forEach(shift => {
         let prevShift = null;
         if (overwriteExistingDates && dateToMatchedPairs[shift.date]) {
           const matchIdx = dateToMatchedPairs[shift.date].findIndex(p => p.incoming === shift);
           if (matchIdx !== -1) {
             prevShift = dateToMatchedPairs[shift.date].splice(matchIdx, 1)[0].prev;
           }
+        } else {
+          // Even when overwriteExistingDates is false, reuse existing document ID if same (date, code) or same id exists
+          const key = getShiftDedupeKey(shift, currentSettings);
+          prevShift =
+            (shift.id && currentShifts.find(e => e.id === shift.id)) ||
+            currentShifts.find(e => !deletedIds.has(e.id) && getShiftDedupeKey(e, currentSettings) === key) ||
+            null;
         }
 
         const id = prevShift?.id || shift.id || crypto.randomUUID();
         const ref = doc(db, `users/${currentUser.uid}/shifts`, id);
-        batch.set(ref, {
+        const docPayload = {
           ...shift,
           id,
           hasBonus: shift.hasBonus !== undefined ? shift.hasBonus : Boolean(prevShift?.hasBonus),
-          bonusAmount: shift.bonusAmount !== undefined ? shift.bonusAmount : (prevShift?.bonusAmount ?? (settings?.defaultBonusAmount ?? 75)),
+          bonusAmount: shift.bonusAmount !== undefined ? shift.bonusAmount : (prevShift?.bonusAmount ?? (currentSettings?.defaultBonusAmount ?? 75)),
           partner: shift.partner || prevShift?.partner || '',
           timestamp: prevShift?.timestamp || shift.timestamp || Date.now(),
           updatedAt: Date.now()
-        });
+        };
+        writtenShiftsById.set(id, docPayload);
+        batch.set(ref, docPayload);
       });
+
+      // Optimistically update shiftsRef.current before awaiting commit so concurrent calls never duplicate
+      const nextShifts = currentShifts
+        .filter(s => !deletedIds.has(s.id) && !writtenShiftsById.has(s.id))
+        .concat(Array.from(writtenShiftsById.values()));
+      shiftsRef.current = nextShifts;
 
       await batch.commit();
       return true;
     } catch (e) {
       console.warn("Batch failed, attempting fallback:", e);
       try {
-        await Promise.all(shiftsArray.map(shift => {
-          const id = shift.id || crypto.randomUUID();
+        await Promise.all(cleanIncoming.map(shift => {
+          const key = getShiftDedupeKey(shift, currentSettings);
+          const existingSame = currentShifts.find(e => getShiftDedupeKey(e, currentSettings) === key);
+          const id = shift.id || existingSame?.id || crypto.randomUUID();
           return setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), {
             ...shift,
             id,
@@ -214,10 +386,11 @@ export function StoreProvider({ children }) {
   };
 
   const ensureCodesAndTypes = async (requiredCodes = [], requiredTypes = []) => {
-    if (!currentUser) return;
+    if (!currentUser) return settingsRef.current || settings;
+    const baseSettings = settingsRef.current || settings || INITIAL_SETTINGS;
     let settingsUpdated = false;
-    let currentCodes = [...(settings?.shiftCodes || [])];
-    let currentTypes = [...(settings?.shiftTypes || [])];
+    let currentCodes = [...(baseSettings?.shiftCodes || [])];
+    let currentTypes = [...(baseSettings?.shiftTypes || [])];
 
     requiredCodes.forEach(rc => {
       const codeStr = typeof rc === 'string' ? rc : rc.code;
@@ -245,20 +418,22 @@ export function StoreProvider({ children }) {
 
     if (settingsUpdated) {
       const newSettings = {
-        ...settings,
+        ...baseSettings,
         shiftCodes: currentCodes,
         shiftTypes: currentTypes
       };
+      settingsRef.current = newSettings;
       setSettings(newSettings);
       await _updateSettingsDoc(newSettings);
       return newSettings;
     }
-    return settings;
+    return baseSettings;
   };
 
   const deleteShift = async (id) => {
     if (!currentUser) return;
     try {
+      shiftsRef.current = (shiftsRef.current || []).filter(s => s.id !== id);
       await deleteDoc(doc(db, `users/${currentUser.uid}/shifts`, id));
       try { sessionStorage.setItem('careman_allow_reimport_after_tab_switch', '1'); } catch {}
     } catch (e) {
@@ -269,6 +444,8 @@ export function StoreProvider({ children }) {
   const deleteShifts = async (shiftIds = []) => {
     if (!currentUser || !shiftIds || shiftIds.length === 0) return true;
     try {
+      const idSet = new Set(shiftIds);
+      shiftsRef.current = (shiftsRef.current || []).filter(s => !idSet.has(s.id));
       const batch = writeBatch(db);
       shiftIds.forEach(id => {
         batch.delete(doc(db, `users/${currentUser.uid}/shifts`, id));
@@ -411,6 +588,7 @@ export function StoreProvider({ children }) {
   // Ensure store always has valid objects
   const safeStore = {
     shifts: shifts || [],
+    loading,
     settings: {
       ...INITIAL_SETTINGS,
       ...(settings || {}),

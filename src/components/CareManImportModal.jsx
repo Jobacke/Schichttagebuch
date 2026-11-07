@@ -248,7 +248,7 @@ export default function CareManImportModal({
         };
       });
 
-      const success = await addShifts(newShifts, overwriteExisting);
+      const success = await addShifts(newShifts, overwriteExisting, overwriteExisting ? selectedYearMonth : null);
 
       if (success) {
         if (onImportSuccess) {

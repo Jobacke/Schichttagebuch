@@ -129,22 +129,19 @@ export async function transferPersonalRosterToJournal({
     };
   });
 
-  // Detect short-term cancelled/swapped shifts in this month that no longer exist in CareMan
+  // Count short-term cancelled/swapped shifts in this month that no longer exist in CareMan
   let removedCount = 0;
-  if (deleteShifts && store?.shifts) {
+  if (store?.shifts) {
     const validDates = new Set(newShifts.map(s => s.date));
     const obsoleteShiftIds = store.shifts
       .filter(s => s.date && s.date.startsWith(yearMonth) && !validDates.has(s.date))
       .map(s => s.id)
       .filter(Boolean);
-
-    if (obsoleteShiftIds.length > 0) {
-      await deleteShifts(obsoleteShiftIds);
-      removedCount = obsoleteShiftIds.length;
-    }
+    removedCount = obsoleteShiftIds.length;
   }
 
-  const ok = await addShifts(newShifts, true);
+  // Atomically update existing shifts in this month, insert new shifts, and delete obsolete/duplicate shifts in yearMonth
+  const ok = await addShifts(newShifts, true, yearMonth);
   if (!ok) {
     throw new Error('Fehler beim Speichern der persönlichen Dienste im Journal.');
   }
@@ -362,9 +359,9 @@ export async function importCareManPayloadAndSync({
     ensureCodesAndTypes
   });
 
-  // 5. Also enrich any existing shifts in that month with partner names
-  if (store?.shifts && addShifts) {
-    const monthShifts = store.shifts.filter(s => s.date && s.date.startsWith(parsedRoster.yearMonth));
+  // 5. If no personal shifts were extracted from this single roster, enrich any existing manual shifts in that month with partner names
+  if (transferRes.transferredCount === 0 && store?.shifts && addShifts) {
+    const monthShifts = store.shifts.filter(s => s.id && s.date && s.date.startsWith(parsedRoster.yearMonth));
     const toUpdate = [];
     monthShifts.forEach(s => {
       const codeObj = (store.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);

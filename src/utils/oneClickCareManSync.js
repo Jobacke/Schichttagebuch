@@ -343,10 +343,19 @@ export async function importCareManPayloadAndSync({
   // 3. Get combined active roster for the month
   const activeCombined = getActiveTeamRoster(parsedRoster.yearMonth);
 
+  let singlePersonalTimes = {};
+  if (trimmed.startsWith('{')) {
+    try {
+      const p = JSON.parse(trimmed);
+      if (p && p.personalTimes) singlePersonalTimes = p.personalTimes;
+    } catch {}
+  }
+
   // 4. Immediately transfer personal shifts ("Backhaus, Johannes") + Partners ("mit ...") into Journal
   const transferRes = await transferPersonalRosterToJournal({
     yearMonth: parsedRoster.yearMonth,
     activeRoster: activeCombined,
+    personalTimesOverride: singlePersonalTimes,
     store,
     addShifts,
     deleteShifts,
@@ -708,25 +717,6 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       return { extractedAt: Date.now(), yearMonth: ym, monthLabel: ml, station, detectedStation, colleagues };
     };
 
-    const personalTimes = {};
-    // 1. Falls noch auf der CareMan-Startseite (Istplan) und noch nicht im Abteilungsdienstplan
-    if (!window.location.href.includes('team-duty') && !/Planungsgruppe/i.test(document.body ? document.body.innerText : '')) {
-      const abtBtn = Array.from(document.querySelectorAll('a, button, div, span')).find(el => {
-        const t = (el.innerText || el.textContent || '').replace(/\\s+/g, '');
-        return t === 'Abteilungsdienstplan' || t === 'Abteilungs-dienstplan';
-      });
-      if (abtBtn) {
-        setStatus('⚡ Öffne Abteilungsdienstplan...');
-        abtBtn.click();
-        for (let i = 0; i < 30; i++) {
-          await sleep(250);
-          if (window.location.href.includes('team-duty') || /Planungsgruppe/i.test(document.body ? document.body.innerText : '')) break;
-        }
-        await sleep(600);
-      }
-    }
-
-    const { yearMonth, monthLabel } = detectMonthYear();
     const PG_ITEM_REGEX = /(61\\s+Fahrzeugplanung|61\\s+SKo|61\\s+WL|61000|61010|61300)/i;
 
     const isElementVisible = (el) => {
@@ -779,8 +769,153 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         return false;
       });
       if (byParentLabel) return byParentLabel;
-      return allSelects[0] || null;
+      return null;
     };
+
+    const personalTimes = {};
+    const istplanShifts = {};
+    const initialMonthInfo = detectMonthYear();
+    const wasOnIstplan = !findPlanungsgruppeTrigger();
+
+    // Falls wir auf dem persönlichen Istplan starten: Istplan-Schichten & Uhrzeiten (z.B. 19:14 - 23:06) vorab sichern
+    if (wasOnIstplan) {
+      try {
+        const { yearMonth: istYm } = initialMonthInfo;
+        const istCells = Array.from(document.querySelectorAll('td, .calendar-cell, .day-cell, [class*="day"]')).filter(c => {
+          const r = c.getBoundingClientRect();
+          return r.width > 50 && r.height > 45 && /\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(c.innerText || '');
+        });
+        let inMonth = false;
+        let prevDay = 0;
+        istCells.forEach(cell => {
+          const txt = (cell.innerText || '').trim();
+          const dayM = txt.match(/^(\\d{1,2})\\b/);
+          const timeM = txt.match(/(\\d{2}:\\d{2})\\s*-\\s*(\\d{2}:\\d{2})/);
+          if (!dayM || !timeM) return;
+          const dNum = parseInt(dayM[1], 10);
+          if (dNum === 1 && !inMonth) inMonth = true;
+          else if (dNum < prevDay && inMonth && prevDay >= 27) inMonth = false;
+          if (inMonth && dNum >= 1 && dNum <= 31) {
+            prevDay = dNum;
+            const dStr = \`\${istYm}-\${String(dNum).padStart(2, '0')}\`;
+            if (timeM[1] !== '00:00' || timeM[2] !== '00:00') {
+              personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
+            }
+            const lines = txt.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
+            for (const line of lines) {
+              if (/^\\d{1,2}(\\s+KW\\s*\\d+)?$/i.test(line)) continue;
+              if (/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(line)) continue;
+              const codeCandidate = line.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '').toUpperCase();
+              if (codeCandidate && codeCandidate.length >= 2 && !['KW', 'FREI', '00', 'WKS', 'U', 'XW'].includes(codeCandidate)) {
+                istplanShifts[dStr] = codeCandidate;
+                break;
+              }
+            }
+          }
+        });
+      } catch (e) {}
+
+      // Automatisch rechts im Menü auf den orangenen Button "Abteilungs-dienstplan" klicken
+      const findAbtTile = () => {
+        const candidates = Array.from(document.querySelectorAll('a, button, div, span, p, li')).filter(el => {
+          if (!el.getBoundingClientRect) return false;
+          const r = el.getBoundingClientRect();
+          if (r.width < 25 || r.width > 280 || r.height < 12 || r.height > 200) return false;
+          const norm = (el.innerText || el.textContent || '').replace(/[\\s\\-\\u00AD\\u2010-\\u2015]+/g, '').toLowerCase();
+          return norm === 'abteilungsdienstplan' || (norm.includes('abteilungsdienstplan') && norm.length < 32);
+        });
+        return candidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
+      };
+
+      let abtEl = findAbtTile();
+      if (!abtEl) {
+        const menuBtn = Array.from(document.querySelectorAll('button, a, div, span')).find(
+          el => /^(Men[üu]|Menu)$/i.test((el.innerText || '').trim())
+        );
+        if (menuBtn) {
+          menuBtn.click();
+          await sleep(350);
+          abtEl = findAbtTile();
+        }
+      }
+
+      if (abtEl) {
+        setStatus('⚡ Öffne Abteilungsdienstplan...');
+        const r = abtEl.getBoundingClientRect();
+        let tile = abtEl.parentElement;
+        for (let d = 0; d < 3 && tile && tile !== document.body; d++) {
+          const tr = tile.getBoundingClientRect();
+          if (tr.height >= 60 && tr.height <= 200 && tr.width <= 240) break;
+          tile = tile.parentElement;
+        }
+
+        // Schritt 1: Klicke gezielt auf den orangenen Kreis-Button im Tile
+        const btnInTile = tile ? tile.querySelector('button, a, [role="button"], .mat-fab, .mat-mini-fab, .mat-icon-button, mat-icon, i, svg') : null;
+        if (btnInTile) {
+          btnInTile.click();
+          await sleep(300);
+        }
+
+        // Schritt 2: Falls noch auf Istplan, klicke auf den Punkt 30px über dem Text "Abteilungs-dienstplan"
+        if (!window.location.href.includes('team-duty') && !findPlanungsgruppeTrigger()) {
+          const iconAbove = document.elementFromPoint(r.left + r.width / 2, Math.max(10, r.top - 30));
+          if (iconAbove && iconAbove !== document.body) {
+            iconAbove.click();
+            await sleep(300);
+          }
+        }
+
+        // Schritt 3: Falls immer noch auf Istplan, klicke auf Tile bzw. Text
+        if (!window.location.href.includes('team-duty') && !findPlanungsgruppeTrigger()) {
+          if (abtEl.previousElementSibling) abtEl.previousElementSibling.click();
+          abtEl.click();
+          if (tile && tile !== abtEl) tile.click();
+          await sleep(300);
+        }
+      }
+    }
+
+    // Warte zuverlässig, bis das Dropdown "Filter Planungsgruppe" UND die Tabelle wirklich geladen sind
+    for (let w = 0; w < 45; w++) {
+      if (findPlanungsgruppeTrigger() && document.querySelectorAll('table tr').length > 2) break;
+      setStatus('⚡ Lade Abteilungsdienstplan...');
+      await sleep(250);
+    }
+    await sleep(350);
+
+    // Falls wir vom Istplan kamen und CareMan im Abteilungsdienstplan einen anderen Monat geöffnet hat: Monat angleichen
+    if (wasOnIstplan && findPlanungsgruppeTrigger()) {
+      const [wantY, wantM] = initialMonthInfo.yearMonth.split('-').map(Number);
+      for (let step = 0; step < 12; step++) {
+        const curInfo = detectMonthYear();
+        const [curY, curM] = curInfo.yearMonth.split('-').map(Number);
+        const diff = (wantY - curY) * 12 + (wantM - curM);
+        if (diff === 0) break;
+
+        const monthLabelEl = Array.from(document.querySelectorAll('span, div, button, p, strong')).find(el => {
+          if (el.children.length > 2 || !isElementVisible(el)) return false;
+          const r = el.getBoundingClientRect();
+          return r.top < 260 && r.left < 450 && new RegExp(curInfo.monthLabel, 'i').test((el.innerText || '').trim());
+        });
+        if (!monthLabelEl) break;
+
+        const mr = monthLabelEl.getBoundingClientRect();
+        // Links neben dem Monatsnamen liegen "<" (zurück) und ">" (vor)
+        const arrowX = diff < 0 ? Math.max(12, mr.left - 54) : Math.max(24, mr.left - 22);
+        const arrowY = mr.top + mr.height / 2;
+        const arrowEl = document.elementFromPoint(arrowX, arrowY);
+        const arrowBtn = arrowEl ? (arrowEl.closest('button, a, [role="button"], mat-icon') || arrowEl) : null;
+        if (!arrowBtn) break;
+        arrowBtn.click();
+        for (let w = 0; w < 20; w++) {
+          await sleep(150);
+          if (detectMonthYear().yearMonth !== curInfo.yearMonth) break;
+        }
+        await sleep(300);
+      }
+    }
+
+    const { yearMonth, monthLabel } = detectMonthYear();
 
     const getPopupScrollContainers = () => {
       const containers = new Set();
@@ -945,19 +1080,25 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       const fallbackSingle = extractVisibleTable(null, yearMonth, monthLabel);
       if (fallbackSingle.colleagues.length > 0) {
         rosters.push(fallbackSingle);
+      } else if (Object.keys(istplanShifts).length > 0) {
+        rosters.push({
+          extractedAt: Date.now(),
+          yearMonth: initialMonthInfo.yearMonth,
+          monthLabel: initialMonthInfo.monthLabel,
+          station: 'Sendling',
+          colleagues: [{ name: 'Backhaus, Johannes', shifts: istplanShifts }]
+        });
       }
     }
 
     if (rosters.length === 0) {
-      banner.style.background = '#d97706';
-      setStatus('⚠️ Bitte in CareMan unter "Filter Planungsgruppe" kurz 61000 Rettungswache München wählen und nochmal klicken!');
-      setTimeout(() => banner.remove(), 8000);
+      setTimeout(() => banner.remove(), 1500);
       return;
     }
 
     const payload = rosters.length > 1
       ? { multiStation: true, extractedAt: Date.now(), yearMonth, monthLabel, rosters, personalTimes }
-      : { ...rosters[0], extractedAt: Date.now() };
+      : { ...rosters[0], personalTimes, extractedAt: Date.now() };
 
     const json = JSON.stringify(payload);
     copySync(json);

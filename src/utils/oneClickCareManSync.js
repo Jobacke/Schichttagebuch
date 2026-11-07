@@ -687,15 +687,6 @@ export function openCareManLiveWindow(targetYearMonth) {
             msgEl.textContent = stepMsg;
           }
 
-          // Falls der Mac zu Hause zugeklappt / ausgeschaltet ist (nach ~3,4s noch auf "requested"):
-          // Automatisch direkt im iPhone-Browser weiterleiten!
-          if (tick >= 4 && curReqId === reqId && curStatus === 'requested') {
-            stopped = true;
-            overlay.remove();
-            window.location.href = targetCareManUrl;
-            return;
-          }
-
           if (curReqId === reqId && curStatus === 'done' && resJson && resJson.length > 20) {
             stopped = true;
             if (msgEl) {

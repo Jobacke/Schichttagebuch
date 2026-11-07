@@ -169,9 +169,6 @@ async function getActivePageTarget() {
 
 async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headless = false }) {
   const jobId = ++currentJob.id;
-  killHelperChrome();
-  await sleep(300);
-
   const creds = saveStoredCredentials(user, pass);
   const targetCareManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
 
@@ -186,6 +183,10 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
     error: null,
     chromeProc: null
   };
+  publishBridgeState(true).catch(() => {});
+
+  killHelperChrome();
+  await sleep(300);
 
   try {
     fs.mkdirSync(CHROME_PROFILE_DIR, { recursive: true });
@@ -205,9 +206,9 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
     '--disable-sync',
     '--metrics-recording-only',
     '--simulate-outdated-no-au="Tue, 31 Dec 2099 23:59:59 GMT"',
-    '--window-size=1240,860',
-    '--window-position=100,50',
-    `--app=${targetCareManUrl}`
+    ...(headless
+      ? ['--window-size=1440,900', targetCareManUrl]
+      : ['--window-size=1240,860', '--window-position=100,50', `--app=${targetCareManUrl}`])
   ];
 
   const proc = spawn(CHROME_BIN, chromeArgs, {
@@ -293,6 +294,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
         currentJob.resultJson = pageState.daemonResult;
         currentJob.stepMessage = `✅ Alle 3 Wachen (${ym}) erfolgreich ausgelesen – übertrage in die App...`;
         currentJob.status = 'done';
+        await publishBridgeState(true).catch(() => {});
         await cdp.send('Browser.close').catch(() => {});
         killHelperChrome();
         break;
@@ -631,7 +633,7 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, version: '2.2.44' }));
+    res.end(JSON.stringify({ ok: true, version: '2.2.45' }));
     return;
   }
 
@@ -829,6 +831,6 @@ async function pollCloudBridgeLoop() {
 }
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.44 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.45 listening on http://127.0.0.1:${PORT}`);
   pollCloudBridgeLoop();
 });

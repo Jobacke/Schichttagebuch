@@ -132,9 +132,7 @@ export default function Journal() {
             });
 
             if (res.source === 'empty') {
-                openCareManLiveWindow(currentYearMonthStr);
-                setToastMessage('🔄 CareMan Live-Fenster geöffnet: Nach 2FA-Freigabe einfach 1x auf das Lesezeichen klicken, um alle 3 Wachen live zu übertragen!');
-                setTimeout(() => setToastMessage(null), 8000);
+                setIsImportModalOpen(true);
                 return;
             }
 

@@ -719,8 +719,8 @@ export default function TeamRoster() {
         setIsProcessing(false);
         setIsSyncingPersonal(false);
         setUploadProgress(null);
-        openCareManLiveWindow(yearMonth);
-        setToastMessage('🔄 CareMan Live-Fenster geöffnet: Nach 2FA-Freigabe 1x auf das Lesezeichen klicken – alle 3 Wachen werden automatisch übertragen!');
+        setIsUploadOpen(true);
+        setUploadError('Noch kein CareMan-Dienstplan in der Zwischenablage. Bitte in CareMan 1x auf das Lesezeichen klicken!');
         return;
       }
 

@@ -370,8 +370,7 @@ export async function runOneClickCareManSync({
   addShifts,
   deleteShifts,
   ensureCodesAndTypes,
-  onProgress,
-  openLivePortalIfNoNewClipboard = true
+  onProgress
 }) {
   // 1. Check URL Hash or pending sessionStorage payload
   if (typeof window !== 'undefined') {
@@ -422,69 +421,38 @@ export async function runOneClickCareManSync({
     }
   }
 
-  // 2. Try reading Clipboard directly (if fresh CareMan data was copied)
+  // 2. Try reading Clipboard directly (if CareMan data was copied)
   if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
     try {
       const clipText = await navigator.clipboard.readText();
       if (clipText && looksLikeCareManData(clipText)) {
-        let lastSig = null;
-        try {
-          lastSig = sessionStorage.getItem('last_imported_careman_sig');
-        } catch {
-          /* ignore */
-        }
-        const currentSig = `${clipText.length}:${clipText.slice(0, 120)}:${clipText.slice(-120)}`;
-        const isFreshClipboard = currentSig !== lastSig;
+        const res = await importCareManPayloadAndSync({
+          rawText: clipText,
+          stationOverride,
+          currentUser,
+          store,
+          addShifts,
+          deleteShifts,
+          ensureCodesAndTypes,
+          onProgress
+        });
 
-        if (isFreshClipboard || !openLivePortalIfNoNewClipboard) {
-          const res = await importCareManPayloadAndSync({
-            rawText: clipText,
-            stationOverride,
-            currentUser,
-            store,
-            addShifts,
-            deleteShifts,
-            ensureCodesAndTypes,
-            onProgress
-          });
+        const personalMsg =
+          res.transferredCount > 0
+            ? ` & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) direkt ins Journal übernommen!`
+            : ` (${res.totalShifts} Team-Dienste gespeichert)!`;
 
-          try {
-            sessionStorage.setItem('last_imported_careman_sig', currentSig);
-          } catch {
-            /* ignore */
-          }
-
-          const personalMsg =
-            res.transferredCount > 0
-              ? ` & ${res.transferredCount} eigene Dienste (${res.withPartnersCount}x mit PartnerIn) direkt ins Journal übernommen!`
-              : ` (${res.totalShifts} Team-Dienste gespeichert)!`;
-
-          return {
-            ...res,
-            message: `✅ CareMan Live-Sync: ${res.monthLabel} (Wache ${res.targetStation}) eingelesen${personalMsg}`
-          };
-        }
+        return {
+          ...res,
+          message: `✅ CareMan Live-Sync: ${res.monthLabel} (Wache ${res.targetStation}) eingelesen${personalMsg}`
+        };
       }
     } catch {
       // Clipboard permission denied or empty -> continue
     }
   }
 
-  // 3. If user clicked 1-Click to fetch live changes from CareMan, open CareMan Live Portal with Auto-Pilot
-  if (openLivePortalIfNoNewClipboard && typeof window !== 'undefined') {
-    const now = new Date();
-    const defaultYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const ym = targetYearMonth || localStorage.getItem('schichten_selected_year_month') || defaultYM;
-    openCareManLiveWindow(ym);
-    return {
-      source: 'live_portal_opened',
-      yearMonth: ym,
-      transferredCount: 0,
-      message: '🔄 CareMan Live-Abruf gestartet: Bitte im geöffneten CareMan-Tab (falls nötig Airlock bestätigen) 1x auf das Lesezeichen klicken – alle 3 Wachen (61000, 61010, 61300) werden automatisch übertragen!'
-    };
-  }
-
-  // 4. Fallback: Sync with Cloud & transfer from active Team Roster for targetYearMonth
+  // 3. Fallback: Sync with Cloud & transfer from active Team Roster for targetYearMonth
   if (currentUser) {
     try {
       await syncTeamRostersWithCloud(currentUser);
@@ -837,7 +805,11 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
     setStatus(\`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) live ans Schichttagebuch übertragen!\`);
     banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-    window.open('https://schicht.vjbackhaus.de/#careman=' + encodeURIComponent(json), 'schichttagebuch_app');
+    const targetUrl = 'https://schicht.vjbackhaus.de/#careman=' + encodeURIComponent(json);
+    const appWin = window.open(targetUrl, 'schichttagebuch_app');
+    if (!appWin) {
+      window.location.href = targetUrl;
+    }
     setTimeout(() => banner.remove(), 6000);
   } catch (err) {
     banner.style.background = '#dc2626';

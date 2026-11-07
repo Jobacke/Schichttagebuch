@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { spawn, execSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { SIEDA_EXTRACTOR_SCRIPT } from '../src/utils/oneClickCareManSync.js';
@@ -13,6 +15,144 @@ const FB_PROJECT_ID = 'schichttagebuch-da2c3';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Zero-dependency RFC-6455 WebSocket client fallback for Node 20 without --experimental-websocket
+class MiniWebSocket {
+  constructor(urlStr) {
+    this.readyState = 0;
+    this.listeners = { open: [], message: [], error: [], close: [] };
+    this._buf = Buffer.alloc(0);
+    this._frag = [];
+    const u = new URL(urlStr);
+    const key = crypto.randomBytes(16).toString('base64');
+    const req = http.request({
+      hostname: u.hostname,
+      port: u.port || 80,
+      path: u.pathname + u.search,
+      headers: {
+        Connection: 'Upgrade',
+        Upgrade: 'websocket',
+        'Sec-WebSocket-Version': '13',
+        'Sec-WebSocket-Key': key
+      }
+    });
+    req.on('upgrade', (res, socket, head) => {
+      this.socket = socket;
+      this.readyState = 1;
+      if (head && head.length) this._onData(head);
+      socket.on('data', chunk => this._onData(chunk));
+      socket.on('close', () => {
+        this.readyState = 3;
+        this._emit('close', {});
+      });
+      socket.on('error', err => this._emit('error', err));
+      this._emit('open', {});
+    });
+    req.on('error', err => this._emit('error', err));
+    req.end();
+  }
+
+  addEventListener(type, fn) {
+    if (this.listeners[type]) this.listeners[type].push(fn);
+  }
+
+  _emit(type, ev) {
+    for (const fn of (this.listeners[type] || [])) {
+      try { fn(ev); } catch {}
+    }
+  }
+
+  _onData(chunk) {
+    this._buf = Buffer.concat([this._buf, chunk]);
+    while (this._buf.length >= 2) {
+      const b0 = this._buf[0];
+      const b1 = this._buf[1];
+      const fin = (b0 & 0x80) !== 0;
+      const opcode = b0 & 0x0f;
+      const masked = (b1 & 0x80) !== 0;
+      let len = b1 & 0x7f;
+      let offset = 2;
+      if (len === 126) {
+        if (this._buf.length < 4) return;
+        len = this._buf.readUInt16BE(2);
+        offset = 4;
+      } else if (len === 127) {
+        if (this._buf.length < 10) return;
+        len = Number(this._buf.readBigUInt64BE(2));
+        offset = 10;
+      }
+      let maskKey = null;
+      if (masked) {
+        if (this._buf.length < offset + 4) return;
+        maskKey = this._buf.subarray(offset, offset + 4);
+        offset += 4;
+      }
+      if (this._buf.length < offset + len) return;
+      let payload = Buffer.from(this._buf.subarray(offset, offset + len));
+      this._buf = this._buf.subarray(offset + len);
+      if (masked && maskKey) {
+        for (let i = 0; i < payload.length; i++) payload[i] ^= maskKey[i % 4];
+      }
+
+      if (opcode === 1 || opcode === 2) {
+        this._frag = [payload];
+        if (fin) {
+          const full = Buffer.concat(this._frag).toString('utf8');
+          this._frag = [];
+          this._emit('message', { data: full });
+        }
+      } else if (opcode === 0) {
+        this._frag.push(payload);
+        if (fin) {
+          const full = Buffer.concat(this._frag).toString('utf8');
+          this._frag = [];
+          this._emit('message', { data: full });
+        }
+      } else if (opcode === 8) {
+        this.close();
+      } else if (opcode === 9) {
+        const mask = crypto.randomBytes(4);
+        const h = Buffer.from([0x8a, 0x80 | payload.length]);
+        const m = Buffer.alloc(payload.length);
+        for (let i = 0; i < payload.length; i++) m[i] = payload[i] ^ mask[i % 4];
+        try { this.socket?.write(Buffer.concat([h, mask, m])); } catch {}
+      }
+    }
+  }
+
+  send(str) {
+    if (!this.socket || this.readyState !== 1) return;
+    const data = Buffer.from(String(str), 'utf8');
+    const mask = crypto.randomBytes(4);
+    let header;
+    if (data.length < 126) {
+      header = Buffer.alloc(2);
+      header[0] = 0x81;
+      header[1] = 0x80 | data.length;
+    } else if (data.length < 65536) {
+      header = Buffer.alloc(4);
+      header[0] = 0x81;
+      header[1] = 0x80 | 126;
+      header.writeUInt16BE(data.length, 2);
+    } else {
+      header = Buffer.alloc(10);
+      header[0] = 0x81;
+      header[1] = 0x80 | 127;
+      header.writeBigUInt64BE(BigInt(data.length), 2);
+    }
+    const masked = Buffer.alloc(data.length);
+    for (let i = 0; i < data.length; i++) masked[i] = data[i] ^ mask[i % 4];
+    this.socket.write(Buffer.concat([header, mask, masked]));
+  }
+
+  close() {
+    this.readyState = 3;
+    try { this.socket?.end(); } catch {}
+  }
+}
+MiniWebSocket.OPEN = 1;
+
+const WsClass = MiniWebSocket;
+
 class CdpSession {
   constructor(wsUrl) {
     this.wsUrl = wsUrl;
@@ -23,7 +163,7 @@ class CdpSession {
 
   async connect() {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(this.wsUrl);
+      const ws = new WsClass(this.wsUrl);
       this.ws = ws;
       const timer = setTimeout(() => reject(new Error('CDP WebSocket timeout')), 8000);
       ws.addEventListener('open', () => {
@@ -55,7 +195,7 @@ class CdpSession {
   }
 
   send(method, params = {}) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== 1) {
       return Promise.reject(new Error('CDP WebSocket not open'));
     }
     const id = ++this.msgId;
@@ -170,7 +310,6 @@ async function main() {
   const credsUser = f.credsUser?.stringValue || 'johannes.backhaus@johanniter.de';
   const credsPass = f.credsPass?.stringValue || '';
 
-  // Only run if there is a recent 'requested' job (within last 3 minutes)
   if (reqStatus !== 'requested' || !reqId || (Date.now() - reqAt > 180000)) {
     console.log('ℹ️ No pending CareMan Cloud Auto-Pilot job – skipping cloud browser run.');
     return;
@@ -198,9 +337,19 @@ async function main() {
     '--disable-gpu',
     '--no-first-run',
     '--no-default-browser-check',
+    '--lang=de-DE',
+    '--accept-lang=de-DE,de',
     '--window-size=1440,900',
     targetCareManUrl
-  ], { stdio: 'ignore' });
+  ], {
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      LANG: 'de_DE.UTF-8',
+      LC_ALL: 'de_DE.UTF-8',
+      TZ: 'Europe/Berlin'
+    }
+  });
 
   let pageTarget = null;
   for (let i = 0; i < 40; i++) {
@@ -252,6 +401,12 @@ async function main() {
         await cdp.connect();
         await cdp.send('Page.enable').catch(() => {});
         await cdp.send('Runtime.enable').catch(() => {});
+        await cdp.send('Network.enable').catch(() => {});
+        await cdp.send('Network.setExtraHTTPHeaders', {
+          headers: { 'Accept-Language': 'de-DE,de;q=0.9' }
+        }).catch(() => {});
+        await cdp.send('Emulation.setLocaleOverride', { locale: 'de-DE' }).catch(() => {});
+        await cdp.send('Emulation.setTimezoneOverride', { timezoneId: 'Europe/Berlin' }).catch(() => {});
         connectedUrl = latestTarget.webSocketDebuggerUrl;
       }
 
@@ -298,13 +453,13 @@ async function main() {
           continue;
         }
 
-        if (/Anmeldung\s+mit\s+Airlock\s+2FA|Nachricht\s+auf\s+Ihrem\s+Smartphone|Offline-Modus/i.test(pageState.bodyText)) {
+        if (/Anmeldung\s+mit\s+Airlock\s+2FA|Login\s+with\s+Airlock\s+2FA|Nachricht\s+auf\s+Ihrem\s+Smartphone|message\s+on\s+your\s+smartphone|Offline-Modus|Offline\s+mode/i.test(pageState.bodyText)) {
           await updateStep(`📱 Bitte jetzt in Airlock 2FA auf deinem iPhone bestätigen – Dienstplan (${ym}) lädt danach automatisch!`);
           await sleep(500);
           continue;
         }
 
-        if (/Authentisierungsm[öo]glichkeiten|Airlock\s+2FA/i.test(pageState.bodyText) && !pageState.hasPassInput) {
+        if (/Authentisierungsm[öo]glichkeiten|Authentication\s+options|Airlock\s+2FA/i.test(pageState.bodyText) && !pageState.hasPassInput) {
           if (Date.now() - last2faSelectAt > 2000) {
             await updateStep('⚡ Wähle Airlock 2FA aus...');
             last2faSelectAt = Date.now();
@@ -323,7 +478,7 @@ async function main() {
               labelsAndSpans.forEach(el => { try { el.click(); } catch (e) {} });
               await sleep(250);
               const btn = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]')).find(b =>
-                /^(Ausw[äa]hlen|Weiter|Best[äa]tigen|OK|Anmelden)$/i.test((b.innerText || b.value || b.textContent || '').trim())
+                /^(Ausw[äa]hlen|Weiter|Best[äa]tigen|OK|Anmelden|Select|Continue|Next|Confirm|Submit)$/i.test((b.innerText || b.value || b.textContent || '').trim())
               );
               if (btn) btn.click();
             })()`, true).catch(() => {});
@@ -361,7 +516,7 @@ async function main() {
             if (passInput) fillField(passInput, ${JSON.stringify(credsPass)});
             await sleep(220);
             const loginBtn = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]')).find(b =>
-              /^(Anmelden|Login|Weiter|OK)$/i.test((b.innerText || b.value || b.textContent || '').trim())
+              /^(Anmelden|Login|Sign\\s*in|Weiter|Next|OK|Submit)$/i.test((b.innerText || b.value || b.textContent || '').trim())
             ) || document.querySelector('button[type="submit"], input[type="submit"]');
             if (loginBtn) loginBtn.click();
           })()`, true).catch(() => {});
@@ -380,8 +535,9 @@ async function main() {
         if (!extractorInjected && pageState.readyState === 'complete' && !pageState.href.includes('/identity/')) {
           const isCareManUiReady = await cdp.evalInPage(`(() => {
             const txt = (document.body?.innerText || '');
-            return /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+20\\d{2}\\b/i.test(txt) ||
-              /Planungsgruppe|Abteilungs|Istplan/i.test(txt);
+            return /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|April|May|June|July|August|September|October|November|December)\\s+20\\d{2}\\b/i.test(txt) ||
+              /Planungsgruppe|Abteilungs|Istplan/i.test(txt) ||
+              Boolean(document.querySelector('myplan-calendar-day, myplan-calendar-day-phone, myplan-duty-list-item'));
           })()`).catch(() => false);
 
           if (isCareManUiReady) {
@@ -406,6 +562,12 @@ async function main() {
 
       await sleep(300);
     }
+  } catch (err) {
+    console.error('Cloud runner loop error:', err);
+    await patchBridge({
+      status: { stringValue: 'error' },
+      stepMessage: { stringValue: '⚠️ Cloud-Fehler: ' + (err.message || String(err)) }
+    });
   } finally {
     if (cdp) cdp.close();
     try { proc.kill('SIGTERM'); } catch {}

@@ -835,6 +835,6 @@ async function pollCloudBridgeLoop() {
 }
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.46 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.47 listening on http://127.0.0.1:${PORT}`);
   pollCloudBridgeLoop();
 });

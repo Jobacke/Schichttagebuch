@@ -685,7 +685,7 @@ export function openCareManLiveWindow(targetYearMonth) {
           const resJson = f.resultJson?.stringValue || '';
           const ghToken = f.ghToken?.stringValue || '';
 
-          if (curReqId === reqId && stepMsg && msgEl) {
+          if (curReqId === reqId && stepMsg && msgEl && !(cloudRunnerTriggered && curStatus === 'requested')) {
             msgEl.textContent = stepMsg;
           }
 

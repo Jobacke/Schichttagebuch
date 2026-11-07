@@ -625,45 +625,107 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
   try {
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-    const monthRegexExact = /^(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+(20\d{2})$/i;
+    const monthRegexSubstr = /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(20\\d{2})\\b/i;
 
-    // Findet das tatsächlich sichtbare (oberste) Monats-Überschrift-Element in der CareMan-Kopfzeile (z.B. "Juli 2026" oder "November 2026")
+    // Findet den exakt sichtbaren Monats-Textknoten in der CareMan-Kopfzeile (z.B. "Juli 2026" oder "November 2026")
+    // und misst per Range.getBoundingClientRect() die millimetergenaue Text-Box (ohne umschließende < / > Buttons).
     // WICHTIG: Ignoriert komplett "01.11.2026 - 30.11.2026" aus dem Dropdown "Filter Planungsgruppe"!
     const getVisibleMonthHeaderInfo = () => {
-      const candidates = Array.from(document.querySelectorAll('span, div, button, p, strong, h1, h2, h3, label')).filter(el => {
-        if (!el.getBoundingClientRect) return false;
-        const r = el.getBoundingClientRect();
-        if (r.width < 30 || r.width > 280 || r.height < 10 || r.height > 75) return false;
-        if (r.top < 15 || r.top > 340 || r.left > 600) return false;
-        const st = window.getComputedStyle(el);
-        if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < 0.1) return false;
-        const txt = (el.innerText || el.textContent || '').trim();
-        return monthRegexExact.test(txt);
+      const rawCandidates = [];
+      let domCounter = 0;
+
+      if (document.body && document.createTreeWalker) {
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while ((node = walker.nextNode())) {
+          const raw = node.nodeValue || '';
+          if (!raw || raw.length > 120) continue;
+          if (/\\d{2}\\.\\d{2}\\.20\\d{2}/.test(raw)) continue;
+          const m = raw.match(monthRegexSubstr);
+          if (!m) continue;
+          const parent = node.parentElement;
+          if (!parent || !parent.getBoundingClientRect) continue;
+          if (parent.closest('table, mat-option, md-option, [role="option"], script, style, noscript')) continue;
+          const st = window.getComputedStyle(parent);
+          if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < 0.1) continue;
+
+          let r = parent.getBoundingClientRect();
+          try {
+            const range = document.createRange();
+            range.setStart(node, m.index);
+            range.setEnd(node, m.index + m[0].length);
+            const rr = range.getBoundingClientRect();
+            if (rr && rr.width >= 20 && rr.height >= 6) {
+              r = rr;
+            }
+          } catch (e) {}
+
+          if (r.width < 22 || r.width > 280 || r.height < 8 || r.height > 75) continue;
+          if (r.top < 8 || r.top > 360 || r.left < 15 || r.left > 580) continue;
+
+          rawCandidates.push({
+            el: parent,
+            rect: r,
+            monthName: m[1],
+            yearStr: m[2],
+            domIdx: ++domCounter
+          });
+        }
+      }
+
+      Array.from(document.querySelectorAll('input')).forEach(inp => {
+        const val = (inp.value || '').trim();
+        if (!val || /\\d{2}\\.\\d{2}\\.20\\d{2}/.test(val)) return;
+        const m = val.match(monthRegexSubstr);
+        if (!m || !inp.getBoundingClientRect) return;
+        const r = inp.getBoundingClientRect();
+        if (r.width < 22 || r.width > 280 || r.height < 8 || r.height > 75) return;
+        if (r.top < 8 || r.top > 360 || r.left < 15 || r.left > 580) return;
+        rawCandidates.push({
+          el: inp,
+          rect: r,
+          monthName: m[1],
+          yearStr: m[2],
+          domIdx: ++domCounter
+        });
       });
 
-      if (candidates.length === 0) return null;
+      if (rawCandidates.length === 0) return null;
 
-      const scored = candidates.map(el => {
-        const r = el.getBoundingClientRect();
+      let pgCy = null;
+      try {
+        const pgEl = typeof findPlanungsgruppeTrigger === 'function' ? findPlanungsgruppeTrigger() : null;
+        if (pgEl && pgEl.getBoundingClientRect) {
+          const pgr = pgEl.getBoundingClientRect();
+          if (pgr.width > 0 && pgr.top > 0) {
+            pgCy = pgr.top + pgr.height / 2;
+          }
+        }
+      } catch (e) {}
+
+      const scored = rawCandidates.map(c => {
+        const r = c.rect;
         const cx = r.left + r.width / 2;
         const cy = r.top + r.height / 2;
         const topHit = document.elementFromPoint(cx, cy);
-        const isTopmost = Boolean(topHit && (el === topHit || el.contains(topHit) || topHit.contains(el)));
-        return { el, r, isTopmost };
+        const isTopmost = Boolean(topHit && (c.el === topHit || c.el.contains(topHit) || topHit.contains(c.el)));
+        const onPgRow = pgCy !== null && Math.abs(cy - pgCy) <= 48;
+        return { ...c, isTopmost, onPgRow };
       });
 
       scored.sort((a, b) => {
+        if (a.onPgRow !== b.onPgRow) return a.onPgRow ? -1 : 1;
         if (a.isTopmost !== b.isTopmost) return a.isTopmost ? -1 : 1;
-        return a.r.width - b.r.width;
+        return b.domIdx - a.domIdx;
       });
 
-      const best = scored[0].el;
-      const m = (best.innerText || best.textContent || '').trim().match(monthRegexExact);
-      const idx = monthNames.findIndex(name => name.toLowerCase() === m[1].toLowerCase());
+      const best = scored[0];
+      const idx = monthNames.findIndex(name => name.toLowerCase() === best.monthName.toLowerCase());
       const month = idx + 1;
-      const year = parseInt(m[2], 10);
+      const year = parseInt(best.yearStr, 10);
       return {
-        el: best,
+        el: best.el,
+        rect: best.rect,
         year,
         month,
         yearMonth: \`\${year}-\${String(month).padStart(2, '0')}\`,
@@ -694,9 +756,28 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       };
     };
 
+    const findAbteilungTable = () => {
+      const allTables = Array.from(document.querySelectorAll('table'));
+      return allTables.slice().reverse().find(t => {
+        const hr = t.querySelector('thead tr') || t.querySelector('tr');
+        const hs = Array.from(hr?.children || []).map(c => c.textContent.trim());
+        return hs.filter(h => /\\b([1-9]|[12]\\d|3[01])\\b/.test(h)).length >= 20;
+      }) || document.querySelector('table.mat-table') || document.querySelector('table');
+    };
+
+    const getAbtTableSig = () => {
+      const tbl = findAbteilungTable();
+      if (!tbl) return '';
+      const trs = Array.from(tbl.querySelectorAll('tr')).filter(r => {
+        const first = (r.querySelector('.employee-cell') || r.children[0])?.textContent?.trim() || '';
+        return first.includes(',') && !/^M-J/i.test(first);
+      });
+      return trs.slice(0, 8).map(r => (r.innerText || r.textContent || '').trim().replace(/\\s+/g, ' ')).join('||');
+    };
+
     const extractVisibleTable = (forcedStation, ymOverride, labelOverride) => {
       const { yearMonth: ym, monthLabel: ml } = ymOverride ? { yearMonth: ymOverride, monthLabel: labelOverride } : detectMonthYear();
-      const table = document.querySelector('table.mat-table') || document.querySelector('table');
+      const table = findAbteilungTable();
       const headerRow = table?.querySelector('thead tr') || table?.querySelector('tr');
       const headers = Array.from(headerRow?.children || []).map(c => c.textContent.trim());
 
@@ -709,7 +790,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         }
       });
 
-      const rows = Array.from(document.querySelectorAll('tr')).filter(r => {
+      const rows = Array.from((table || document).querySelectorAll('tr')).filter(r => {
         const nameEl = r.querySelector('.employee-cell') || r.children[0];
         const txt = nameEl ? nameEl.textContent.trim() : '';
         if (!txt.includes(',') || txt.match(/\\d{2,}/)) return false;
@@ -826,13 +907,29 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       )).filter(isElementVisible);
       const byParentLabel = allSelects.find(el => {
         let p = el.parentElement;
-        for (let d = 0; d < 4 && p && p !== document.body; d++) {
+        for (let d = 0; d < 5 && p && p !== document.body; d++) {
           if (/Planungsgruppe/i.test(p.innerText || p.textContent || '')) return true;
           p = p.parentElement;
         }
         return false;
       });
       if (byParentLabel) return byParentLabel;
+
+      // Fallback über das sichtbare Label "Filter Planungsgruppe" (auch wenn nach Monatswechsel noch keine Gruppe gewählt ist)
+      const labelEl = Array.from(document.querySelectorAll('label, span, div')).find(el => {
+        if (!el.getBoundingClientRect) return false;
+        const r = el.getBoundingClientRect();
+        if (r.top < 15 || r.top > 340 || r.width < 30 || r.width > 240 || r.height < 6 || r.height > 40) return false;
+        const txt = (el.innerText || el.textContent || '').trim();
+        return /^(Filter\\s+)?Planungsgruppe$/i.test(txt);
+      });
+      if (labelEl) {
+        const r = labelEl.getBoundingClientRect();
+        const belowEl = document.elementFromPoint(r.left + 45, r.bottom + 14);
+        if (belowEl && belowEl !== document.body) {
+          return belowEl.closest('mat-select, md-select, ng-select, select, .mat-select-trigger, .mat-mdc-select-trigger, .mat-form-field-infix, [role="combobox"], [role="listbox"]') || belowEl;
+        }
+      }
       return null;
     };
 
@@ -929,13 +1026,14 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const iconAbove = document.elementFromPoint(cx, Math.max(10, r.top - 36));
         const tileContainer = abtEl.closest('button, a, [role="button"], li, mat-list-item, .mat-ripple') || abtEl.parentElement || abtEl;
         try {
-          if (iconAbove && typeof iconAbove.click === 'function') iconAbove.click();
-          else if (typeof tileContainer.click === 'function') tileContainer.click();
+          if (typeof tileContainer.click === 'function') tileContainer.click();
+          else if (typeof abtEl.click === 'function') abtEl.click();
         } catch (e) {}
-        await sleep(350);
-        if (!findPlanungsgruppeTrigger()) {
+        await sleep(550);
+        if (!findPlanungsgruppeTrigger() && !window.location.href.includes('team-duty')) {
           try {
-            if (typeof abtEl.click === 'function') abtEl.click();
+            const iconHost = iconAbove ? (iconAbove.closest('button, a, [role="button"], div, span') || iconAbove) : abtEl;
+            if (iconHost && typeof iconHost.click === 'function') iconHost.click();
           } catch (e) {}
         }
 
@@ -947,14 +1045,35 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       }
     }
 
-    // Warte bis zu 5 Sekunden, bis das Dropdown "Filter Planungsgruppe" UND die Tabelle geladen sind
+    // Warte bis zu 5 Sekunden, bis das Dropdown "Filter Planungsgruppe" geladen ist
     for (let w = 0; w < 20; w++) {
-      if (findPlanungsgruppeTrigger() && document.querySelectorAll('table tr').length > 2) break;
+      if (findPlanungsgruppeTrigger()) break;
       await sleep(250);
     }
-    await sleep(300);
+    await sleep(350);
+
+    const clickChevronAt = (elOrNull, cx, cy) => {
+      const hit = document.elementFromPoint(cx, cy) || elOrNull;
+      const btn = (hit && hit.closest && hit.closest('button, a, [role="button"], mat-icon, .mat-icon')) ||
+        (elOrNull && elOrNull.closest && elOrNull.closest('button, a, [role="button"], mat-icon, .mat-icon')) ||
+        (hit && typeof hit.click === 'function' ? hit : null) ||
+        (hit && hit.parentElement && typeof hit.parentElement.click === 'function' ? hit.parentElement : null);
+      try {
+        if (btn && typeof btn.click === 'function') {
+          btn.click();
+          return;
+        }
+      } catch (e) {}
+      if (hit) {
+        try {
+          hit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
+        } catch (e) {}
+      }
+    };
 
     // Falls wir vom Istplan kamen und CareMan im Abteilungsdienstplan einen anderen Monat geöffnet hat: Monat angleichen
+    let didStepMonth = false;
+    const sigBeforeMonthStep = getAbtTableSig();
     if (wasOnIstplan && findPlanungsgruppeTrigger()) {
       const [wantY, wantM] = initialMonthInfo.yearMonth.split('-').map(Number);
       for (let step = 0; step < 12; step++) {
@@ -964,58 +1083,88 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const diff = (wantY - curY) * 12 + (wantM - curM);
         if (diff === 0) break;
 
-        setStatus(\`⚡ Wechsle im Abteilungsdienstplan auf \${initialMonthInfo.monthLabel}...\`);
-        const monthLabelEl = curHeader?.el || null;
-        if (!monthLabelEl) break;
+        setStatus(\`⚡ Wechsle im Abteilungsdienstplan auf \${initialMonthInfo.monthLabel} (\${curInfo.monthLabel})...\`);
+        const mr = curHeader?.rect || (curHeader?.el ? curHeader.el.getBoundingClientRect() : null);
+        if (!mr) break;
 
-        const mr = monthLabelEl.getBoundingClientRect();
         const arrowY = mr.top + mr.height / 2;
+        // Exakt gemessene CareMan-Koordinaten links vom Monatsnamen ("<  >  Monat Jahr"):
+        // "<" (Monat zurück) liegt bei mr.left - 44px, ">" (Monat vor) liegt bei mr.left - 14px
+        const coordX = diff < 0 ? Math.max(14, mr.left - 44) : Math.max(28, mr.left - 14);
 
-        // Suche die Pfeil-Buttons "<" (zurück) und ">" (vor) links neben dem Monatsnamen
-        const leftButtons = [];
-        const seenBtns = new Set();
-        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg, span')).forEach(el => {
-          const btn = el.closest('button, a, [role="button"], mat-icon, .mat-icon') || el;
-          if (!btn || seenBtns.has(btn) || !btn.getBoundingClientRect || btn === monthLabelEl || btn.contains(monthLabelEl)) return;
-          const r = btn.getBoundingClientRect();
-          if (r.width < 8 || r.width > 58 || r.height < 8 || r.height > 58) return;
-          if (Math.abs((r.top + r.height / 2) - arrowY) > 26) return;
-          if (r.right <= mr.left + 6 && r.left >= Math.max(0, mr.left - 130)) {
-            seenBtns.add(btn);
-            leftButtons.push({ btn, left: r.left, cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+        // Cluster alle klickbaren Icon-/Button-Elemente links neben mr.left nach ihrer X-Mitte (Abstand >= 14px)
+        const clusters = [];
+        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg')).forEach(el => {
+          if (!el.getBoundingClientRect) return;
+          const r = el.getBoundingClientRect();
+          if (r.width < 6 || r.width > 58 || r.height < 6 || r.height > 58) return;
+          const cy = r.top + r.height / 2;
+          const cx = r.left + r.width / 2;
+          if (Math.abs(cy - arrowY) > 24) return;
+          if (cx < Math.max(8, mr.left - 80) || cx > mr.left - 3) return;
+          const host = el.closest('button, a, [role="button"]') || el.closest('mat-icon, .mat-icon') || el.parentElement || el;
+          const existing = clusters.find(c => Math.abs(c.cx - cx) < 14);
+          if (!existing) {
+            clusters.push({ host, cx, cy });
+          } else if (host && host.matches && host.matches('button, a, [role="button"]')) {
+            existing.host = host;
           }
         });
-        leftButtons.sort((a, b) => a.left - b.left);
+        clusters.sort((a, b) => a.cx - b.cx);
 
-        let arrowBtn = null;
-        if (leftButtons.length >= 2) {
-          arrowBtn = diff < 0 ? leftButtons[0].btn : leftButtons[1].btn;
-        } else {
-          // Exakte CareMan-Koordinaten links neben dem Monatsnamen ("<  >  Monat Jahr"):
-          // "<" liegt ca. 54px links von mr.left, ">" liegt ca. 22px links von mr.left
-          const arrowX = diff < 0 ? Math.max(12, mr.left - 54) : Math.max(24, mr.left - 22);
-          const arrowEl = document.elementFromPoint(arrowX, arrowY);
-          arrowBtn = arrowEl ? (arrowEl.closest('button, a, [role="button"], mat-icon, .mat-icon') || arrowEl) : null;
+        const chosen = clusters.length >= 2 ? (diff < 0 ? clusters[0] : clusters[1]) : null;
+        const clickX = chosen ? chosen.cx : coordX;
+        const clickY = chosen ? chosen.cy : arrowY;
+
+        clickChevronAt(chosen ? chosen.host : null, clickX, clickY);
+
+        let monthChanged = false;
+        for (let w = 0; w < 6; w++) {
+          await sleep(140);
+          if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
+            monthChanged = true;
+            break;
+          }
         }
 
-        if (!arrowBtn) break;
-        const br = arrowBtn.getBoundingClientRect();
-        const bx = br.left + br.width / 2;
-        const by = br.top + br.height / 2;
-        arrowBtn.click();
-        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
-          arrowBtn.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: bx, clientY: by }));
-        });
-
-        for (let w = 0; w < 22; w++) {
-          await sleep(150);
-          if (detectMonthYear().yearMonth !== curInfo.yearMonth) break;
+        // Fallback mit exakter CareMan-Koordinate + MouseEvent-Sequenz, falls der erste Klick noch nicht ausgelöst hat
+        if (!monthChanged) {
+          const fallbackEl = document.elementFromPoint(coordX, arrowY);
+          clickChevronAt(fallbackEl, coordX, arrowY);
+          if (fallbackEl) {
+            ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+              try {
+                fallbackEl.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: coordX, clientY: arrowY }));
+              } catch (e) {}
+            });
+          }
+          for (let w = 0; w < 14; w++) {
+            await sleep(150);
+            if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
+              monthChanged = true;
+              break;
+            }
+          }
         }
-        await sleep(320);
+
+        if (monthChanged) {
+          didStepMonth = true;
+        }
+        await sleep(260);
+      }
+
+      if (didStepMonth) {
+        // Warte nach dem Monatswechsel kurz, bis CareMan die Tabelle / Planungsgruppen für den Zielmonat geladen hat
+        for (let w = 0; w < 18; w++) {
+          await sleep(160);
+          const curSig = getAbtTableSig();
+          if (curSig && curSig !== sigBeforeMonthStep) break;
+        }
+        await sleep(300);
       }
     }
 
-    const detectedAfterNav = detectMonthYear();
+    const detectedAfterNav = getVisibleMonthHeaderInfo() || detectMonthYear();
     const abtReachedTargetMonth = !wasOnIstplan || detectedAfterNav.yearMonth === initialMonthInfo.yearMonth;
     // WICHTIG: Wenn auf dem Istplan gestartet wurde (z.B. Juli 2026), bleibt der Zielmonat IMMER fest auf dem Istplan-Monat!
     const yearMonth = wasOnIstplan ? initialMonthInfo.yearMonth : detectedAfterNav.yearMonth;
@@ -1108,9 +1257,10 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       const target = TARGET_STATIONS[i];
       setStatus(\`⚡ Lese Wache \${i + 1}/3: \${target.label}...\`);
 
-      // Prüfe anhand der echten Schicht-Codes in der Tabelle, ob diese Wache bereits geladen ist!
+      // Prüfe anhand der echten Schicht-Codes in der Tabelle, ob diese Wache für den Zielmonat bereits geladen ist!
       const currentSnap = extractVisibleTable(null, yearMonth, monthLabel);
-      if (currentSnap.colleagues.length > 0 && currentSnap.detectedStation === target.station) {
+      const tableUpdatedForMonth = !didStepMonth || getAbtTableSig() !== sigBeforeMonthStep;
+      if (tableUpdatedForMonth && currentSnap.colleagues.length > 0 && currentSnap.detectedStation === target.station) {
         rosters.push({ ...currentSnap, station: target.station });
         continue;
       }
@@ -1145,7 +1295,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       }
 
       if (matchOpt) {
-        const prevSig = Array.from(document.querySelectorAll('tr')).slice(1, 7).map(r => (r.children[0]?.textContent || '').trim()).join('|');
+        const prevSig = getAbtTableSig();
         try { matchOpt.scrollIntoView({ block: 'nearest' }); } catch (e) {}
         await sleep(60);
         matchOpt.click();
@@ -1162,9 +1312,11 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
         for (let w = 0; w < 32; w++) {
           await sleep(160);
-          const newSig = Array.from(document.querySelectorAll('tr')).slice(1, 7).map(r => (r.children[0]?.textContent || '').trim()).join('|');
+          const newSig = getAbtTableSig();
           const checkSnap = extractVisibleTable(null, yearMonth, monthLabel);
-          if (checkSnap.colleagues.length > 0 && (checkSnap.detectedStation === target.station || (newSig && newSig !== prevSig))) {
+          const sigChanged = Boolean(newSig && newSig !== prevSig);
+          const validForMonth = !didStepMonth || Boolean(newSig && newSig !== sigBeforeMonthStep);
+          if (checkSnap.colleagues.length > 0 && (sigChanged || (validForMonth && checkSnap.detectedStation === target.station))) {
             break;
           }
         }
@@ -1177,6 +1329,33 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       } else {
         document.body.click();
         await sleep(150);
+      }
+    }
+
+    // Falls wir vom Istplan kamen und sowohl den 3-Wachen-Abteilungsdienstplan als auch Istplan-Schichten haben:
+    // Ergänze eventuelle reine Istplan-Einträge (z.B. Lehrgänge wie LGI), ohne die Abteilungsdienstplan-Wachen zu überschreiben
+    if (rosters.length > 0 && Object.keys(istplanShifts).length > 0) {
+      let selfEntry = null;
+      for (const r of rosters) {
+        const found = (r.colleagues || []).find(c => c && c.name && /backhaus/i.test(c.name));
+        if (found) {
+          selfEntry = found;
+          break;
+        }
+      }
+      if (!selfEntry && rosters[0] && Array.isArray(rosters[0].colleagues)) {
+        selfEntry = { name: 'Backhaus, Johannes', shifts: {} };
+        rosters[0].colleagues.unshift(selfEntry);
+      }
+      if (selfEntry && selfEntry.shifts) {
+        Object.entries(istplanShifts).forEach(([dayKey, codeVal]) => {
+          const alreadyHasDay = rosters.some(r =>
+            (r.colleagues || []).some(c => c && c.name && /backhaus/i.test(c.name) && c.shifts && c.shifts[dayKey])
+          );
+          if (!alreadyHasDay) {
+            selfEntry.shifts[dayKey] = codeVal;
+          }
+        });
       }
     }
 

@@ -1,2 +1,2 @@
-export const APP_VERSION = "2.2.29";
+export const APP_VERSION = "2.2.30";
 export const BUILD_DATE = new Date().toLocaleDateString('de-DE');

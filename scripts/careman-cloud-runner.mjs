@@ -309,6 +309,20 @@ async function main() {
   const targetDate = f.targetDate?.stringValue || '2026-11-7';
   const credsUser = f.credsUser?.stringValue || 'johannes.backhaus@johanniter.de';
   const credsPass = f.credsPass?.stringValue || '';
+  const myPlanToken = f.myPlanToken?.stringValue ||
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MDkyMTE3IiwiZXhwIjoiMTc5NDEyMDkxNyJ9.ac6n-uEUGm9C8i1c9SG_DSEGzMSSWGvJuPBF-seY6TA';
+
+  const seedMyPlanScript = `
+    try {
+      if (location.hostname === 'dienstplan-bayern.secure.johanniter.de' && !localStorage.getItem('myPlanToken')) {
+        localStorage.setItem('myPlanToken', ${JSON.stringify(myPlanToken)});
+        localStorage.setItem('myPlanLogin', JSON.stringify({ userId: 5692, kennwortAenderungNotwendig: false, warningMessage: '' }));
+        localStorage.setItem('myPlanTenant', '-');
+        localStorage.setItem('stayLoggedIn', 'true');
+        localStorage.setItem('#5692-selectedEmployeeId', '11948');
+      }
+    } catch (e) {}
+  `;
 
   if (reqStatus !== 'requested' || !reqId || (Date.now() - reqAt > 180000)) {
     console.log('ℹ️ No pending CareMan Cloud Auto-Pilot job – skipping cloud browser run.');
@@ -371,7 +385,7 @@ async function main() {
 
   let cdp = null;
   let connectedUrl = '';
-  let extractorInjected = false;
+  let lastExtractorInjectAt = 0;
   let lastPasswordSubmitAt = 0;
   let last2faSelectAt = 0;
   let lastStepMsg = '';
@@ -401,12 +415,7 @@ async function main() {
         await cdp.connect();
         await cdp.send('Page.enable').catch(() => {});
         await cdp.send('Runtime.enable').catch(() => {});
-        await cdp.send('Network.enable').catch(() => {});
-        await cdp.send('Network.setExtraHTTPHeaders', {
-          headers: { 'Accept-Language': 'de-DE,de;q=0.9' }
-        }).catch(() => {});
-        await cdp.send('Emulation.setLocaleOverride', { locale: 'de-DE' }).catch(() => {});
-        await cdp.send('Emulation.setTimezoneOverride', { timezoneId: 'Europe/Berlin' }).catch(() => {});
+        await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: seedMyPlanScript }).catch(() => {});
         connectedUrl = latestTarget.webSocketDebuggerUrl;
       }
 
@@ -417,10 +426,17 @@ async function main() {
         const bodyText = (document.body ? (document.body.innerText || document.body.textContent || '') : '').trim();
         const passEl = document.querySelector('input[type="password"]');
         const hasPassInput = Boolean(passEl);
+        let freshMyPlanToken = '';
+        try {
+          if (host === 'dienstplan-bayern.secure.johanniter.de') {
+            freshMyPlanToken = localStorage.getItem('myPlanToken') || '';
+          }
+        } catch (e) {}
+        const extractorRunning = Boolean(window.__CAREMAN_EXTRACTOR_RUNNING);
         const bannerText = document.querySelector('[data-careman-sync-banner]')?.textContent || '';
         const daemonResult = window.__CAREMAN_DAEMON_RESULT ||
           (window.name && window.name.startsWith('CAREMAN_SYNC:') ? window.name.slice('CAREMAN_SYNC:'.length) : null);
-        return { href, host, readyState, bodyText: bodyText.slice(0, 1500), hasPassInput, bannerText, daemonResult };
+        return { href, host, readyState, bodyText: bodyText.slice(0, 1500), hasPassInput, freshMyPlanToken, extractorRunning, bannerText, daemonResult };
       })()`).catch(() => null);
 
       if (!pageState) {
@@ -433,6 +449,7 @@ async function main() {
           status: { stringValue: 'done' },
           stepMessage: { stringValue: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...` },
           resultJson: { stringValue: pageState.daemonResult },
+          ...(pageState.freshMyPlanToken ? { myPlanToken: { stringValue: pageState.freshMyPlanToken } } : {}),
           updatedAt: { integerValue: String(Date.now()) }
         });
         console.log('✅ Cloud Auto-Pilot finished successfully!');
@@ -526,13 +543,22 @@ async function main() {
       }
 
       if (/dienstplan-bayern\.secure\.johanniter\.de/i.test(pageState.host)) {
+        if (!pageState.freshMyPlanToken || pageState.href.includes('/identity/')) {
+          await cdp.evalInPage(`(() => {
+            ${seedMyPlanScript}
+            window.location.href = ${JSON.stringify(targetCareManUrl)};
+          })()`).catch(() => {});
+          await sleep(800);
+          continue;
+        }
+
         if (pageState.bannerText) {
           await updateStep(pageState.bannerText);
         } else {
           await updateStep(`⚡ Dienstplan Bayern geöffnet (${ym}) – lese die 3 Wachen aus...`);
         }
 
-        if (!extractorInjected && pageState.readyState === 'complete' && !pageState.href.includes('/identity/')) {
+        if (!pageState.extractorRunning && pageState.readyState === 'complete' && Date.now() - lastExtractorInjectAt > 4000) {
           const isCareManUiReady = await cdp.evalInPage(`(() => {
             const txt = (document.body?.innerText || '');
             return /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|April|May|June|July|August|September|October|November|December)\\s+20\\d{2}\\b/i.test(txt) ||
@@ -541,7 +567,7 @@ async function main() {
           })()`).catch(() => false);
 
           if (isCareManUiReady) {
-            extractorInjected = true;
+            lastExtractorInjectAt = Date.now();
             await sleep(200);
             const apPayload = JSON.stringify({
               autoRun: true,
@@ -551,6 +577,7 @@ async function main() {
               startedAt: Date.now()
             });
             await cdp.evalInPage(`
+              window.__CAREMAN_EXTRACTOR_RUNNING = Date.now();
               window.__CAREMAN_DAEMON_MODE = true;
               window.__CAREMAN_DAEMON_RESULT = null;
               window.name = 'CAREMAN_AUTOPILOT:' + ${JSON.stringify(apPayload)};

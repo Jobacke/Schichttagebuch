@@ -689,9 +689,9 @@ export function openCareManLiveWindow(targetYearMonth) {
             msgEl.textContent = stepMsg;
           }
 
-          // Falls der Mac ausgeschaltet ist (nach ~2,5s noch auf "requested"):
+          // Falls der Mac ausgeschaltet ist (nach ~3,4s noch auf "requested"):
           // Starte automatisch den 24/7 GitHub Cloud-Auto-Pilot-Server!
-          if (!cloudRunnerTriggered && tick >= 3 && curReqId === reqId && curStatus === 'requested' && ghToken) {
+          if (!cloudRunnerTriggered && tick >= 4 && curReqId === reqId && curStatus === 'requested' && ghToken) {
             cloudRunnerTriggered = true;
             if (msgEl) {
               msgEl.textContent = `☁️ Mac ist ausgeschaltet – starte 24/7 Cloud-Auto-Pilot für ${ym} (dauert ca. 10–15s)...`;

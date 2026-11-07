@@ -16,6 +16,7 @@ const CHROME_BIN = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function loadStoredCredentials() {
+  const defaultToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MDkyMTE3IiwiZXhwIjoiMTc5NDEyMDkxNyJ9.ac6n-uEUGm9C8i1c9SG_DSEGzMSSWGvJuPBF-seY6TA';
   try {
     if (fs.existsSync(CREDENTIALS_PATH)) {
       const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf8');
@@ -23,28 +24,30 @@ function loadStoredCredentials() {
       return {
         username: parsed.username || 'johannes.backhaus@johanniter.de',
         password: parsed.password || '',
-        ghToken: parsed.ghToken || ''
+        ghToken: parsed.ghToken || '',
+        myPlanToken: parsed.myPlanToken || defaultToken
       };
     }
   } catch {
     /* ignore */
   }
-  return { username: 'johannes.backhaus@johanniter.de', password: '', ghToken: '' };
+  return { username: 'johannes.backhaus@johanniter.de', password: '', ghToken: '', myPlanToken: defaultToken };
 }
 
-function saveStoredCredentials(username, password) {
+function saveStoredCredentials(username, password, myPlanToken) {
   try {
     const existing = loadStoredCredentials();
     const next = {
       username: (username && username.trim()) ? username.trim() : existing.username,
       password: password ? password : existing.password,
       ghToken: existing.ghToken || '',
+      myPlanToken: myPlanToken || existing.myPlanToken || '',
       updatedAt: new Date().toISOString()
     };
     fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(next, null, 2), { mode: 0o600 });
     return next;
   } catch {
-    return { username: username || 'johannes.backhaus@johanniter.de', password: password || '', ghToken: '' };
+    return { username: username || 'johannes.backhaus@johanniter.de', password: password || '', ghToken: '', myPlanToken: myPlanToken || '' };
   }
 }
 
@@ -245,9 +248,21 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
 
   let cdp = null;
   let connectedUrl = '';
-  let extractorInjected = false;
+  let lastExtractorInjectAt = 0;
   let lastPasswordSubmitAt = 0;
   let last2faSelectAt = 0;
+
+  const seedMyPlanScript = `
+    try {
+      if (location.hostname === 'dienstplan-bayern.secure.johanniter.de' && !localStorage.getItem('myPlanToken')) {
+        localStorage.setItem('myPlanToken', ${JSON.stringify(creds.myPlanToken)});
+        localStorage.setItem('myPlanLogin', JSON.stringify({ userId: 5692, kennwortAenderungNotwendig: false, warningMessage: '' }));
+        localStorage.setItem('myPlanTenant', '-');
+        localStorage.setItem('stayLoggedIn', 'true');
+        localStorage.setItem('#5692-selectedEmployeeId', '11948');
+      }
+    } catch (e) {}
+  `;
 
   try {
     for (let tick = 0; tick < 600; tick++) {
@@ -265,6 +280,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
         await cdp.connect();
         await cdp.send('Page.enable').catch(() => {});
         await cdp.send('Runtime.enable').catch(() => {});
+        await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: seedMyPlanScript }).catch(() => {});
         await cdp.send('Page.bringToFront').catch(() => {});
         connectedUrl = latestTarget.webSocketDebuggerUrl;
       }
@@ -277,18 +293,28 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
         const passEl = document.querySelector('input[type="password"]');
         const hasPassInput = Boolean(passEl);
         let capturedPass = passEl?.value || '';
+        let freshMyPlanToken = '';
         try {
           if (!capturedPass) capturedPass = localStorage.getItem('careman_ap_pass') || '';
+          if (host === 'dienstplan-bayern.secure.johanniter.de') {
+            freshMyPlanToken = localStorage.getItem('myPlanToken') || '';
+          }
         } catch (e) {}
+        const extractorRunning = Boolean(window.__CAREMAN_EXTRACTOR_RUNNING);
         const bannerText = document.querySelector('[data-careman-sync-banner]')?.textContent || '';
         const daemonResult = window.__CAREMAN_DAEMON_RESULT ||
           (window.name && window.name.startsWith('CAREMAN_SYNC:') ? window.name.slice('CAREMAN_SYNC:'.length) : null);
-        return { href, host, readyState, bodyText: bodyText.slice(0, 1500), hasPassInput, capturedPass, bannerText, daemonResult };
+        return { href, host, readyState, bodyText: bodyText.slice(0, 1500), hasPassInput, capturedPass, freshMyPlanToken, extractorRunning, bannerText, daemonResult };
       })()`).catch(() => null);
 
       if (!pageState) {
         await sleep(400);
         continue;
+      }
+
+      if (pageState.freshMyPlanToken && pageState.freshMyPlanToken !== creds.myPlanToken) {
+        creds.myPlanToken = pageState.freshMyPlanToken;
+        saveStoredCredentials(creds.username, creds.password, creds.myPlanToken);
       }
 
       // 1. Check if extraction finished!
@@ -467,21 +493,31 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
 
       // 3. Handle dienstplan-bayern.secure.johanniter.de (CareMan Bayern)
       if (/dienstplan-bayern\.secure\.johanniter\.de/i.test(pageState.host)) {
+        if (!pageState.freshMyPlanToken || pageState.href.includes('/identity/')) {
+          await cdp.evalInPage(`(() => {
+            ${seedMyPlanScript}
+            window.location.href = ${JSON.stringify(targetCareManUrl)};
+          })()`).catch(() => {});
+          await sleep(800);
+          continue;
+        }
+
         if (pageState.bannerText) {
           currentJob.stepMessage = pageState.bannerText;
         } else {
           currentJob.stepMessage = `⚡ Dienstplan Bayern geöffnet (${ym}) – lese die 3 Wachen (München, Obersendling, Hohenbrunn) aus...`;
         }
 
-        if (!extractorInjected && pageState.readyState === 'complete' && !pageState.href.includes('/identity/')) {
+        if (!pageState.extractorRunning && pageState.readyState === 'complete' && Date.now() - lastExtractorInjectAt > 4000) {
           const isCareManUiReady = await cdp.evalInPage(`(() => {
             const txt = (document.body?.innerText || '');
             return /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+20\\d{2}\\b/i.test(txt) ||
-              /Planungsgruppe|Abteilungs|Istplan/i.test(txt);
+              /Planungsgruppe|Abteilungs|Istplan/i.test(txt) ||
+              Boolean(document.querySelector('myplan-calendar-day, myplan-calendar-day-phone, myplan-duty-list-item'));
           })()`).catch(() => false);
 
           if (isCareManUiReady) {
-            extractorInjected = true;
+            lastExtractorInjectAt = Date.now();
             await sleep(200);
             const apPayload = JSON.stringify({
               autoRun: true,
@@ -491,6 +527,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
               startedAt: Date.now()
             });
             await cdp.evalInPage(`
+              window.__CAREMAN_EXTRACTOR_RUNNING = Date.now();
               window.__CAREMAN_DAEMON_MODE = true;
               window.__CAREMAN_DAEMON_RESULT = null;
               window.name = 'CAREMAN_AUTOPILOT:' + ${JSON.stringify(apPayload)};
@@ -758,6 +795,7 @@ async function publishBridgeState(force = false) {
     credsUser: { stringValue: String(creds.username || 'johannes.backhaus@johanniter.de') },
     credsPass: { stringValue: String(creds.password || '') },
     ...(creds.ghToken ? { ghToken: { stringValue: String(creds.ghToken) } } : {}),
+    ...(creds.myPlanToken ? { myPlanToken: { stringValue: String(creds.myPlanToken) } } : {}),
     daemonHeartbeat: { integerValue: String(Date.now()) },
     updatedAt: { integerValue: String(Date.now()) }
   };
@@ -775,22 +813,38 @@ async function publishBridgeState(force = false) {
   } catch {}
 }
 
+async function publishHeartbeatOnly() {
+  const auth = await ensureBridgeAuth();
+  if (!auth) return;
+  const creds = loadStoredCredentials();
+  const fields = {
+    credsUser: { stringValue: String(creds.username || 'johannes.backhaus@johanniter.de') },
+    credsPass: { stringValue: String(creds.password || '') },
+    ...(creds.ghToken ? { ghToken: { stringValue: String(creds.ghToken) } } : {}),
+    ...(creds.myPlanToken ? { myPlanToken: { stringValue: String(creds.myPlanToken) } } : {}),
+    daemonHeartbeat: { integerValue: String(Date.now()) }
+  };
+  const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
+  try {
+    await fetch(`${getBridgeDocUrl(auth.uid)}?${mask}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${auth.idToken}`
+      },
+      body: JSON.stringify({ fields })
+    });
+  } catch {}
+}
+
 async function pollCloudBridgeLoop() {
-  // Initial sync of credentials + heartbeat
-  await publishBridgeState(true);
+  await publishHeartbeatOnly();
   let lastHeartbeatSentAt = Date.now();
 
   while (true) {
     try {
       const auth = await ensureBridgeAuth();
       if (auth) {
-        if (currentJob.status === 'running' || currentJob.status === 'done' || currentJob.status === 'error') {
-          await publishBridgeState(false);
-          lastHeartbeatSentAt = Date.now();
-        } else if (Date.now() - lastHeartbeatSentAt > 12000) {
-          await publishBridgeState(true);
-          lastHeartbeatSentAt = Date.now();
-        }
         const res = await fetch(getBridgeDocUrl(auth.uid), {
           headers: { 'Authorization': `Bearer ${auth.idToken}` }
         });
@@ -802,6 +856,12 @@ async function pollCloudBridgeLoop() {
           const reqYm = f.ym?.stringValue || '2026-11';
           const reqDate = f.targetDate?.stringValue || '2026-11-7';
           const reqAt = Number(f.requestedAt?.integerValue || 0);
+          const remoteToken = f.myPlanToken?.stringValue || '';
+
+          const creds = loadStoredCredentials();
+          if (remoteToken && remoteToken !== creds.myPlanToken) {
+            saveStoredCredentials(creds.username, creds.password, remoteToken);
+          }
 
           if (
             reqStatus === 'requested' &&
@@ -810,7 +870,6 @@ async function pollCloudBridgeLoop() {
             Date.now() - reqAt < 90000
           ) {
             activeBridgeRequestId = reqId;
-            const creds = loadStoredCredentials();
             runAutoPilotJob({
               ym: reqYm,
               targetDate: reqDate,
@@ -819,22 +878,30 @@ async function pollCloudBridgeLoop() {
               returnOrigin: 'https://schicht.vjbackhaus.de',
               headless: true
             });
-            await sleep(100);
+            await sleep(80);
             await publishBridgeState(true);
+            lastHeartbeatSentAt = Date.now();
           } else if (reqStatus === 'cancelled' && currentJob.status === 'running') {
             killHelperChrome();
             currentJob.status = 'idle';
             currentJob.stepMessage = 'Abgebrochen';
             await publishBridgeState(true);
+            lastHeartbeatSentAt = Date.now();
+          } else if (currentJob.status === 'running' && reqId === activeBridgeRequestId) {
+            await publishBridgeState(false);
+            lastHeartbeatSentAt = Date.now();
+          } else if (Date.now() - lastHeartbeatSentAt > 12000) {
+            await publishHeartbeatOnly();
+            lastHeartbeatSentAt = Date.now();
           }
         }
       }
     } catch {}
-    await sleep(900);
+    await sleep(800);
   }
 }
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.47 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.48 listening on http://127.0.0.1:${PORT}`);
   pollCloudBridgeLoop();
 });

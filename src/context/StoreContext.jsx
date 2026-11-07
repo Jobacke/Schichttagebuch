@@ -7,7 +7,8 @@ import {
   subscribeToCloudTeamRosters,
   getActiveTeamRoster,
   extractPersonalShiftsFromRoster,
-  getPartnersForShiftFromRoster
+  getPartnersForShiftFromRoster,
+  isValidPersonalShiftCode
 } from '../utils/teamRosterParser';
 import { getPresetForCode, buildShiftFromPreset, CAREMAN_NOVEMBER_2026_BACKHAUS } from '../utils/shiftPresets';
 
@@ -138,7 +139,21 @@ export function StoreProvider({ children }) {
         dedupedData.push(winner);
       });
 
-      // Self-heal shifts corrupted by the v2.2.23 Istplan start-hour bug (where start hours 06, 14, 15, 22 became days 6, 14, 15, 22)
+      // Self-heal shifts corrupted by the v2.2.23 Istplan start-hour bug or the v2.2.26 non-shift holiday/KW/-- bug
+      const ghostIdsSet = new Set();
+      const hourDaysSet = new Set([6, 7, 8, 14, 15, 19, 22]);
+      const monthsWithGarbage = new Set();
+
+      dedupedData.forEach(s => {
+        const code = resolveShiftCode(s, settingsRef.current);
+        if (code && !isValidPersonalShiftCode(code) && !/^[TN]$/i.test(code)) {
+          ghostIdsSet.add(s.id);
+          duplicateIdsToDelete.push(s.id);
+          const ym = (s.date || '').slice(0, 7);
+          if (/^\d{4}-\d{2}$/.test(ym)) monthsWithGarbage.add(ym);
+        }
+      });
+
       const byMonth = new Map();
       dedupedData.forEach(s => {
         const ym = (s.date || '').slice(0, 7);
@@ -146,9 +161,6 @@ export function StoreProvider({ children }) {
         if (!byMonth.has(ym)) byMonth.set(ym, []);
         byMonth.get(ym).push(s);
       });
-
-      const ghostIdsSet = new Set();
-      const hourDaysSet = new Set([6, 7, 8, 14, 15, 19, 22]);
 
       byMonth.forEach((mShifts, ym) => {
         const roster = getActiveTeamRoster(ym);
@@ -168,9 +180,10 @@ export function StoreProvider({ children }) {
           const validDateCodeSet = new Set(validPersonal.map(p => `${p.date}_${p.code.toUpperCase()}`));
           const validDatesMap = new Map();
           validPersonal.forEach(p => validDatesMap.set(p.date, p));
-          let monthHadGhost = false;
+          let monthHadGhost = monthsWithGarbage.has(ym);
 
           mShifts.forEach(s => {
+            if (ghostIdsSet.has(s.id)) return;
             const code = resolveShiftCode(s, settingsRef.current);
             const dayNum = parseInt((s.date || '').split('-')[2], 10);
             const startHour = parseInt((s.startTime || '').split(':')[0], 10);
@@ -314,6 +327,16 @@ export function StoreProvider({ children }) {
     const unsubscribe = onSnapshot(settingsRefDoc, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        if (Array.isArray(data.shiftCodes)) {
+          const cleanedCodes = data.shiftCodes.filter(c => {
+            const codeStr = String(c?.code || '').trim().toUpperCase();
+            return codeStr && (isValidPersonalShiftCode(codeStr) || /^[TNK]$/i.test(codeStr));
+          });
+          if (cleanedCodes.length !== data.shiftCodes.length) {
+            data.shiftCodes = cleanedCodes;
+            setDoc(settingsRefDoc, data).catch(() => {});
+          }
+        }
         settingsRef.current = data;
         setSettings(data);
       } else {

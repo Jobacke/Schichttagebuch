@@ -87,6 +87,17 @@ export function cleanSingleShiftCode(c) {
  * Example: "RDRT2M"   -> ["RDÜ", "RT2M"]
  * Example: "RD"       -> ["RDÜ"]
  */
+export const VALID_PERSONAL_SHIFT_CODE_REGEX = /^(RF[MHO]|RS\d?[MHO]|RN[MHO]|RT\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\d?|RZF|R-SAN)$/i;
+
+export function isValidPersonalShiftCode(rawCode = '') {
+  const base = String(rawCode || '').replace(/\*+$/, '').trim().toUpperCase();
+  if (!base || base.length < 2 || base.length > 6) return false;
+  if (!/[A-ZÄÖÜ]/.test(base)) return false;
+  if (/^[-_0]+$/.test(base)) return false;
+  if (/^KW\d*$/i.test(base)) return false;
+  return VALID_PERSONAL_SHIFT_CODE_REGEX.test(base) || Boolean(SHIFT_PRESETS[base]);
+}
+
 export function splitShiftCodes(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) {
@@ -105,9 +116,12 @@ export function splitShiftCodes(raw) {
     const subTokens = t.split(/\s+/);
     subTokens.forEach(st => {
       let code = st.trim().toUpperCase();
-      if (!code || code === '-' || code === '/' || code === '0' || code === '00' || code === 'FREI') return;
+      if (!code || code === '-' || code === '--' || code === '/' || code === '0' || code === '00' || code === 'FREI') return;
       code = code.replace(/[^A-ZÄÖÜ0-9\-*]/g, '');
-      if (code.length < 2) return;
+      const baseOnly = code.replace(/\*+$/, '');
+      if (baseOnly.length < 2 || baseOnly.length > 10) return;
+      if (!/[A-ZÄÖÜ]/.test(baseOnly)) return;
+      if (/^[-_0]+$/.test(baseOnly) || /^KW\d*$/i.test(baseOnly)) return;
 
       // 1. Prefix compound: (RD|RDÜ|ÜB) + standard shift (e.g. "RDRT2M", "RDÜRT2M*")
       const prefixMatch = code.match(new RegExp('^(RD|RDÜ|ÜB)(' + stdPattern + ')(\\*?)$'));
@@ -137,6 +151,7 @@ export function splitShiftCodes(raw) {
         return;
       }
 
+      if (baseOnly.length > 6) return;
       result.push(cleanSingleShiftCode(code));
     });
   });
@@ -460,7 +475,7 @@ export function detectRosterStation(rosterData) {
 
 /**
  * Detects a corrupted 1-colleague Istplan roster created by the v2.2.23 inner-div hour regex bug
- * (where all shift days in the roster equal the start-time hour: 6, 7, 8, 14, 15, 19, 22).
+ * or the v2.2.26 non-shift holiday/KW/-- extraction bug.
  */
 export function isCorruptedIstplanHourRoster(roster) {
   if (!roster) return false;
@@ -468,7 +483,13 @@ export function isCorruptedIstplanHourRoster(roster) {
   if (cols.length !== 1) return false;
   const shifts = cols[0]?.shifts || {};
   const entries = Object.entries(shifts);
-  if (entries.length === 0) return false;
+  if (entries.length === 0) return true;
+  if (entries.some(([, rawCode]) => {
+    const firstCode = String(rawCode || '').split(',')[0].replace(/\*+$/, '').trim().toUpperCase();
+    return !isValidPersonalShiftCode(firstCode);
+  })) {
+    return true;
+  }
   const hourDays = new Set([6, 7, 8, 14, 15, 19, 22]);
   return entries.every(([k, rawCode]) => {
     const dayPart = k.includes('-') ? parseInt(k.split('-')[2], 10) : parseInt(k, 10);
@@ -1117,7 +1138,7 @@ export function extractPersonalShiftsFromRoster(yearMonth, rosterOverride = null
 
         const rawCode = String(myEntry.code).trim();
         const baseCode = rawCode.replace(/\*+$/, '').trim().toUpperCase();
-        if (!baseCode || isNonPartnerShiftCode(baseCode)) return;
+        if (!baseCode || isNonPartnerShiftCode(baseCode) || !isValidPersonalShiftCode(baseCode)) return;
 
         const dedupeKey = `${dateStr}_${baseCode}`;
         if (seenDateCodes.has(dedupeKey)) return;

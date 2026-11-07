@@ -706,7 +706,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             parts.forEach(part => {
               const hasAsterisk = part.includes('*') || cellHasAsterisk;
               let baseCode = part.replace(/[^A-ZÄÖÜ0-9\\-]/g, '');
-              if (!baseCode || baseCode.length < 2 || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
+              if (!baseCode || baseCode.length < 2 || baseCode.length > 6 || !/[A-ZÄÖÜ]/i.test(baseCode) || /^KW\\d*$/i.test(baseCode) || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
 
               const stdPat = '(?:RF[MHO]|RS[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MH]|RH[MH]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
               const pm = baseCode.match(new RegExp('^(RD|RDÜ|ÜB)(' + stdPat + ')(\\\\*?)$'));
@@ -839,17 +839,17 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           if (idx < 7 && dNum > 20) return;
           if (istCells.length >= 28 && idx >= istCells.length - 7 && dNum < 15) return;
 
+          if (timeM[1] === '00:00' && timeM[2] === '00:00') return;
+
           const dStr = \`\${istYm}-\${String(dNum).padStart(2, '0')}\`;
-          if (timeM[1] !== '00:00' || timeM[2] !== '00:00') {
-            personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
-          }
+          personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
+          const validShiftRegex = /^(RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT\\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\\d?|RZF|R-SAN)\\*?$/i;
           const lines = withoutTime.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
           for (let li = 1; li < lines.length; li++) {
             const line = lines[li];
-            if (/^\\d{1,2}(\\s+KW\\s*\\d+)?$/i.test(line)) continue;
             const codeCandidate = line.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '').toUpperCase();
-            if (codeCandidate && codeCandidate.length >= 2 && !['KW', 'FREI', '00', 'WKS', 'U', 'XW', 'STAR', 'GRADE'].includes(codeCandidate)) {
-              istplanShifts[String(dNum)] = codeCandidate;
+            if (validShiftRegex.test(codeCandidate)) {
+              istplanShifts[String(dNum)] = codeCandidate.replace(/^RD(\\*?)$/, 'RDÜ$1');
               break;
             }
           }
@@ -861,9 +861,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const candidates = Array.from(document.querySelectorAll('a, button, div, span, p, li')).filter(el => {
           if (!el.getBoundingClientRect) return false;
           const r = el.getBoundingClientRect();
-          if (r.width < 25 || r.width > 180 || r.height < 12 || r.height > 150) return false;
+          if (r.width < 20 || r.width > 220 || r.height < 12 || r.height > 200) return false;
           const norm = (el.innerText || el.textContent || '').replace(/[\\s\\-\\u00AD\\u2010-\\u2015]+/g, '').toLowerCase();
-          return norm === 'abteilungsdienstplan' || (norm.includes('abteilungsdienstplan') && norm.length < 32);
+          return norm === 'abteilungsdienstplan' || (norm.includes('abteilungs') && norm.includes('dienstplan') && norm.length < 55);
         });
         return candidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
       };
@@ -884,15 +884,18 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         setStatus('⚡ Öffne Abteilungsdienstplan...');
         const r = abtEl.getBoundingClientRect();
         const cx = r.left + r.width / 2;
-        const iconAbove = document.elementFromPoint(cx, Math.max(10, r.top - 30));
+        const iconAbove = document.elementFromPoint(cx, Math.max(10, r.top - 36));
         const tileContainer = abtEl.closest('button, a, [role="button"], li, mat-list-item, .mat-ripple') || abtEl.parentElement || abtEl;
-        const targets = [tileContainer, abtEl, iconAbove].filter(Boolean);
-        targets.forEach(t => {
+        try {
+          if (iconAbove && typeof iconAbove.click === 'function') iconAbove.click();
+          else if (typeof tileContainer.click === 'function') tileContainer.click();
+        } catch (e) {}
+        await sleep(350);
+        if (!findPlanungsgruppeTrigger()) {
           try {
-            if (typeof t.click === 'function') t.click();
-            else t.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            if (typeof abtEl.click === 'function') abtEl.click();
           } catch (e) {}
-        });
+        }
 
         // Bis zu 4 Sekunden warten, ob der Abteilungsdienstplan lädt
         for (let w = 0; w < 16; w++) {

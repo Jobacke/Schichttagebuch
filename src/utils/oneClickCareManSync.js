@@ -1,4 +1,4 @@
-import { parseCareManHtml } from './teamRosterHtmlParser';
+import { parseCareManHtml } from './teamRosterHtmlParser.js';
 import {
   getActiveTeamRoster,
   saveStationTeamRoster,
@@ -8,12 +8,12 @@ import {
   extractPersonalShiftsFromRoster,
   getPartnersForShiftFromRoster,
   isCorruptedIstplanHourRoster
-} from './teamRosterParser';
+} from './teamRosterParser.js';
 import {
   CAREMAN_NOVEMBER_2026_BACKHAUS,
   getPresetForCode,
   buildShiftFromPreset
-} from './shiftPresets';
+} from './shiftPresets.js';
 
 /**
  * Checks whether a string looks like CareMan roster data
@@ -603,7 +603,8 @@ export async function runOneClickCareManSync({
 export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;padding:12px 22px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;box-shadow:0 12px 32px rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.3);display:flex;align-items:center;gap:12px;';
+  banner.setAttribute('data-careman-sync-banner', '1');
+  banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;pointer-events:none;background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;padding:12px 22px;border-radius:14px;font-family:sans-serif;font-size:14px;font-weight:700;box-shadow:0 12px 32px rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.3);display:flex;align-items:center;gap:12px;';
   const setStatus = txt => { banner.textContent = txt; };
   document.body.appendChild(banner);
 
@@ -611,7 +612,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     try {
       const ta = document.createElement('textarea');
       ta.value = str;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
       document.body.appendChild(ta);
       ta.focus();
       ta.select();
@@ -627,25 +628,71 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
     const monthRegexSubstr = /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(20\\d{2})\\b/i;
 
+    const getCommonAncestorDepth = (a, b) => {
+      if (!a || !b) return 0;
+      const ancestorsA = new Set();
+      let cur = a;
+      while (cur) {
+        ancestorsA.add(cur);
+        cur = cur.parentElement;
+      }
+      let lca = b;
+      while (lca && !ancestorsA.has(lca)) {
+        lca = lca.parentElement;
+      }
+      let depth = 0;
+      while (lca) {
+        depth++;
+        lca = lca.parentElement;
+      }
+      return depth;
+    };
+
     // Findet den exakt sichtbaren Monats-Textknoten in der CareMan-Kopfzeile (z.B. "Juli 2026" oder "November 2026")
     // und misst per Range.getBoundingClientRect() die millimetergenaue Text-Box (ohne umschließende < / > Buttons).
-    // WICHTIG: Ignoriert komplett "01.11.2026 - 30.11.2026" aus dem Dropdown "Filter Planungsgruppe"!
+    // WICHTIG: Ignoriert unser eigenes Banner ([data-careman-sync-banner]) sowie Datumsbereiche ("01.11.2026 - 30.11.2026")!
     const getVisibleMonthHeaderInfo = () => {
       const rawCandidates = [];
       let domCounter = 0;
+      let pgEl = null;
+      let pgCy = null;
+      try {
+        pgEl = typeof findPlanungsgruppeTrigger === 'function' ? findPlanungsgruppeTrigger() : null;
+        if (pgEl && pgEl.getBoundingClientRect) {
+          const pgr = pgEl.getBoundingClientRect();
+          if (pgr.width > 0 && pgr.top > 0) {
+            pgCy = pgr.top + pgr.height / 2;
+          }
+        }
+      } catch (e) {}
+
+      const isIstplanToolbarRow = (el) => {
+        if (!pgEl || !el) return false;
+        let p = el;
+        for (let d = 0; d < 4 && p && p !== document.body; d++) {
+          const pr = p.getBoundingClientRect ? p.getBoundingClientRect() : null;
+          if (pr && pr.height > 150) break;
+          const t = (p.innerText || p.textContent || '');
+          if (/Planungsgruppe/i.test(t)) return false;
+          if (/\\b(Istplan|Sollplan|Erfassung)\\b/i.test(t)) return true;
+          p = p.parentElement;
+        }
+        return false;
+      };
 
       if (document.body && document.createTreeWalker) {
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
         let node;
         while ((node = walker.nextNode())) {
+          const parent = node.parentElement;
+          if (!parent || !parent.getBoundingClientRect) continue;
+          if (parent.closest('[data-careman-sync-banner], table, mat-option, md-option, [role="option"], script, style, noscript')) continue;
           const raw = node.nodeValue || '';
           if (!raw || raw.length > 120) continue;
           if (/\\d{2}\\.\\d{2}\\.20\\d{2}/.test(raw)) continue;
           const m = raw.match(monthRegexSubstr);
           if (!m) continue;
-          const parent = node.parentElement;
-          if (!parent || !parent.getBoundingClientRect) continue;
-          if (parent.closest('table, mat-option, md-option, [role="option"], script, style, noscript')) continue;
+          if (isIstplanToolbarRow(parent)) continue;
           const st = window.getComputedStyle(parent);
           if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < 0.1) continue;
 
@@ -673,11 +720,37 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         }
       }
 
+      // Unterstützung falls Monat & Jahr auf zwei Kind-Spans verteilt sind (z.B. <span>Juli</span> <span>2026</span>)
+      Array.from(document.querySelectorAll('span, div, button, a, strong, b, label')).forEach(el => {
+        if (el.closest('[data-careman-sync-banner], table, mat-option, md-option, [role="option"], script, style, noscript')) return;
+        if (el.children && el.children.length > 4) return;
+        const txt = (el.innerText || el.textContent || '').trim().replace(/\\s+/g, ' ');
+        if (!txt || txt.length > 40 || /\\d{2}\\.\\d{2}\\.20\\d{2}/.test(txt)) return;
+        const m = txt.match(/^(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(20\\d{2})$/i);
+        if (!m || !el.getBoundingClientRect) return;
+        if (isIstplanToolbarRow(el)) return;
+        const st = window.getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < 0.1) return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 22 || r.width > 280 || r.height < 8 || r.height > 75) return;
+        if (r.top < 8 || r.top > 360 || r.left < 15 || r.left > 580) return;
+        if (rawCandidates.some(c => c.el === el || c.el.contains(el))) return;
+        rawCandidates.push({
+          el,
+          rect: r,
+          monthName: m[1],
+          yearStr: m[2],
+          domIdx: ++domCounter
+        });
+      });
+
       Array.from(document.querySelectorAll('input')).forEach(inp => {
+        if (inp.closest('[data-careman-sync-banner]')) return;
         const val = (inp.value || '').trim();
         if (!val || /\\d{2}\\.\\d{2}\\.20\\d{2}/.test(val)) return;
         const m = val.match(monthRegexSubstr);
         if (!m || !inp.getBoundingClientRect) return;
+        if (isIstplanToolbarRow(inp)) return;
         const r = inp.getBoundingClientRect();
         if (r.width < 22 || r.width > 280 || r.height < 8 || r.height > 75) return;
         if (r.top < 8 || r.top > 360 || r.left < 15 || r.left > 580) return;
@@ -692,17 +765,6 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       if (rawCandidates.length === 0) return null;
 
-      let pgCy = null;
-      try {
-        const pgEl = typeof findPlanungsgruppeTrigger === 'function' ? findPlanungsgruppeTrigger() : null;
-        if (pgEl && pgEl.getBoundingClientRect) {
-          const pgr = pgEl.getBoundingClientRect();
-          if (pgr.width > 0 && pgr.top > 0) {
-            pgCy = pgr.top + pgr.height / 2;
-          }
-        }
-      } catch (e) {}
-
       const scored = rawCandidates.map(c => {
         const r = c.rect;
         const cx = r.left + r.width / 2;
@@ -710,11 +772,13 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const topHit = document.elementFromPoint(cx, cy);
         const isTopmost = Boolean(topHit && (c.el === topHit || c.el.contains(topHit) || topHit.contains(c.el)));
         const onPgRow = pgCy !== null && Math.abs(cy - pgCy) <= 48;
-        return { ...c, isTopmost, onPgRow };
+        const lcaDepth = pgEl ? getCommonAncestorDepth(c.el, pgEl) : 0;
+        return { ...c, isTopmost, onPgRow, lcaDepth };
       });
 
       scored.sort((a, b) => {
         if (a.onPgRow !== b.onPgRow) return a.onPgRow ? -1 : 1;
+        if (a.lcaDepth !== b.lcaDepth) return b.lcaDepth - a.lcaDepth;
         if (a.isTopmost !== b.isTopmost) return a.isTopmost ? -1 : 1;
         return b.domIdx - a.domIdx;
       });
@@ -740,7 +804,10 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       }
       let year = new Date().getFullYear();
       let month = new Date().getMonth() + 1;
-      const pageText = document.body ? document.body.innerText : '';
+      const pageText = Array.from(document.body ? document.body.children : [])
+        .filter(el => !el.hasAttribute('data-careman-sync-banner'))
+        .map(el => el.innerText || el.textContent || '')
+        .join('\\n');
       const textMatches = Array.from(pageText.matchAll(/\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(20\\d{2})\\b/gi));
       if (textMatches.length > 0) {
         const lastText = textMatches[textMatches.length - 1];
@@ -768,11 +835,15 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     const getAbtTableSig = () => {
       const tbl = findAbteilungTable();
       if (!tbl) return '';
-      const trs = Array.from(tbl.querySelectorAll('tr')).filter(r => {
+      const allTrs = Array.from(tbl.querySelectorAll('tr'));
+      const empTrs = allTrs.filter(r => {
         const first = (r.querySelector('.employee-cell') || r.children[0])?.textContent?.trim() || '';
         return first.includes(',') && !/^M-J/i.test(first);
       });
-      return trs.slice(0, 8).map(r => (r.innerText || r.textContent || '').trim().replace(/\\s+/g, ' ')).join('||');
+      const headerSig = (allTrs[0]?.innerText || allTrs[0]?.textContent || '').trim().replace(/\\s+/g, ' ');
+      const bodyRows = empTrs.length > 0 ? empTrs.slice(0, 8) : allTrs.slice(1, 9);
+      const bodySig = bodyRows.map(r => (r.innerText || r.textContent || '').trim().replace(/\\s+/g, ' ')).join('||');
+      return headerSig + '##' + bodySig;
     };
 
     const extractVisibleTable = (forcedStation, ymOverride, labelOverride) => {
@@ -823,9 +894,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             parts.forEach(part => {
               const hasAsterisk = part.includes('*') || cellHasAsterisk;
               let baseCode = part.replace(/[^A-ZÄÖÜ0-9\\-]/g, '');
-              if (!baseCode || baseCode.length < 2 || baseCode.length > 6 || !/[A-ZÄÖÜ]/i.test(baseCode) || /^KW\\d*$/i.test(baseCode) || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
+              if (!baseCode || baseCode.length < 2 || baseCode.length > 10 || !/[A-ZÄÖÜ]/i.test(baseCode) || /^KW\\d*$/i.test(baseCode) || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
 
-              const stdPat = '(?:RF[MHO]|RS[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MH]|RH[MH]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
+              const stdPat = '(?:RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
               const pm = baseCode.match(new RegExp('^(RD|RDÜ|ÜB)(' + stdPat + ')(\\\\*?)$'));
               if (pm) {
                 const sub1 = pm[1] === 'RD' ? 'RDÜ' : pm[1];
@@ -833,7 +904,15 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
                 validCodes.push(sub1, sub2);
                 return;
               }
+              const sm = baseCode.match(new RegExp('^(' + stdPat + ')(RD|RDÜ|ÜB)(\\\\*?)$'));
+              if (sm) {
+                const sub1 = sm[1] + (hasAsterisk ? '*' : '');
+                const sub2 = sm[2] === 'RD' ? 'RDÜ' : sm[2];
+                validCodes.push(sub1, sub2);
+                return;
+              }
 
+              if (baseCode.length > 6) return;
               if (baseCode === 'RD') baseCode = 'RDÜ';
               const finalCode = hasAsterisk ? (baseCode + '*') : baseCode;
               validCodes.push(finalCode);
@@ -843,7 +922,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             });
 
             if (validCodes.length > 0) {
-              shifts[String(dayNum)] = validCodes.join(', ');
+              shifts[String(dayNum)] = validCodes.join(',');
             }
           }
         });
@@ -876,7 +955,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
     const getVisiblePgElements = () => {
       return Array.from(document.querySelectorAll('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option, li, div, span')).filter(el => {
-        if (el.closest('table')) return false;
+        if (el.closest('[data-careman-sync-banner], table')) return false;
         if (!isElementVisible(el)) return false;
         const txt = (el.innerText || el.textContent || '').trim();
         if (!txt || txt.length > 110) return false;
@@ -917,6 +996,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       // Fallback über das sichtbare Label "Filter Planungsgruppe" (auch wenn nach Monatswechsel noch keine Gruppe gewählt ist)
       const labelEl = Array.from(document.querySelectorAll('label, span, div')).find(el => {
+        if (el.closest('[data-careman-sync-banner]')) return false;
         if (!el.getBoundingClientRect) return false;
         const r = el.getBoundingClientRect();
         if (r.top < 15 || r.top > 340 || r.width < 30 || r.width > 240 || r.height < 6 || r.height > 40) return false;
@@ -943,6 +1023,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       try {
         const { yearMonth: istYm } = initialMonthInfo;
         const rawCells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
+          if (c.closest('[data-careman-sync-banner]')) return false;
           if (!c.getBoundingClientRect) return false;
           const r = c.getBoundingClientRect();
           if (r.width < 55 || r.width > 320 || r.height < 50 || r.height > 250) return false;
@@ -990,44 +1071,69 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             });
           }
           if (matchedIstCodes.length > 0) {
-            istplanShifts[String(dNum)] = matchedIstCodes.join(', ');
+            istplanShifts[String(dNum)] = matchedIstCodes.join(',');
           }
         });
       } catch (e) {}
 
       // Automatisch rechts im Menü auf den orangenen Button "Abteilungs-dienstplan" klicken
-      const findAbtTile = () => {
+      const findAbtTile = (requireVisible = true) => {
         const candidates = Array.from(document.querySelectorAll('a, button, div, span, p, li')).filter(el => {
+          if (el.closest('[data-careman-sync-banner]')) return false;
+          const norm = (el.innerText || el.textContent || '').replace(/[\\s\\-\\u00AD\\u2010-\\u2015]+/g, '').toLowerCase();
+          if (norm !== 'abteilungsdienstplan' && !(norm.includes('abteilungs') && norm.includes('dienstplan') && norm.length < 55)) return false;
+          if (!requireVisible) return true;
           if (!el.getBoundingClientRect) return false;
           const r = el.getBoundingClientRect();
-          if (r.width < 20 || r.width > 220 || r.height < 12 || r.height > 200) return false;
-          const norm = (el.innerText || el.textContent || '').replace(/[\\s\\-\\u00AD\\u2010-\\u2015]+/g, '').toLowerCase();
-          return norm === 'abteilungsdienstplan' || (norm.includes('abteilungs') && norm.includes('dienstplan') && norm.length < 55);
+          if (r.width < 16 || r.width > 240 || r.height < 10 || r.height > 220) return false;
+          if (r.right <= 0 || r.left >= window.innerWidth) return false;
+          const st = window.getComputedStyle(el);
+          return st.display !== 'none' && st.visibility !== 'hidden' && parseFloat(st.opacity) >= 0.1;
         });
         return candidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
       };
 
-      let abtEl = findAbtTile();
+      let abtEl = findAbtTile(true);
       if (!abtEl) {
-        const menuBtn = Array.from(document.querySelectorAll('button, a, div, span')).find(
-          el => /^(Men[üu]|Menu)$/i.test((el.innerText || '').trim())
-        );
-        if (menuBtn && typeof menuBtn.click === 'function') {
-          menuBtn.click();
-          await sleep(350);
-          abtEl = findAbtTile();
+        // Falls das rechte "⠿ Menü" noch eingeklappt ist: Menü-Button oben rechts in der CareMan-Leiste öffnen!
+        const menuTriggerCandidates = Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, div, span')).filter(el => {
+          if (el.closest('[data-careman-sync-banner]')) return false;
+          const txt = (el.innerText || el.textContent || '').trim();
+          const aria = ((el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('mattooltip'))) || '').trim();
+          if (/^(Men[üu]|Menu|apps|grid_view|view_module|more_vert)$/i.test(txt) || /(Men[üu]|Menu|Apps)/i.test(aria)) return true;
+          return false;
+        });
+        // Zusätzlich den ganz rechten Icon-Button in der oberen CareMan-Kopfleiste (rechts neben Kalender & Profil-Icon) prüfen
+        const topRightProbe = document.elementFromPoint(window.innerWidth - 28, 32);
+        if (topRightProbe && !topRightProbe.closest('[data-careman-sync-banner]')) {
+          const topBtn = topRightProbe.closest('button, a, [role="button"], div') || topRightProbe;
+          menuTriggerCandidates.push(topBtn);
         }
+        for (const mBtn of menuTriggerCandidates) {
+          try {
+            const host = (mBtn.closest && mBtn.closest('button, a, [role="button"]')) || mBtn;
+            if (host && typeof host.click === 'function') host.click();
+          } catch (e) {}
+          await sleep(320);
+          abtEl = findAbtTile(true);
+          if (abtEl) break;
+        }
+      }
+      if (!abtEl) {
+        abtEl = findAbtTile(false);
       }
 
       if (abtEl) {
         setStatus('⚡ Öffne Abteilungsdienstplan...');
-        const r = abtEl.getBoundingClientRect();
+        const r = abtEl.getBoundingClientRect ? abtEl.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
         const cx = r.left + r.width / 2;
-        const iconAbove = document.elementFromPoint(cx, Math.max(10, r.top - 36));
+        const iconAbove = (r.width > 0 && r.top > 20) ? document.elementFromPoint(cx, Math.max(10, r.top - 32)) : null;
         const tileContainer = abtEl.closest('button, a, [role="button"], li, mat-list-item, .mat-ripple') || abtEl.parentElement || abtEl;
         try {
           if (typeof tileContainer.click === 'function') tileContainer.click();
-          else if (typeof abtEl.click === 'function') abtEl.click();
+          if (typeof abtEl.click === 'function') abtEl.click();
+          const innerBtn = tileContainer.querySelector && tileContainer.querySelector('button, a, [role="button"], .mat-icon, mat-icon, svg');
+          if (innerBtn && typeof innerBtn.click === 'function') innerBtn.click();
         } catch (e) {}
         await sleep(550);
         if (!findPlanungsgruppeTrigger() && !window.location.href.includes('team-duty')) {
@@ -1045,29 +1151,35 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       }
     }
 
-    // Warte bis zu 5 Sekunden, bis das Dropdown "Filter Planungsgruppe" geladen ist
+    // Warte bis zu 5 Sekunden, bis das Dropdown "Filter Planungsgruppe" UND die Tabelle geladen sind
     for (let w = 0; w < 20; w++) {
-      if (findPlanungsgruppeTrigger()) break;
+      if (findPlanungsgruppeTrigger() && findAbteilungTable()) break;
       await sleep(250);
     }
     await sleep(350);
 
+    const resolveClickableHost = (node) => {
+      if (!node || (node.closest && node.closest('[data-careman-sync-banner]'))) return null;
+      const svgRoot = node.closest ? node.closest('svg') : null;
+      const base = (svgRoot && svgRoot.parentElement) ? svgRoot.parentElement : node;
+      return (base.closest && base.closest('button, a, [role="button"], mat-icon, .mat-icon')) || base;
+    };
+
     const clickChevronAt = (elOrNull, cx, cy) => {
-      const hit = document.elementFromPoint(cx, cy) || elOrNull;
-      const btn = (hit && hit.closest && hit.closest('button, a, [role="button"], mat-icon, .mat-icon')) ||
-        (elOrNull && elOrNull.closest && elOrNull.closest('button, a, [role="button"], mat-icon, .mat-icon')) ||
-        (hit && typeof hit.click === 'function' ? hit : null) ||
-        (hit && hit.parentElement && typeof hit.parentElement.click === 'function' ? hit.parentElement : null);
+      const rawHit = document.elementFromPoint(cx, cy) || elOrNull;
+      const btn = resolveClickableHost(elOrNull) || resolveClickableHost(rawHit);
       try {
         if (btn && typeof btn.click === 'function') {
           btn.click();
-          return;
         }
       } catch (e) {}
-      if (hit) {
-        try {
-          hit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
-        } catch (e) {}
+      const evtTarget = btn || rawHit;
+      if (evtTarget && evtTarget.dispatchEvent) {
+        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+          try {
+            evtTarget.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
+          } catch (e) {}
+        });
       }
     };
 
@@ -1092,54 +1204,54 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         // "<" (Monat zurück) liegt bei mr.left - 44px, ">" (Monat vor) liegt bei mr.left - 14px
         const coordX = diff < 0 ? Math.max(14, mr.left - 44) : Math.max(28, mr.left - 14);
 
-        // Cluster alle klickbaren Icon-/Button-Elemente links neben mr.left nach ihrer X-Mitte (Abstand >= 14px)
+        // Kombiniere DOM-Suche + horizontalen elementFromPoint-Scan links von mr.left
         const clusters = [];
-        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg')).forEach(el => {
-          if (!el.getBoundingClientRect) return;
-          const r = el.getBoundingClientRect();
-          if (r.width < 6 || r.width > 58 || r.height < 6 || r.height > 58) return;
+        const addClusterCandidate = (rawEl) => {
+          const host = resolveClickableHost(rawEl);
+          if (!host || !host.getBoundingClientRect) return;
+          if (curHeader?.el && (host === curHeader.el || host.contains(curHeader.el) || curHeader.el.contains(host))) return;
+          const r = host.getBoundingClientRect();
+          if (r.width < 6 || r.width > 64 || r.height < 6 || r.height > 64) return;
           const cy = r.top + r.height / 2;
           const cx = r.left + r.width / 2;
-          if (Math.abs(cy - arrowY) > 24) return;
-          if (cx < Math.max(8, mr.left - 80) || cx > mr.left - 3) return;
-          const host = el.closest('button, a, [role="button"]') || el.closest('mat-icon, .mat-icon') || el.parentElement || el;
-          const existing = clusters.find(c => Math.abs(c.cx - cx) < 14);
+          if (Math.abs(cy - arrowY) > 26) return;
+          if (cx < Math.max(6, mr.left - 105) || cx > mr.left - 2) return;
+          const existing = clusters.find(c => Math.abs(c.cx - cx) < 12);
           if (!existing) {
             clusters.push({ host, cx, cy });
-          } else if (host && host.matches && host.matches('button, a, [role="button"]')) {
+          } else if (host.matches && host.matches('button, a, [role="button"]')) {
             existing.host = host;
           }
-        });
+        };
+
+        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg, span, div')).forEach(addClusterCandidate);
+        for (let probeX = Math.max(8, Math.round(mr.left - 96)); probeX <= Math.round(mr.left - 4); probeX += 4) {
+          const hit = document.elementFromPoint(probeX, arrowY);
+          if (hit) addClusterCandidate(hit);
+        }
         clusters.sort((a, b) => a.cx - b.cx);
 
-        const chosen = clusters.length >= 2 ? (diff < 0 ? clusters[0] : clusters[1]) : null;
+        const chosen = clusters.length >= 2 ? (diff < 0 ? clusters[0] : clusters[1]) : (clusters.length === 1 ? clusters[0] : null);
         const clickX = chosen ? chosen.cx : coordX;
         const clickY = chosen ? chosen.cy : arrowY;
 
         clickChevronAt(chosen ? chosen.host : null, clickX, clickY);
 
         let monthChanged = false;
-        for (let w = 0; w < 6; w++) {
-          await sleep(140);
+        for (let w = 0; w < 8; w++) {
+          await sleep(130);
           if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
             monthChanged = true;
             break;
           }
         }
 
-        // Fallback mit exakter CareMan-Koordinate + MouseEvent-Sequenz, falls der erste Klick noch nicht ausgelöst hat
+        // Fallback mit exakter CareMan-Koordinate, falls der erste Klick noch nicht ausgelöst hat
         if (!monthChanged) {
           const fallbackEl = document.elementFromPoint(coordX, arrowY);
           clickChevronAt(fallbackEl, coordX, arrowY);
-          if (fallbackEl) {
-            ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
-              try {
-                fallbackEl.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: coordX, clientY: arrowY }));
-              } catch (e) {}
-            });
-          }
-          for (let w = 0; w < 14; w++) {
-            await sleep(150);
+          for (let w = 0; w < 12; w++) {
+            await sleep(140);
             if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
               monthChanged = true;
               break;
@@ -1150,7 +1262,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         if (monthChanged) {
           didStepMonth = true;
         }
-        await sleep(260);
+        await sleep(240);
       }
 
       if (didStepMonth) {
@@ -1218,13 +1330,13 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       const hitEl = document.elementFromPoint(cx, cy) || pgTrigger;
 
       // Versuch 1: Nativer Einzel-Klick auf den sichtbaren Punkt im Dropdown
-      hitEl.click();
+      if (hitEl && typeof hitEl.click === 'function') hitEl.click();
       await sleep(260);
       if (isPopupOpen()) return true;
 
       // Versuch 2: Klick auf das umschließende mat-select / trigger Element
-      const selectBox = hitEl.closest('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, mat-select, md-select, [role="combobox"], [role="listbox"]') || pgTrigger;
-      if (selectBox && selectBox !== hitEl) {
+      const selectBox = (hitEl && hitEl.closest && hitEl.closest('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, mat-select, md-select, [role="combobox"], [role="listbox"]')) || pgTrigger;
+      if (selectBox && typeof selectBox.click === 'function') {
         selectBox.click();
         await sleep(260);
         if (isPopupOpen()) return true;
@@ -1232,15 +1344,19 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       // Versuch 3: Vollständige MouseEvent-Sequenz (mousedown -> mouseup -> click)
       ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
-        hitEl.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
+        try {
+          (selectBox || hitEl).dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
+        } catch (e) {}
       });
       await sleep(260);
       if (isPopupOpen()) return true;
 
       // Versuch 4: Tastatur-Event (ArrowDown) auf dem fokussierten Dropdown
-      const focusTarget = hitEl.closest('mat-select, md-select, [tabindex], [role="combobox"], [role="listbox"]') || selectBox;
+      const focusTarget = (hitEl && hitEl.closest && hitEl.closest('mat-select, md-select, [tabindex], [role="combobox"], [role="listbox"]')) || selectBox;
       if (focusTarget && focusTarget.focus) focusTarget.focus();
-      focusTarget.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+      if (focusTarget && focusTarget.dispatchEvent) {
+        focusTarget.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+      }
       await sleep(260);
       return isPopupOpen();
     };
@@ -1333,7 +1449,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     }
 
     // Falls wir vom Istplan kamen und sowohl den 3-Wachen-Abteilungsdienstplan als auch Istplan-Schichten haben:
-    // Ergänze eventuelle reine Istplan-Einträge (z.B. Lehrgänge wie LGI), ohne die Abteilungsdienstplan-Wachen zu überschreiben
+    // Ergänze eventuelle reine Istplan-Einträge (z.B. Lehrgänge wie LGI oder Wachen-übergreifende Dienste), ohne die Abteilungsdienstplan-Wachen zu überschreiben
     if (rosters.length > 0 && Object.keys(istplanShifts).length > 0) {
       let selfEntry = null;
       for (const r of rosters) {
@@ -1385,10 +1501,10 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       try { await navigator.clipboard.writeText(json); } catch (e) {}
     }
 
+    // WICHTIG: #careman= IMMER an die Ziel-URL anhängen (URL-Fragmente nach # werden nie an den HTTP-Server gesendet
+    // und überleben den Cross-Origin-Wechsel von johanniter.de zu schicht.vjbackhaus.de auch bei großen 3-Wachen-Plänen zu 100%)!
     const encodedHash = encodeURIComponent(json);
-    const targetUrl = encodedHash.length < 48000
-      ? ('https://schicht.vjbackhaus.de/?sync=' + Date.now() + '#careman=' + encodedHash)
-      : ('https://schicht.vjbackhaus.de/?sync=' + Date.now());
+    const targetUrl = 'https://schicht.vjbackhaus.de/?sync=' + Date.now() + '#careman=' + encodedHash;
 
     banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
     setStatus(\`✅ \${Math.max(1, rosters.length)} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – öffne Schichttagebuch...\`);

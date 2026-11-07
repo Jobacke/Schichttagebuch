@@ -240,14 +240,24 @@ export function StoreProvider({ children }) {
             } else if (isExactValid) {
               // Check if personalTimes start-hour bug overwrote the time of a valid shift (e.g. 06.11. RT4M given 06:54 - 15:06)
               const preset = getPresetForCode(code);
+              let needsUpsert = false;
               if (preset && preset.startTime && s.startTime && s.startTime !== preset.startTime) {
                 const presetHour = parseInt(preset.startTime.split(':')[0], 10);
                 if (Math.abs(startHour - presetHour) >= 6 && dayNum === startHour) {
                   monthHadGhost = true;
                   s.startTime = preset.startTime;
                   s.endTime = preset.endTime;
-                  shiftsToUpsertInCleanup.push({ ...s, updatedAt: Date.now() });
+                  needsUpsert = true;
                 }
+              }
+              const detectedPartner = getPartnersForShiftFromRoster(s.date, code, roster) || '';
+              const curPartner = (s.partner || '').trim();
+              if (detectedPartner && curPartner !== detectedPartner && (!curPartner || curPartner.startsWith('mit '))) {
+                s.partner = detectedPartner;
+                needsUpsert = true;
+              }
+              if (needsUpsert) {
+                shiftsToUpsertInCleanup.push({ ...s, updatedAt: Date.now() });
               }
             }
           });
@@ -378,7 +388,17 @@ export function StoreProvider({ children }) {
       setRosterVersion(v => v + 1);
     });
 
-    return unsubscribe;
+    const onLocalSync = () => setRosterVersion(v => v + 1);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('careman-oneclick-synced', onLocalSync);
+    }
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('careman-oneclick-synced', onLocalSync);
+      }
+    };
   }, [currentUser]);
 
   // --- Actions ---

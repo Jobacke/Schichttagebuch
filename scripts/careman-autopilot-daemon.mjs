@@ -22,13 +22,14 @@ function loadStoredCredentials() {
       const parsed = JSON.parse(raw);
       return {
         username: parsed.username || 'johannes.backhaus@johanniter.de',
-        password: parsed.password || ''
+        password: parsed.password || '',
+        ghToken: parsed.ghToken || ''
       };
     }
   } catch {
     /* ignore */
   }
-  return { username: 'johannes.backhaus@johanniter.de', password: '' };
+  return { username: 'johannes.backhaus@johanniter.de', password: '', ghToken: '' };
 }
 
 function saveStoredCredentials(username, password) {
@@ -37,12 +38,13 @@ function saveStoredCredentials(username, password) {
     const next = {
       username: (username && username.trim()) ? username.trim() : existing.username,
       password: password ? password : existing.password,
+      ghToken: existing.ghToken || '',
       updatedAt: new Date().toISOString()
     };
     fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(next, null, 2), { mode: 0o600 });
     return next;
   } catch {
-    return { username: username || 'johannes.backhaus@johanniter.de', password: password || '' };
+    return { username: username || 'johannes.backhaus@johanniter.de', password: password || '', ghToken: '' };
   }
 }
 
@@ -633,7 +635,7 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, version: '2.2.45' }));
+    res.end(JSON.stringify({ ok: true, version: '2.2.46' }));
     return;
   }
 
@@ -755,12 +757,14 @@ async function publishBridgeState(force = false) {
     error: { stringValue: String(currentJob.error || '') },
     credsUser: { stringValue: String(creds.username || 'johannes.backhaus@johanniter.de') },
     credsPass: { stringValue: String(creds.password || '') },
+    ...(creds.ghToken ? { ghToken: { stringValue: String(creds.ghToken) } } : {}),
     daemonHeartbeat: { integerValue: String(Date.now()) },
     updatedAt: { integerValue: String(Date.now()) }
   };
 
+  const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
   try {
-    await fetch(getBridgeDocUrl(auth.uid), {
+    await fetch(`${getBridgeDocUrl(auth.uid)}?${mask}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -831,6 +835,6 @@ async function pollCloudBridgeLoop() {
 }
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.45 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.46 listening on http://127.0.0.1:${PORT}`);
   pollCloudBridgeLoop();
 });

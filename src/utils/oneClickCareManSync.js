@@ -668,6 +668,7 @@ export function openCareManLiveWindow(targetYearMonth) {
           })
         });
 
+        let cloudRunnerTriggered = false;
         for (let tick = 0; tick < 220 && !stopped; tick++) {
           await new Promise(r => setTimeout(r, 850));
           if (stopped) break;
@@ -682,9 +683,28 @@ export function openCareManLiveWindow(targetYearMonth) {
           const curStatus = f.status?.stringValue || '';
           const stepMsg = f.stepMessage?.stringValue || '';
           const resJson = f.resultJson?.stringValue || '';
+          const ghToken = f.ghToken?.stringValue || '';
 
           if (curReqId === reqId && stepMsg && msgEl) {
             msgEl.textContent = stepMsg;
+          }
+
+          // Falls der Mac ausgeschaltet ist (nach ~2,5s noch auf "requested"):
+          // Starte automatisch den 24/7 GitHub Cloud-Auto-Pilot-Server!
+          if (!cloudRunnerTriggered && tick >= 3 && curReqId === reqId && curStatus === 'requested' && ghToken) {
+            cloudRunnerTriggered = true;
+            if (msgEl) {
+              msgEl.textContent = `☁️ Mac ist ausgeschaltet – starte 24/7 Cloud-Auto-Pilot für ${ym} (dauert ca. 10–15s)...`;
+            }
+            fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/230396421/dispatches', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${ghToken}`,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ ref: 'main' })
+            }).catch(() => {});
           }
 
           if (curReqId === reqId && curStatus === 'done' && resJson && resJson.length > 20) {

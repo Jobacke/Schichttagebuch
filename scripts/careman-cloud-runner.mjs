@@ -1,0 +1,417 @@
+#!/usr/bin/env node
+import { spawn, execSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { SIEDA_EXTRACTOR_SCRIPT } from '../src/utils/oneClickCareManSync.js';
+
+const DEBUG_PORT = 9229;
+const FB_API_KEY = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
+const FB_BRIDGE_EMAIL = 'careman-autopilot-bridge@vjbackhaus.de';
+const FB_BRIDGE_PASS = 'CareManBridge_2026!Secure';
+const FB_PROJECT_ID = 'schichttagebuch-da2c3';
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+class CdpSession {
+  constructor(wsUrl) {
+    this.wsUrl = wsUrl;
+    this.ws = null;
+    this.msgId = 0;
+    this.pending = new Map();
+  }
+
+  async connect() {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(this.wsUrl);
+      this.ws = ws;
+      const timer = setTimeout(() => reject(new Error('CDP WebSocket timeout')), 8000);
+      ws.addEventListener('open', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      ws.addEventListener('error', err => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      ws.addEventListener('message', event => {
+        try {
+          const data = JSON.parse(String(event.data));
+          if (data.id && this.pending.has(data.id)) {
+            const { resolve: res, reject: rej } = this.pending.get(data.id);
+            this.pending.delete(data.id);
+            if (data.error) rej(new Error(data.error.message || 'CDP error'));
+            else res(data.result);
+          }
+        } catch {}
+      });
+      ws.addEventListener('close', () => {
+        for (const { reject: rej } of this.pending.values()) {
+          rej(new Error('CDP connection closed'));
+        }
+        this.pending.clear();
+      });
+    });
+  }
+
+  send(method, params = {}) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error('CDP WebSocket not open'));
+    }
+    const id = ++this.msgId;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (this.pending.has(id)) {
+          this.pending.delete(id);
+          reject(new Error(`CDP timeout calling ${method}`));
+        }
+      }, 10000);
+      this.pending.set(id, {
+        resolve: val => {
+          clearTimeout(timer);
+          resolve(val);
+        },
+        reject: err => {
+          clearTimeout(timer);
+          reject(err);
+        }
+      });
+      this.ws.send(JSON.stringify({ id, method, params }));
+    });
+  }
+
+  async evalInPage(expression, awaitPromise = false) {
+    const res = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise
+    });
+    if (res?.exceptionDetails) {
+      throw new Error(res.exceptionDetails.text || 'Eval exception');
+    }
+    return res?.result?.value;
+  }
+
+  close() {
+    try {
+      if (this.ws) this.ws.close();
+    } catch {}
+  }
+}
+
+async function getActivePageTarget() {
+  const res = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`);
+  if (!res.ok) return null;
+  const targets = await res.json();
+  return targets.find(t =>
+    t.type === 'page' &&
+    t.webSocketDebuggerUrl &&
+    !/devtools:\/\//i.test(t.url || '')
+  ) || null;
+}
+
+function findChromeBinary() {
+  const candidates = [
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  try {
+    return execSync('which google-chrome || which chromium-browser || which chromium', { encoding: 'utf8' }).trim();
+  } catch {
+    return 'google-chrome';
+  }
+}
+
+async function main() {
+  if (process.env.GITHUB_ACTIONS !== 'true' && process.env.FORCE_CLOUD_RUNNER !== '1') {
+    return;
+  }
+
+  const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: FB_BRIDGE_EMAIL, password: FB_BRIDGE_PASS, returnSecureToken: true })
+  });
+  if (!authRes.ok) return;
+  const auth = await authRes.json();
+  const docUrl = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT_ID}/databases/(default)/documents/users/${auth.localId}/team_rosters/autopilot_bridge`;
+
+  const getBridgeDoc = async () => {
+    const r = await fetch(docUrl, { headers: { 'Authorization': `Bearer ${auth.idToken}` } });
+    if (!r.ok) return null;
+    return r.json();
+  };
+
+  const patchBridge = async (fieldsObj) => {
+    const mask = Object.keys(fieldsObj).map(k => `updateMask.fieldPaths=${k}`).join('&');
+    await fetch(`${docUrl}?${mask}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${auth.idToken}`
+      },
+      body: JSON.stringify({ fields: fieldsObj })
+    }).catch(() => {});
+  };
+
+  const doc = await getBridgeDoc();
+  const f = doc?.fields || {};
+  const reqStatus = f.status?.stringValue || '';
+  const reqId = f.requestId?.stringValue || '';
+  const reqAt = Number(f.requestedAt?.integerValue || 0);
+  const ym = f.ym?.stringValue || '2026-11';
+  const targetDate = f.targetDate?.stringValue || '2026-11-7';
+  const credsUser = f.credsUser?.stringValue || 'johannes.backhaus@johanniter.de';
+  const credsPass = f.credsPass?.stringValue || '';
+
+  // Only run if there is a recent 'requested' job (within last 3 minutes)
+  if (reqStatus !== 'requested' || !reqId || (Date.now() - reqAt > 180000)) {
+    console.log('ℹ️ No pending CareMan Cloud Auto-Pilot job – skipping cloud browser run.');
+    return;
+  }
+
+  console.log(`☁️ Starting CareMan Cloud Auto-Pilot for ${ym} (${targetDate}), requestId=${reqId}...`);
+  await patchBridge({
+    status: { stringValue: 'running' },
+    stepMessage: { stringValue: `☁️ Cloud-Auto-Pilot verbunden – öffne Johanniter-Anmeldung für ${ym}...` },
+    updatedAt: { integerValue: String(Date.now()) }
+  });
+
+  const targetCareManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
+  const profileDir = path.join(os.tmpdir(), `careman-cloud-profile-${Date.now()}`);
+  fs.mkdirSync(profileDir, { recursive: true });
+
+  const chromeBin = findChromeBinary();
+  const proc = spawn(chromeBin, [
+    `--remote-debugging-port=${DEBUG_PORT}`,
+    `--user-data-dir=${profileDir}`,
+    '--headless=new',
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--window-size=1440,900',
+    targetCareManUrl
+  ], { stdio: 'ignore' });
+
+  let pageTarget = null;
+  for (let i = 0; i < 40; i++) {
+    await sleep(250);
+    try {
+      pageTarget = await getActivePageTarget();
+      if (pageTarget) break;
+    } catch {}
+  }
+
+  if (!pageTarget) {
+    await patchBridge({
+      status: { stringValue: 'error' },
+      stepMessage: { stringValue: '⚠️ Cloud-Browser konnte nicht gestartet werden.' }
+    });
+    proc.kill('SIGTERM');
+    return;
+  }
+
+  let cdp = null;
+  let connectedUrl = '';
+  let extractorInjected = false;
+  let lastPasswordSubmitAt = 0;
+  let last2faSelectAt = 0;
+  let lastStepMsg = '';
+
+  const updateStep = async (msg) => {
+    if (!msg || msg === lastStepMsg) return;
+    lastStepMsg = msg;
+    console.log('[Cloud Auto-Pilot]', msg);
+    await patchBridge({
+      status: { stringValue: 'running' },
+      stepMessage: { stringValue: msg },
+      updatedAt: { integerValue: String(Date.now()) }
+    });
+  };
+
+  try {
+    for (let tick = 0; tick < 550; tick++) {
+      const latestTarget = await getActivePageTarget().catch(() => null);
+      if (!latestTarget) {
+        await sleep(300);
+        continue;
+      }
+
+      if (!cdp || latestTarget.webSocketDebuggerUrl !== connectedUrl) {
+        if (cdp) cdp.close();
+        cdp = new CdpSession(latestTarget.webSocketDebuggerUrl);
+        await cdp.connect();
+        await cdp.send('Page.enable').catch(() => {});
+        await cdp.send('Runtime.enable').catch(() => {});
+        connectedUrl = latestTarget.webSocketDebuggerUrl;
+      }
+
+      const pageState = await cdp.evalInPage(`(() => {
+        const href = window.location.href || '';
+        const host = window.location.hostname || '';
+        const readyState = document.readyState;
+        const bodyText = (document.body ? (document.body.innerText || document.body.textContent || '') : '').trim();
+        const passEl = document.querySelector('input[type="password"]');
+        const hasPassInput = Boolean(passEl);
+        const bannerText = document.querySelector('[data-careman-sync-banner]')?.textContent || '';
+        const daemonResult = window.__CAREMAN_DAEMON_RESULT ||
+          (window.name && window.name.startsWith('CAREMAN_SYNC:') ? window.name.slice('CAREMAN_SYNC:'.length) : null);
+        return { href, host, readyState, bodyText: bodyText.slice(0, 1500), hasPassInput, bannerText, daemonResult };
+      })()`).catch(() => null);
+
+      if (!pageState) {
+        await sleep(400);
+        continue;
+      }
+
+      if (pageState.daemonResult && pageState.daemonResult.length > 20) {
+        await patchBridge({
+          status: { stringValue: 'done' },
+          stepMessage: { stringValue: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...` },
+          resultJson: { stringValue: pageState.daemonResult },
+          updatedAt: { integerValue: String(Date.now()) }
+        });
+        console.log('✅ Cloud Auto-Pilot finished successfully!');
+        break;
+      }
+
+      if (/my\.secure\.johanniter\.de/i.test(pageState.host)) {
+        if (pageState.href.includes('/error_path/')) {
+          await cdp.evalInPage(`window.location.href = ${JSON.stringify(targetCareManUrl)};`).catch(() => {});
+          await sleep(800);
+          continue;
+        }
+
+        if (!pageState.href.includes('/auth/ui/') && /Dienstplan\s+BAYERN|Webanwendungen|Self\s*Service/i.test(pageState.bodyText)) {
+          await updateStep(`🚀 Airlock 2FA bestätigt! Öffne Dienstplan Bayern (${targetDate})...`);
+          await cdp.evalInPage(`window.location.href = ${JSON.stringify(targetCareManUrl)};`).catch(() => {});
+          await sleep(600);
+          continue;
+        }
+
+        if (/Anmeldung\s+mit\s+Airlock\s+2FA|Nachricht\s+auf\s+Ihrem\s+Smartphone|Offline-Modus/i.test(pageState.bodyText)) {
+          await updateStep(`📱 Bitte jetzt in Airlock 2FA auf deinem iPhone bestätigen – Dienstplan (${ym}) lädt danach automatisch!`);
+          await sleep(500);
+          continue;
+        }
+
+        if (/Authentisierungsm[öo]glichkeiten|Airlock\s+2FA/i.test(pageState.bodyText) && !pageState.hasPassInput) {
+          if (Date.now() - last2faSelectAt > 2000) {
+            await updateStep('⚡ Wähle Airlock 2FA aus...');
+            last2faSelectAt = Date.now();
+            await cdp.evalInPage(`(async () => {
+              const sleep = ms => new Promise(r => setTimeout(r, ms));
+              const labelsAndSpans = Array.from(document.querySelectorAll('label, span, div, [role="radio"]')).filter(el =>
+                /^Airlock\\s*2FA$/i.test((el.innerText || el.textContent || '').trim())
+              );
+              const rInp = document.querySelector('input[type="radio"]');
+              if (rInp) {
+                rInp.click();
+                rInp.checked = true;
+                rInp.dispatchEvent(new Event('input', { bubbles: true }));
+                rInp.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+              labelsAndSpans.forEach(el => { try { el.click(); } catch (e) {} });
+              await sleep(250);
+              const btn = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]')).find(b =>
+                /^(Ausw[äa]hlen|Weiter|Best[äa]tigen|OK|Anmelden)$/i.test((b.innerText || b.value || b.textContent || '').trim())
+              );
+              if (btn) btn.click();
+            })()`, true).catch(() => {});
+          }
+          await sleep(450);
+          continue;
+        }
+
+        if (pageState.hasPassInput && credsPass && Date.now() - lastPasswordSubmitAt > 3000) {
+          await updateStep(`🔐 Trage Benutzername & Passwort in der Cloud ein und klicke auf Anmelden...`);
+          lastPasswordSubmitAt = Date.now();
+          await cdp.evalInPage(`(async () => {
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+            const fillField = (el, val) => {
+              if (!el) return;
+              el.focus();
+              try {
+                el.select();
+                document.execCommand('insertText', false, val);
+              } catch (e) {}
+              if (el.value !== val) {
+                const proto = Object.getPrototypeOf(el);
+                const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set ||
+                  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+                if (setter) setter.call(el, val);
+                else el.value = val;
+              }
+              ['input', 'change', 'blur'].forEach(ev => el.dispatchEvent(new Event(ev, { bubbles: true })));
+            };
+            const passInput = document.querySelector('input[type="password"]');
+            const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="password"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"])'));
+            const userInput = allInputs.find(inp => /user|login|mail|name/i.test((inp.name || '') + ' ' + (inp.id || '') + ' ' + (inp.placeholder || ''))) || allInputs[0];
+            if (userInput) fillField(userInput, ${JSON.stringify(credsUser)});
+            await sleep(80);
+            if (passInput) fillField(passInput, ${JSON.stringify(credsPass)});
+            await sleep(220);
+            const loginBtn = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]')).find(b =>
+              /^(Anmelden|Login|Weiter|OK)$/i.test((b.innerText || b.value || b.textContent || '').trim())
+            ) || document.querySelector('button[type="submit"], input[type="submit"]');
+            if (loginBtn) loginBtn.click();
+          })()`, true).catch(() => {});
+        }
+        await sleep(300);
+        continue;
+      }
+
+      if (/dienstplan-bayern\.secure\.johanniter\.de/i.test(pageState.host)) {
+        if (pageState.bannerText) {
+          await updateStep(pageState.bannerText);
+        } else {
+          await updateStep(`⚡ Dienstplan Bayern geöffnet (${ym}) – lese die 3 Wachen aus...`);
+        }
+
+        if (!extractorInjected && pageState.readyState === 'complete' && !pageState.href.includes('/identity/')) {
+          const isCareManUiReady = await cdp.evalInPage(`(() => {
+            const txt = (document.body?.innerText || '');
+            return /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+20\\d{2}\\b/i.test(txt) ||
+              /Planungsgruppe|Abteilungs|Istplan/i.test(txt);
+          })()`).catch(() => false);
+
+          if (isCareManUiReady) {
+            extractorInjected = true;
+            await sleep(200);
+            const apPayload = JSON.stringify({
+              autoRun: true,
+              targetYearMonth: ym,
+              targetDate,
+              targetCareManUrl,
+              startedAt: Date.now()
+            });
+            await cdp.evalInPage(`
+              window.__CAREMAN_DAEMON_MODE = true;
+              window.__CAREMAN_DAEMON_RESULT = null;
+              window.name = 'CAREMAN_AUTOPILOT:' + ${JSON.stringify(apPayload)};
+            `).catch(() => {});
+            cdp.evalInPage(SIEDA_EXTRACTOR_SCRIPT, false).catch(() => {});
+          }
+        }
+      }
+
+      await sleep(300);
+    }
+  } finally {
+    if (cdp) cdp.close();
+    try { proc.kill('SIGTERM'); } catch {}
+  }
+}
+
+main().catch(err => {
+  console.error('Cloud runner error:', err);
+});

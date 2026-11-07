@@ -18,7 +18,7 @@ if (typeof window !== 'undefined' && window.location.hash && window.location.has
         if (looksLikeCareManData(decoded)) {
             sessionStorage.setItem('pending_careman_import', decoded);
             sessionStorage.setItem('pending_careman_redirect_journal', '1');
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            window.history.replaceState(null, '', window.location.pathname);
         }
     } catch (e) {
         console.warn('Could not decode #careman hash:', e);
@@ -39,6 +39,7 @@ export default function Layout() {
 
     const isImportingRef = useRef(false);
     const hasLeftTabRef = useRef(false);
+    const lastHashImportTimeRef = useRef(0);
 
     useEffect(() => {
         if (!currentUser || store?.loading) return;
@@ -61,6 +62,7 @@ export default function Layout() {
             if (!hasHash && !hasPending) return;
 
             isImportingRef.current = true;
+            lastHashImportTimeRef.current = Date.now();
             try {
                 const ctx = latestRef.current;
                 const res = await runOneClickCareManSync({
@@ -73,9 +75,8 @@ export default function Layout() {
                 if (res && res.message) {
                     showToast(res.message);
                 }
-                const shouldRedirect = sessionStorage.getItem('pending_careman_redirect_journal') === '1';
                 sessionStorage.removeItem('pending_careman_redirect_journal');
-                if (res?.yearMonth && (shouldRedirect || ctx.location.pathname === '/analysis')) {
+                if (res?.yearMonth) {
                     ctx.navigate(`/journal?month=${res.yearMonth}`, { replace: true });
                 }
             } catch (err) {
@@ -87,6 +88,7 @@ export default function Layout() {
 
         const checkClipboardOnTabReturn = async (isInitialMount = false) => {
             if (isImportingRef.current) return;
+            if (Date.now() - lastHashImportTimeRef.current < 12000) return;
             if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') return;
 
             try {

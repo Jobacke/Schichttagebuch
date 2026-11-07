@@ -688,7 +688,8 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             });
 
             if (validCodes.length > 0) {
-              shifts[String(dayNum)] = validCodes.join(', ');
+              const dateStr = \`\${ym}-\${String(dayNum).padStart(2, '0')}\`;
+              shifts[dateStr] = validCodes.join(', ');
             }
           }
         });
@@ -698,19 +699,14 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         }
       });
 
-      let station = forcedStation || 'Sendling';
-      if (!forcedStation) {
-        if (oCount > mCount && oCount > hCount) station = 'Obersendling';
-        else if (hCount > mCount && hCount > oCount) station = 'Hohenbrunn';
-      }
-      return { extractedAt: Date.now(), yearMonth: ym, monthLabel: ml, station, colleagues };
-    };
+      let detectedStation = null;
+      if (oCount > mCount && oCount > hCount) detectedStation = 'Obersendling';
+      else if (hCount > mCount && hCount > oCount) detectedStation = 'Hohenbrunn';
+      else if (mCount > 0) detectedStation = 'Sendling';
 
-    // MILLISECOND 0 (SYNCHRONOUS): Immediately copy the currently visible table while Chrome's user gesture is 100% active!
-    const initialSnap = extractVisibleTable(null);
-    if (initialSnap.colleagues.length > 0) {
-      copySync(JSON.stringify(initialSnap));
-    }
+      const station = detectedStation || forcedStation || 'Sendling';
+      return { extractedAt: Date.now(), yearMonth: ym, monthLabel: ml, station, detectedStation, colleagues };
+    };
 
     const personalTimes = {};
     // 1. Falls noch auf der CareMan-Startseite (Istplan) und noch nicht im Abteilungsdienstplan
@@ -731,12 +727,49 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     }
 
     const { yearMonth, monthLabel } = detectMonthYear();
+    const PG_ITEM_REGEX = /(61\\s+Fahrzeugplanung|61\\s+SKo|61\\s+WL|61000|61010|61300)/i;
 
-    // Universeller Finder für das Dropdown "Filter Planungsgruppe" (egal ob mat-select, md-select, ng-select oder div)
+    const isElementVisible = (el) => {
+      if (!el || !el.getBoundingClientRect) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 45 || rect.height < 12 || rect.height > 95) return false;
+      if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) < 0.1) return false;
+      return true;
+    };
+
+    const getVisiblePgElements = () => {
+      return Array.from(document.querySelectorAll('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option, li, div, span')).filter(el => {
+        if (el.closest('table')) return false;
+        if (!isElementVisible(el)) return false;
+        const txt = (el.innerText || el.textContent || '').trim();
+        if (!txt || txt.length > 110) return false;
+        return PG_ITEM_REGEX.test(txt);
+      });
+    };
+
+    // Das Popup ist genau dann offen, wenn mindestens 3 verschiedene Zeilen (unterschiedliche Y-Positionen)
+    // mit Planungsgruppen ("61 Fahrzeugplanung", "61 SKo", "61 WL", "61000...", etc.) gleichzeitig sichtbar sind!
+    const isPopupOpen = () => {
+      const vis = getVisiblePgElements();
+      const distinctY = new Set(vis.map(el => Math.round(el.getBoundingClientRect().top / 16)));
+      return distinctY.size >= 3;
+    };
+
+    // Universeller Finder für das geschlossene Dropdown "Filter Planungsgruppe"
     const findPlanungsgruppeTrigger = () => {
+      const visPg = getVisiblePgElements()
+        .filter(el => el.getBoundingClientRect().top < 340)
+        .sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length);
+      if (visPg.length > 0) {
+        const inner = visPg[0];
+        return inner.closest('mat-select, md-select, ng-select, select, .mat-select-trigger, .mat-mdc-select-trigger, [role="combobox"], [role="listbox"]') || inner;
+      }
+
       const allSelects = Array.from(document.querySelectorAll(
         'mat-select, md-select, ng-select, select, [role="combobox"], [role="listbox"], .mat-select, .md-select, .ng-select'
-      ));
+      )).filter(isElementVisible);
       const byParentLabel = allSelects.find(el => {
         let p = el.parentElement;
         for (let d = 0; d < 4 && p && p !== document.body; d++) {
@@ -746,78 +779,82 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         return false;
       });
       if (byParentLabel) return byParentLabel;
-      if (allSelects.length > 0) return allSelects[0];
+      return allSelects[0] || null;
+    };
 
-      const allEls = Array.from(document.querySelectorAll('*'));
-      const labelEl = allEls.find(el => {
-        if (el.children.length > 2) return false;
-        const t = (el.innerText || el.textContent || '').trim();
-        return /^Filter\\s+Planungsgruppe$/i.test(t) || t === 'Planungsgruppe';
-      });
-
-      if (labelEl) {
-        let container = labelEl.parentElement;
-        for (let i = 0; i < 4 && container && container !== document.body; i++) {
-          const siblingOrChild = Array.from(container.querySelectorAll('input, select, button, [tabindex], [role], div, span')).find(
-            c => c !== labelEl && !labelEl.contains(c) && !c.contains(labelEl) && /(61\\d*|Fahrzeugplanung|Rettungswache|SKo|WL|Oktoberfest|Aubing|M[üu]nchen|Obersendling|Hohenbrunn)/i.test((c.innerText || c.value || '').trim())
-          );
-          if (siblingOrChild) return siblingOrChild;
-          container = container.parentElement;
+    const getPopupScrollContainers = () => {
+      const containers = new Set();
+      const vis = getVisiblePgElements();
+      vis.forEach(el => {
+        let p = el.parentElement;
+        while (p && p !== document.body && p !== document.documentElement) {
+          if (!p.closest('table')) {
+            const st = window.getComputedStyle(p);
+            if (
+              p.scrollHeight > p.clientHeight + 4 ||
+              /(auto|scroll)/i.test(st.overflowY) ||
+              p.matches('.mat-select-panel, .mat-mdc-select-panel, md-content, .md-select-menu-container, .cdk-virtual-scroll-viewport, [role="listbox"]')
+            ) {
+              containers.add(p);
+            }
+          }
+          p = p.parentElement;
         }
-        return labelEl.nextElementSibling || labelEl.parentElement;
-      }
-
-      return allEls.find(el => {
-        if (el.closest('table')) return false;
-        if (el.children.length > 3) return false;
-        const t = (el.innerText || el.textContent || '').trim();
-        return /^(61\\s+Fahrzeugplanung|61\\s+SKo|61\\s+WL|61000|61010|61300)/i.test(t);
-      }) || null;
+      });
+      return Array.from(containers);
     };
 
     const findOptionInPopup = (pattern, pgTrigger) => {
-      const optionCandidates = Array.from(document.querySelectorAll(
-        'mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option, li'
-      ));
-      const explicitMatch = optionCandidates.find(o => pattern.test((o.innerText || o.textContent || '').trim()));
-      if (explicitMatch) return explicitMatch;
-
-      const allCandidates = Array.from(document.querySelectorAll('div, span, a, p, li')).filter(el => {
-        if (!pgTrigger) return false;
-        if (el === pgTrigger || pgTrigger.contains(el) || el.contains(pgTrigger)) return false;
-        if (el.closest('table')) return false;
+      const triggerRect = pgTrigger ? pgTrigger.getBoundingClientRect() : null;
+      const candidates = getVisiblePgElements().filter(el => {
+        if (pgTrigger && (el === pgTrigger || pgTrigger.contains(el) || el.contains(pgTrigger))) return false;
         const txt = (el.innerText || el.textContent || '').trim();
-        if (!txt || txt.length > 120) return false;
-        return pattern.test(txt);
+        if (!pattern.test(txt)) return false;
+        // Falls das geschlossene Trigger-Element an exakt derselben Y-Koordinate liegt und kein mat-option ist
+        if (triggerRect && Math.abs(el.getBoundingClientRect().top - triggerRect.top) < 6 && !el.closest('mat-option, md-option, [role="option"], .cdk-overlay-container, .md-select-menu-container')) {
+          return false;
+        }
+        return true;
       });
-      return allCandidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
+
+      const explicitOpt = candidates.find(el => el.matches('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option, li'));
+      if (explicitOpt) return explicitOpt;
+      return candidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
     };
 
-    const isPopupOpen = (pgTrigger) => {
-      const opts = document.querySelectorAll('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option');
-      if (opts.length > 0) return true;
-      return Boolean(findOptionInPopup(/(61\\s+Fahrzeugplanung|61000|61010|61300)/i, pgTrigger));
-    };
-
-    // Opens the dropdown cleanly with a SINGLE click (never double-toggling!)
     const openDropdown = async (pgTrigger) => {
-      if (isPopupOpen(pgTrigger)) return true;
-      const inner = pgTrigger.querySelector
-        ? pgTrigger.querySelector('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, [role="combobox"], [role="listbox"]')
-        : null;
-      if (inner && inner !== pgTrigger) {
-        inner.click();
-        await sleep(200);
-        if (isPopupOpen(pgTrigger)) return true;
+      if (isPopupOpen()) return true;
+      const rect = pgTrigger.getBoundingClientRect();
+      const cx = rect.left + Math.min(Math.max(rect.width * 0.35, 24), 110);
+      const cy = rect.top + rect.height / 2;
+      const hitEl = document.elementFromPoint(cx, cy) || pgTrigger;
+
+      // Versuch 1: Nativer Einzel-Klick auf den sichtbaren Punkt im Dropdown
+      hitEl.click();
+      await sleep(260);
+      if (isPopupOpen()) return true;
+
+      // Versuch 2: Klick auf das umschließende mat-select / trigger Element
+      const selectBox = hitEl.closest('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, mat-select, md-select, [role="combobox"], [role="listbox"]') || pgTrigger;
+      if (selectBox && selectBox !== hitEl) {
+        selectBox.click();
+        await sleep(260);
+        if (isPopupOpen()) return true;
       }
-      pgTrigger.click();
-      await sleep(200);
-      if (isPopupOpen(pgTrigger)) return true;
-      const target = inner || pgTrigger;
-      target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-      target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-      await sleep(200);
-      return isPopupOpen(pgTrigger);
+
+      // Versuch 3: Vollständige MouseEvent-Sequenz (mousedown -> mouseup -> click)
+      ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+        hitEl.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
+      });
+      await sleep(260);
+      if (isPopupOpen()) return true;
+
+      // Versuch 4: Tastatur-Event (ArrowDown) auf dem fokussierten Dropdown
+      const focusTarget = hitEl.closest('mat-select, md-select, [tabindex], [role="combobox"], [role="listbox"]') || selectBox;
+      if (focusTarget && focusTarget.focus) focusTarget.focus();
+      focusTarget.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+      await sleep(260);
+      return isPopupOpen();
     };
 
     const TARGET_STATIONS = [
@@ -830,67 +867,97 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
     for (let i = 0; i < TARGET_STATIONS.length; i++) {
       const target = TARGET_STATIONS[i];
+      setStatus(\`⚡ Lese Wache \${i + 1}/3: \${target.label}...\`);
+
+      // Prüfe anhand der echten Schicht-Codes in der Tabelle, ob diese Wache bereits geladen ist!
+      const currentSnap = extractVisibleTable(null, yearMonth, monthLabel);
+      if (currentSnap.colleagues.length > 0 && currentSnap.detectedStation === target.station) {
+        rosters.push({ ...currentSnap, station: target.station });
+        continue;
+      }
+
       const pgTrigger = findPlanungsgruppeTrigger();
       if (!pgTrigger) break;
 
-      setStatus(\`⚡ Lese Wache \${i + 1}/3: \${target.label}...\`);
+      const opened = await openDropdown(pgTrigger);
+      if (!opened) continue;
 
-      const currentTriggerText = (pgTrigger.innerText || pgTrigger.textContent || pgTrigger.value || '').trim();
-      const alreadySelected = target.pattern.test(currentTriggerText) &&
-        document.querySelectorAll('tr').length > 3 &&
-        !Array.from(document.querySelectorAll('tr')).some(r => /^M-J\\s*\\d/i.test((r.children[0]?.textContent || '').trim()));
+      let matchOpt = findOptionInPopup(target.pattern, pgTrigger);
 
-      if (!alreadySelected) {
-        await openDropdown(pgTrigger);
+      // Falls Option noch nicht sichtbar: erst im Popup ganz nach oben scrollen, dann schrittweise nach unten!
+      if (!matchOpt) {
+        const scrollBoxes = getPopupScrollContainers();
+        scrollBoxes.forEach(s => {
+          s.scrollTop = 0;
+          s.dispatchEvent(new Event('scroll'));
+        });
+        await sleep(160);
+        matchOpt = findOptionInPopup(target.pattern, pgTrigger);
 
-        let matchOpt = null;
-        for (let w = 0; w < 18; w++) {
-          matchOpt = findOptionInPopup(target.pattern, pgTrigger);
-          if (matchOpt) break;
-          await sleep(130);
-          matchOpt = findOptionInPopup(target.pattern, pgTrigger);
-          if (matchOpt) break;
-          // Falls das Popup eine Scrollbar hat (z.B. ab 61010 / 61300), im Popup nach unten scrollen
-          const scrollables = Array.from(document.querySelectorAll('div, ul, md-content, .mat-select-panel, .cdk-virtual-scroll-viewport')).filter(
-            el => !el.closest('table') && el !== document.body && el.scrollHeight > el.clientHeight + 20 && el.clientHeight > 60 && el.clientHeight < 600
-          );
-          scrollables.forEach(s => { s.scrollTop += 220; });
-        }
-
-        if (matchOpt) {
-          const prevSig = Array.from(document.querySelectorAll('tr')).slice(1, 6).map(r => (r.children[0]?.textContent || '').trim()).join('|');
-          try { matchOpt.scrollIntoView({ block: 'nearest' }); } catch (e) {}
-          await sleep(60);
-          matchOpt.click();
-
-          for (let w = 0; w < 30; w++) {
-            await sleep(160);
-            const newSig = Array.from(document.querySelectorAll('tr')).slice(1, 6).map(r => (r.children[0]?.textContent || '').trim()).join('|');
-            if (newSig && newSig !== prevSig && !/^M-J\\s*\\d/i.test(newSig)) break;
-          }
-          await sleep(300);
-        } else {
-          document.body.click();
+        for (let step = 0; step < 12 && !matchOpt; step++) {
+          const boxes = getPopupScrollContainers();
+          boxes.forEach(s => {
+            s.scrollTop += 150;
+            s.dispatchEvent(new Event('scroll'));
+          });
           await sleep(150);
-          continue;
+          matchOpt = findOptionInPopup(target.pattern, pgTrigger);
         }
       }
 
-      const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
-      if (extracted.colleagues.length > 0) {
-        rosters.push(extracted);
+      if (matchOpt) {
+        const prevSig = Array.from(document.querySelectorAll('tr')).slice(1, 7).map(r => (r.children[0]?.textContent || '').trim()).join('|');
+        try { matchOpt.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+        await sleep(60);
+        matchOpt.click();
+        await sleep(180);
+
+        // Falls das Popup nach Klick auf den inneren Text noch offen ist, auf das mat-option Element klicken
+        if (isPopupOpen()) {
+          const optHost = matchOpt.closest('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, li') || matchOpt.parentElement;
+          if (optHost && optHost !== matchOpt) {
+            optHost.click();
+            await sleep(180);
+          }
+        }
+
+        for (let w = 0; w < 32; w++) {
+          await sleep(160);
+          const newSig = Array.from(document.querySelectorAll('tr')).slice(1, 7).map(r => (r.children[0]?.textContent || '').trim()).join('|');
+          const checkSnap = extractVisibleTable(null, yearMonth, monthLabel);
+          if (checkSnap.colleagues.length > 0 && (checkSnap.detectedStation === target.station || (newSig && newSig !== prevSig))) {
+            break;
+          }
+        }
+        await sleep(300);
+
+        const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
+        if (extracted.colleagues.length > 0) {
+          rosters.push({ ...extracted, station: extracted.detectedStation || target.station });
+        }
+      } else {
+        document.body.click();
+        await sleep(150);
       }
     }
 
     if (rosters.length === 0) {
-      const single = extractVisibleTable(null, yearMonth, monthLabel);
-      if (single.colleagues.length > 0) rosters.push(single);
-      else if (initialSnap.colleagues.length > 0) rosters.push(initialSnap);
+      const fallbackSingle = extractVisibleTable(null, yearMonth, monthLabel);
+      if (fallbackSingle.colleagues.length > 0) {
+        rosters.push(fallbackSingle);
+      }
+    }
+
+    if (rosters.length === 0) {
+      banner.style.background = '#d97706';
+      setStatus('⚠️ Bitte in CareMan unter "Filter Planungsgruppe" kurz 61000 Rettungswache München wählen und nochmal klicken!');
+      setTimeout(() => banner.remove(), 8000);
+      return;
     }
 
     const payload = rosters.length > 1
       ? { multiStation: true, extractedAt: Date.now(), yearMonth, monthLabel, rosters, personalTimes }
-      : { ...(rosters[0] || { yearMonth, monthLabel, station: 'Sendling', colleagues: [] }), extractedAt: Date.now() };
+      : { ...rosters[0], extractedAt: Date.now() };
 
     const json = JSON.stringify(payload);
     copySync(json);
@@ -904,7 +971,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       } catch (e) {}
     }
 
-    const targetUrl = 'https://schicht.vjbackhaus.de/#careman=' + encodeURIComponent(json);
+    const targetUrl = 'https://schicht.vjbackhaus.de/?sync=' + Date.now() + '#careman=' + encodeURIComponent(json);
     banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
     setStatus(\`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) ans Schichttagebuch übertragen!\`);
 

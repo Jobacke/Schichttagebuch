@@ -513,11 +513,13 @@ export function StoreProvider({ children }) {
       const dateToMatchedPairs = {};
       const deletedIds = new Set();
 
+      const bonusByDateCode = new Map();
+
       if (overwriteExistingDates) {
         const datesToOverwrite = new Set(cleanIncoming.map(s => s.date));
 
-        // If replaceMonthYearMonth is passed (or if all incoming shifts belong to a single YYYY-MM),
-        // also remove any obsolete shifts in that month whose dates are no longer in cleanIncoming.
+        // If replaceMonthYearMonth is passed, wipe ALL existing shifts in that month first
+        // (preserving only user-set bonus flags by date+code) and then insert the fresh month shifts cleanly!
         const monthPrefix =
           replaceMonthYearMonth && /^\d{4}-\d{2}$/.test(replaceMonthYearMonth)
             ? replaceMonthYearMonth
@@ -525,14 +527,20 @@ export function StoreProvider({ children }) {
 
         if (monthPrefix) {
           currentShifts.forEach(s => {
-            if (s.date && s.date.startsWith(monthPrefix) && !datesToOverwrite.has(s.date) && s.id) {
-              deletedIds.add(s.id);
-              batch.delete(doc(db, `users/${currentUser.uid}/shifts`, s.id));
+            if (s.date && s.date.startsWith(monthPrefix)) {
+              const bKey = `${s.date}_${resolveShiftCode(s, currentSettings)}`;
+              if (s.hasBonus) {
+                bonusByDateCode.set(bKey, { hasBonus: true, bonusAmount: s.bonusAmount });
+              }
+              if (s.id) {
+                deletedIds.add(s.id);
+                batch.delete(doc(db, `users/${currentUser.uid}/shifts`, s.id));
+              }
             }
           });
         }
 
-        // Group existing shifts on the target dates by date
+        // Group any remaining existing shifts on the target dates by date (when replaceMonthYearMonth is not set)
         const existingByDate = {};
         currentShifts
           .filter(s => datesToOverwrite.has(s.date) && !deletedIds.has(s.id))
@@ -555,7 +563,6 @@ export function StoreProvider({ children }) {
 
           incomingList.forEach(inc => {
             const incCode = resolveShiftCode(inc, currentSettings);
-            // First try to match existing shift with identical code to keep IDs / bonus settings
             const matchIdx = existingList.findIndex(
               e => resolveShiftCode(e, currentSettings) === incCode
             );
@@ -568,7 +575,6 @@ export function StoreProvider({ children }) {
             }
           });
 
-          // Any remaining existing shifts (or old duplicates) on this date are deleted
           existingList.forEach(extra => {
             if (extra.id) {
               deletedIds.add(extra.id);
@@ -598,14 +604,15 @@ export function StoreProvider({ children }) {
             null;
         }
 
+        const savedBonus = bonusByDateCode.get(`${shift.date}_${resolveShiftCode(shift, currentSettings)}`);
         const id = prevShift?.id || shift.id || crypto.randomUUID();
         const ref = doc(db, `users/${currentUser.uid}/shifts`, id);
         const docPayload = {
           ...shift,
           id,
-          hasBonus: shift.hasBonus !== undefined ? shift.hasBonus : Boolean(prevShift?.hasBonus),
-          bonusAmount: shift.bonusAmount !== undefined ? shift.bonusAmount : (prevShift?.bonusAmount ?? (currentSettings?.defaultBonusAmount ?? 75)),
-          partner: shift.partner || prevShift?.partner || '',
+          hasBonus: shift.hasBonus !== undefined ? shift.hasBonus : Boolean(prevShift?.hasBonus || savedBonus?.hasBonus),
+          bonusAmount: shift.bonusAmount !== undefined ? shift.bonusAmount : (prevShift?.bonusAmount ?? savedBonus?.bonusAmount ?? (currentSettings?.defaultBonusAmount ?? 75)),
+          partner: shift.partner !== undefined ? shift.partner : (prevShift?.partner || ''),
           timestamp: prevShift?.timestamp || shift.timestamp || Date.now(),
           updatedAt: Date.now()
         };

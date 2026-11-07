@@ -516,9 +516,12 @@ export function saveStationTeamRoster(rosterData, stationOverride) {
   if (isCorruptedIstplanHourRoster(rosterData)) return 'Sendling';
   const normalized = normalizeRosterMultipleShifts(rosterData);
   const station = stationOverride || normalized.station || detectRosterStation(normalized);
+  const nowMs = Date.now();
   const updatedRoster = {
     ...normalized,
-    station
+    station,
+    extractedAt: rosterData.extractedAt || normalized.extractedAt || nowMs,
+    updatedAtMs: nowMs
   };
 
   // Tag station on each shift in shiftsByDate
@@ -535,6 +538,12 @@ export function saveStationTeamRoster(rosterData, stationOverride) {
   if (memExisting && (updatedRoster.colleagues?.length || 0) <= 1 && (memExisting.colleagues?.length || 0) >= 5) {
     return station;
   }
+
+  try {
+    // Remove any legacy unsuffixed key for this month so stale legacy data can never bleed in
+    memoryRosterStore.delete(`${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}`);
+    localStorage.removeItem(`${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}`);
+  } catch {}
 
   try {
     // Never overwrite a full multi-colleague team roster (>= 5 colleagues) with a 1-colleague Istplan fallback
@@ -607,7 +616,9 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
           return;
         }
         const norm = normalizeRosterMultipleShifts(parsed);
-        if (!stationRosters[st] || (norm.colleagues?.length || 0) >= (stationRosters[st].colleagues?.length || 0)) {
+        const memTime = Number(stationRosters[st]?.updatedAtMs || stationRosters[st]?.extractedAt || 0);
+        const storedTime = Number(norm?.updatedAtMs || norm?.extractedAt || 0);
+        if (!stationRosters[st] || storedTime >= memTime) {
           stationRosters[st] = norm;
           memoryRosterStore.set(key, norm);
         }
@@ -848,6 +859,20 @@ export function deleteTeamRoster(yearMonth) {
   }
 }
 
+function getRosterTimestamp(obj) {
+  if (!obj) return 0;
+  const r = obj.roster || obj;
+  return Number(
+    obj.updatedAtMs ||
+    r?.updatedAtMs ||
+    r?.extractedAt ||
+    obj.extractedAt ||
+    (obj.updatedAt ? Date.parse(obj.updatedAt) : 0) ||
+    (r?.updatedAt ? Date.parse(r.updatedAt) : 0) ||
+    0
+  );
+}
+
 /**
  * Saves a station roster directly to Cloud Firestore under users/{uid}/team_rosters/{yearMonth}_{station}
  */
@@ -856,10 +881,13 @@ export async function saveStationTeamRosterToCloud(rosterData, stationOverride, 
   if (isCorruptedIstplanHourRoster(rosterData)) return;
   const station = stationOverride || rosterData.station || detectRosterStation(rosterData);
   const docId = `${rosterData.yearMonth}_${station}`;
+  const nowMs = Number(rosterData.updatedAtMs || rosterData.extractedAt || Date.now());
 
   const cleanRoster = JSON.parse(JSON.stringify({
     ...rosterData,
-    station
+    station,
+    extractedAt: rosterData.extractedAt || nowMs,
+    updatedAtMs: nowMs
   }));
 
   const docData = {
@@ -868,7 +896,8 @@ export async function saveStationTeamRosterToCloud(rosterData, stationOverride, 
     monthLabel: rosterData.monthLabel || '',
     totalColleagues: rosterData.totalColleagues || rosterData.colleagues?.length || 0,
     totalShifts: rosterData.totalShifts || 0,
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date(nowMs).toISOString(),
+    updatedAtMs: nowMs,
     roster: cleanRoster
   };
 
@@ -910,8 +939,8 @@ export async function deleteTeamRosterFromCloud(yearMonth, currentUser) {
 
 /**
  * Synchronizes local rosters with Cloud Firestore bidirectionally:
- * - Uploads any local rosters from localStorage into Firestore if not present
- * - Downloads all Firestore rosters into localStorage
+ * - Uploads any local rosters from localStorage into Firestore if newer or not present
+ * - Downloads all newer Firestore rosters into localStorage
  */
 export async function syncTeamRostersWithCloud(currentUser) {
   if (!currentUser || !currentUser.uid || !db) return { uploaded: 0, downloaded: 0, totalCloud: 0 };
@@ -956,8 +985,12 @@ export async function syncTeamRostersWithCloud(currentUser) {
           }
           if (localData && (localData.totalShifts > 0 || (localData.colleagues && localData.colleagues.length > 0))) {
             const cloudDoc = cloudDocs.get(docId);
-            if (!cloudDoc || (localData.totalShifts > (cloudDoc.totalShifts || 0))) {
+            const localTs = getRosterTimestamp(localData);
+            const cloudTs = getRosterTimestamp(cloudDoc);
+            const isLocalNewer = !cloudDoc || (localTs > 0 && localTs > cloudTs) || (localTs === 0 && cloudTs === 0 && (localData.totalShifts > (cloudDoc.totalShifts || 0)));
+            if (isLocalNewer) {
               await saveStationTeamRosterToCloud(localData, parts[1], currentUser);
+              cloudDocs.set(docId, { roster: localData, updatedAtMs: localTs || Date.now() });
               uploaded++;
             }
           }
@@ -977,8 +1010,11 @@ export async function syncTeamRostersWithCloud(currentUser) {
             const detected = detectRosterStation(localData);
             const docId = `${ym}_${detected}`;
             const cloudDoc = cloudDocs.get(docId);
-            if (!cloudDoc || (localData.totalShifts > (cloudDoc.totalShifts || 0))) {
+            const localTs = getRosterTimestamp(localData);
+            const cloudTs = getRosterTimestamp(cloudDoc);
+            if (!cloudDoc || (localTs > 0 && localTs > cloudTs)) {
               await saveStationTeamRosterToCloud(localData, detected, currentUser);
+              cloudDocs.set(docId, { roster: localData, updatedAtMs: localTs || Date.now() });
               uploaded++;
             }
           }
@@ -986,16 +1022,22 @@ export async function syncTeamRostersWithCloud(currentUser) {
       }
     }
 
-    // 2. Sync downloaded cloud docs to localStorage & memoryRosterStore
+    // 2. Sync downloaded cloud docs to localStorage & memoryRosterStore (never overwrite a newer local roster!)
     cloudDocs.forEach((cData, docId) => {
       const localKey = `${STORAGE_KEY_PREFIX}${docId}`;
       const existing = localStorage.getItem(localKey);
       const roster = cData.roster || cData;
       if (isCorruptedIstplanHourRoster(roster)) return;
-      if (existing && (roster?.colleagues?.length || 0) <= 1) {
+      if (existing) {
         try {
           const existingParsed = JSON.parse(existing);
-          if ((existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
+          if ((roster?.colleagues?.length || 0) <= 1 && (existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
+            return;
+          }
+          const localTs = getRosterTimestamp(existingParsed);
+          const cloudTs = getRosterTimestamp(cData);
+          if (localTs > 0 && cloudTs > 0 && localTs > cloudTs) {
+            memoryRosterStore.set(localKey, existingParsed);
             return;
           }
         } catch {}
@@ -1048,13 +1090,17 @@ export function subscribeToCloudTeamRosters(currentUser, onChange) {
           return;
         }
         const currentLocal = localStorage.getItem(localKey);
-        if (currentLocal && (roster?.colleagues?.length || 0) <= 1) {
-          try {
-            const existingParsed = JSON.parse(currentLocal);
-            if ((existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
-              return;
-            }
-          } catch {}
+        const memLocal = memoryRosterStore.get(localKey);
+        const existingObj = memLocal || (currentLocal ? (() => { try { return JSON.parse(currentLocal); } catch { return null; } })() : null);
+        if (existingObj) {
+          if ((roster?.colleagues?.length || 0) <= 1 && (existingObj?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingObj)) {
+            return;
+          }
+          const localTs = getRosterTimestamp(existingObj);
+          const cloudTs = getRosterTimestamp(cData);
+          if (localTs > 0 && cloudTs > 0 && localTs > cloudTs) {
+            return;
+          }
         }
         memoryRosterStore.set(localKey, roster);
         const newStr = JSON.stringify(roster);

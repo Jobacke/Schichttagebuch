@@ -95,6 +95,11 @@ export default function TeamRoster() {
     };
   }, [currentUser, currentYearMonth]);
 
+  useEffect(() => {
+    setSavedRosters(getSavedRosterSummaries());
+    setRoster(getActiveTeamRoster(currentYearMonth));
+  }, [store?.rosterVersion, currentYearMonth]);
+
   const handleManualCloudSync = async () => {
     if (!currentUser) {
       setToastMessage('Bitte zuerst anmelden für die Cloud-Synchronisation.');

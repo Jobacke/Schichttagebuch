@@ -3,6 +3,8 @@ import {
   getActiveTeamRoster,
   saveStationTeamRoster,
   saveStationTeamRosterToCloud,
+  deleteTeamRoster,
+  deleteTeamRosterFromCloud,
   detectRosterStation,
   syncTeamRostersWithCloud,
   extractPersonalShiftsFromRoster,
@@ -257,8 +259,25 @@ export async function importCareManPayloadAndSync({
     const stationsImported = [];
     let totalShiftsAll = 0;
     let totalColleaguesAll = 0;
-    let targetYearMonth = parsedMulti.yearMonth || '2026-11';
+    let targetYearMonth = parsedMulti.yearMonth || parsedMulti.rosters?.[0]?.yearMonth || '2026-11';
     let targetMonthLabel = parsedMulti.monthLabel || targetYearMonth;
+    const importTimestampMs = Date.now();
+
+    // Lösche zunächst alle bisherigen Team-Dienstpläne des Zielmonats lokal (und in der Cloud),
+    // damit Personaländerungen oder gestrichene Dienste niemals als Altlasten erhalten bleiben!
+    if (targetYearMonth && /^\d{4}-\d{2}$/.test(targetYearMonth)) {
+      deleteTeamRoster(targetYearMonth);
+      if (currentUser) {
+        try {
+          await Promise.race([
+            deleteTeamRosterFromCloud(targetYearMonth, currentUser),
+            new Promise(r => setTimeout(r, 1500))
+          ]);
+        } catch {}
+      }
+    }
+
+    const cloudSavePromises = [];
 
     for (let i = 0; i < parsedMulti.rosters.length; i++) {
       const stRoster = parsedMulti.rosters[i];
@@ -281,19 +300,36 @@ export async function importCareManPayloadAndSync({
       const parsedRoster = await parseCareManHtml(JSON.stringify({ ...stRoster, station: stName }));
       if (!parsedRoster || !parsedRoster.yearMonth) continue;
 
-      targetYearMonth = parsedRoster.yearMonth;
+      parsedRoster.extractedAt = importTimestampMs;
+      parsedRoster.updatedAtMs = importTimestampMs;
+
+      if (parsedRoster.yearMonth !== targetYearMonth) {
+        targetYearMonth = parsedRoster.yearMonth;
+        deleteTeamRoster(targetYearMonth);
+      }
       targetMonthLabel = parsedRoster.monthLabel || targetMonthLabel;
 
       saveStationTeamRoster(parsedRoster, stName);
       if (currentUser) {
-        saveStationTeamRosterToCloud(parsedRoster, stName, currentUser).catch(err => {
-          console.error(`Cloud save failed for ${stName}:`, err);
-        });
+        cloudSavePromises.push(
+          saveStationTeamRosterToCloud(parsedRoster, stName, currentUser).catch(err => {
+            console.error(`Cloud save failed for ${stName}:`, err);
+          })
+        );
       }
 
       stationsImported.push(stName);
       totalShiftsAll += parsedRoster.totalShifts || 0;
       totalColleaguesAll += parsedRoster.totalColleagues || 0;
+    }
+
+    if (cloudSavePromises.length > 0) {
+      try {
+        await Promise.race([
+          Promise.all(cloudSavePromises),
+          new Promise(r => setTimeout(r, 2500))
+        ]);
+      } catch {}
     }
 
     localStorage.setItem('schichten_selected_year_month', targetYearMonth);

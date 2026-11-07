@@ -17,13 +17,14 @@ if (typeof window !== 'undefined') {
             const rawEncoded = window.location.hash.slice('#careman='.length);
             const decoded = decodeURIComponent(rawEncoded);
             if (looksLikeCareManData(decoded)) {
+                window.__PENDING_CAREMAN_IMPORT = decoded;
                 try { sessionStorage.setItem('pending_careman_import', decoded); } catch {}
                 try { localStorage.setItem('pending_careman_import', decoded); } catch {}
                 try { sessionStorage.setItem('pending_careman_redirect_journal', '1'); } catch {}
                 if (window.name && window.name.startsWith('CAREMAN_SYNC:')) {
                     window.name = '';
                 }
-                window.history.replaceState(null, '', window.location.pathname);
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
         } catch (e) {
             console.warn('Could not decode #careman hash:', e);
@@ -34,6 +35,7 @@ if (typeof window !== 'undefined') {
             const rawJson = window.name.slice('CAREMAN_SYNC:'.length);
             window.name = '';
             if (looksLikeCareManData(rawJson)) {
+                window.__PENDING_CAREMAN_IMPORT = rawJson;
                 try { sessionStorage.setItem('pending_careman_import', rawJson); } catch {}
                 try { localStorage.setItem('pending_careman_import', rawJson); } catch {}
                 try { sessionStorage.setItem('pending_careman_redirect_journal', '1'); } catch {}
@@ -72,9 +74,9 @@ export default function Layout() {
         const checkAndRunHashOrPending = async () => {
             if (isImportingRef.current) return;
             const hasHash = window.location.hash && window.location.hash.startsWith('#careman=');
-            let hasPending = false;
+            let hasPending = Boolean(window.__PENDING_CAREMAN_IMPORT);
             try {
-                hasPending = Boolean(
+                hasPending = hasPending || Boolean(
                     sessionStorage.getItem('pending_careman_import') ||
                     localStorage.getItem('pending_careman_import')
                 );

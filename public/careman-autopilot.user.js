@@ -782,16 +782,14 @@
     // Falls wir auf dem persönlichen Istplan starten: Istplan-Schichten & Uhrzeiten (z.B. 19:14 - 23:06) vorab sichern
     // (Auch auf dem iPhone, wo 7 Kalender-Spalten ~44px-53px breit sind!)
     if (wasOnIstplan) {
-      if (desiredAutoYm && detectMonthYear().yearMonth !== initialMonthInfo.yearMonth) {
+      if (desiredAutoYm && !urlYearMonth && detectMonthYear().yearMonth !== initialMonthInfo.yearMonth) {
         const didStepIst = await stepVisibleHeaderToMonth(initialMonthInfo.yearMonth, initialMonthInfo.monthLabel, 'Istplan');
-        if (didStepIst) await sleep(350);
+        if (didStepIst) await sleep(200);
       }
-      const istVisibleMatchesTarget = !desiredAutoYm || detectMonthYear().yearMonth === initialMonthInfo.yearMonth;
-      if (istVisibleMatchesTarget) {
-      try {
-        const { yearMonth: istYm } = initialMonthInfo;
-        const validShiftRegex = /^(RF[MHO]|RS\d?[MHO]|RN[MHO]|RT\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\d?|RZF|R-SAN)\*?$/i;
-        let rawCells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
+
+      const validShiftRegex = /^(RF[MHO]|RS\d?[MHO]|RN[MHO]|RT\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\d?|RZF|R-SAN)\*?$/i;
+      const getIstplanRawCells = () => {
+        let cells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
           if (c.closest('[data-careman-sync-banner]')) return false;
           if (!c.getBoundingClientRect) return false;
           const r = c.getBoundingClientRect();
@@ -802,10 +800,8 @@
           const withoutTime = t.replace(/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/g, '').trim();
           return /^([0-3]?\d)\b/.test(withoutTime);
         });
-
-        // Mobiler Fallback falls CareMan auf kleinen iPhone-Screens die Uhrzeit im Kalender-Tile ausblendet
-        if (rawCells.length === 0) {
-          rawCells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
+        if (cells.length === 0) {
+          cells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
             if (c.closest('[data-careman-sync-banner], thead, th')) return false;
             if (!c.getBoundingClientRect) return false;
             const r = c.getBoundingClientRect();
@@ -816,6 +812,22 @@
             return tokens.length >= 2 && tokens.length <= 12 && tokens.slice(1).some(tok => validShiftRegex.test(tok.replace(/[^A-ZÄÖÜ0-9\-*]/gi, '')));
           });
         }
+        return cells;
+      };
+
+      // WICHTIG: CareMan rendert die Überschrift (z.B. "Dezember 2024") sofort bei 0ms, lädt die Kalenderzellen (getSmartMyPlanRoster)
+      // aber asynchron nach. Warte bis zu 4.5s, bis die Kalenderzellen (00:00 - 00:00 / 06:54 - 15:06) geladen sind!
+      for (let w = 0; w < 30; w++) {
+        if (getIstplanRawCells().length > 0) break;
+        setStatus(`⚡ Lade Istplan (${initialMonthInfo.monthLabel})...`);
+        await sleep(140);
+      }
+
+      const istVisibleMatchesTarget = !desiredAutoYm || detectMonthYear().yearMonth === initialMonthInfo.yearMonth;
+      if (istVisibleMatchesTarget) {
+      try {
+        const { yearMonth: istYm } = initialMonthInfo;
+        const rawCells = getIstplanRawCells();
 
         const istCells = rawCells
           .filter(c => !rawCells.some(other => other !== c && c.contains(other)))
@@ -882,68 +894,119 @@
         return candidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
       };
 
-      let abtEl = findAbtTile(true);
-      if (!abtEl) {
-        // Auf dem iPhone ist das rechte Menü-Drawer auf dem Istplan zunächst eingeklappt:
-        // Öffne das Menü über den 9-Punkte-Button (⠿) oben rechts in der CareMan-Kopfzeile oder einen "Menü"-Button
-        let menuBtn = Array.from(document.querySelectorAll('button, a, [role="button"], div, span')).find(el => {
-          if (el.closest('[data-careman-sync-banner]')) return false;
+      const isMenuPanelVisible = () => {
+        return Array.from(document.querySelectorAll('div, span, h1, h2, h3, h4, p, a, button')).some(el => {
+          if (el.closest && el.closest('[data-careman-sync-banner], table')) return false;
           const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-          if (!r || r.width < 16 || r.height < 12 || r.left >= window.innerWidth) return false;
-          const txt = (el.innerText || '').trim();
-          const aria = ((el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title'))) || '').trim();
-          return /^(Men[üu]|Menu|apps|grid_on|view_module)$/i.test(txt) || /Men[üu]|Menu/i.test(aria);
+          if (!r || r.width < 18 || r.height < 10 || r.left < 0 || r.left >= window.innerWidth) return false;
+          const st = window.getComputedStyle(el);
+          if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < 0.1) return false;
+          const norm = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+          return /^(Nacherfassung|Urlaub\s*&\s*Fehlzeiten|Vakante\s*Dienste|Men[üu])$/i.test(norm);
         });
-        if (!menuBtn) {
-          const topRightBtns = Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon')).filter(el => {
-            if (el.closest('[data-careman-sync-banner], table')) return false;
-            if (!el.getBoundingClientRect) return false;
-            const r = el.getBoundingClientRect();
-            return r.top >= 0 && r.top <= 85 && r.left >= Math.max(120, window.innerWidth - 110) && r.width >= 16 && r.width <= 90 && r.height >= 16 && r.height <= 85;
-          }).sort((a, b) => b.getBoundingClientRect().left - a.getBoundingClientRect().left);
-          menuBtn = topRightBtns[0] ? (topRightBtns[0].closest('button, a, [role="button"]') || topRightBtns[0]) : null;
+      };
+
+      const isCloseButton = (el) => {
+        if (!el) return false;
+        const host = (el.closest && el.closest('button, a, [role="button"]')) || el;
+        const txt = ((el.innerText || el.textContent || '') + ' ' + (host.innerText || host.textContent || '')).trim();
+        const aria = ((host.getAttribute && (host.getAttribute('aria-label') || host.getAttribute('title'))) || '').trim();
+        return /close|clear|✕|✖|×/i.test(txt) || /close|schlie/i.test(aria);
+      };
+
+      // WICHTIG: In CareMan wird die Kachel "Abteilungs-dienstplan" (*ngIf="showTeamDutyCalendarEntry") erst sichtbar,
+      // nachdem CareMan im Hintergrund fillAllRight() (Berechtigungs-Check) geladen hat.
+      // Außerdem darf NIEMALS der Schließen-Button (close_circle_blank / ✕) des bereits offenen Menüs geklickt werden!
+      let abtEl = findAbtTile(true);
+      let triedOpeningMenuDrawer = false;
+      for (let w = 0; w < 38 && !abtEl; w++) {
+        if (!triedOpeningMenuDrawer && !isMenuPanelVisible()) {
+          triedOpeningMenuDrawer = true;
+          let menuBtn = Array.from(document.querySelectorAll('button, a, [role="button"], div, span')).find(el => {
+            if (el.closest && el.closest('[data-careman-sync-banner]')) return false;
+            if (isCloseButton(el)) return false;
+            const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+            if (!r || r.width < 16 || r.height < 12 || r.left >= window.innerWidth) return false;
+            const txt = (el.innerText || '').trim();
+            const aria = ((el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title'))) || '').trim();
+            return /^(Men[üu]|Menu|apps|grid_on|view_module)$/i.test(txt) || /Men[üu]|Menu/i.test(aria);
+          });
+          if (!menuBtn) {
+            const topRightBtns = Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon')).filter(el => {
+              if (el.closest && el.closest('[data-careman-sync-banner], table')) return false;
+              if (isCloseButton(el)) return false;
+              if (!el.getBoundingClientRect) return false;
+              const r = el.getBoundingClientRect();
+              return r.top >= 0 && r.top <= 85 && r.left >= Math.max(120, window.innerWidth - 110) && r.width >= 16 && r.width <= 90 && r.height >= 16 && r.height <= 85;
+            }).sort((a, b) => b.getBoundingClientRect().left - a.getBoundingClientRect().left);
+            menuBtn = topRightBtns[0] ? ((topRightBtns[0].closest && topRightBtns[0].closest('button, a, [role="button"]')) || topRightBtns[0]) : null;
+          }
+          if (menuBtn) {
+            try {
+              if (typeof menuBtn.click === 'function') menuBtn.click();
+              else menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            } catch (e) {}
+          }
         }
-        if (menuBtn) {
-          try {
-            if (typeof menuBtn.click === 'function') menuBtn.click();
-            else menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-          } catch (e) {}
-          await sleep(450);
-          abtEl = findAbtTile(true);
-        }
-        if (!abtEl) {
-          abtEl = findAbtTile(false);
-        }
+        await sleep(140);
+        abtEl = findAbtTile(true);
+      }
+      if (!abtEl) {
+        abtEl = findAbtTile(false);
       }
 
-      if (abtEl) {
-        setStatus('⚡ Öffne Abteilungsdienstplan...');
-        const r = abtEl.getBoundingClientRect ? abtEl.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
-        const cx = r.left + r.width / 2;
-        const iconAbove = (r.width > 0 && r.top > 32) ? document.elementFromPoint(cx, Math.max(10, r.top - 32)) : null;
-        const tileContainer = abtEl.closest('button, a, [role="button"], li, mat-list-item, .mat-ripple') || abtEl.parentElement || abtEl;
-        const targets = [tileContainer, abtEl, iconAbove].filter(Boolean);
+      const clickAbtTileCleanly = (tileEl) => {
+        if (!tileEl) return;
+        const routerTarget = (tileEl.closest && tileEl.closest('[routerlink], [ng-reflect-router-link], .square, button, a, [role="button"], li, mat-list-item, .mat-ripple')) || tileEl.parentElement || tileEl;
+        const targets = routerTarget && routerTarget !== tileEl ? [routerTarget, tileEl] : [tileEl];
         targets.forEach(t => {
           try {
             if (typeof t.click === 'function') t.click();
             else t.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
           } catch (e) {}
         });
+      };
 
-        // Bis zu 4.5 Sekunden warten, ob der Abteilungsdienstplan lädt
-        for (let w = 0; w < 18; w++) {
-          await sleep(250);
-          if (window.location.href.includes('team-duty') || findPlanungsgruppeTrigger()) break;
+      if (abtEl) {
+        setStatus('⚡ Öffne Abteilungsdienstplan...');
+        clickAbtTileCleanly(abtEl);
+
+        // Bis zu 5 Sekunden warten, ob der Abteilungsdienstplan lädt
+        for (let w = 0; w < 42; w++) {
+          await sleep(110);
+          if ((window.location.href || '').includes('team-duty') || findPlanungsgruppeTrigger()) break;
+          if (w === 16) {
+            const freshAbt = findAbtTile(true) || abtEl;
+            clickAbtTileCleanly(freshAbt);
+          }
         }
+      }
+
+      // Fallback falls CareMan trotz Klick noch auf /app/home steht: direkt per Angular Router (pushState + popstate) auf /app/team-duty wechseln
+      if (!(window.location.href || '').includes('team-duty') && !findPlanungsgruppeTrigger()) {
+        try {
+          const isMobileRoute = (window.location.pathname || '').includes('/app/sm/');
+          const dateSearch = window.location.search || (urlDateMatch ? `?date=${urlDateMatch[0].split('=')[1]}` : '');
+          const abtPath = (isMobileRoute ? '/app/sm/team-duty' : '/app/team-duty') + dateSearch;
+          if (window.history && typeof window.history.pushState === 'function') {
+            window.history.pushState({}, '', abtPath);
+            window.dispatchEvent(new Event('popstate'));
+          }
+          for (let w = 0; w < 30; w++) {
+            await sleep(120);
+            if (findPlanungsgruppeTrigger()) break;
+          }
+        } catch (e) {}
       }
     }
 
-    // Warte bis zu 5 Sekunden, bis das Dropdown "Filter Planungsgruppe" UND die Tabelle geladen sind
-    for (let w = 0; w < 20; w++) {
+    // Warte bis zu 7.5 Sekunden, bis das Dropdown "Filter Planungsgruppe" (*ngIf="!isLoading") UND die Tabelle geladen sind
+    for (let w = 0; w < 65; w++) {
       if (findPlanungsgruppeTrigger() && document.querySelectorAll('table tr').length > 2) break;
-      await sleep(250);
+      setStatus(`⚡ Lade Abteilungsdienstplan (${initialMonthInfo.monthLabel})...`);
+      await sleep(115);
     }
-    await sleep(300);
+    await sleep(120);
 
     // WICHTIG FÜR IPHONE / SCHMALE BILDSCHIRME:
     // Falls das rechte "Menü"-Drawer (mit "Nacherfassung" / "Urlaub & Fehlzeiten") auf einem schmalen Bildschirm (< 950px)
@@ -1045,8 +1108,8 @@
         clickChevronAt(chosen ? chosen.host : null, clickX, clickY);
 
         let monthChanged = false;
-        for (let w = 0; w < 8; w++) {
-          await sleep(130);
+        for (let w = 0; w < 14; w++) {
+          await sleep(50);
           if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
             monthChanged = true;
             break;
@@ -1057,8 +1120,8 @@
         if (!monthChanged) {
           const fallbackEl = document.elementFromPoint(coordX, arrowY);
           clickChevronAt(fallbackEl, coordX, arrowY);
-          for (let w = 0; w < 12; w++) {
-            await sleep(140);
+          for (let w = 0; w < 16; w++) {
+            await sleep(60);
             if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
               monthChanged = true;
               break;
@@ -1069,17 +1132,17 @@
         if (monthChanged) {
           didStepMonth = true;
         }
-        await sleep(200);
+        await sleep(45);
       }
 
       if (didStepMonth) {
-        // Warte nach dem Monatswechsel kurz, bis CareMan die Tabelle / Planungsgruppen für den Zielmonat geladen hat
-        for (let w = 0; w < 18; w++) {
-          await sleep(160);
+        // Warte nach dem Monatswechsel kurz, bis CareMan die Tabelle / Planungsgruppen (*ngIf="!isLoading") für den Zielmonat geladen hat
+        for (let w = 0; w < 45; w++) {
+          await sleep(80);
           const curSig = getAbtTableSig();
-          if (curSig && curSig !== sigBeforeMonthStep) break;
+          if (findPlanungsgruppeTrigger() && curSig && curSig !== sigBeforeMonthStep) break;
         }
-        await sleep(300);
+        await sleep(100);
       }
     }
 
@@ -1141,14 +1204,14 @@
 
       // Versuch 1: Nativer Einzel-Klick auf den sichtbaren Punkt im Dropdown
       if (hitEl && typeof hitEl.click === 'function') hitEl.click();
-      await sleep(260);
+      await sleep(120);
       if (isPopupOpen()) return true;
 
       // Versuch 2: Klick auf das umschließende mat-select / trigger Element
       const selectBox = (hitEl && hitEl.closest && hitEl.closest('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, mat-select, md-select, [role="combobox"], [role="listbox"]')) || pgTrigger;
       if (selectBox && selectBox !== hitEl && typeof selectBox.click === 'function') {
         selectBox.click();
-        await sleep(260);
+        await sleep(140);
         if (isPopupOpen()) return true;
       }
 
@@ -1158,7 +1221,7 @@
           hitEl.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
         } catch (e) {}
       });
-      await sleep(260);
+      await sleep(140);
       if (isPopupOpen()) return true;
 
       // Versuch 4: Tastatur-Event (ArrowDown) auf dem fokussierten Dropdown
@@ -1167,7 +1230,7 @@
       if (focusTarget && focusTarget.dispatchEvent) {
         focusTarget.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
       }
-      await sleep(260);
+      await sleep(140);
       return isPopupOpen();
     };
 
@@ -1191,7 +1254,11 @@
         continue;
       }
 
-      const pgTrigger = findPlanungsgruppeTrigger();
+      let pgTrigger = findPlanungsgruppeTrigger();
+      for (let w = 0; w < 25 && !pgTrigger; w++) {
+        await sleep(110);
+        pgTrigger = findPlanungsgruppeTrigger();
+      }
       if (!pgTrigger) break;
 
       const opened = await openDropdown(pgTrigger);
@@ -1206,7 +1273,7 @@
           s.scrollTop = 0;
           s.dispatchEvent(new Event('scroll'));
         });
-        await sleep(160);
+        await sleep(90);
         matchOpt = findOptionInPopup(target.pattern, pgTrigger);
 
         for (let step = 0; step < 12 && !matchOpt; step++) {
@@ -1215,7 +1282,7 @@
             s.scrollTop += 150;
             s.dispatchEvent(new Event('scroll'));
           });
-          await sleep(150);
+          await sleep(80);
           matchOpt = findOptionInPopup(target.pattern, pgTrigger);
         }
       }
@@ -1236,21 +1303,21 @@
           });
           matchOpt.scrollIntoView({ block: 'nearest' });
         } catch (e) {}
-        await sleep(80);
+        await sleep(40);
         matchOpt.click();
-        await sleep(180);
+        await sleep(85);
 
         // Falls das Popup nach Klick auf den inneren Text noch offen ist, auf das mat-option Element klicken
         if (isPopupOpen()) {
           const optHost = matchOpt.closest('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, li') || matchOpt.parentElement;
           if (optHost && optHost !== matchOpt) {
             optHost.click();
-            await sleep(180);
+            await sleep(85);
           }
         }
 
-        for (let w = 0; w < 32; w++) {
-          await sleep(160);
+        for (let w = 0; w < 55; w++) {
+          await sleep(65);
           const newSig = getAbtTableSig();
           const checkSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
           const sigChanged = Boolean(newSig && newSig !== prevSig);
@@ -1259,7 +1326,7 @@
             break;
           }
         }
-        await sleep(300);
+        await sleep(90);
 
         const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
         if (extracted.colleagues.length > 0) {

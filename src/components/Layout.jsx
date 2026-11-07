@@ -10,18 +10,35 @@ import {
     looksLikeCareManData
 } from '../utils/oneClickCareManSync';
 
-// Capture #careman=... hash early before any route redirects
-if (typeof window !== 'undefined' && window.location.hash && window.location.hash.startsWith('#careman=')) {
-    try {
-        const rawEncoded = window.location.hash.slice('#careman='.length);
-        const decoded = decodeURIComponent(rawEncoded);
-        if (looksLikeCareManData(decoded)) {
-            sessionStorage.setItem('pending_careman_import', decoded);
-            sessionStorage.setItem('pending_careman_redirect_journal', '1');
-            window.history.replaceState(null, '', window.location.pathname);
+// Capture #careman=... hash or window.name payload early before any route redirects
+if (typeof window !== 'undefined') {
+    if (window.location.hash && window.location.hash.startsWith('#careman=')) {
+        try {
+            const rawEncoded = window.location.hash.slice('#careman='.length);
+            const decoded = decodeURIComponent(rawEncoded);
+            if (looksLikeCareManData(decoded)) {
+                sessionStorage.setItem('pending_careman_import', decoded);
+                sessionStorage.setItem('pending_careman_redirect_journal', '1');
+                if (window.name && window.name.startsWith('CAREMAN_SYNC:')) {
+                    window.name = '';
+                }
+                window.history.replaceState(null, '', window.location.pathname);
+            }
+        } catch (e) {
+            console.warn('Could not decode #careman hash:', e);
         }
-    } catch (e) {
-        console.warn('Could not decode #careman hash:', e);
+    }
+    if (window.name && window.name.startsWith('CAREMAN_SYNC:')) {
+        try {
+            const rawJson = window.name.slice('CAREMAN_SYNC:'.length);
+            window.name = '';
+            if (looksLikeCareManData(rawJson)) {
+                sessionStorage.setItem('pending_careman_import', rawJson);
+                sessionStorage.setItem('pending_careman_redirect_journal', '1');
+            }
+        } catch (e) {
+            console.warn('Could not read window.name CareMan payload:', e);
+        }
     }
 }
 

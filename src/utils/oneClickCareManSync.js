@@ -466,6 +466,13 @@ export async function runOneClickCareManSync({
     }
 
     try {
+      if (window.name && window.name.startsWith('CAREMAN_SYNC:')) {
+        const fromName = window.name.slice('CAREMAN_SYNC:'.length);
+        window.name = '';
+        if (looksLikeCareManData(fromName)) {
+          sessionStorage.setItem('pending_careman_import', fromName);
+        }
+      }
       const pending = sessionStorage.getItem('pending_careman_import');
       if (pending && looksLikeCareManData(pending)) {
         const res = await importCareManPayloadAndSync({
@@ -697,8 +704,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             });
 
             if (validCodes.length > 0) {
-              const dateStr = \`\${ym}-\${String(dayNum).padStart(2, '0')}\`;
-              shifts[dateStr] = validCodes.join(', ');
+              shifts[String(dayNum)] = validCodes.join(', ');
             }
           }
         });
@@ -786,7 +792,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           const r = c.getBoundingClientRect();
           if (r.width < 55 || r.width > 300 || r.height < 45 || r.height > 230) return false;
           const t = (c.innerText || '').trim();
-          return /^\\d{1,2}\\b/.test(t) && /\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(t);
+          return /\\b([0-3]?\\d)\\b/.test(t) && /\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(t);
         });
         const istCells = rawCells
           .filter(c => !rawCells.some(other => other !== c && c.contains(other)))
@@ -796,31 +802,29 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             return Math.round(ra.top / 30) - Math.round(rb.top / 30) || ra.left - rb.left;
           });
 
-        let inMonth = false;
-        let prevDay = 0;
-        istCells.forEach(cell => {
+        istCells.forEach((cell, idx) => {
           const txt = (cell.innerText || '').trim();
-          const dayM = txt.match(/^(\\d{1,2})\\b/);
+          const dayM = txt.match(/\\b([0-3]?\\d)\\b/);
           const timeM = txt.match(/(\\d{2}:\\d{2})\\s*-\\s*(\\d{2}:\\d{2})/);
           if (!dayM || !timeM) return;
           const dNum = parseInt(dayM[1], 10);
-          if (dNum === 1 && !inMonth) inMonth = true;
-          else if (dNum < prevDay && inMonth && prevDay >= 27) inMonth = false;
-          if (inMonth && dNum >= 1 && dNum <= 31) {
-            prevDay = dNum;
-            const dStr = \`\${istYm}-\${String(dNum).padStart(2, '0')}\`;
-            if (timeM[1] !== '00:00' || timeM[2] !== '00:00') {
-              personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
-            }
-            const lines = txt.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
-            for (const line of lines) {
-              if (/^\\d{1,2}(\\s+KW\\s*\\d+)?$/i.test(line)) continue;
-              if (/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(line)) continue;
-              const codeCandidate = line.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '').toUpperCase();
-              if (codeCandidate && codeCandidate.length >= 2 && !['KW', 'FREI', '00', 'WKS', 'U', 'XW'].includes(codeCandidate)) {
-                istplanShifts[dStr] = codeCandidate;
-                break;
-              }
+          if (dNum < 1 || dNum > 31) return;
+          // In den ersten 7 Zellen gehören Tage > 20 zum Vormonat; in den letzten 7 Zellen gehören Tage < 15 zum Folgemonat
+          if (idx < 7 && dNum > 20) return;
+          if (istCells.length >= 28 && idx >= istCells.length - 7 && dNum < 15) return;
+
+          const dStr = \`\${istYm}-\${String(dNum).padStart(2, '0')}\`;
+          if (timeM[1] !== '00:00' || timeM[2] !== '00:00') {
+            personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
+          }
+          const lines = txt.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
+          for (const line of lines) {
+            if (/^\\d{1,2}(\\s+KW\\s*\\d+)?$/i.test(line)) continue;
+            if (/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(line)) continue;
+            const codeCandidate = line.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '').toUpperCase();
+            if (codeCandidate && codeCandidate.length >= 2 && !['KW', 'FREI', '00', 'WKS', 'U', 'XW', 'STAR', 'GRADE'].includes(codeCandidate)) {
+              istplanShifts[String(dNum)] = codeCandidate;
+              break;
             }
           }
         });
@@ -855,47 +859,27 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const r = abtEl.getBoundingClientRect();
         const cx = r.left + r.width / 2;
 
-        // Schritt 1: Klicke gezielt auf den orangenen Kreis direkt über dem Text "Abteilungs-dienstplan" (niemals auf das ganze Menü!)
+        // Einmal gezielt auf den orangenen Kreis über "Abteilungs-dienstplan" klicken
         const iconAbove = document.elementFromPoint(cx, Math.max(10, r.top - 30));
-        if (iconAbove && iconAbove !== document.body) {
-          const btnHost = iconAbove.closest('button, a, [role="button"]') || iconAbove;
-          btnHost.click();
-          await sleep(350);
-        }
+        const clickTarget = (iconAbove && iconAbove !== document.body)
+          ? (iconAbove.closest('button, a, [role="button"]') || iconAbove)
+          : abtEl;
+        clickTarget.click();
 
-        // Schritt 2: Falls noch auf Istplan, prüfe ausschließlich das einzelne Tile-Elternelement (< 170px breit/hoch)
-        if (!window.location.href.includes('team-duty') && !findPlanungsgruppeTrigger()) {
-          const singleTile = abtEl.parentElement &&
-            abtEl.parentElement.getBoundingClientRect().width < 170 &&
-            abtEl.parentElement.getBoundingClientRect().height < 170
-            ? abtEl.parentElement
-            : null;
-          const tileBtn = singleTile ? singleTile.querySelector('button, a, [role="button"], mat-icon, i, svg') : null;
-          if (tileBtn) tileBtn.click();
-          else if (abtEl.previousElementSibling) abtEl.previousElementSibling.click();
-          else abtEl.click();
-          await sleep(350);
-        }
-
-        // Schritt 3: Falls immer noch auf Istplan, per Angular-Router direkt zu /app/team-duty wechseln
-        if (!window.location.href.includes('team-duty') && !findPlanungsgruppeTrigger()) {
-          const [wy, wm] = initialMonthInfo.yearMonth.split('-').map(Number);
-          try {
-            window.history.pushState({}, '', \`/app/team-duty?date=\${wy}-\${wm}-1\`);
-            window.dispatchEvent(new PopStateEvent('popstate'));
-            await sleep(450);
-          } catch (e) {}
+        // Bis zu 4 Sekunden warten, ob der Abteilungsdienstplan lädt
+        for (let w = 0; w < 16; w++) {
+          await sleep(250);
+          if (window.location.href.includes('team-duty') || findPlanungsgruppeTrigger()) break;
         }
       }
     }
 
-    // Warte zuverlässig, bis das Dropdown "Filter Planungsgruppe" UND die Tabelle wirklich geladen sind
-    for (let w = 0; w < 45; w++) {
+    // Warte bis zu 5 Sekunden, bis das Dropdown "Filter Planungsgruppe" UND die Tabelle geladen sind
+    for (let w = 0; w < 20; w++) {
       if (findPlanungsgruppeTrigger() && document.querySelectorAll('table tr').length > 2) break;
-      setStatus('⚡ Lade Abteilungsdienstplan...');
       await sleep(250);
     }
-    await sleep(350);
+    await sleep(300);
 
     // Falls wir vom Istplan kamen und CareMan im Abteilungsdienstplan einen anderen Monat geöffnet hat: Monat angleichen
     if (wasOnIstplan && findPlanungsgruppeTrigger()) {
@@ -1105,16 +1089,12 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       }
     }
 
-    if (rosters.length === 0) {
-      setTimeout(() => banner.remove(), 1500);
-      return;
-    }
-
     const payload = rosters.length > 1
       ? { multiStation: true, extractedAt: Date.now(), yearMonth, monthLabel, rosters, personalTimes }
-      : { ...rosters[0], personalTimes, extractedAt: Date.now() };
+      : { ...(rosters[0] || { yearMonth, monthLabel, station: 'Sendling', colleagues: [] }), personalTimes, extractedAt: Date.now() };
 
     const json = JSON.stringify(payload);
+    try { window.name = 'CAREMAN_SYNC:' + json; } catch (e) {}
     copySync(json);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try { await navigator.clipboard.writeText(json); } catch (e) {}
@@ -1126,10 +1106,22 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       } catch (e) {}
     }
 
-    const targetUrl = 'https://schicht.vjbackhaus.de/?sync=' + Date.now() + '#careman=' + encodeURIComponent(json);
+    const encodedHash = encodeURIComponent(json);
+    const targetUrl = encodedHash.length < 48000
+      ? ('https://schicht.vjbackhaus.de/?sync=' + Date.now() + '#careman=' + encodedHash)
+      : ('https://schicht.vjbackhaus.de/?sync=' + Date.now());
+
     banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-    setStatus(\`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – öffne Schichttagebuch...\`);
-    await sleep(300);
+    setStatus(\`✅ \${Math.max(1, rosters.length)} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – öffne Schichttagebuch...\`);
+
+    const navLink = document.createElement('a');
+    navLink.href = targetUrl;
+    navLink.target = '_top';
+    navLink.style.display = 'none';
+    document.body.appendChild(navLink);
+    navLink.click();
+    await sleep(150);
+    window.top.location.href = targetUrl;
     window.location.href = targetUrl;
   } catch (err) {
     banner.style.background = '#dc2626';

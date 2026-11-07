@@ -5,7 +5,7 @@ import { getDaysInMonth, startOfMonth, getDay, isSameDay, parseISO } from 'date-
 import {
     ChevronLeft, ChevronRight, PenSquare, MapPin, Sparkles,
     CheckCircle2, Trash2, CheckSquare, Square, X, AlertTriangle, Check,
-    Calendar as CalendarIcon, Bookmark
+    Calendar as CalendarIcon, Bookmark, ExternalLink
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
@@ -325,8 +325,7 @@ export default function Journal() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     <button
                         type="button"
-                        disabled={isOneClickSyncing}
-                        onClick={handleOneClickCareMan}
+                        onClick={() => openCareManLiveWindow()}
                         style={{
                             background: 'linear-gradient(135deg, #059669, #10b981)',
                             color: '#ffffff',
@@ -337,16 +336,16 @@ export default function Journal() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            cursor: isOneClickSyncing ? 'default' : 'pointer',
+                            cursor: 'pointer',
                             fontSize: '12.5px',
                             whiteSpace: 'nowrap',
                             boxShadow: '0 3px 12px rgba(16, 185, 129, 0.3)',
                             transition: 'all 0.15s ease'
                         }}
-                        title="Monatsdienstplan aus CareMan mit 1 Klick vollautomatisch einlesen & direkt übernehmen"
+                        title="CareMan öffnen, anmelden und dort mit dem Lesezeichen den Dienstplan direkt in die App übertragen"
                     >
-                        <Sparkles size={15} />
-                        <span>{isOneClickSyncing ? 'Übertrage...' : '⚡ 1-Klick CareMan'}</span>
+                        <ExternalLink size={15} />
+                        <span>CareMan öffnen</span>
                     </button>
 
                     <button
@@ -368,7 +367,7 @@ export default function Journal() {
                             boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)',
                             transition: 'all 0.15s ease'
                         }}
-                        title="3-Wachen-Auto-Pilot Lesezeichen & Dienstplan-Vorschau öffnen"
+                        title="CareMan 1-Klick Lesezeichen einrichten oder kopieren"
                     >
                         <Bookmark size={14} />
                         <span>Lesezeichen</span>

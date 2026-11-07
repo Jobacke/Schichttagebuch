@@ -432,15 +432,13 @@ export async function importCareManPayloadAndSync({
 }
 
 /**
- * Opens the live CareMan Bayern portal in a helper tab/window for the requested month
- * so the Auto-Pilot / Bookmarklet can fetch all 3 stations (61000, 61010, 61300) live.
+ * Opens the live CareMan Bayern portal so the user can log in (if needed),
+ * select any month, and trigger the 1-Click Bookmarklet to import all 3 stations
+ * + personal shifts directly back into the app.
  */
-export function openCareManLiveWindow(targetYearMonth) {
-  const now = new Date();
-  const ym = targetYearMonth || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const [y, m] = ym.split('-').map(Number);
-  const careManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/team-duty?date=${y}-${m}-1&schichten_autopilot=1`;
-  return window.open(careManUrl, 'careman_live_sync');
+export function openCareManLiveWindow() {
+  const careManUrl = 'https://dienstplan-bayern.secure.johanniter.de/';
+  window.location.href = careManUrl;
 }
 
 /**
@@ -627,29 +625,67 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
   try {
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    const monthRegexExact = /^(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+(20\d{2})$/i;
+
+    // Findet das tatsächlich sichtbare (oberste) Monats-Überschrift-Element in der CareMan-Kopfzeile (z.B. "Juli 2026" oder "November 2026")
+    // WICHTIG: Ignoriert komplett "01.11.2026 - 30.11.2026" aus dem Dropdown "Filter Planungsgruppe"!
+    const getVisibleMonthHeaderInfo = () => {
+      const candidates = Array.from(document.querySelectorAll('span, div, button, p, strong, h1, h2, h3, label')).filter(el => {
+        if (!el.getBoundingClientRect) return false;
+        const r = el.getBoundingClientRect();
+        if (r.width < 30 || r.width > 280 || r.height < 10 || r.height > 75) return false;
+        if (r.top < 15 || r.top > 340 || r.left > 600) return false;
+        const st = window.getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < 0.1) return false;
+        const txt = (el.innerText || el.textContent || '').trim();
+        return monthRegexExact.test(txt);
+      });
+
+      if (candidates.length === 0) return null;
+
+      const scored = candidates.map(el => {
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const topHit = document.elementFromPoint(cx, cy);
+        const isTopmost = Boolean(topHit && (el === topHit || el.contains(topHit) || topHit.contains(el)));
+        return { el, r, isTopmost };
+      });
+
+      scored.sort((a, b) => {
+        if (a.isTopmost !== b.isTopmost) return a.isTopmost ? -1 : 1;
+        return a.r.width - b.r.width;
+      });
+
+      const best = scored[0].el;
+      const m = (best.innerText || best.textContent || '').trim().match(monthRegexExact);
+      const idx = monthNames.findIndex(name => name.toLowerCase() === m[1].toLowerCase());
+      const month = idx + 1;
+      const year = parseInt(m[2], 10);
+      return {
+        el: best,
+        year,
+        month,
+        yearMonth: \`\${year}-\${String(month).padStart(2, '0')}\`,
+        monthLabel: \`\${monthNames[month - 1]} \${year}\`
+      };
+    };
+
     const detectMonthYear = () => {
+      const headerInfo = getVisibleMonthHeaderInfo();
+      if (headerInfo) {
+        return { yearMonth: headerInfo.yearMonth, monthLabel: headerInfo.monthLabel };
+      }
       let year = new Date().getFullYear();
       let month = new Date().getMonth() + 1;
       const pageText = document.body ? document.body.innerText : '';
-      // Verwende das LETZTE Vorkommen im DOM (da ein geöffneter Abteilungsdienstplan-Dialog im DOM hinter dem Hintergrund-Istplan liegt)
-      const rangeMatches = Array.from(pageText.matchAll(/01\.(\d{2})\.(\d{4})\s*-\s*\d{2}\.\d{2}\.\d{4}/g));
-      const textMatches = Array.from(pageText.matchAll(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+(\d{4})/gi));
-      if (rangeMatches.length > 0) {
-        const lastRange = rangeMatches[rangeMatches.length - 1];
-        month = parseInt(lastRange[1], 10);
-        year = parseInt(lastRange[2], 10);
-      } else if (textMatches.length > 0) {
+      const textMatches = Array.from(pageText.matchAll(/\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(20\\d{2})\\b/gi));
+      if (textMatches.length > 0) {
         const lastText = textMatches[textMatches.length - 1];
         const idx = monthNames.findIndex(m => m.toLowerCase() === lastText[1].toLowerCase());
         if (idx !== -1) {
           month = idx + 1;
           year = parseInt(lastText[2], 10);
-        }
-      } else {
-        const urlMatch = window.location.href.match(/date=(\d{4})-(\d{1,2})/);
-        if (urlMatch) {
-          year = parseInt(urlMatch[1], 10);
-          month = parseInt(urlMatch[2], 10);
         }
       }
       return {
@@ -916,35 +952,68 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     if (wasOnIstplan && findPlanungsgruppeTrigger()) {
       const [wantY, wantM] = initialMonthInfo.yearMonth.split('-').map(Number);
       for (let step = 0; step < 12; step++) {
-        const curInfo = detectMonthYear();
+        const curHeader = getVisibleMonthHeaderInfo();
+        const curInfo = curHeader || detectMonthYear();
         const [curY, curM] = curInfo.yearMonth.split('-').map(Number);
         const diff = (wantY - curY) * 12 + (wantM - curM);
         if (diff === 0) break;
 
-        const monthLabelEl = Array.from(document.querySelectorAll('span, div, button, p, strong')).find(el => {
-          if (el.children.length > 2 || !isElementVisible(el)) return false;
-          const r = el.getBoundingClientRect();
-          return r.top < 260 && r.left < 450 && new RegExp(curInfo.monthLabel, 'i').test((el.innerText || '').trim());
-        });
+        setStatus(\`⚡ Wechsle im Abteilungsdienstplan auf \${initialMonthInfo.monthLabel}...\`);
+        const monthLabelEl = curHeader?.el || null;
         if (!monthLabelEl) break;
 
         const mr = monthLabelEl.getBoundingClientRect();
-        // Links neben dem Monatsnamen liegen "<" (zurück) und ">" (vor)
-        const arrowX = diff < 0 ? Math.max(12, mr.left - 54) : Math.max(24, mr.left - 22);
         const arrowY = mr.top + mr.height / 2;
-        const arrowEl = document.elementFromPoint(arrowX, arrowY);
-        const arrowBtn = arrowEl ? (arrowEl.closest('button, a, [role="button"], mat-icon') || arrowEl) : null;
+
+        // Suche alle klickbaren Pfeil-Buttons links neben dem Monatsnamen (in CareMan: [ < ] [ > ] [ Heute ] Monat Jahr)
+        const leftButtons = [];
+        const seenBtns = new Set();
+        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg')).forEach(el => {
+          const btn = el.closest('button, a, [role="button"]') || el;
+          if (!btn || seenBtns.has(btn) || !btn.getBoundingClientRect) return;
+          const r = btn.getBoundingClientRect();
+          if (r.width < 12 || r.width > 65 || r.height < 12 || r.height > 65) return;
+          if (Math.abs((r.top + r.height / 2) - arrowY) > 28) return;
+          if (r.right <= mr.left + 8 && r.left >= Math.max(0, mr.left - 240)) {
+            seenBtns.add(btn);
+            leftButtons.push({ btn, left: r.left, cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+          }
+        });
+        leftButtons.sort((a, b) => a.left - b.left);
+
+        let arrowBtn = null;
+        if (leftButtons.length >= 2) {
+          arrowBtn = diff < 0 ? leftButtons[0].btn : leftButtons[1].btn;
+        } else if (leftButtons.length === 1) {
+          arrowBtn = leftButtons[0].btn;
+        } else {
+          const arrowX = diff < 0 ? Math.max(12, mr.left - 135) : Math.max(24, mr.left - 95);
+          const arrowEl = document.elementFromPoint(arrowX, arrowY);
+          arrowBtn = arrowEl ? (arrowEl.closest('button, a, [role="button"], mat-icon') || arrowEl) : null;
+        }
+
         if (!arrowBtn) break;
+        const br = arrowBtn.getBoundingClientRect();
+        const bx = br.left + br.width / 2;
+        const by = br.top + br.height / 2;
         arrowBtn.click();
-        for (let w = 0; w < 20; w++) {
+        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+          arrowBtn.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: bx, clientY: by }));
+        });
+
+        for (let w = 0; w < 22; w++) {
           await sleep(150);
           if (detectMonthYear().yearMonth !== curInfo.yearMonth) break;
         }
-        await sleep(300);
+        await sleep(320);
       }
     }
 
-    const { yearMonth, monthLabel } = detectMonthYear();
+    const detectedAfterNav = detectMonthYear();
+    const abtReachedTargetMonth = !wasOnIstplan || detectedAfterNav.yearMonth === initialMonthInfo.yearMonth;
+    // WICHTIG: Wenn auf dem Istplan gestartet wurde (z.B. Juli 2026), bleibt der Zielmonat IMMER fest auf dem Istplan-Monat!
+    const yearMonth = wasOnIstplan ? initialMonthInfo.yearMonth : detectedAfterNav.yearMonth;
+    const monthLabel = wasOnIstplan ? initialMonthInfo.monthLabel : detectedAfterNav.monthLabel;
 
     const getPopupScrollContainers = () => {
       const containers = new Set();
@@ -1029,7 +1098,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
     const rosters = [];
 
-    for (let i = 0; i < TARGET_STATIONS.length; i++) {
+    for (let i = 0; i < TARGET_STATIONS.length && abtReachedTargetMonth; i++) {
       const target = TARGET_STATIONS[i];
       setStatus(\`⚡ Lese Wache \${i + 1}/3: \${target.label}...\`);
 
@@ -1106,7 +1175,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     }
 
     if (rosters.length === 0) {
-      const fallbackSingle = extractVisibleTable(null, yearMonth, monthLabel);
+      const fallbackSingle = abtReachedTargetMonth ? extractVisibleTable(null, yearMonth, monthLabel) : { colleagues: [] };
       if (fallbackSingle.colleagues.length > 0) {
         rosters.push(fallbackSingle);
       } else if (Object.keys(istplanShifts).length > 0) {
@@ -1129,12 +1198,6 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     copySync(json);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try { await navigator.clipboard.writeText(json); } catch (e) {}
-    }
-
-    if (window.opener && !window.opener.closed) {
-      try {
-        window.opener.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload }, '*');
-      } catch (e) {}
     }
 
     const encodedHash = encodeURIComponent(json);

@@ -474,12 +474,33 @@ export function detectRosterStation(rosterData) {
 }
 
 /**
- * Detects a corrupted 1-colleague Istplan roster created by the v2.2.23 inner-div hour regex bug
- * or the v2.2.26 non-shift holiday/KW/-- extraction bug.
+ * Detects a corrupted 1-colleague Istplan roster created by the v2.2.23 inner-div hour regex bug,
+ * the v2.2.26 non-shift holiday/KW/-- extraction bug, or a non-November roster mislabeled as 2026-11
+ * by the v2.2.27 Filter Planungsgruppe rangeMatches bug.
  */
 export function isCorruptedIstplanHourRoster(roster) {
   if (!roster) return false;
   const cols = Array.isArray(roster.colleagues) ? roster.colleagues : [];
+
+  // Check if a non-November roster (e.g. Juli 2026) was accidentally saved under 2026-11
+  if (roster.yearMonth === '2026-11') {
+    const selfRow = cols.find(c => c?.name && /backhaus/i.test(c.name));
+    if (selfRow && selfRow.shifts) {
+      const sMap = selfRow.shifts;
+      const validShiftCount = Object.values(sMap).filter(raw => {
+        const first = String(raw || '').split(',')[0].replace(/\*+$/, '').trim().toUpperCase();
+        return isValidPersonalShiftCode(first) && !isNonPartnerShiftCode(first);
+      }).length;
+      if (validShiftCount >= 2) {
+        const d04 = String(sMap['2026-11-04'] || sMap['4'] || sMap['04'] || '').toUpperCase();
+        const d05 = String(sMap['2026-11-05'] || sMap['5'] || sMap['05'] || '').toUpperCase();
+        if (!d04.includes('RFM') || !d05.includes('RT2M')) {
+          return true;
+        }
+      }
+    }
+  }
+
   if (cols.length !== 1) return false;
   const shifts = cols[0]?.shifts || {};
   const entries = Object.entries(shifts);

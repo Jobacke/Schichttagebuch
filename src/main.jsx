@@ -2,6 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { APP_VERSION } from './version.js'
+
+if (typeof document !== 'undefined') {
+  document.title = `Schichttagebuch v${APP_VERSION}`;
+}
 
 // Capture #careman=... hash or window.name payload synchronously BEFORE React Router mounts or redirects
 if (typeof window !== 'undefined') {

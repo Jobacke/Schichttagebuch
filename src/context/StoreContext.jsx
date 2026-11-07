@@ -251,7 +251,9 @@ export function StoreProvider({ children }) {
       };
       setSettings(newSettings);
       await _updateSettingsDoc(newSettings);
+      return newSettings;
     }
+    return settings;
   };
 
   const deleteShift = async (id) => {

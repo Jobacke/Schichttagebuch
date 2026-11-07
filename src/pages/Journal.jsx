@@ -11,6 +11,8 @@ import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import { getShiftColor } from '../utils/shiftColors';
 import { getPartnersForShiftFromRoster, getIncomingNightShiftForDate } from '../utils/teamRosterParser';
+import { useAuth } from '../context/AuthContext';
+import { runOneClickCareManSync } from '../utils/oneClickCareManSync';
 
 const JOURNAL_MONTH_STORAGE_KEY = 'schichttagebuch_journal_month';
 
@@ -22,6 +24,7 @@ function parseYearMonthToDate(ymStr) {
 }
 
 export default function Journal() {
+    const { currentUser } = useAuth();
     const { store, addShifts, ensureCodesAndTypes, deleteShifts, toggleShiftBonus } = useStore();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -41,6 +44,7 @@ export default function Journal() {
     });
     const [selectedDate, setSelectedDate] = useState(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isOneClickSyncing, setIsOneClickSyncing] = useState(false);
     const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(() => searchParams.get('openCalendarExport') === '1');
     const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') === '1');
     const [toastMessage, setToastMessage] = useState(null);
@@ -96,6 +100,61 @@ export default function Journal() {
     const currentMonthLabel = currentDate.toLocaleString('de-DE', { month: 'long', year: 'numeric' });
     const nowDate = new Date();
     const isCurrentMonth = currentDate.getFullYear() === nowDate.getFullYear() && currentDate.getMonth() === nowDate.getMonth();
+
+    // Listen for global 1-click CareMan sync events
+    useEffect(() => {
+        const onSynced = (e) => {
+            const detail = e?.detail;
+            if (detail?.yearMonth) {
+                const parsed = parseYearMonthToDate(detail.yearMonth);
+                if (parsed) {
+                    setCurrentDate(parsed);
+                    setSelectedDate(null);
+                }
+            }
+        };
+        window.addEventListener('careman-oneclick-synced', onSynced);
+        return () => window.removeEventListener('careman-oneclick-synced', onSynced);
+    }, []);
+
+    // 1-Click CareMan Direct Transfer on Journal Page
+    const handleOneClickCareMan = async () => {
+        if (isOneClickSyncing) return;
+        setIsOneClickSyncing(true);
+        try {
+            const res = await runOneClickCareManSync({
+                targetYearMonth: currentYearMonthStr,
+                currentUser,
+                store,
+                addShifts,
+                ensureCodesAndTypes
+            });
+
+            if (res.source === 'empty') {
+                setIsImportModalOpen(true);
+                return;
+            }
+
+            if (res.yearMonth) {
+                const parsed = parseYearMonthToDate(res.yearMonth);
+                if (parsed) {
+                    setCurrentDate(parsed);
+                    setSelectedDate(null);
+                }
+            }
+
+            if (res.message) {
+                setToastMessage(res.message);
+                setTimeout(() => setToastMessage(null), 6000);
+            }
+        } catch (err) {
+            console.error('1-Click CareMan Error:', err);
+            setToastMessage('⚠️ ' + (err.message || 'Fehler beim 1-Klick-Import.'));
+            setTimeout(() => setToastMessage(null), 5000);
+        } finally {
+            setIsOneClickSyncing(false);
+        }
+    };
 
     // Persist selected month in sessionStorage so returning from Edit/Entry stays in the same month
     useEffect(() => {
@@ -225,7 +284,7 @@ export default function Journal() {
             )}
 
             {/* Header */}
-            <div className="calendar-header" style={{ alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="calendar-header" style={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <img
                         src="/icon.png"
@@ -260,6 +319,32 @@ export default function Journal() {
                         </div>
                     </div>
                 </div>
+
+                <button
+                    type="button"
+                    disabled={isOneClickSyncing}
+                    onClick={handleOneClickCareMan}
+                    style={{
+                        background: 'linear-gradient(135deg, #059669, #10b981)',
+                        color: '#ffffff',
+                        border: '1px solid rgba(52, 211, 153, 0.55)',
+                        fontWeight: 800,
+                        padding: '8px 13px',
+                        borderRadius: '12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: isOneClickSyncing ? 'default' : 'pointer',
+                        fontSize: '12.5px',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 3px 12px rgba(16, 185, 129, 0.3)',
+                        transition: 'all 0.15s ease'
+                    }}
+                    title="Monatsdienstplan aus CareMan mit 1 Klick vollautomatisch einlesen & direkt übernehmen"
+                >
+                    <Sparkles size={15} />
+                    <span>{isOneClickSyncing ? 'Übertrage...' : '⚡ 1-Klick CareMan'}</span>
+                </button>
             </div>
 
             {/* Month Switcher Bar with Month Clear Option */}

@@ -30,6 +30,7 @@ import { buildShiftFromPreset, getPresetForCode } from '../utils/shiftPresets';
 import { parseCareManPdf } from '../utils/teamRosterPdfParser';
 import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
 import { getShiftColor, detectStation, STATION_THEMES } from '../utils/shiftColors';
+import { runOneClickCareManSync, transferPersonalRosterToJournal } from '../utils/oneClickCareManSync';
 
 const SIEDA_EXTRACTOR_SCRIPT = `(() => {
   let year = 2026;
@@ -140,11 +141,12 @@ const SIEDA_EXTRACTOR_SCRIPT = `(() => {
   else if (hCount > mCount && hCount > oCount) station = 'Hohenbrunn';
 
   const result = { yearMonth, monthLabel, station, colleagues };
-  copy(JSON.stringify(result));
-  alert('✅ Erfolg! ' + colleagues.length + ' Kollegen für ' + monthLabel + ' (Wache ' + station + ') kopiert!\\n(Dienste mit Sonderkürzel *: ' + asteriskCount + ')\\n\\nJetzt in der Schichten-App einfügen.');
+  const json = JSON.stringify(result);
+  copy(json);
+  window.open('https://schicht.vjbackhaus.de/team#careman=' + encodeURIComponent(json), 'schichttagebuch_app');
 })();`;
 
-const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];var mc=0,oc=0,hc=0,ac=0;rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var cl=cs[colIdx];var rt=(cl.innerText||cl.textContent||"").trim();if(rt){var ha=rt.indexOf("*")!==-1||(cl.innerHTML&&cl.innerHTML.indexOf("*")!==-1)||(cl.getAttribute("title")&&cl.getAttribute("title").indexOf("*")!==-1)||(cl.getAttribute("aria-label")&&cl.getAttribute("aria-label").indexOf("*")!==-1)||Boolean(cl.querySelector("[matbadge],.mat-badge,.mat-badge-content,[class*='star'],[class*='asterisk']"));var pts=rt.toUpperCase().split(/[,/;\n\r\t]+/).map(function(p){return p.trim();}).filter(Boolean);var vcs=[];pts.forEach(function(pt){var hasAst=pt.indexOf("*")!==-1||ha;var bc=pt.replace(/[^A-ZÄÖÜ0-9\\-]/g,"");if(bc&&bc.length>=2&&bc!=="FREI"&&bc!=="00"){var pm=bc.match(/^(RD|RDÜ|ÜB)((?:RF|RS|RN|RT|RC|RH|FF|NF|DD|T[1-4]|LGI|BDR)[0-9]?[MHO]?)(.*)$/);if(pm){var s1=pm[1]==="RD"?"RDÜ":pm[1];var s2=pm[2]+(hasAst?"*":"");vcs.push(s1);vcs.push(s2);if(hasAst)ac++;return;}if(bc==="RD")bc="RDÜ";var fc=hasAst?(bc+"*"):bc;if(hasAst)ac++;vcs.push(fc);if(bc.endsWith("M")||bc.indexOf("-M")!==-1)mc++;else if(bc.endsWith("O")||bc==="FFO"||bc==="NFO")oc++;else if(bc.endsWith("H")||["RFH","RTH","RT1H","RT2H","RSH","RNH","RHH"].indexOf(bc)!==-1)hc++;}});if(vcs.length>0){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=vcs.join(", ");}}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var st="Sendling";if(oc>mc&&oc>hc)st="Obersendling";else if(hc>mc&&hc>oc)st="Hohenbrunn";var json=JSON.stringify({yearMonth:ym,monthLabel:ml,station:st,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}alert("✅ Erfolg! "+cols.length+" Kollegen für "+ml+" (Wache "+st+") kopiert!\\n(Dienste mit Sonderkürzel *: "+ac+")\\n\\nJetzt in der Schichten-App einfügen.");}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
+const BOOKMARKLET_CODE = `javascript:(function(){try{var y=2026,m=10;var um=window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);if(um){y=parseInt(um[1],10);m=parseInt(um[2],10);}else{var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var tx=document.body?document.body.innerText:"";var tm=tx.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);if(tm){var fi=mn.findIndex(function(x){return x.toLowerCase()===tm[1].toLowerCase();});if(fi!==-1){m=fi+1;y=parseInt(tm[2],10);}}}var mn=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];var ym=y+"-"+(m<10?"0"+m:m);var ml=mn[m-1]+" "+y;var t=document.querySelector("table.mat-table")||document.querySelector("table");if(!t){return alert("Keine Dienstplan-Tabelle gefunden! Bitte stelle sicher, dass die Monatsansicht geöffnet ist.");}var hRow=t.querySelector("thead tr")||t.querySelector("tr");var headers=Array.from(hRow?hRow.children:[]).map(function(c){return c.textContent.trim();});var cd={};headers.forEach(function(x,i){var n=x.match(/\\d+/);if(n){var d=parseInt(n[0],10);if(d>=1&&d<=31)cd[i]=d;}});var rs=Array.from(document.querySelectorAll("tr")).filter(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var tx=e?e.textContent.trim():"";return tx.indexOf(",")!==-1&&!tx.match(/\\d{2,}/);});var cols=[];var mc=0,oc=0,hc=0,ac=0;rs.forEach(function(r){var e=r.querySelector(".employee-cell")||r.children[0];var nm=e.textContent.trim();var cs=Array.from(r.children);var sh={};Object.keys(cd).forEach(function(ci){var colIdx=parseInt(ci,10);if(colIdx<cs.length){var cl=cs[colIdx];var rt=(cl.innerText||cl.textContent||"").trim();if(rt){var ha=rt.indexOf("*")!==-1||(cl.innerHTML&&cl.innerHTML.indexOf("*")!==-1)||(cl.getAttribute("title")&&cl.getAttribute("title").indexOf("*")!==-1)||(cl.getAttribute("aria-label")&&cl.getAttribute("aria-label").indexOf("*")!==-1)||Boolean(cl.querySelector("[matbadge],.mat-badge,.mat-badge-content,[class*='star'],[class*='asterisk']"));var pts=rt.toUpperCase().split(/[,/;\n\r\t]+/).map(function(p){return p.trim();}).filter(Boolean);var vcs=[];pts.forEach(function(pt){var hasAst=pt.indexOf("*")!==-1||ha;var bc=pt.replace(/[^A-ZÄÖÜ0-9\\-]/g,"");if(bc&&bc.length>=2&&bc!=="FREI"&&bc!=="00"){var pm=bc.match(/^(RD|RDÜ|ÜB)((?:RF|RS|RN|RT|RC|RH|FF|NF|DD|T[1-4]|LGI|BDR)[0-9]?[MHO]?)(.*)$/);if(pm){var s1=pm[1]==="RD"?"RDÜ":pm[1];var s2=pm[2]+(hasAst?"*":"");vcs.push(s1);vcs.push(s2);if(hasAst)ac++;return;}if(bc==="RD")bc="RDÜ";var fc=hasAst?(bc+"*"):bc;if(hasAst)ac++;vcs.push(fc);if(bc.endsWith("M")||bc.indexOf("-M")!==-1)mc++;else if(bc.endsWith("O")||bc==="FFO"||bc==="NFO")oc++;else if(bc.endsWith("H")||["RFH","RTH","RT1H","RT2H","RSH","RNH","RHH"].indexOf(bc)!==-1)hc++;}});if(vcs.length>0){var dn=cd[colIdx];var dateStr=ym+"-"+(dn<10?"0"+dn:dn);sh[dateStr]=vcs.join(", ");}}}});if(Object.keys(sh).length>0)cols.push({name:nm,shifts:sh});});var st="Sendling";if(oc>mc&&oc>hc)st="Obersendling";else if(hc>mc&&hc>oc)st="Hohenbrunn";var json=JSON.stringify({yearMonth:ym,monthLabel:ml,station:st,colleagues:cols});var ta=document.createElement("textarea");ta.value=json;ta.style.position="fixed";ta.style.top="0";ta.style.left="0";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();var ok=false;try{ok=document.execCommand("copy");}catch(e){}document.body.removeChild(ta);if(!ok&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(json);}var appWin=window.open("https://schicht.vjbackhaus.de/team#careman="+encodeURIComponent(json),"schichttagebuch_app");if(!appWin){alert("✅ "+cols.length+" Kollegen für "+ml+" (Wache "+st+") kopiert!\\nJetzt in der App einfach auf „⚡ 1-Klick CareMan“ klicken.");}}catch(err){alert("Fehler im Lesezeichen: "+err.message);}})();`;
 
 export default function TeamRoster() {
   const { currentUser } = useAuth();
@@ -783,6 +785,85 @@ export default function TeamRoster() {
     }
   };
 
+  // Listen for global 1-Click CareMan sync events (e.g. triggered via #careman=... URL hash)
+  useEffect(() => {
+    const onSynced = (e) => {
+      const detail = e?.detail;
+      if (detail?.yearMonth) {
+        setCurrentYearMonth(detail.yearMonth);
+        localStorage.setItem('schichten_selected_year_month', detail.yearMonth);
+        setRoster(detail.activeCombined || getActiveTeamRoster(detail.yearMonth));
+        setSavedRosters(getSavedRosterSummaries());
+        if (!selectedDate.startsWith(detail.yearMonth)) {
+          setSelectedDate(`${detail.yearMonth}-01`);
+        }
+      }
+    };
+    window.addEventListener('careman-oneclick-synced', onSynced);
+    return () => window.removeEventListener('careman-oneclick-synced', onSynced);
+  }, [selectedDate]);
+
+  // 1-Click Master Handler: Reads CareMan from Clipboard (or active/cloud roster) and transfers directly into Journal
+  const handleOneClickCareManSync = async () => {
+    if (isProcessing || isSyncingPersonal) return;
+    setUploadError(null);
+    setIsSyncingPersonal(true);
+    setIsProcessing(true);
+    setUploadProgress(35);
+
+    try {
+      const res = await runOneClickCareManSync({
+        targetYearMonth: yearMonth,
+        stationOverride: uploadStationOverride,
+        currentUser,
+        store,
+        addShifts,
+        ensureCodesAndTypes,
+        onProgress: p => setUploadProgress(p)
+      });
+
+      setUploadProgress(100);
+
+      if (res.source === 'empty') {
+        setIsProcessing(false);
+        setIsSyncingPersonal(false);
+        setUploadProgress(null);
+        setIsUploadOpen(true);
+        setUploadError('Kein CareMan-Dienstplan in der Zwischenablage gefunden. Bitte in CareMan auf das Lesezeichen klicken (oder Tabelle mit Cmd+A & Cmd+C kopieren) und dann auf „⚡ 1-Klick CareMan“ klicken!');
+        return;
+      }
+
+      if (res.yearMonth) {
+        setCurrentYearMonth(res.yearMonth);
+        localStorage.setItem('schichten_selected_year_month', res.yearMonth);
+        const activeCombined = res.activeCombined || getActiveTeamRoster(res.yearMonth);
+        setRoster(activeCombined);
+        setSavedRosters(getSavedRosterSummaries());
+
+        if (!selectedDate.startsWith(res.yearMonth)) {
+          const today = new Date();
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+          setSelectedDate(todayStr.startsWith(res.yearMonth) ? todayStr : `${res.yearMonth}-01`);
+        }
+      }
+
+      setIsUploadOpen(false);
+      setIsProcessing(false);
+      setIsSyncingPersonal(false);
+      setUploadProgress(null);
+      if (res.message) {
+        setToastMessage(res.message);
+      }
+    } catch (err) {
+      console.error('1-Click CareMan Sync Error:', err);
+      setUploadError('Fehler beim 1-Klick-Import: ' + (err.message || 'Bitte prüfe die kopierten CareMan-Daten.'));
+      setToastMessage('⚠️ ' + (err.message || 'Bitte zuerst den CareMan-Plan kopieren.'));
+      setIsProcessing(false);
+      setIsSyncingPersonal(false);
+      setUploadProgress(null);
+    }
+  };
+
   // Handle File Upload (HTML, PDF or Image)
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -830,7 +911,14 @@ export default function TeamRoster() {
       setRoster(activeCombined);
       setSavedRosters(getSavedRosterSummaries());
 
-      // Automatically sync partner names ("mit ...") onto any existing Journal shifts in this month
+      // Automatically transfer personal shifts ("Backhaus, Johannes") + PartnerIn directly into Journal
+      const transferRes = await transferPersonalRosterToJournal({
+        yearMonth: parsedRoster.yearMonth,
+        activeRoster: activeCombined,
+        store,
+        addShifts,
+        ensureCodesAndTypes
+      });
       const updatedPartnerCount = await autoSyncExistingJournalPartners(parsedRoster.yearMonth, activeCombined);
 
       if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
@@ -846,8 +934,11 @@ export default function TeamRoster() {
       setIsUploadOpen(false);
       setIsProcessing(false);
       setUploadProgress(null);
+      const transferNote = transferRes.transferredCount > 0
+        ? ` & ${transferRes.transferredCount} eigene Dienste ins Journal übernommen`
+        : (updatedPartnerCount > 0 ? `, ${updatedPartnerCount}x PartnerIn im Journal ergänzt` : '');
       setToastMessage(
-        `Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) gespeichert (${parsedRoster.totalShifts} Schichten${updatedPartnerCount > 0 ? `, ${updatedPartnerCount}x PartnerIn im Journal ergänzt` : ''})!`
+        `✅ Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) gespeichert (${parsedRoster.totalShifts} Schichten${transferNote})!`
       );
     } catch (err) {
       console.error('Upload Error:', err);
@@ -879,7 +970,14 @@ export default function TeamRoster() {
       setRoster(activeCombined);
       setSavedRosters(getSavedRosterSummaries());
 
-      // Automatically sync partner names ("mit ...") onto any existing Journal shifts in this month
+      // Automatically transfer personal shifts ("Backhaus, Johannes") + PartnerIn directly into Journal
+      const transferRes = await transferPersonalRosterToJournal({
+        yearMonth: parsedRoster.yearMonth,
+        activeRoster: activeCombined,
+        store,
+        addShifts,
+        ensureCodesAndTypes
+      });
       const updatedPartnerCount = await autoSyncExistingJournalPartners(parsedRoster.yearMonth, activeCombined);
 
       if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
@@ -897,8 +995,11 @@ export default function TeamRoster() {
       setUploadProgress(null);
       setPasteText('');
       setActiveModalTab('paste');
+      const transferNote = transferRes.transferredCount > 0
+        ? ` & ${transferRes.transferredCount} eigene Dienste direkt ins Journal übernommen`
+        : (updatedPartnerCount > 0 ? `, ${updatedPartnerCount}x PartnerIn im Journal ergänzt` : '');
       setToastMessage(
-        `Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) übernommen (${parsedRoster.totalShifts} Schichten${updatedPartnerCount > 0 ? `, ${updatedPartnerCount}x PartnerIn im Journal ergänzt` : ''})!`
+        `✅ Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) eingelesen (${parsedRoster.totalShifts} Schichten${transferNote})!`
       );
     } catch (err) {
       console.error('Paste Error:', err);
@@ -934,38 +1035,66 @@ export default function TeamRoster() {
         </div>
       )}
 
-      {/* Top Header: Title & Upload Button */}
-      <div className="team-roster-header" style={{ marginBottom: '8px', paddingBottom: '0' }}>
+      {/* Top Header: Title & 1-Click + Upload Buttons */}
+      <div className="team-roster-header" style={{ marginBottom: '8px', paddingBottom: '0', gap: '8px', flexWrap: 'wrap' }}>
         <h1 className="team-roster-title" style={{ whiteSpace: 'nowrap' }}>
           <Users style={{ color: '#38bdf8' }} size={24} />
           <span>Wer hat Dienst?</span>
         </h1>
 
-        <button
-          type="button"
-          onClick={() => setIsUploadOpen(true)}
-          style={{
-            background: 'rgba(14, 165, 233, 0.18)',
-            color: '#38bdf8',
-            border: '1px solid rgba(56, 189, 248, 0.45)',
-            fontWeight: 700,
-            padding: '7px 14px',
-            borderRadius: '12px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)',
-            transition: 'all 0.15s ease'
-          }}
-          title="Dienstplan importieren (SIEDA einfügen oder Datei)"
-        >
-          <UploadCloud size={16} />
-          <span>Plan laden</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <button
+            type="button"
+            disabled={isProcessing || isSyncingPersonal}
+            onClick={handleOneClickCareManSync}
+            style={{
+              background: 'linear-gradient(135deg, #059669, #10b981)',
+              color: '#ffffff',
+              border: '1px solid rgba(52, 211, 153, 0.55)',
+              fontWeight: 800,
+              padding: '7px 12px',
+              borderRadius: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              cursor: isProcessing || isSyncingPersonal ? 'default' : 'pointer',
+              fontSize: '12.5px',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 3px 10px rgba(16, 185, 129, 0.3)',
+              transition: 'all 0.15s ease'
+            }}
+            title="CareMan-Dienstplan mit 1 Klick vollautomatisch aus Zwischenablage / Cloud einlesen & eigene Dienste ins Journal übertragen"
+          >
+            <Sparkles size={15} />
+            <span>{isProcessing || isSyncingPersonal ? 'Übertrage...' : '⚡ 1-Klick CareMan'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsUploadOpen(true)}
+            style={{
+              background: 'rgba(14, 165, 233, 0.18)',
+              color: '#38bdf8',
+              border: '1px solid rgba(56, 189, 248, 0.45)',
+              fontWeight: 700,
+              padding: '7px 11px',
+              borderRadius: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              cursor: 'pointer',
+              fontSize: '12.5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)',
+              transition: 'all 0.15s ease'
+            }}
+            title="Dienstplan importieren (SIEDA einfügen oder Datei)"
+          >
+            <UploadCloud size={15} />
+            <span>Plan laden</span>
+          </button>
+        </div>
       </div>
 
       {/* Month Stepper Bar (Full width, spacious & thumb-friendly in portrait) */}
@@ -1882,17 +2011,41 @@ export default function TeamRoster() {
                   Noch kein Dienstplan für {roster.monthLabel || yearMonth} geladen
                 </p>
                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-                  Kopiere den Dienstplan mit deinem Lesezeichen im Safari und füge ihn hier ein.
+                  Mit 1 Klick aus CareMan (Zwischenablage / Lesezeichen) direkt einlesen & ins Journal übernehmen:
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsUploadOpen(true)}
-                  className="btn-primary"
-                  style={{ margin: '0 auto', fontSize: '13px', padding: '9px 18px', borderRadius: '10px' }}
-                >
-                  <UploadCloud size={16} />
-                  <span>Dienstplan jetzt einfügen</span>
-                </button>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    disabled={isProcessing || isSyncingPersonal}
+                    onClick={handleOneClickCareManSync}
+                    style={{
+                      background: 'linear-gradient(135deg, #059669, #10b981)',
+                      color: '#ffffff',
+                      border: '1px solid rgba(52, 211, 153, 0.5)',
+                      fontSize: '13px',
+                      fontWeight: 800,
+                      padding: '9px 18px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)'
+                    }}
+                  >
+                    <Sparkles size={16} />
+                    <span>{isProcessing || isSyncingPersonal ? 'Wird übertragen...' : '⚡ 1-Klick CareMan-Übernahme'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsUploadOpen(true)}
+                    className="btn-primary"
+                    style={{ fontSize: '13px', padding: '9px 16px', borderRadius: '10px' }}
+                  >
+                    <UploadCloud size={16} />
+                    <span>Manuell laden</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -2203,16 +2356,43 @@ export default function TeamRoster() {
               ) : activeModalTab === 'paste' ? (
                 /* Direct Paste Area */
                 <div>
+                  {/* 1-Click Direct Clipboard Import Button */}
+                  <button
+                    type="button"
+                    disabled={isProcessing || isSyncingPersonal}
+                    onClick={handleOneClickCareManSync}
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #059669, #10b981)',
+                      color: '#ffffff',
+                      border: '1px solid rgba(52, 211, 153, 0.5)',
+                      fontWeight: 800,
+                      fontSize: '13.5px',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      cursor: isProcessing || isSyncingPersonal ? 'default' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginBottom: '12px',
+                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                    }}
+                  >
+                    <Sparkles size={16} />
+                    <span>{isProcessing || isSyncingPersonal ? 'Wird vollautomatisch übertragen...' : '⚡ 1-Klick: Direkt aus Zwischenablage übernehmen'}</span>
+                  </button>
+
                   {/* SIEDA Helper Card: Bookmarklet + Copy Command */}
                   <div className="team-roster-helper-card">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8' }}>
-                        ⚡ 1-Klick Abgriff aus dem SIEDA-Portal
+                        ⚡ 1-Klick Abgriff aus dem SIEDA-Portal (CareMan)
                       </span>
                     </div>
 
                     <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
-                      Ziehe diesen Button mit der Maus in Deine Lesezeichenleiste. Wenn Du auf der Dienstplan-Seite bist, reicht <strong>ein einziger Klick</strong> darauf, um den Plan fehlerfrei zu kopieren:
+                      Ziehe diesen Button in Deine Lesezeichenleiste. Ein Klick darauf in CareMan überträgt den kompletten Monatsdienstplan <strong>vollautomatisch mit 1 Klick</strong> in Deine App & Dein Journal:
                     </p>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -2226,7 +2406,7 @@ export default function TeamRoster() {
                         }}
                       >
                         <Bookmark size={14} />
-                        <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '📋 Dienstplan kopieren'}</span>
+                        <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '⚡ CareMan 1-Klick Übernahme'}</span>
                       </a>
 
                       <button
@@ -2253,7 +2433,7 @@ export default function TeamRoster() {
 
                     <div style={{ fontSize: '11px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <CheckCircle2 size={12} />
-                      <span>Danach einfach unten in das Feld klicken, <strong>Cmd + V</strong> drücken und einlesen!</span>
+                      <span>Mit dem bestehenden Lesezeichen reicht oben <strong>1 Klick auf den grünen Button</strong> (kein Einfügen mehr nötig)!</span>
                     </div>
                   </div>
 

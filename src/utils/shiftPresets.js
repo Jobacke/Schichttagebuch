@@ -347,6 +347,10 @@ export function getPresetForCode(rawCode) {
     station = 'Wache Obersendling';
     vehicle = 'RTW Akkon Obersendling 71/1';
     callSign = 'Akkon Obersendling 71/1';
+  } else if (clean.startsWith('K')) {
+    const ktwNum = clean.match(/\d/)?.[0] || '1';
+    vehicle = clean.endsWith('H') ? `KTW Akkon HBN 72/${ktwNum}` : `KTW Akkon Sendling 72/${ktwNum}`;
+    callSign = clean.endsWith('H') ? `Akkon HBN 72/${ktwNum}` : `Akkon Sendling 72/${ktwNum}`;
   } else if (clean.includes('2') || clean.includes('4') || clean.includes('3') || clean.includes('1')) {
     vehicle = 'RTW Akkon Sendling 71/2';
     callSign = 'Akkon Sendling 71/2';
@@ -357,18 +361,18 @@ export function getPresetForCode(rawCode) {
   let endTime = '19:06';
   let hours = 8.2;
 
-  if (clean.includes('RN') || clean.endsWith('NM') || clean.endsWith('NH') || clean.endsWith('NO') || clean.startsWith('NF')) {
+  if (clean.includes('RN') || clean.includes('KN') || clean.endsWith('NM') || clean.endsWith('NH') || clean.endsWith('NO') || clean.startsWith('NF')) {
     shiftTypeName = 'Nachtschicht';
     startTime = '22:54';
     endTime = '07:06';
-  } else if (clean.includes('RF') || clean.endsWith('FM') || clean.endsWith('FH') || clean.endsWith('FO') || clean === 'RT1M' || clean === 'RT3M') {
+  } else if (clean.includes('RF') || clean.includes('KF') || clean.endsWith('FM') || clean.endsWith('FH') || clean.endsWith('FO') || clean === 'RT1M' || clean === 'RT3M') {
     shiftTypeName = 'Frühschicht';
     startTime = clean.endsWith('O') ? '07:54' : '06:54';
     endTime = clean.endsWith('O') ? '16:06' : (clean.includes('3') ? '15:36' : '15:06');
-  } else if (clean.includes('RS') || clean.endsWith('SM') || clean.endsWith('SH') || clean.endsWith('SO') || clean.includes('RT2') || clean.includes('RT4')) {
+  } else if (clean.includes('RS') || clean.includes('KS') || clean.endsWith('SM') || clean.endsWith('SH') || clean.endsWith('SO') || clean.includes('RT2') || clean.includes('RT4')) {
     shiftTypeName = 'Spätschicht';
-    startTime = clean.endsWith('O') ? '15:54' : (clean.includes('4') ? '15:24' : '14:54');
-    endTime = (clean.endsWith('O') || clean.includes('4')) ? '00:06' : '23:06';
+    startTime = clean.endsWith('O') ? '15:54' : (clean.startsWith('KS') ? '15:54' : (clean.includes('4') ? '15:24' : '14:54'));
+    endTime = (clean.endsWith('O') || clean.includes('4')) ? '00:06' : (clean.startsWith('KS') ? '22:36' : '23:06');
   }
 
   return {

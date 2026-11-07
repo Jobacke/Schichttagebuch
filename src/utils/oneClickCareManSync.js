@@ -545,7 +545,8 @@ export function openCareManLiveWindow(targetYearMonth) {
   // which controls the login window via CDP, fills username & password automatically, waits for manual Airlock 2FA,
   // opens Dienstplan Bayern (?date=...), extracts all 3 stations, and returns straight back to the App in Safari!
   const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
-  const isMacDesktop = /Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad|iPod|Mobile/i.test(ua);
+  const isTouchDevice = typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints) > 1;
+  const isMacDesktop = /Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad|iPod|Mobile/i.test(ua) && !isTouchDevice;
   if (isMacDesktop) {
     const returnOrigin = (typeof window !== 'undefined' && window.location && window.location.origin)
       ? window.location.origin
@@ -1232,7 +1233,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
               let baseCode = part.replace(/[^A-ZÄÖÜ0-9\\-]/g, '');
               if (!baseCode || baseCode.length < 2 || baseCode.length > 10 || !/[A-ZÄÖÜ]/i.test(baseCode) || /^KW\\d*$/i.test(baseCode) || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
 
-              const stdPat = '(?:RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
+              const stdPat = '(?:RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MHO]|RH[MHO]|KS\\d?[MHO]|KF\\d?[MHO]|KT\\d?[MHO]|KN\\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
               const pm = baseCode.match(new RegExp('^(RD|RDÜ|ÜB)(' + stdPat + ')(\\\\*?)$'));
               if (pm) {
                 const sub1 = pm[1] === 'RD' ? 'RDÜ' : pm[1];
@@ -1496,33 +1497,65 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     // (Auch auf dem iPhone, wo 7 Kalender-Spalten ~44px-53px breit sind!)
     if (wasOnIstplan) {
       if (desiredAutoYm && !urlYearMonth && detectMonthYear().yearMonth !== initialMonthInfo.yearMonth) {
-        const didStepIst = await stepVisibleHeaderToMonth(initialMonthInfo.yearMonth, initialMonthInfo.monthLabel, 'Istplan');
-        if (didStepIst) await sleep(200);
+        const dpToggleBtn = document.querySelector('myplan-date-selector mat-datepicker-toggle button, mat-datepicker-toggle button');
+        if (dpToggleBtn && !getVisibleMonthHeaderInfo()) {
+          try {
+            dismissBlockingDialogs();
+            dpToggleBtn.click();
+            await sleep(220);
+            const periodBtn = document.querySelector('.mat-calendar-period-button');
+            if (periodBtn) {
+              periodBtn.click();
+              await sleep(220);
+              const [wantY, wantM] = initialMonthInfo.yearMonth.split('-').map(Number);
+              const yrCell = Array.from(document.querySelectorAll('.mat-calendar-body-cell')).find(c => (c.innerText || '').trim() === String(wantY));
+              if (yrCell) {
+                yrCell.click();
+                await sleep(220);
+                const mCells = Array.from(document.querySelectorAll('.mat-calendar-body-cell'));
+                if (mCells[wantM - 1]) {
+                  mCells[wantM - 1].click();
+                  await sleep(220);
+                  const dCell = Array.from(document.querySelectorAll('.mat-calendar-body-cell')).find(c => (c.innerText || '').trim() === '1');
+                  if (dCell) {
+                    dCell.click();
+                    await sleep(900);
+                  }
+                }
+              }
+            }
+          } catch (e) {}
+        } else {
+          const didStepIst = await stepVisibleHeaderToMonth(initialMonthInfo.yearMonth, initialMonthInfo.monthLabel, 'Istplan');
+          if (didStepIst) await sleep(200);
+        }
       }
 
-      const validShiftRegex = /^(RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT\\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\\d?|RZF|R-SAN)\\*?$/i;
+      const istDayPrefixRegex = /^(?:(?:Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mo|Di|Mi|Do|Fr|Sa|So)\\.?\\s+)?([0-3]?\\d)\\b/i;
+      const validShiftRegex = /^(RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT\\d?[MHO]|RC[MHO]|RH[MHO]|KS\\d?[MHO]|KF\\d?[MHO]|KT\\d?[MHO]|KN\\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\\d?|RZF|R-SAN)\\*?$/i;
       const getIstplanRawCells = () => {
-        let cells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
+        let cells = Array.from(document.querySelectorAll('myplan-calendar-day-phone, myplan-calendar-cell, td, mat-grid-tile, div')).filter(c => {
           if (c.closest('[data-careman-sync-banner]')) return false;
           if (!c.getBoundingClientRect) return false;
           const r = c.getBoundingClientRect();
-          if (r.width < 28 || r.width > 360 || r.height < 24 || r.height > 260) return false;
+          if (r.width < 28 || r.width > 480 || r.height < 20 || r.height > 260) return false;
           const t = (c.innerText || c.textContent || '').trim();
           if (!/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(t)) return false;
           // Wichtig: Uhrzeit vorher entfernen, damit NIEMALS die Startstunde (06, 14, 15, 22) im inneren grauen Kasten als Kalendertag erkannt wird!
           const withoutTime = t.replace(/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/g, '').trim();
-          return /^([0-3]?\\d)\\b/.test(withoutTime);
+          return istDayPrefixRegex.test(withoutTime);
         });
         if (cells.length === 0) {
-          cells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
+          cells = Array.from(document.querySelectorAll('myplan-calendar-day-phone, myplan-calendar-cell, td, mat-grid-tile, div')).filter(c => {
             if (c.closest('[data-careman-sync-banner], thead, th')) return false;
             if (!c.getBoundingClientRect) return false;
             const r = c.getBoundingClientRect();
-            if (r.width < 28 || r.width > 360 || r.height < 24 || r.height > 260) return false;
+            if (r.width < 28 || r.width > 480 || r.height < 20 || r.height > 260) return false;
             const t = (c.innerText || c.textContent || '').trim();
-            if (!/^([0-3]?\\d)\\b/.test(t)) return false;
-            const tokens = t.split(/[\\s,;/+|\\n\\r]+/).map(x => x.trim()).filter(Boolean);
-            return tokens.length >= 2 && tokens.length <= 12 && tokens.slice(1).some(tok => validShiftRegex.test(tok.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '')));
+            if (!istDayPrefixRegex.test(t)) return false;
+            const withoutPrefix = t.replace(istDayPrefixRegex, '').trim();
+            const tokens = withoutPrefix.split(/[\\s,;/+|\\n\\r]+/).map(x => x.trim()).filter(Boolean);
+            return tokens.length >= 1 && tokens.length <= 12 && tokens.some(tok => validShiftRegex.test(tok.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '')));
           });
         }
         return cells;
@@ -1537,7 +1570,12 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         await sleep(140);
       }
 
-      const istVisibleMatchesTarget = !desiredAutoYm || detectMonthYear().yearMonth === initialMonthInfo.yearMonth;
+      const curUrlMatch = (window.location.href || '').match(/[?&]date=(20\\d{2})-(\\d{1,2})-(\\d{1,2})/);
+      const curUrlYm = curUrlMatch ? \`\${curUrlMatch[1]}-\${String(parseInt(curUrlMatch[2], 10)).padStart(2, '0')}\` : urlYearMonth;
+      const istVisibleMatchesTarget =
+        !desiredAutoYm ||
+        Boolean(curUrlYm && curUrlYm === initialMonthInfo.yearMonth) ||
+        detectMonthYear().yearMonth === initialMonthInfo.yearMonth;
       if (istVisibleMatchesTarget) {
       try {
         const { yearMonth: istYm } = initialMonthInfo;
@@ -1554,14 +1592,15 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         istCells.forEach((cell, idx) => {
           const txt = (cell.innerText || cell.textContent || '').trim();
           const withoutTime = txt.replace(/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/g, '').trim();
-          const dayM = withoutTime.match(/^([0-3]?\\d)\\b/);
+          const dayM = withoutTime.match(istDayPrefixRegex);
           const timeM = txt.match(/(\\d{2}:\\d{2})\\s*-\\s*(\\d{2}:\\d{2})/);
           if (!dayM) return;
           const dNum = parseInt(dayM[1], 10);
           if (dNum < 1 || dNum > 31) return;
-          // In den ersten 7 Zellen (bei vollem 28+ Tage-Kalendergitter) gehören Tage > 20 zum Vormonat; in den letzten 7 Zellen gehören Tage < 15 zum Folgemonat
-          if (istCells.length >= 28 && idx < 7 && dNum > 20) return;
-          if (istCells.length >= 28 && idx >= istCells.length - 7 && dNum < 15) return;
+          // In den ersten 7 Zellen (bei vollem Desktop-Kalendergitter mit >31 Zellen inkl. Vor-/Folgemonat) gehören Tage > 20 zum Vormonat
+          const isDesktopGridWithPadding = istCells.length > 31;
+          if (isDesktopGridWithPadding && idx < 7 && dNum > 20) return;
+          if (isDesktopGridWithPadding && idx >= istCells.length - 7 && dNum < 15) return;
 
           if (timeM && timeM[1] === '00:00' && timeM[2] === '00:00') return;
 
@@ -1569,11 +1608,11 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           if (timeM) {
             personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
           }
-          const lines = withoutTime.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
+          const withoutDayPrefix = withoutTime.replace(istDayPrefixRegex, '').trim();
+          const lines = withoutDayPrefix.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
           const matchedIstCodes = [];
-          const searchLines = lines.length > 1 ? lines.slice(1) : [withoutTime.replace(/^([0-3]?\\d)\\b/, '').trim()];
-          for (let li = 0; li < searchLines.length; li++) {
-            const line = searchLines[li];
+          for (let li = 0; li < lines.length; li++) {
+            const line = lines[li];
             const tokens = line.split(/[,;/+|\\s]+/).map(t => t.trim()).filter(Boolean);
             tokens.forEach(tok => {
               const codeCandidate = tok.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '').toUpperCase();

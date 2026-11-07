@@ -87,7 +87,7 @@ export function cleanSingleShiftCode(c) {
  * Example: "RDRT2M"   -> ["RDÜ", "RT2M"]
  * Example: "RD"       -> ["RDÜ"]
  */
-export const VALID_PERSONAL_SHIFT_CODE_REGEX = /^(RF[MHO]|RS\d?[MHO]|RN[MHO]|RT\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\d?|RZF|R-SAN)$/i;
+export const VALID_PERSONAL_SHIFT_CODE_REGEX = /^(RF[MHO]|RS\d?[MHO]|RN[MHO]|RT\d?[MHO]|RC[MHO]|RH[MHO]|KS\d?[MHO]|KF\d?[MHO]|KT\d?[MHO]|KN\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\d?|RZF|R-SAN)$/i;
 
 export function isValidPersonalShiftCode(rawCode = '') {
   const base = String(rawCode || '').replace(/\*+$/, '').trim().toUpperCase();
@@ -108,7 +108,7 @@ export function splitShiftCodes(raw) {
   const tokens = str.split(/[,;/+|\\\n\r]+/);
   const result = [];
 
-  const stdPattern = '(?:RF[MHO]|RS[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MH]|RH[MH]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
+  const stdPattern = '(?:RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MH]|RH[MH]|KS\\d?[MHO]|KF\\d?[MHO]|KT\\d?[MHO]|KN\\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
 
   tokens.forEach(tok => {
     let t = tok.trim();

@@ -325,7 +325,7 @@ export default function Journal() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     <button
                         type="button"
-                        onClick={() => openCareManLiveWindow()}
+                        onClick={() => openCareManLiveWindow(currentYearMonthStr)}
                         style={{
                             background: 'linear-gradient(135deg, #059669, #10b981)',
                             color: '#ffffff',
@@ -342,10 +342,10 @@ export default function Journal() {
                             boxShadow: '0 3px 12px rgba(16, 185, 129, 0.3)',
                             transition: 'all 0.15s ease'
                         }}
-                        title="CareMan öffnen, anmelden und dort mit dem Lesezeichen den Dienstplan direkt in die App übertragen"
+                        title={`Neueste Dienstpläne für "Rettungswache München", "Rettungswache Obersendling" & "Rettungswache Hohenbrunn" (${currentMonthLabel}) laden`}
                     >
                         <ExternalLink size={15} />
-                        <span>CareMan öffnen</span>
+                        <span>⚡ Dienstpläne (3 Wachen) laden</span>
                     </button>
 
                     <button
@@ -367,10 +367,10 @@ export default function Journal() {
                             boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)',
                             transition: 'all 0.15s ease'
                         }}
-                        title="CareMan 1-Klick Lesezeichen einrichten oder kopieren"
+                        title="CareMan Auto-Pilot Zugangsdaten & Lesezeichen einrichten"
                     >
                         <Bookmark size={14} />
-                        <span>Lesezeichen</span>
+                        <span>Auto-Pilot</span>
                     </button>
                 </div>
             </div>

@@ -453,13 +453,60 @@ export async function importCareManPayloadAndSync({
 }
 
 /**
- * Opens the live CareMan Bayern portal so the user can log in (if needed),
- * select any month, and trigger the 1-Click Bookmarklet to import all 3 stations
- * + personal shifts directly back into the app.
+ * Opens the Johanniter Secure Portal login page (`https://my.secure.johanniter.de/auth/ui/app/auth/flow/secure-portal/password`)
+ * with Auto-Pilot state in `window.name` so that:
+ * 1. Username & Password are automatically filled and submitted ("Anmelden")
+ * 2. Airlock 2FA selection is automatically confirmed (user confirms push manually in Airlock 2FA)
+ * 3. Automatically opens Dienstplan Bayern for the selected month (`https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=YYYY-M-D`)
+ * 4. Automatically extracts all 3 stations (Rettungswache München, Rettungswache Obersendling, Rettungswache Hohenbrunn) + personal shifts and transfers them into the App.
  */
-export function openCareManLiveWindow() {
-  const careManUrl = 'https://dienstplan-bayern.secure.johanniter.de/';
-  window.location.href = careManUrl;
+export function openCareManLiveWindow(targetYearMonth) {
+  const now = new Date();
+  const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const ym =
+    (typeof targetYearMonth === 'string' && /^\d{4}-\d{2}$/.test(targetYearMonth) ? targetYearMonth : null) ||
+    (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('schichttagebuch_journal_month')) ||
+    (typeof localStorage !== 'undefined' && localStorage.getItem('schichten_selected_year_month')) ||
+    currentYM;
+
+  const [yStr, mStr] = ym.split('-');
+  const year = parseInt(yStr, 10) || now.getFullYear();
+  const month = parseInt(mStr, 10) || (now.getMonth() + 1);
+  const day = ym === currentYM ? now.getDate() : 1;
+  const targetDate = `${year}-${month}-${day}`;
+  const targetCareManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
+
+  let username = 'johannes.backhaus@johanniter.de';
+  let password = '';
+  try {
+    const savedUser = localStorage.getItem('careman_login_user');
+    if (savedUser && savedUser.trim()) username = savedUser.trim();
+    const savedPass = localStorage.getItem('careman_login_pass');
+    if (savedPass) password = savedPass;
+    localStorage.setItem('schichten_selected_year_month', ym);
+    sessionStorage.setItem('schichttagebuch_journal_month', ym);
+  } catch {
+    /* ignore storage errors */
+  }
+
+  const autoPilotPayload = {
+    autoRun: true,
+    targetYearMonth: ym,
+    targetDate,
+    targetCareManUrl,
+    username,
+    password,
+    startedAt: Date.now()
+  };
+
+  try {
+    window.name = 'CAREMAN_AUTOPILOT:' + JSON.stringify(autoPilotPayload);
+  } catch {
+    /* ignore */
+  }
+
+  const loginUrl = 'https://my.secure.johanniter.de/auth/ui/app/auth/flow/secure-portal/password';
+  window.location.href = loginUrl;
 }
 
 /**
@@ -652,6 +699,210 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
   try {
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
     const monthRegexSubstr = /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(20\\d{2})\\b/i;
+
+    // ============================================================================
+    // AUTO-PILOT STATE AUS WINDOW.NAME & URL (?date=YYYY-M-D)
+    // ============================================================================
+    let autoPilot = null;
+    try {
+      if (window.name && window.name.startsWith('CAREMAN_AUTOPILOT:')) {
+        autoPilot = JSON.parse(window.name.slice('CAREMAN_AUTOPILOT:'.length));
+      }
+    } catch (e) {}
+
+    const isFreshAutoPilot = Boolean(
+      autoPilot &&
+      autoPilot.targetYearMonth &&
+      /^\\d{4}-\\d{2}$/.test(autoPilot.targetYearMonth) &&
+      (!autoPilot.startedAt || (Date.now() - autoPilot.startedAt < 25 * 60 * 1000))
+    );
+
+    const urlDateMatch = (window.location.href || '').match(/[?&]date=(20\\d{2})-(\\d{1,2})-(\\d{1,2})/);
+    const urlYearMonth = urlDateMatch
+      ? \`\${urlDateMatch[1]}-\${String(parseInt(urlDateMatch[2], 10)).padStart(2, '0')}\`
+      : null;
+
+    const setNativeInputValue = (el, val) => {
+      if (!el || val === undefined || val === null) return;
+      try {
+        const proto = Object.getPrototypeOf(el);
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'value') ||
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        if (descriptor && descriptor.set) {
+          descriptor.set.call(el, val);
+        } else {
+          el.value = val;
+        }
+      } catch (e) {
+        el.value = val;
+      }
+      ['input', 'change', 'blur'].forEach(evtName => {
+        try { el.dispatchEvent(new Event(evtName, { bubbles: true })); } catch (e) {}
+      });
+    };
+
+    // ============================================================================
+    // STUFE 1: JOHANNITER SECURE PORTAL (LOGIN -> AIRLOCK 2FA -> DIENSTPLAN BAYERN)
+    // ============================================================================
+    if (/my\\.secure\\.johanniter\\.de/i.test(window.location.hostname || '')) {
+      const now = new Date();
+      const fallbackDate = \`\${now.getFullYear()}-\${now.getMonth() + 1}-\${now.getDate()}\`;
+      const targetDate = (autoPilot && autoPilot.targetDate) || fallbackDate;
+      const targetYm = (autoPilot && autoPilot.targetYearMonth) ||
+        \`\${now.getFullYear()}-\${String(now.getMonth() + 1).padStart(2, '0')}\`;
+      const targetCareManUrl = (autoPilot && autoPilot.targetCareManUrl) ||
+        \`https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=\${targetDate}\`;
+
+      let apUser = (autoPilot && autoPilot.username) || '';
+      let apPass = (autoPilot && autoPilot.password) || '';
+      try {
+        if (apUser) localStorage.setItem('careman_ap_user', apUser);
+        else apUser = localStorage.getItem('careman_ap_user') || 'johannes.backhaus@johanniter.de';
+        if (apPass) localStorage.setItem('careman_ap_pass', apPass);
+        else apPass = localStorage.getItem('careman_ap_pass') || '';
+      } catch (e) {
+        if (!apUser) apUser = 'johannes.backhaus@johanniter.de';
+      }
+
+      try {
+        window.name = 'CAREMAN_AUTOPILOT:' + JSON.stringify({
+          autoRun: true,
+          targetYearMonth: targetYm,
+          targetDate,
+          targetCareManUrl,
+          username: apUser,
+          password: apPass,
+          startedAt: (autoPilot && autoPilot.startedAt) || Date.now()
+        });
+      } catch (e) {}
+
+      let lastPasswordSubmitAt = 0;
+      let last2faSelectAt = 0;
+
+      // Warte bis zu 180 Sekunden auf Login + manuelle Bestätigung in Airlock 2FA
+      for (let tick = 0; tick < 450; tick++) {
+        const href = window.location.href || '';
+        const bodyText = (document.body?.innerText || document.body?.textContent || '').trim();
+
+        // 1. Prüfen, ob wir nach Airlock 2FA im Self Service Portal angekommen sind
+        const dienstplanTile = Array.from(document.querySelectorAll('a, button, div, span, p')).find(el => {
+          if (el.closest && el.closest('[data-careman-sync-banner]')) return false;
+          const t = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+          return /^Dienstplan\\s+BAYERN$/i.test(t) || (el.tagName === 'A' && /dienstplan-bayern\\.secure\\.johanniter\\.de/i.test((el.getAttribute && el.getAttribute('href')) || ''));
+        });
+        const isPortalLoaded = Boolean(dienstplanTile) ||
+          (!href.includes('/auth/ui/') && (/Webanwendungen|Self\\s*Service|Dienstplan\\s*BAYERN/i.test(bodyText)));
+
+        if (isPortalLoaded) {
+          banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+          setStatus(\`🚀 Airlock 2FA bestätigt! Öffne Dienstplan Bayern (\${targetDate})...\`);
+          await sleep(250);
+          window.location.href = targetCareManUrl;
+          return;
+        }
+
+        // 2. Prüfen auf "Anmeldung mit Airlock 2FA" (manuelle Smartphone-Bestätigung)
+        if (/Anmeldung\\s+mit\\s+Airlock\\s+2FA|Nachricht\\s+auf\\s+Ihrem\\s+Smartphone|Offline-Modus/i.test(bodyText)) {
+          banner.style.background = 'linear-gradient(135deg,#0284c7,#0369a1)';
+          setStatus(\`📱 Bitte jetzt in Airlock 2FA bestätigen – öffne danach automatisch Dienstplan Bayern (\${targetYm})...\`);
+          await sleep(400);
+          continue;
+        }
+
+        // 3. Prüfen auf "Auswahl" (Authentisierungsmöglichkeit: Airlock 2FA vs. OATH)
+        if (/Authentisierungsm[öo]glichkeiten|Airlock\\s+2FA/i.test(bodyText) && !document.querySelector('input[type="password"]')) {
+          if (Date.now() - last2faSelectAt > 2500) {
+            setStatus('⚡ Wähle Airlock 2FA aus...');
+            const radios = Array.from(document.querySelectorAll('input[type="radio"], [role="radio"], label, span, div')).filter(el => {
+              if (el.closest && el.closest('[data-careman-sync-banner]')) return false;
+              const t = (el.innerText || el.textContent || '').trim();
+              return /^Airlock\\s*2FA$/i.test(t) || (el.tagName === 'INPUT' && /airlock/i.test((el.value || '') + ' ' + (el.id || '') + ' ' + (el.name || '')));
+            });
+            const radioInput = document.querySelector('input[type="radio"]') || radios[0];
+            if (radioInput) {
+              try {
+                radioInput.click();
+                if (radioInput.tagName === 'INPUT') {
+                  radioInput.checked = true;
+                  radioInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              } catch (e) {}
+            }
+            if (radios[0] && radios[0] !== radioInput) {
+              try { radios[0].click(); } catch (e) {}
+            }
+            await sleep(200);
+            const selectBtn = Array.from(document.querySelectorAll('button, input[type="submit"], a, [role="button"]')).find(b => {
+              const t = (b.innerText || b.value || b.textContent || '').trim();
+              return /^(Ausw[äa]hlen|Weiter|Best[äa]tigen|OK|Anmelden)$/i.test(t);
+            });
+            if (selectBtn) {
+              last2faSelectAt = Date.now();
+              try { selectBtn.click(); } catch (e) {}
+            }
+          }
+          await sleep(400);
+          continue;
+        }
+
+        // 4. Prüfen auf Login-Formular (Benutzername & Passwort)
+        const passInput = document.querySelector('input[type="password"]');
+        if (passInput) {
+          const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="password"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"])'));
+          const userInput = allInputs.find(inp => /user|login|mail|name/i.test((inp.name || '') + ' ' + (inp.id || '') + ' ' + (inp.placeholder || '') + ' ' + (inp.getAttribute('autocomplete') || ''))) || allInputs[0];
+
+          if (userInput && !userInput.value && apUser) {
+            setNativeInputValue(userInput, apUser);
+          }
+          if (!passInput.value && apPass) {
+            setNativeInputValue(passInput, apPass);
+          }
+
+          if (passInput && !passInput.hasAttribute('data-careman-listener')) {
+            passInput.setAttribute('data-careman-listener', '1');
+            passInput.addEventListener('change', () => {
+              try {
+                if (passInput.value) localStorage.setItem('careman_ap_pass', passInput.value);
+                if (userInput && userInput.value) localStorage.setItem('careman_ap_user', userInput.value);
+              } catch (e) {}
+            });
+          }
+
+          const currentUserVal = userInput ? userInput.value.trim() : apUser;
+          const currentPassVal = passInput.value;
+
+          if (currentUserVal && currentPassVal && Date.now() - lastPasswordSubmitAt > 3000) {
+            setStatus('🔐 Benutzername & Passwort eingetragen – klicke auf Anmelden...');
+            try {
+              localStorage.setItem('careman_ap_user', currentUserVal);
+              localStorage.setItem('careman_ap_pass', currentPassVal);
+            } catch (e) {}
+            if (userInput) setNativeInputValue(userInput, currentUserVal);
+            setNativeInputValue(passInput, currentPassVal);
+            await sleep(150);
+
+            const loginBtn = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]')).find(b => {
+              const t = (b.innerText || b.value || b.textContent || '').trim();
+              return /^(Anmelden|Login|Weiter|OK|Submit)$/i.test(t);
+            }) || document.querySelector('button[type="submit"], input[type="submit"]');
+
+            if (loginBtn) {
+              lastPasswordSubmitAt = Date.now();
+              try { loginBtn.click(); } catch (e) {}
+              try {
+                const form = passInput.closest('form');
+                if (form && typeof form.requestSubmit === 'function') form.requestSubmit();
+              } catch (e) {}
+            }
+          } else if (!currentPassVal) {
+            setStatus('🔐 Bitte Passwort bestätigen (oder im Schichttagebuch speichern) – klicke danach automatisch auf Anmelden...');
+          }
+        }
+
+        await sleep(400);
+      }
+      return;
+    }
 
     const getCommonAncestorDepth = (a, b) => {
       if (!a || !b) return 0;
@@ -1043,14 +1294,140 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       return null;
     };
 
+    const resolveClickableHost = (node) => {
+      if (!node || (node.closest && node.closest('[data-careman-sync-banner]'))) return null;
+      const svgRoot = node.closest ? node.closest('svg') : null;
+      const base = (svgRoot && svgRoot.parentElement) ? svgRoot.parentElement : node;
+      return (base.closest && base.closest('button, a, [role="button"]')) ||
+        (base.closest && base.closest('mat-icon, .mat-icon')) ||
+        base;
+    };
+
+    const clickChevronAt = (elOrNull, cx, cy) => {
+      const rawHit = document.elementFromPoint(cx, cy) || elOrNull;
+      const btn = resolveClickableHost(elOrNull) || resolveClickableHost(rawHit);
+      try {
+        if (btn && typeof btn.click === 'function') {
+          btn.click();
+        }
+      } catch (e) {}
+      const evtTarget = btn || rawHit;
+      if (evtTarget && evtTarget.dispatchEvent) {
+        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
+          try {
+            evtTarget.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
+          } catch (e) {}
+        });
+      }
+    };
+
+    const stepVisibleHeaderToMonth = async (wantYm, wantLabel, contextName) => {
+      const [wantY, wantM] = wantYm.split('-').map(Number);
+      let stepped = false;
+      for (let step = 0; step < 48; step++) {
+        const curHeader = getVisibleMonthHeaderInfo();
+        const curInfo = curHeader || detectMonthYear();
+        const [curY, curM] = curInfo.yearMonth.split('-').map(Number);
+        const diff = (wantY - curY) * 12 + (wantM - curM);
+        if (diff === 0) break;
+
+        setStatus(\`⚡ Wechsle im \${contextName} auf \${wantLabel} (\${curInfo.monthLabel})...\`);
+        const mr = curHeader?.rect || (curHeader?.el ? curHeader.el.getBoundingClientRect() : null);
+        if (!mr) break;
+
+        const arrowY = mr.top + mr.height / 2;
+        const coordX = diff < 0 ? Math.max(8, mr.left - 44) : Math.max(22, mr.left - 14);
+
+        const clusters = [];
+        const addClusterCandidate = (rawEl) => {
+          const host = resolveClickableHost(rawEl);
+          if (!host || !host.getBoundingClientRect) return;
+          if (curHeader?.el && (host === curHeader.el || host.contains(curHeader.el))) return;
+          const r = host.getBoundingClientRect();
+          if (r.width < 6 || r.width > 64 || r.height < 6 || r.height > 64) return;
+          const cy = r.top + r.height / 2;
+          const cx = r.left + r.width / 2;
+          if (Math.abs(cy - arrowY) > 28) return;
+          if (cx < Math.max(2, mr.left - 115) || cx > mr.left - 2) return;
+          const existing = clusters.find(c => Math.abs(c.cx - cx) < 12);
+          if (!existing) {
+            clusters.push({ host, cx, cy });
+          } else if (host.matches && host.matches('button, a, [role="button"]')) {
+            existing.host = host;
+          }
+        };
+
+        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg')).forEach(addClusterCandidate);
+        for (let probeX = Math.max(4, Math.round(mr.left - 100)); probeX <= Math.round(mr.left - 4); probeX += 4) {
+          const hit = document.elementFromPoint(probeX, arrowY);
+          if (hit) addClusterCandidate(hit);
+        }
+        clusters.sort((a, b) => a.cx - b.cx);
+
+        const chosen = clusters.length >= 2 ? (diff < 0 ? clusters[0] : clusters[1]) : (clusters.length === 1 ? clusters[0] : null);
+        const clickX = chosen ? chosen.cx : coordX;
+        const clickY = chosen ? chosen.cy : arrowY;
+
+        clickChevronAt(chosen ? chosen.host : null, clickX, clickY);
+
+        let monthChanged = false;
+        for (let w = 0; w < 8; w++) {
+          await sleep(130);
+          if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
+            monthChanged = true;
+            break;
+          }
+        }
+
+        if (!monthChanged) {
+          const fallbackEl = document.elementFromPoint(coordX, arrowY);
+          clickChevronAt(fallbackEl, coordX, arrowY);
+          for (let w = 0; w < 12; w++) {
+            await sleep(140);
+            if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
+              monthChanged = true;
+              break;
+            }
+          }
+        }
+
+        if (!monthChanged) break;
+        stepped = true;
+      }
+      return stepped;
+    };
+
+    // Falls CareMan direkt nach dem Login/Redirect noch lädt, warte kurz bis Kalender oder Planungsgruppe sichtbar sind
+    for (let w = 0; w < 36; w++) {
+      if (getVisibleMonthHeaderInfo() || findPlanungsgruppeTrigger() || document.querySelectorAll('table tr').length > 2) break;
+      setStatus('⚡ Warte auf Dienstplan Bayern...');
+      await sleep(250);
+    }
+
     const personalTimes = {};
     const istplanShifts = {};
-    const initialMonthInfo = detectMonthYear();
+    let initialMonthInfo = detectMonthYear();
+    const desiredAutoYm = (isFreshAutoPilot && autoPilot.targetYearMonth) || urlYearMonth;
+    if (desiredAutoYm && /^20\\d{2}-\\d{2}$/.test(desiredAutoYm)) {
+      const [dy, dm] = desiredAutoYm.split('-').map(Number);
+      if (dm >= 1 && dm <= 12) {
+        initialMonthInfo = {
+          yearMonth: desiredAutoYm,
+          monthLabel: \`\${monthNames[dm - 1]} \${dy}\`
+        };
+      }
+    }
     const wasOnIstplan = !findPlanungsgruppeTrigger();
 
     // Falls wir auf dem persönlichen Istplan starten: Istplan-Schichten & Uhrzeiten (z.B. 19:14 - 23:06) vorab sichern
     // (Auch auf dem iPhone, wo 7 Kalender-Spalten ~44px-53px breit sind!)
     if (wasOnIstplan) {
+      if (desiredAutoYm && detectMonthYear().yearMonth !== initialMonthInfo.yearMonth) {
+        const didStepIst = await stepVisibleHeaderToMonth(initialMonthInfo.yearMonth, initialMonthInfo.monthLabel, 'Istplan');
+        if (didStepIst) await sleep(350);
+      }
+      const istVisibleMatchesTarget = !desiredAutoYm || detectMonthYear().yearMonth === initialMonthInfo.yearMonth;
+      if (istVisibleMatchesTarget) {
       try {
         const { yearMonth: istYm } = initialMonthInfo;
         const validShiftRegex = /^(RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT\\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\\d?|RZF|R-SAN)\\*?$/i;
@@ -1124,6 +1501,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           }
         });
       } catch (e) {}
+      }
 
       // Automatisch rechts im Menü auf den orangenen Button "Abteilungs-dienstplan" klicken
       const findAbtTile = (requireVisible = true) => {
@@ -1251,38 +1629,11 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       }
     }
 
-    const resolveClickableHost = (node) => {
-      if (!node || (node.closest && node.closest('[data-careman-sync-banner]'))) return null;
-      const svgRoot = node.closest ? node.closest('svg') : null;
-      const base = (svgRoot && svgRoot.parentElement) ? svgRoot.parentElement : node;
-      return (base.closest && base.closest('button, a, [role="button"]')) ||
-        (base.closest && base.closest('mat-icon, .mat-icon')) ||
-        base;
-    };
-
-    const clickChevronAt = (elOrNull, cx, cy) => {
-      const rawHit = document.elementFromPoint(cx, cy) || elOrNull;
-      const btn = resolveClickableHost(elOrNull) || resolveClickableHost(rawHit);
-      try {
-        if (btn && typeof btn.click === 'function') {
-          btn.click();
-        }
-      } catch (e) {}
-      const evtTarget = btn || rawHit;
-      if (evtTarget && evtTarget.dispatchEvent) {
-        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
-          try {
-            evtTarget.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
-          } catch (e) {}
-        });
-      }
-    };
-
-    // Falls wir vom Istplan kamen und CareMan im Abteilungsdienstplan einen anderen Monat geöffnet hat:
+    // Falls wir vom Istplan kamen (oder per Auto-Pilot einen Zielmonat angefordert haben) und CareMan im Abteilungsdienstplan einen anderen Monat geöffnet hat:
     // Bis zu 48 Monate (4 Jahre, z.B. von 2026 bis Januar 2025) rückwärts oder vorwärts blättern!
     let didStepMonth = false;
     const sigBeforeMonthStep = getAbtTableSig();
-    if (wasOnIstplan && findPlanungsgruppeTrigger()) {
+    if ((wasOnIstplan || Boolean(desiredAutoYm)) && findPlanungsgruppeTrigger()) {
       const [wantY, wantM] = initialMonthInfo.yearMonth.split('-').map(Number);
       for (let step = 0; step < 48; step++) {
         const curHeader = getVisibleMonthHeaderInfo();
@@ -1373,9 +1724,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     }
 
     const detectedAfterNav = getVisibleMonthHeaderInfo() || detectMonthYear();
-    // WICHTIG: Wenn auf dem Istplan gestartet wurde (z.B. Januar 2025 oder Juli 2026), bleibt der Zielmonat IMMER fest auf dem Istplan-Monat!
-    const yearMonth = wasOnIstplan ? initialMonthInfo.yearMonth : detectedAfterNav.yearMonth;
-    const monthLabel = wasOnIstplan ? initialMonthInfo.monthLabel : detectedAfterNav.monthLabel;
+    // WICHTIG: Wenn auf dem Istplan gestartet wurde (oder per Auto-Pilot ein Zielmonat gewählt wurde), bleibt der Zielmonat IMMER fest auf dem Zielmonat!
+    const yearMonth = (wasOnIstplan || Boolean(desiredAutoYm)) ? initialMonthInfo.yearMonth : detectedAfterNav.yearMonth;
+    const monthLabel = (wasOnIstplan || Boolean(desiredAutoYm)) ? initialMonthInfo.monthLabel : detectedAfterNav.monthLabel;
 
     const getPopupScrollContainers = () => {
       const containers = new Set();

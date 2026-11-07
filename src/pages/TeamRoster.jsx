@@ -32,6 +32,7 @@ import { parseCareManHtml } from '../utils/teamRosterHtmlParser';
 import { getShiftColor, detectStation, STATION_THEMES } from '../utils/shiftColors';
 import {
   runOneClickCareManSync,
+  importCareManPayloadAndSync,
   transferPersonalRosterToJournal,
   openCareManLiveWindow,
   SIEDA_EXTRACTOR_SCRIPT,
@@ -845,7 +846,7 @@ export default function TeamRoster() {
     }
   };
 
-  // Handle direct Paste (HTML or Tab-separated table text)
+  // Handle direct Paste (Multi-Station JSON, Single-Station JSON, HTML or Tab-separated table text)
   const handlePasteSubmit = async () => {
     if (!pasteText.trim()) return;
     setUploadError(null);
@@ -853,39 +854,34 @@ export default function TeamRoster() {
     setUploadProgress(30);
 
     try {
-      const parsedRoster = await parseCareManHtml(pasteText, p => setUploadProgress(p));
-      setUploadProgress(100);
-      const targetStation = uploadStationOverride !== 'AUTO' ? uploadStationOverride : (parsedRoster.station || detectRosterStation(parsedRoster));
-      saveStationTeamRoster(parsedRoster, targetStation);
-      if (currentUser) {
-        saveStationTeamRosterToCloud(parsedRoster, targetStation, currentUser).catch(err => {
-          console.error('Cloud save failed:', err);
-        });
-      }
-      setCurrentYearMonth(parsedRoster.yearMonth);
-      localStorage.setItem('schichten_selected_year_month', parsedRoster.yearMonth);
-      const activeCombined = getActiveTeamRoster(parsedRoster.yearMonth);
-      setRoster(activeCombined);
-      setSavedRosters(getSavedRosterSummaries());
-
-      // Automatically transfer personal shifts ("Backhaus, Johannes") + PartnerIn directly into Journal
-      const transferRes = await transferPersonalRosterToJournal({
-        yearMonth: parsedRoster.yearMonth,
-        activeRoster: activeCombined,
+      const res = await importCareManPayloadAndSync({
+        rawText: pasteText,
+        stationOverride: uploadStationOverride,
+        preferredYearMonth: yearMonth,
+        currentUser,
         store,
         addShifts,
         deleteShifts,
-        ensureCodesAndTypes
+        ensureCodesAndTypes,
+        onProgress: p => setUploadProgress(p)
       });
-      const updatedPartnerCount = await autoSyncExistingJournalPartners(parsedRoster.yearMonth, activeCombined);
 
-      if (!selectedDate.startsWith(parsedRoster.yearMonth)) {
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        if (todayStr.startsWith(parsedRoster.yearMonth)) {
-          setSelectedDate(todayStr);
-        } else {
-          setSelectedDate(`${parsedRoster.yearMonth}-01`);
+      setUploadProgress(100);
+      if (res?.yearMonth) {
+        setCurrentYearMonth(res.yearMonth);
+        localStorage.setItem('schichten_selected_year_month', res.yearMonth);
+        const activeCombined = res.activeCombined || getActiveTeamRoster(res.yearMonth);
+        setRoster(activeCombined);
+        setSavedRosters(getSavedRosterSummaries());
+
+        if (!selectedDate.startsWith(res.yearMonth)) {
+          const today = new Date();
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+          if (todayStr.startsWith(res.yearMonth)) {
+            setSelectedDate(todayStr);
+          } else {
+            setSelectedDate(`${res.yearMonth}-01`);
+          }
         }
       }
 
@@ -894,12 +890,9 @@ export default function TeamRoster() {
       setUploadProgress(null);
       setPasteText('');
       setActiveModalTab('paste');
-      const transferNote = transferRes.transferredCount > 0
-        ? ` & ${transferRes.transferredCount} eigene Dienste direkt ins Journal übernommen`
-        : (updatedPartnerCount > 0 ? `, ${updatedPartnerCount}x PartnerIn im Journal ergänzt` : '');
-      setToastMessage(
-        `✅ Dienstplan für ${parsedRoster.monthLabel} (Wache ${targetStation}) eingelesen (${parsedRoster.totalShifts} Schichten${transferNote})!`
-      );
+      if (res?.message) {
+        setToastMessage(res.message);
+      }
     } catch (err) {
       console.error('Paste Error:', err);
       setUploadError('Fehler beim Einlesen: ' + (err.message || 'Bitte prüfe den kopierten Inhalt.'));

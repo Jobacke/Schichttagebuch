@@ -16,7 +16,7 @@ const CHROME_BIN = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function loadStoredCredentials() {
-  const defaultToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MDkyMTE3IiwiZXhwIjoiMTc5NDEyMDkxNyJ9.ac6n-uEUGm9C8i1c9SG_DSEGzMSSWGvJuPBF-seY6TA';
+  const defaultToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MDk0MjAzIiwiZXhwIjoiMTc5NDEyMzAwMyJ9.ys8mmRZc6yVOwDmSKSmqa5urcrbwo9v5ijUJ1LDMYz8';
   try {
     if (fs.existsSync(CREDENTIALS_PATH)) {
       const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf8');
@@ -672,7 +672,7 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, version: '2.2.46' }));
+    res.end(JSON.stringify({ ok: true, version: '2.2.49' }));
     return;
   }
 
@@ -902,6 +902,6 @@ async function pollCloudBridgeLoop() {
 }
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.48 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.49 listening on http://127.0.0.1:${PORT}`);
   pollCloudBridgeLoop();
 });

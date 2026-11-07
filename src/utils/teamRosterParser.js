@@ -563,17 +563,34 @@ export function saveStationTeamRoster(rosterData, stationOverride) {
     try {
       localStorage.setItem(targetKey, jsonStr);
     } catch {
-      // iOS Safari 5MB localStorage quota recovery: remove redundant legacy/clipboard cache keys and retry
+      // iOS Safari 5MB localStorage quota recovery: remove redundant legacy/clipboard cache keys and oldest other months
       try {
         localStorage.removeItem(CURRENT_ROSTER_KEY);
         localStorage.removeItem('careman_last_imported_clip');
+        const otherMonthKeys = [];
+        const currentMonthPrefix = `${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}`;
         for (let i = localStorage.length - 1; i >= 0; i--) {
           const k = localStorage.key(i);
-          if (k && k.startsWith(STORAGE_KEY_PREFIX) && !k.includes('_')) {
+          if (!k || !k.startsWith(STORAGE_KEY_PREFIX)) continue;
+          if (!k.includes('_')) {
             localStorage.removeItem(k);
+          } else if (!k.startsWith(currentMonthPrefix)) {
+            otherMonthKeys.push(k);
           }
         }
-        localStorage.setItem(targetKey, jsonStr);
+        otherMonthKeys.sort();
+        let savedOk = false;
+        try {
+          localStorage.setItem(targetKey, jsonStr);
+          savedOk = true;
+        } catch {}
+        for (let idx = 0; idx < otherMonthKeys.length && !savedOk; idx++) {
+          localStorage.removeItem(otherMonthKeys[idx]);
+          try {
+            localStorage.setItem(targetKey, jsonStr);
+            savedOk = true;
+          } catch {}
+        }
       } catch (retryErr) {
         console.warn('localStorage quota exceeded, using memoryRosterStore:', retryErr);
       }
@@ -929,9 +946,11 @@ export async function deleteStationTeamRosterFromCloud(yearMonth, station, curre
 export async function deleteTeamRosterFromCloud(yearMonth, currentUser) {
   if (!currentUser || !currentUser.uid || !db || !yearMonth) return;
   try {
-    for (const st of ROSTER_STATIONS) {
-      await deleteDoc(doc(db, 'users', currentUser.uid, 'team_rosters', `${yearMonth}_${st}`));
-    }
+    await Promise.all(
+      ROSTER_STATIONS.map(st =>
+        deleteDoc(doc(db, 'users', currentUser.uid, 'team_rosters', `${yearMonth}_${st}`)).catch(() => {})
+      )
+    );
   } catch (err) {
     console.error('Error deleting team roster from cloud:', err);
   }
@@ -939,7 +958,7 @@ export async function deleteTeamRosterFromCloud(yearMonth, currentUser) {
 
 /**
  * Synchronizes local rosters with Cloud Firestore bidirectionally:
- * - Uploads any local rosters from localStorage into Firestore if newer or not present
+ * - Uploads any local rosters from localStorage / memoryRosterStore into Firestore if newer or not present
  * - Downloads all newer Firestore rosters into localStorage
  */
 export async function syncTeamRostersWithCloud(currentUser) {
@@ -950,6 +969,7 @@ export async function syncTeamRostersWithCloud(currentUser) {
     const snap = await getDocs(colRef);
     const cloudDocs = new Map();
     snap.forEach(d => {
+      if (d.id === 'autopilot_bridge') return;
       const cData = d.data();
       const r = cData?.roster || cData;
       if (isCorruptedIstplanHourRoster(r)) {
@@ -962,14 +982,18 @@ export async function syncTeamRostersWithCloud(currentUser) {
     let uploaded = 0;
     let downloaded = 0;
 
-    // 1. Check all localStorage items for rosters that need uploading to Cloud Firestore
-    const localKeys = [];
+    // 1. Check all localStorage & memoryRosterStore items for rosters that need uploading to Cloud Firestore
+    const localKeySet = new Set();
+    memoryRosterStore.forEach((_, k) => {
+      if (k && k.startsWith(STORAGE_KEY_PREFIX)) localKeySet.add(k);
+    });
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
-        localKeys.push(key);
+        localKeySet.add(key);
       }
     }
+    const localKeys = Array.from(localKeySet);
 
     for (const key of localKeys) {
       const rest = key.replace(STORAGE_KEY_PREFIX, '');
@@ -978,8 +1002,10 @@ export async function syncTeamRostersWithCloud(currentUser) {
       if (parts.length === 2 && parts[0].match(/^\d{4}-\d{2}$/) && ROSTER_STATIONS.includes(parts[1])) {
         const docId = rest;
         try {
-          const localData = JSON.parse(localStorage.getItem(key));
+          const rawStored = localStorage.getItem(key);
+          const localData = memoryRosterStore.get(key) || (rawStored ? JSON.parse(rawStored) : null);
           if (isCorruptedIstplanHourRoster(localData)) {
+            memoryRosterStore.delete(key);
             localStorage.removeItem(key);
             continue;
           }
@@ -1026,21 +1052,20 @@ export async function syncTeamRostersWithCloud(currentUser) {
     cloudDocs.forEach((cData, docId) => {
       const localKey = `${STORAGE_KEY_PREFIX}${docId}`;
       const existing = localStorage.getItem(localKey);
+      const memExisting = memoryRosterStore.get(localKey);
       const roster = cData.roster || cData;
       if (isCorruptedIstplanHourRoster(roster)) return;
-      if (existing) {
-        try {
-          const existingParsed = JSON.parse(existing);
-          if ((roster?.colleagues?.length || 0) <= 1 && (existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
-            return;
-          }
-          const localTs = getRosterTimestamp(existingParsed);
-          const cloudTs = getRosterTimestamp(cData);
-          if (localTs > 0 && cloudTs > 0 && localTs > cloudTs) {
-            memoryRosterStore.set(localKey, existingParsed);
-            return;
-          }
-        } catch {}
+      const existingParsed = memExisting || (existing ? (() => { try { return JSON.parse(existing); } catch { return null; } })() : null);
+      if (existingParsed) {
+        if ((roster?.colleagues?.length || 0) <= 1 && (existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
+          return;
+        }
+        const localTs = getRosterTimestamp(existingParsed);
+        const cloudTs = getRosterTimestamp(cData);
+        if (localTs > 0 && cloudTs > 0 && localTs > cloudTs) {
+          memoryRosterStore.set(localKey, existingParsed);
+          return;
+        }
       }
       memoryRosterStore.set(localKey, roster);
       const newStr = JSON.stringify(roster);
@@ -1080,6 +1105,7 @@ export function subscribeToCloudTeamRosters(currentUser, onChange) {
     let hasChanges = false;
     snapshot.docChanges().forEach((change) => {
       const docId = change.doc.id;
+      if (docId === 'autopilot_bridge') return;
       const localKey = `${STORAGE_KEY_PREFIX}${docId}`;
 
       if (change.type === 'added' || change.type === 'modified') {
@@ -1117,8 +1143,20 @@ export function subscribeToCloudTeamRosters(currentUser, onChange) {
           hasChanges = true;
         }
       } else if (change.type === 'removed') {
+        const memLocal = memoryRosterStore.get(localKey);
+        const currentLocal = localStorage.getItem(localKey);
+        const existingObj = memLocal || (currentLocal ? (() => { try { return JSON.parse(currentLocal); } catch { return null; } })() : null);
+        const localTs = getRosterTimestamp(existingObj);
+        // Never allow an in-flight cloud delete event to wipe out a station roster that was just imported locally (< 25s ago)
+        if (existingObj && localTs > 0 && Date.now() - localTs < 25000) {
+          const stParts = docId.split('_');
+          if (stParts.length === 2 && ROSTER_STATIONS.includes(stParts[1])) {
+            saveStationTeamRosterToCloud(existingObj, stParts[1], currentUser).catch(() => {});
+          }
+          return;
+        }
         memoryRosterStore.delete(localKey);
-        if (localStorage.getItem(localKey)) {
+        if (currentLocal) {
           localStorage.removeItem(localKey);
           hasChanges = true;
         }

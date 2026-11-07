@@ -310,7 +310,7 @@ async function main() {
   const credsUser = f.credsUser?.stringValue || 'johannes.backhaus@johanniter.de';
   const credsPass = f.credsPass?.stringValue || '';
   const myPlanToken = f.myPlanToken?.stringValue ||
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MDkyMTE3IiwiZXhwIjoiMTc5NDEyMDkxNyJ9.ac6n-uEUGm9C8i1c9SG_DSEGzMSSWGvJuPBF-seY6TA';
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MDk0MjAzIiwiZXhwIjoiMTc5NDEyMzAwMyJ9.ys8mmRZc6yVOwDmSKSmqa5urcrbwo9v5ijUJ1LDMYz8';
 
   const seedMyPlanScript = `
     try {

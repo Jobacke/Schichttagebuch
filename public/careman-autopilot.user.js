@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Schichttagebuch CareMan Auto-Pilot (v2.2.44)
+// @name         Schichttagebuch CareMan Auto-Pilot (v2.2.49)
 // @namespace    https://schicht.vjbackhaus.de/
-// @version      2.2.44
+// @version      2.2.49
 // @description  Vollautomatischer CareMan Login, Airlock 2FA Weiterleitung & 3-Wachen Dienstplan-Import (Rettungswache München, Obersendling, Hohenbrunn) in die App Schichttagebuch
 // @author       Johannes Backhaus
 // @match        https://my.secure.johanniter.de/*
@@ -16,8 +16,8 @@
   const host = window.location.hostname || "";
   if (/schicht\.vjbackhaus\.de/i.test(host)) {
     try {
-      localStorage.setItem("careman_autopilot_userscript_installed", "2.2.44");
-      document.documentElement.setAttribute("data-careman-autopilot-installed", "2.2.44");
+      localStorage.setItem("careman_autopilot_userscript_installed", "2.2.49");
+      document.documentElement.setAttribute("data-careman-autopilot-installed", "2.2.49");
     } catch (e) {}
     return;
   }

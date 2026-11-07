@@ -1314,91 +1314,103 @@
         continue;
       }
 
-      let pgTrigger = findPlanungsgruppeTrigger();
-      for (let w = 0; w < 25 && !pgTrigger; w++) {
-        await sleep(110);
-        pgTrigger = findPlanungsgruppeTrigger();
-      }
-      if (!pgTrigger) break;
+      let stationExtracted = false;
+      for (let attempt = 0; attempt < 2 && !stationExtracted; attempt++) {
+        let pgTrigger = findPlanungsgruppeTrigger();
+        for (let w = 0; w < 25 && !pgTrigger; w++) {
+          await sleep(110);
+          pgTrigger = findPlanungsgruppeTrigger();
+        }
+        if (!pgTrigger) break;
 
-      const opened = await openDropdown(pgTrigger);
-      if (!opened) continue;
+        let opened = await openDropdown(pgTrigger);
+        if (!opened) {
+          await sleep(200);
+          pgTrigger = findPlanungsgruppeTrigger() || pgTrigger;
+          opened = await openDropdown(pgTrigger);
+        }
+        if (!opened) continue;
 
-      let matchOpt = findOptionInPopup(target.pattern, pgTrigger);
+        let matchOpt = findOptionInPopup(target.pattern, pgTrigger);
 
-      // Falls Option noch nicht sichtbar: erst im Popup ganz nach oben scrollen, dann schrittweise nach unten!
-      if (!matchOpt) {
-        const scrollBoxes = getPopupScrollContainers();
-        scrollBoxes.forEach(s => {
-          s.scrollTop = 0;
-          s.dispatchEvent(new Event('scroll'));
-        });
-        await sleep(90);
-        matchOpt = findOptionInPopup(target.pattern, pgTrigger);
-
-        for (let step = 0; step < 12 && !matchOpt; step++) {
-          const boxes = getPopupScrollContainers();
-          boxes.forEach(s => {
-            s.scrollTop += 150;
+        // Falls Option noch nicht sichtbar: erst im Popup ganz nach oben scrollen, dann schrittweise nach unten!
+        if (!matchOpt) {
+          const scrollBoxes = getPopupScrollContainers();
+          scrollBoxes.forEach(s => {
+            s.scrollTop = 0;
             s.dispatchEvent(new Event('scroll'));
           });
-          await sleep(80);
+          await sleep(90);
           matchOpt = findOptionInPopup(target.pattern, pgTrigger);
-        }
-      }
 
-      if (matchOpt) {
-        const prevSig = getAbtTableSig();
-        try {
-          const scrollBoxes = getPopupScrollContainers();
-          scrollBoxes.forEach(sb => {
-            if (sb.contains(matchOpt) && sb.getBoundingClientRect && matchOpt.getBoundingClientRect) {
-              const sbRect = sb.getBoundingClientRect();
-              const optRect = matchOpt.getBoundingClientRect();
-              if (optRect.bottom > sbRect.bottom || optRect.top < sbRect.top) {
-                sb.scrollTop += (optRect.top - sbRect.top) - (sbRect.height / 2) + (optRect.height / 2);
-                sb.dispatchEvent(new Event('scroll'));
+          for (let step = 0; step < 12 && !matchOpt; step++) {
+            const boxes = getPopupScrollContainers();
+            boxes.forEach(s => {
+              s.scrollTop += 150;
+              s.dispatchEvent(new Event('scroll'));
+            });
+            await sleep(80);
+            matchOpt = findOptionInPopup(target.pattern, pgTrigger);
+          }
+        }
+
+        if (matchOpt) {
+          const prevSig = getAbtTableSig();
+          try {
+            const scrollBoxes = getPopupScrollContainers();
+            scrollBoxes.forEach(sb => {
+              if (sb.contains(matchOpt) && sb.getBoundingClientRect && matchOpt.getBoundingClientRect) {
+                const sbRect = sb.getBoundingClientRect();
+                const optRect = matchOpt.getBoundingClientRect();
+                if (optRect.bottom > sbRect.bottom || optRect.top < sbRect.top) {
+                  sb.scrollTop += (optRect.top - sbRect.top) - (sbRect.height / 2) + (optRect.height / 2);
+                  sb.dispatchEvent(new Event('scroll'));
+                }
               }
+            });
+            matchOpt.scrollIntoView({ block: 'nearest' });
+          } catch (e) {}
+          await sleep(40);
+          matchOpt.click();
+          await sleep(85);
+
+          // Falls das Popup nach Klick auf den inneren Text noch offen ist, auf das mat-option Element klicken
+          if (isPopupOpen()) {
+            const optHost = matchOpt.closest('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, li') || matchOpt.parentElement;
+            if (optHost && optHost !== matchOpt) {
+              optHost.click();
+              await sleep(85);
             }
-          });
-          matchOpt.scrollIntoView({ block: 'nearest' });
-        } catch (e) {}
-        await sleep(40);
-        matchOpt.click();
-        await sleep(85);
-
-        // Falls das Popup nach Klick auf den inneren Text noch offen ist, auf das mat-option Element klicken
-        if (isPopupOpen()) {
-          const optHost = matchOpt.closest('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, li') || matchOpt.parentElement;
-          if (optHost && optHost !== matchOpt) {
-            optHost.click();
-            await sleep(85);
           }
-        }
 
-        // Warte bis CareMan den Ladebalken (mat-progress-bar) beendet hat (61000 hat ~120 Mitarbeiter und braucht ca. 5-8s Server-Ladezeit)
-        await sleep(120);
-        for (let w = 0; w < 240; w++) {
-          await sleep(80);
-          const isBusy = Boolean(document.querySelector('mat-progress-bar, .mat-progress-bar, [role="progressbar"]'));
-          if (isBusy) continue;
-          const newSig = getAbtTableSig();
-          const checkSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
-          const sigChanged = Boolean(newSig && newSig !== prevSig);
-          const validForMonth = !didStepMonth || Boolean(newSig && newSig !== sigBeforeMonthStep);
-          if (checkSnap.colleagues.length > 0 && (sigChanged || (i === 0 && validForMonth && checkSnap.detectedStation === 'Sendling'))) {
-            break;
+          // Warte bis CareMan den Ladebalken (mat-progress-bar) beendet hat (61000 hat ~120 Mitarbeiter und braucht ca. 5-8s Server-Ladezeit)
+          await sleep(120);
+          for (let w = 0; w < 240; w++) {
+            await sleep(80);
+            const isBusy = Boolean(document.querySelector('mat-progress-bar, .mat-progress-bar, [role="progressbar"]'));
+            if (isBusy) continue;
+            const newSig = getAbtTableSig();
+            const checkSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
+            const sigChanged = Boolean(newSig && newSig !== prevSig);
+            const validForMonth = !didStepMonth || Boolean(newSig && newSig !== sigBeforeMonthStep);
+            if (checkSnap.colleagues.length > 0 && (checkSnap.detectedStation === target.station || sigChanged || (i === 0 && validForMonth && checkSnap.detectedStation === 'Sendling'))) {
+              break;
+            }
+            if (w === 60 && !sigChanged && checkSnap.detectedStation !== target.station) {
+              break;
+            }
           }
-        }
-        await sleep(90);
+          await sleep(90);
 
-        const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
-        if (extracted.colleagues.length > 0) {
-          rosters.push({ ...extracted, station: target.station });
+          const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
+          if (extracted.colleagues.length > 0 && (extracted.detectedStation === target.station || getAbtTableSig() !== prevSig || attempt === 1)) {
+            rosters.push({ ...extracted, station: target.station });
+            stationExtracted = true;
+          }
+        } else {
+          document.body.click();
+          await sleep(150);
         }
-      } else {
-        document.body.click();
-        await sleep(150);
       }
     }
 

@@ -19,6 +19,7 @@ import {
   importCareManPayloadAndSync,
   looksLikeCareManData
 } from '../utils/oneClickCareManSync';
+import { APP_VERSION } from '../version';
 
 export default function CareManImportModal({
   isOpen,
@@ -353,7 +354,7 @@ export default function CareManImportModal({
                 }}
               >
                 <Bookmark size={14} />
-                <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '⚡ CareMan 1-Klick (v2.2.23)'}</span>
+                <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : `⚡ CareMan 1-Klick (v${APP_VERSION})`}</span>
               </a>
               <button
                 type="button"

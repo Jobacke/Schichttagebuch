@@ -37,6 +37,7 @@ import {
   SIEDA_EXTRACTOR_SCRIPT,
   BOOKMARKLET_CODE
 } from '../utils/oneClickCareManSync';
+import { APP_VERSION } from '../version';
 
 export default function TeamRoster() {
   const { currentUser } = useAuth();
@@ -2315,7 +2316,7 @@ export default function TeamRoster() {
                         }}
                       >
                         <Bookmark size={14} />
-                        <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '⚡ CareMan 1-Klick Übernahme'}</span>
+                        <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : `⚡ CareMan 1-Klick (v${APP_VERSION})`}</span>
                       </a>
 
                       <button

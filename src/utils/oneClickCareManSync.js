@@ -546,21 +546,34 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
   const setStatus = txt => { banner.textContent = txt; };
   document.body.appendChild(banner);
 
+  const fireClick = (el) => {
+    if (!el) return;
+    const inner = el.querySelector ? el.querySelector('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, input, button, [role="combobox"], [role="listbox"]') : null;
+    const targets = [inner, el].filter(Boolean);
+    targets.forEach(t => {
+      ['pointerdown', 'mousedown', 'mouseup', 'click'].forEach(type => {
+        t.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+      });
+      if (typeof t.click === 'function') t.click();
+    });
+  };
+
   try {
     const personalTimes = {};
-    if (!document.querySelector('table.mat-table')) {
+    // 1. Falls noch auf der CareMan-Startseite (Istplan) und noch nicht im Abteilungsdienstplan
+    if (!window.location.href.includes('team-duty') && !/Planungsgruppe/i.test(document.body ? document.body.innerText : '')) {
       const abtBtn = Array.from(document.querySelectorAll('a, button, div, span')).find(el => {
         const t = (el.innerText || el.textContent || '').replace(/\\s+/g, '');
         return t === 'Abteilungsdienstplan' || t === 'Abteilungs-dienstplan';
       });
       if (abtBtn) {
         setStatus('⚡ Öffne Abteilungsdienstplan...');
-        abtBtn.click();
-        for (let i = 0; i < 25; i++) {
+        fireClick(abtBtn);
+        for (let i = 0; i < 30; i++) {
           await sleep(250);
-          if (document.querySelector('table.mat-table') || document.querySelector('mat-select')) break;
+          if (window.location.href.includes('team-duty') || /Planungsgruppe/i.test(document.body ? document.body.innerText : '')) break;
         }
-        await sleep(500);
+        await sleep(600);
       }
     }
 
@@ -672,14 +685,61 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       return { yearMonth, monthLabel, station, colleagues };
     };
 
-    const findPlanungsgruppeSelect = () => {
-      const fields = Array.from(document.querySelectorAll('mat-form-field, .mat-form-field'));
-      const pgField = fields.find(f => /Planungsgruppe/i.test(f.innerText || f.textContent || ''));
-      if (pgField) {
-        const sel = pgField.querySelector('mat-select, .mat-select, [role="combobox"], [role="listbox"]');
-        if (sel) return sel;
+    // Universeller Finder für das Dropdown "Filter Planungsgruppe" (egal ob mat-select, md-select, ng-select oder div)
+    const findPlanungsgruppeTrigger = () => {
+      const allSelects = Array.from(document.querySelectorAll(
+        'mat-select, md-select, ng-select, select, [role="combobox"], [role="listbox"], .mat-select, .md-select, .ng-select'
+      ));
+      const byParentLabel = allSelects.find(el => {
+        const container = el.closest('mat-form-field, md-input-container, .form-group, .form-field, div');
+        return container && /Planungsgruppe/i.test(container.innerText || container.textContent || '');
+      });
+      if (byParentLabel) return byParentLabel;
+      if (allSelects.length > 0) return allSelects[0];
+
+      const allEls = Array.from(document.querySelectorAll('*'));
+      const labelEl = allEls.find(el => {
+        if (el.children.length > 2) return false;
+        const t = (el.innerText || el.textContent || '').trim();
+        return /^Filter\\s+Planungsgruppe$/i.test(t) || t === 'Planungsgruppe';
+      });
+
+      if (labelEl) {
+        let container = labelEl.parentElement;
+        for (let i = 0; i < 4 && container; i++) {
+          const siblingOrChild = Array.from(container.querySelectorAll('input, select, button, [tabindex], [role], div, span')).find(
+            c => c !== labelEl && !labelEl.contains(c) && !c.contains(labelEl) && /(61\\d*|Fahrzeugplanung|Rettungswache|SKo|WL|Oktoberfest|Aubing|M[üu]nchen|Obersendling|Hohenbrunn)/i.test((c.innerText || c.value || '').trim())
+          );
+          if (siblingOrChild) return siblingOrChild;
+          container = container.parentElement;
+        }
+        return labelEl.nextElementSibling || labelEl.parentElement;
       }
-      return document.querySelectorAll('mat-select, .mat-select')[0] || null;
+
+      return allEls.find(el => {
+        if (el.closest('table')) return false;
+        if (el.children.length > 3) return false;
+        const t = (el.innerText || el.textContent || '').trim();
+        return /^(61\\s+Fahrzeugplanung|61\\s+SKo|61\\s+WL|61000|61010|61300)/i.test(t);
+      }) || null;
+    };
+
+    const findOptionInPopup = (pattern, pgTrigger) => {
+      const optionCandidates = Array.from(document.querySelectorAll(
+        'mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option, li'
+      ));
+      const explicitMatch = optionCandidates.find(o => pattern.test((o.innerText || o.textContent || '').trim()));
+      if (explicitMatch) return explicitMatch;
+
+      const allCandidates = Array.from(document.querySelectorAll('div, span, a, p, li')).filter(el => {
+        if (!pgTrigger) return false;
+        if (el === pgTrigger || pgTrigger.contains(el) || el.contains(pgTrigger)) return false;
+        if (el.closest('table')) return false;
+        const txt = (el.innerText || el.textContent || '').trim();
+        if (!txt || txt.length > 120) return false;
+        return pattern.test(txt);
+      });
+      return allCandidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
     };
 
     const TARGET_STATIONS = [
@@ -689,51 +749,59 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     ];
 
     const rosters = [];
-    const pgSelect = findPlanungsgruppeSelect();
 
-    if (pgSelect) {
-      for (let i = 0; i < TARGET_STATIONS.length; i++) {
-        const target = TARGET_STATIONS[i];
-        setStatus(\`⚡ Lese Wache \${i + 1}/3: \${target.label}...\`);
+    for (let i = 0; i < TARGET_STATIONS.length; i++) {
+      const target = TARGET_STATIONS[i];
+      const pgTrigger = findPlanungsgruppeTrigger();
+      if (!pgTrigger) break;
 
-        const currentTriggerText = (pgSelect.innerText || pgSelect.textContent || '').trim();
-        const alreadySelected = target.pattern.test(currentTriggerText) &&
-          document.querySelectorAll('tr').length > 3 &&
-          !Array.from(document.querySelectorAll('tr')).some(r => /^M-J\\s*\\d/i.test((r.children[0]?.textContent || '').trim()));
+      setStatus(\`⚡ Lese Wache \${i + 1}/3: \${target.label}...\`);
 
-        if (!alreadySelected) {
-          const clickTarget = pgSelect.querySelector('.mat-select-trigger, .mat-mdc-select-trigger') || pgSelect;
-          clickTarget.click();
+      const currentTriggerText = (pgTrigger.innerText || pgTrigger.textContent || pgTrigger.value || '').trim();
+      const alreadySelected = target.pattern.test(currentTriggerText) &&
+        document.querySelectorAll('tr').length > 3 &&
+        !Array.from(document.querySelectorAll('tr')).some(r => /^M-J\\s*\\d/i.test((r.children[0]?.textContent || '').trim()));
 
-          let options = [];
-          for (let w = 0; w < 15; w++) {
-            await sleep(120);
-            options = Array.from(document.querySelectorAll('mat-option, .mat-option, [role="option"]'));
-            if (options.length > 0) break;
-          }
+      if (!alreadySelected) {
+        fireClick(pgTrigger);
 
-          const matchOpt = options.find(o => target.pattern.test((o.innerText || o.textContent || '').trim()));
-          if (matchOpt) {
-            const prevSig = Array.from(document.querySelectorAll('tr')).slice(1, 5).map(r => (r.children[0]?.textContent || '').trim()).join('|');
-            matchOpt.scrollIntoView({ block: 'nearest' });
-            matchOpt.click();
-
-            for (let w = 0; w < 25; w++) {
-              await sleep(160);
-              const newSig = Array.from(document.querySelectorAll('tr')).slice(1, 5).map(r => (r.children[0]?.textContent || '').trim()).join('|');
-              if (newSig && newSig !== prevSig && !/^M-J\\s*\\d/i.test(newSig)) break;
-            }
-            await sleep(250);
-          } else {
-            document.body.click();
-            await sleep(150);
-          }
+        let matchOpt = null;
+        for (let w = 0; w < 18; w++) {
+          await sleep(130);
+          matchOpt = findOptionInPopup(target.pattern, pgTrigger);
+          if (matchOpt) break;
+          // Falls das Popup eine Scrollbar hat (z.B. ab 61010 / 61300), im Popup nach unten scrollen
+          const scrollables = Array.from(document.querySelectorAll('div, ul, md-content, .mat-select-panel, .cdk-virtual-scroll-viewport')).filter(
+            el => !el.closest('table') && el !== document.body && el.scrollHeight > el.clientHeight + 20 && el.clientHeight > 60 && el.clientHeight < 600
+          );
+          scrollables.forEach(s => { s.scrollTop += 220; });
         }
 
-        const extracted = extractVisibleTable(target.station);
-        if (extracted.colleagues.length > 0) {
-          rosters.push(extracted);
+        if (matchOpt) {
+          const prevSig = Array.from(document.querySelectorAll('tr')).slice(1, 6).map(r => (r.children[0]?.textContent || '').trim()).join('|');
+          try { matchOpt.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+          await sleep(80);
+          fireClick(matchOpt);
+          if (matchOpt.parentElement && matchOpt.parentElement !== document.body) {
+            fireClick(matchOpt.parentElement);
+          }
+
+          for (let w = 0; w < 30; w++) {
+            await sleep(160);
+            const newSig = Array.from(document.querySelectorAll('tr')).slice(1, 6).map(r => (r.children[0]?.textContent || '').trim()).join('|');
+            if (newSig && newSig !== prevSig && !/^M-J\\s*\\d/i.test(newSig)) break;
+          }
+          await sleep(300);
+        } else {
+          document.body.click();
+          await sleep(150);
+          continue;
         }
+      }
+
+      const extracted = extractVisibleTable(target.station);
+      if (extracted.colleagues.length > 0) {
+        rosters.push(extracted);
       }
     }
 
@@ -767,9 +835,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       } catch (e) {}
     }
 
-    setStatus(\`✅ Alle \${rosters.length} Wachen (\${monthLabel}) live ans Schichttagebuch übertragen!\`);
+    setStatus(\`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) live ans Schichttagebuch übertragen!\`);
     banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-    window.open('https://schicht.vjbackhaus.de/team#careman=' + encodeURIComponent(json), 'schichttagebuch_app');
+    window.open('https://schicht.vjbackhaus.de/#careman=' + encodeURIComponent(json), 'schichttagebuch_app');
     setTimeout(() => banner.remove(), 6000);
   } catch (err) {
     banner.style.background = '#dc2626';

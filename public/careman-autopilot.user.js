@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Schichttagebuch CareMan Auto-Pilot (v2.2.35)
+// @name         Schichttagebuch CareMan Auto-Pilot (v2.2.44)
 // @namespace    https://schicht.vjbackhaus.de/
-// @version      2.2.35
+// @version      2.2.44
 // @description  Vollautomatischer CareMan Login, Airlock 2FA Weiterleitung & 3-Wachen Dienstplan-Import (Rettungswache München, Obersendling, Hohenbrunn) in die App Schichttagebuch
 // @author       Johannes Backhaus
 // @match        https://my.secure.johanniter.de/*
@@ -16,14 +16,15 @@
   const host = window.location.hostname || "";
   if (/schicht\.vjbackhaus\.de/i.test(host)) {
     try {
-      localStorage.setItem("careman_autopilot_userscript_installed", "2.2.35");
-      document.documentElement.setAttribute("data-careman-autopilot-installed", "2.2.35");
+      localStorage.setItem("careman_autopilot_userscript_installed", "2.2.44");
+      document.documentElement.setAttribute("data-careman-autopilot-installed", "2.2.44");
     } catch (e) {}
     return;
   }
+  const isLoginHost = /my\.secure\.johanniter\.de/i.test(host);
   const isAutoPilotActive = Boolean(window.name && window.name.startsWith("CAREMAN_AUTOPILOT:"));
   const hasDateParam = /[?&]date=20\d{2}-\d{1,2}-\d{1,2}/.test(window.location.search || "");
-  if (!isAutoPilotActive && !(/dienstplan-bayern\.secure\.johanniter\.de/i.test(host) && hasDateParam)) {
+  if (!isLoginHost && !isAutoPilotActive && !(/dienstplan-bayern\.secure\.johanniter\.de/i.test(host) && hasDateParam)) {
     return;
   }
   if (window.__caremanAutoPilotRunning) return;
@@ -77,9 +78,15 @@
       (!autoPilot.startedAt || (Date.now() - autoPilot.startedAt < 25 * 60 * 1000))
     );
 
-    const urlDateMatch = (window.location.href || '').match(/[?&]date=(20\d{2})-(\d{1,2})-(\d{1,2})/);
+    const decodedHref = (() => {
+      try { return decodeURIComponent(window.location.href || ''); } catch (e) { return window.location.href || ''; }
+    })();
+    const urlDateMatch = decodedHref.match(/[?&]date=(20\d{2})-(\d{1,2})-(\d{1,2})/);
     const urlYearMonth = urlDateMatch
       ? `${urlDateMatch[1]}-${String(parseInt(urlDateMatch[2], 10)).padStart(2, '0')}`
+      : null;
+    const urlTargetDate = urlDateMatch
+      ? `${urlDateMatch[1]}-${parseInt(urlDateMatch[2], 10)}-${parseInt(urlDateMatch[3], 10)}`
       : null;
 
     const setNativeInputValue = (el, val) => {
@@ -107,11 +114,9 @@
     if (/my\.secure\.johanniter\.de/i.test(window.location.hostname || '')) {
       const now = new Date();
       const fallbackDate = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-      const targetDate = (autoPilot && autoPilot.targetDate) || fallbackDate;
-      const targetYm = (autoPilot && autoPilot.targetYearMonth) ||
+      let targetDate = (autoPilot && autoPilot.targetDate) || urlTargetDate || fallbackDate;
+      let targetYm = (autoPilot && autoPilot.targetYearMonth) || urlYearMonth ||
         `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const targetCareManUrl = (autoPilot && autoPilot.targetCareManUrl) ||
-        `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
 
       let apUser = (autoPilot && autoPilot.username) || '';
       let apPass = (autoPilot && autoPilot.password) || '';
@@ -123,6 +128,38 @@
       } catch (e) {
         if (!apUser) apUser = 'johannes.backhaus@johanniter.de';
       }
+
+      if (!apPass) {
+        try {
+          const fbKey = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
+          const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${fbKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'careman-autopilot-bridge@vjbackhaus.de', password: 'CareManBridge_2026!Secure', returnSecureToken: true })
+          });
+          if (authRes.ok) {
+            const authData = await authRes.json();
+            const docRes = await fetch(`https://firestore.googleapis.com/v1/projects/schichttagebuch-da2c3/databases/(default)/documents/users/${authData.localId}/team_rosters/autopilot_bridge`, {
+              headers: { 'Authorization': `Bearer ${authData.idToken}` }
+            });
+            if (docRes.ok) {
+              const doc = await docRes.json();
+              const f = doc.fields || {};
+              if (f.credsUser?.stringValue) apUser = f.credsUser.stringValue;
+              if (f.credsPass?.stringValue) apPass = f.credsPass.stringValue;
+              if (!urlYearMonth && f.ym?.stringValue) targetYm = f.ym.stringValue;
+              if (!urlTargetDate && f.targetDate?.stringValue) targetDate = f.targetDate.stringValue;
+              try {
+                if (apUser) localStorage.setItem('careman_ap_user', apUser);
+                if (apPass) localStorage.setItem('careman_ap_pass', apPass);
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }
+
+      const targetCareManUrl = (autoPilot && autoPilot.targetCareManUrl) ||
+        `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
 
       try {
         window.name = 'CAREMAN_AUTOPILOT:' + JSON.stringify({
@@ -532,7 +569,7 @@
               let baseCode = part.replace(/[^A-ZÄÖÜ0-9\-]/g, '');
               if (!baseCode || baseCode.length < 2 || baseCode.length > 10 || !/[A-ZÄÖÜ]/i.test(baseCode) || /^KW\d*$/i.test(baseCode) || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
 
-              const stdPat = '(?:RF[MHO]|RS\d?[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
+              const stdPat = '(?:RF[MHO]|RS\d?[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MHO]|RH[MHO]|KS\d?[MHO]|KF\d?[MHO]|KT\d?[MHO]|KN\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
               const pm = baseCode.match(new RegExp('^(RD|RDÜ|ÜB)(' + stdPat + ')(\\*?)$'));
               if (pm) {
                 const sub1 = pm[1] === 'RD' ? 'RDÜ' : pm[1];
@@ -599,17 +636,30 @@
       });
     };
 
-    // Das Popup ist genau dann offen, wenn entweder mindestens 2 sichtbare mat-option/[role="option"] Zeilen existieren
-    // ODER mindestens 3 verschiedene Zeilen mit Planungsgruppen gleichzeitig sichtbar sind!
+    // Das Popup ist genau dann offen, wenn mindestens 2 sichtbare mat-option/[role="option"] Zeilen existieren
+    // ODER mindestens 3 nicht-ineinander-verschachtelte Zeilen mit unterschiedlichen Planungsgruppen sichtbar sind!
     const isPopupOpen = () => {
       const visOpts = Array.from(document.querySelectorAll('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option')).filter(
         el => !el.closest('[data-careman-sync-banner], table') && isElementVisible(el)
       );
-      const optY = new Set(visOpts.map(el => Math.round(el.getBoundingClientRect().top / 14)));
+      const optY = new Set(visOpts.map(el => Math.round(el.getBoundingClientRect().top / 18)));
       if (optY.size >= 2) return true;
-      const vis = getVisiblePgElements();
-      const distinctY = new Set(vis.map(el => Math.round(el.getBoundingClientRect().top / 16)));
+      const rawVis = getVisiblePgElements();
+      const leafVis = rawVis.filter(el => !rawVis.some(other => other !== el && el.contains(other)));
+      const distinctY = new Set(leafVis.map(el => Math.round(el.getBoundingClientRect().top / 28)));
       return distinctY.size >= 3;
+    };
+
+    const dismissBlockingDialogs = () => {
+      try {
+        const dlgBtns = Array.from(document.querySelectorAll('mat-dialog-container button, .mat-dialog-container button, [role="dialog"] button'));
+        const okBtn = dlgBtns.find(b => /^(OK|Schlie[ßs]en|Verstanden|Ja)$/i.test((b.innerText || b.textContent || '').trim())) || dlgBtns[0];
+        if (okBtn && typeof okBtn.click === 'function') {
+          okBtn.click();
+          return true;
+        }
+      } catch (e) {}
+      return false;
     };
 
     // Universeller Finder für das geschlossene Dropdown "Filter Planungsgruppe"
@@ -783,33 +833,65 @@
     // (Auch auf dem iPhone, wo 7 Kalender-Spalten ~44px-53px breit sind!)
     if (wasOnIstplan) {
       if (desiredAutoYm && !urlYearMonth && detectMonthYear().yearMonth !== initialMonthInfo.yearMonth) {
-        const didStepIst = await stepVisibleHeaderToMonth(initialMonthInfo.yearMonth, initialMonthInfo.monthLabel, 'Istplan');
-        if (didStepIst) await sleep(200);
+        const dpToggleBtn = document.querySelector('myplan-date-selector mat-datepicker-toggle button, mat-datepicker-toggle button');
+        if (dpToggleBtn && !getVisibleMonthHeaderInfo()) {
+          try {
+            dismissBlockingDialogs();
+            dpToggleBtn.click();
+            await sleep(220);
+            const periodBtn = document.querySelector('.mat-calendar-period-button');
+            if (periodBtn) {
+              periodBtn.click();
+              await sleep(220);
+              const [wantY, wantM] = initialMonthInfo.yearMonth.split('-').map(Number);
+              const yrCell = Array.from(document.querySelectorAll('.mat-calendar-body-cell')).find(c => (c.innerText || '').trim() === String(wantY));
+              if (yrCell) {
+                yrCell.click();
+                await sleep(220);
+                const mCells = Array.from(document.querySelectorAll('.mat-calendar-body-cell'));
+                if (mCells[wantM - 1]) {
+                  mCells[wantM - 1].click();
+                  await sleep(220);
+                  const dCell = Array.from(document.querySelectorAll('.mat-calendar-body-cell')).find(c => (c.innerText || '').trim() === '1');
+                  if (dCell) {
+                    dCell.click();
+                    await sleep(900);
+                  }
+                }
+              }
+            }
+          } catch (e) {}
+        } else {
+          const didStepIst = await stepVisibleHeaderToMonth(initialMonthInfo.yearMonth, initialMonthInfo.monthLabel, 'Istplan');
+          if (didStepIst) await sleep(200);
+        }
       }
 
-      const validShiftRegex = /^(RF[MHO]|RS\d?[MHO]|RN[MHO]|RT\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\d?|RZF|R-SAN)\*?$/i;
+      const istDayPrefixRegex = /^(?:(?:Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mo|Di|Mi|Do|Fr|Sa|So)\.?\s+)?([0-3]?\d)\b/i;
+      const validShiftRegex = /^(RF[MHO]|RS\d?[MHO]|RN[MHO]|RT\d?[MHO]|RC[MHO]|RH[MHO]|KS\d?[MHO]|KF\d?[MHO]|KT\d?[MHO]|KN\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\d?|RZF|R-SAN)\*?$/i;
       const getIstplanRawCells = () => {
-        let cells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
+        let cells = Array.from(document.querySelectorAll('myplan-calendar-day-phone, myplan-calendar-cell, td, mat-grid-tile, div')).filter(c => {
           if (c.closest('[data-careman-sync-banner]')) return false;
           if (!c.getBoundingClientRect) return false;
           const r = c.getBoundingClientRect();
-          if (r.width < 28 || r.width > 360 || r.height < 24 || r.height > 260) return false;
+          if (r.width < 28 || r.width > 480 || r.height < 20 || r.height > 260) return false;
           const t = (c.innerText || c.textContent || '').trim();
           if (!/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/.test(t)) return false;
           // Wichtig: Uhrzeit vorher entfernen, damit NIEMALS die Startstunde (06, 14, 15, 22) im inneren grauen Kasten als Kalendertag erkannt wird!
           const withoutTime = t.replace(/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/g, '').trim();
-          return /^([0-3]?\d)\b/.test(withoutTime);
+          return istDayPrefixRegex.test(withoutTime);
         });
         if (cells.length === 0) {
-          cells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
+          cells = Array.from(document.querySelectorAll('myplan-calendar-day-phone, myplan-calendar-cell, td, mat-grid-tile, div')).filter(c => {
             if (c.closest('[data-careman-sync-banner], thead, th')) return false;
             if (!c.getBoundingClientRect) return false;
             const r = c.getBoundingClientRect();
-            if (r.width < 28 || r.width > 360 || r.height < 24 || r.height > 260) return false;
+            if (r.width < 28 || r.width > 480 || r.height < 20 || r.height > 260) return false;
             const t = (c.innerText || c.textContent || '').trim();
-            if (!/^([0-3]?\d)\b/.test(t)) return false;
-            const tokens = t.split(/[\s,;/+|\n\r]+/).map(x => x.trim()).filter(Boolean);
-            return tokens.length >= 2 && tokens.length <= 12 && tokens.slice(1).some(tok => validShiftRegex.test(tok.replace(/[^A-ZÄÖÜ0-9\-*]/gi, '')));
+            if (!istDayPrefixRegex.test(t)) return false;
+            const withoutPrefix = t.replace(istDayPrefixRegex, '').trim();
+            const tokens = withoutPrefix.split(/[\s,;/+|\n\r]+/).map(x => x.trim()).filter(Boolean);
+            return tokens.length >= 1 && tokens.length <= 12 && tokens.some(tok => validShiftRegex.test(tok.replace(/[^A-ZÄÖÜ0-9\-*]/gi, '')));
           });
         }
         return cells;
@@ -818,12 +900,18 @@
       // WICHTIG: CareMan rendert die Überschrift (z.B. "Dezember 2024") sofort bei 0ms, lädt die Kalenderzellen (getSmartMyPlanRoster)
       // aber asynchron nach. Warte bis zu 4.5s, bis die Kalenderzellen (00:00 - 00:00 / 06:54 - 15:06) geladen sind!
       for (let w = 0; w < 30; w++) {
+        dismissBlockingDialogs();
         if (getIstplanRawCells().length > 0) break;
         setStatus(`⚡ Lade Istplan (${initialMonthInfo.monthLabel})...`);
         await sleep(140);
       }
 
-      const istVisibleMatchesTarget = !desiredAutoYm || detectMonthYear().yearMonth === initialMonthInfo.yearMonth;
+      const curUrlMatch = (window.location.href || '').match(/[?&]date=(20\d{2})-(\d{1,2})-(\d{1,2})/);
+      const curUrlYm = curUrlMatch ? `${curUrlMatch[1]}-${String(parseInt(curUrlMatch[2], 10)).padStart(2, '0')}` : urlYearMonth;
+      const istVisibleMatchesTarget =
+        !desiredAutoYm ||
+        Boolean(curUrlYm && curUrlYm === initialMonthInfo.yearMonth) ||
+        detectMonthYear().yearMonth === initialMonthInfo.yearMonth;
       if (istVisibleMatchesTarget) {
       try {
         const { yearMonth: istYm } = initialMonthInfo;
@@ -840,14 +928,15 @@
         istCells.forEach((cell, idx) => {
           const txt = (cell.innerText || cell.textContent || '').trim();
           const withoutTime = txt.replace(/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/g, '').trim();
-          const dayM = withoutTime.match(/^([0-3]?\d)\b/);
+          const dayM = withoutTime.match(istDayPrefixRegex);
           const timeM = txt.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
           if (!dayM) return;
           const dNum = parseInt(dayM[1], 10);
           if (dNum < 1 || dNum > 31) return;
-          // In den ersten 7 Zellen (bei vollem 28+ Tage-Kalendergitter) gehören Tage > 20 zum Vormonat; in den letzten 7 Zellen gehören Tage < 15 zum Folgemonat
-          if (istCells.length >= 28 && idx < 7 && dNum > 20) return;
-          if (istCells.length >= 28 && idx >= istCells.length - 7 && dNum < 15) return;
+          // In den ersten 7 Zellen (bei vollem Desktop-Kalendergitter mit >31 Zellen inkl. Vor-/Folgemonat) gehören Tage > 20 zum Vormonat
+          const isDesktopGridWithPadding = istCells.length > 31;
+          if (isDesktopGridWithPadding && idx < 7 && dNum > 20) return;
+          if (isDesktopGridWithPadding && idx >= istCells.length - 7 && dNum < 15) return;
 
           if (timeM && timeM[1] === '00:00' && timeM[2] === '00:00') return;
 
@@ -855,11 +944,11 @@
           if (timeM) {
             personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
           }
-          const lines = withoutTime.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
+          const withoutDayPrefix = withoutTime.replace(istDayPrefixRegex, '').trim();
+          const lines = withoutDayPrefix.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
           const matchedIstCodes = [];
-          const searchLines = lines.length > 1 ? lines.slice(1) : [withoutTime.replace(/^([0-3]?\d)\b/, '').trim()];
-          for (let li = 0; li < searchLines.length; li++) {
-            const line = searchLines[li];
+          for (let li = 0; li < lines.length; li++) {
+            const line = lines[li];
             const tokens = line.split(/[,;/+|\s]+/).map(t => t.trim()).filter(Boolean);
             tokens.forEach(tok => {
               const codeCandidate = tok.replace(/[^A-ZÄÖÜ0-9\-*]/gi, '').toUpperCase();
@@ -920,6 +1009,7 @@
       let abtEl = findAbtTile(true);
       let triedOpeningMenuDrawer = false;
       for (let w = 0; w < 38 && !abtEl; w++) {
+        dismissBlockingDialogs();
         if (!triedOpeningMenuDrawer && !isMenuPanelVisible()) {
           triedOpeningMenuDrawer = true;
           let menuBtn = Array.from(document.querySelectorAll('button, a, [role="button"], div, span')).find(el => {
@@ -1002,6 +1092,7 @@
 
     // Warte bis zu 7.5 Sekunden, bis das Dropdown "Filter Planungsgruppe" (*ngIf="!isLoading") UND die Tabelle geladen sind
     for (let w = 0; w < 65; w++) {
+      dismissBlockingDialogs();
       if (findPlanungsgruppeTrigger() && document.querySelectorAll('table tr').length > 2) break;
       setStatus(`⚡ Lade Abteilungsdienstplan (${initialMonthInfo.monthLabel})...`);
       await sleep(115);
@@ -1136,11 +1227,14 @@
       }
 
       if (didStepMonth) {
-        // Warte nach dem Monatswechsel kurz, bis CareMan die Tabelle / Planungsgruppen (*ngIf="!isLoading") für den Zielmonat geladen hat
-        for (let w = 0; w < 45; w++) {
+        // Warte nach dem Monatswechsel, bis CareMan den Ladebalken (mat-progress-bar) beendet hat und die Planungsgruppen bereit sind
+        await sleep(120);
+        for (let w = 0; w < 90; w++) {
           await sleep(80);
+          const isBusy = Boolean(document.querySelector('mat-progress-bar, .mat-progress-bar, [role="progressbar"]'));
           const curSig = getAbtTableSig();
-          if (findPlanungsgruppeTrigger() && curSig && curSig !== sigBeforeMonthStep) break;
+          if (!isBusy && findPlanungsgruppeTrigger() && curSig && curSig !== sigBeforeMonthStep) break;
+          if (!isBusy && w >= 15 && findPlanungsgruppeTrigger()) break;
         }
         await sleep(100);
       }
@@ -1192,6 +1286,7 @@
     };
 
     const openDropdown = async (pgTrigger) => {
+      dismissBlockingDialogs();
       if (isPopupOpen()) return true;
       try { pgTrigger.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
       const rect = pgTrigger.getBoundingClientRect();
@@ -1316,8 +1411,12 @@
           }
         }
 
-        for (let w = 0; w < 55; w++) {
-          await sleep(65);
+        // Warte bis CareMan den Ladebalken (mat-progress-bar) beendet hat (61000 hat ~120 Mitarbeiter und braucht ca. 5-8s Server-Ladezeit)
+        await sleep(120);
+        for (let w = 0; w < 240; w++) {
+          await sleep(80);
+          const isBusy = Boolean(document.querySelector('mat-progress-bar, .mat-progress-bar, [role="progressbar"]'));
+          if (isBusy) continue;
           const newSig = getAbtTableSig();
           const checkSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
           const sigChanged = Boolean(newSig && newSig !== prevSig);

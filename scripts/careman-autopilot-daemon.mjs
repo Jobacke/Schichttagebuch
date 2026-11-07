@@ -167,7 +167,7 @@ async function getActivePageTarget() {
   ) || null;
 }
 
-async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin }) {
+async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headless = false }) {
   const jobId = ++currentJob.id;
   killHelperChrome();
   await sleep(300);
@@ -194,6 +194,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin }) {
   const chromeArgs = [
     `--remote-debugging-port=${DEBUG_PORT}`,
     `--user-data-dir=${CHROME_PROFILE_DIR}`,
+    ...(headless ? ['--headless=new'] : []),
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-popup-blocking',
@@ -630,7 +631,7 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, version: '2.2.43' }));
+    res.end(JSON.stringify({ ok: true, version: '2.2.44' }));
     return;
   }
 
@@ -771,6 +772,7 @@ async function publishBridgeState(force = false) {
 async function pollCloudBridgeLoop() {
   // Initial sync of credentials + heartbeat
   await publishBridgeState(true);
+  let lastHeartbeatSentAt = Date.now();
 
   while (true) {
     try {
@@ -778,6 +780,10 @@ async function pollCloudBridgeLoop() {
       if (auth) {
         if (currentJob.status === 'running' || currentJob.status === 'done' || currentJob.status === 'error') {
           await publishBridgeState(false);
+          lastHeartbeatSentAt = Date.now();
+        } else if (Date.now() - lastHeartbeatSentAt > 12000) {
+          await publishBridgeState(true);
+          lastHeartbeatSentAt = Date.now();
         }
         const res = await fetch(getBridgeDocUrl(auth.uid), {
           headers: { 'Authorization': `Bearer ${auth.idToken}` }
@@ -804,7 +810,8 @@ async function pollCloudBridgeLoop() {
               targetDate: reqDate,
               user: creds.username,
               pass: creds.password,
-              returnOrigin: 'https://schicht.vjbackhaus.de'
+              returnOrigin: 'https://schicht.vjbackhaus.de',
+              headless: true
             });
             await sleep(100);
             await publishBridgeState(true);
@@ -822,6 +829,6 @@ async function pollCloudBridgeLoop() {
 }
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.43 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.44 listening on http://127.0.0.1:${PORT}`);
   pollCloudBridgeLoop();
 });

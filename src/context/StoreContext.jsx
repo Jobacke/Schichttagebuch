@@ -201,7 +201,7 @@ export function StoreProvider({ children }) {
             const startHour = parseInt((s.startTime || '').split(':')[0], 10);
             const isExactValid = validDateCodeSet.has(`${s.date}_${code}`);
 
-            if (!isExactValid && (ym === '2026-11' || hourDaysSet.has(dayNum) || dayNum === startHour)) {
+            if (!isExactValid && ym === '2026-11' && hourDaysSet.has(dayNum) && dayNum === startHour) {
               monthHadGhost = true;
               const expectedOnDate = validDatesMap.get(s.date);
               if (!expectedOnDate) {

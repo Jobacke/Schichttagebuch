@@ -17,8 +17,9 @@ if (typeof window !== 'undefined') {
             const rawEncoded = window.location.hash.slice('#careman='.length);
             const decoded = decodeURIComponent(rawEncoded);
             if (looksLikeCareManData(decoded)) {
-                sessionStorage.setItem('pending_careman_import', decoded);
-                sessionStorage.setItem('pending_careman_redirect_journal', '1');
+                try { sessionStorage.setItem('pending_careman_import', decoded); } catch {}
+                try { localStorage.setItem('pending_careman_import', decoded); } catch {}
+                try { sessionStorage.setItem('pending_careman_redirect_journal', '1'); } catch {}
                 if (window.name && window.name.startsWith('CAREMAN_SYNC:')) {
                     window.name = '';
                 }
@@ -33,8 +34,9 @@ if (typeof window !== 'undefined') {
             const rawJson = window.name.slice('CAREMAN_SYNC:'.length);
             window.name = '';
             if (looksLikeCareManData(rawJson)) {
-                sessionStorage.setItem('pending_careman_import', rawJson);
-                sessionStorage.setItem('pending_careman_redirect_journal', '1');
+                try { sessionStorage.setItem('pending_careman_import', rawJson); } catch {}
+                try { localStorage.setItem('pending_careman_import', rawJson); } catch {}
+                try { sessionStorage.setItem('pending_careman_redirect_journal', '1'); } catch {}
             }
         } catch (e) {
             console.warn('Could not read window.name CareMan payload:', e);
@@ -72,7 +74,10 @@ export default function Layout() {
             const hasHash = window.location.hash && window.location.hash.startsWith('#careman=');
             let hasPending = false;
             try {
-                hasPending = Boolean(sessionStorage.getItem('pending_careman_import'));
+                hasPending = Boolean(
+                    sessionStorage.getItem('pending_careman_import') ||
+                    localStorage.getItem('pending_careman_import')
+                );
             } catch {
                 /* ignore */
             }
@@ -92,7 +97,7 @@ export default function Layout() {
                 if (res && res.message) {
                     showToast(res.message);
                 }
-                sessionStorage.removeItem('pending_careman_redirect_journal');
+                try { sessionStorage.removeItem('pending_careman_redirect_journal'); } catch {}
                 if (res?.yearMonth) {
                     ctx.navigate(`/journal?month=${res.yearMonth}`, { replace: true });
                 }

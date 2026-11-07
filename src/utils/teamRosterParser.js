@@ -505,8 +505,11 @@ export function isCorruptedIstplanHourRoster(roster) {
   return false;
 }
 
+// In-memory store guarantees rosters are always available during the session even if iOS Safari localStorage hits its 5MB quota
+const memoryRosterStore = new Map();
+
 /**
- * Saves a station-specific team roster into localStorage
+ * Saves a station-specific team roster into localStorage (and in-memory fallback)
  */
 export function saveStationTeamRoster(rosterData, stationOverride) {
   if (!rosterData || !rosterData.yearMonth) return 'Sendling';
@@ -527,27 +530,47 @@ export function saveStationTeamRoster(rosterData, stationOverride) {
     });
   }
 
+  const targetKey = `${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}_${station}`;
+  const memExisting = memoryRosterStore.get(targetKey);
+  if (memExisting && (updatedRoster.colleagues?.length || 0) <= 1 && (memExisting.colleagues?.length || 0) >= 5) {
+    return station;
+  }
+
   try {
-    const targetKey = `${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}_${station}`;
     // Never overwrite a full multi-colleague team roster (>= 5 colleagues) with a 1-colleague Istplan fallback
     const existingRaw = localStorage.getItem(targetKey);
     if (existingRaw && (updatedRoster.colleagues?.length || 0) <= 1) {
       try {
         const existingParsed = JSON.parse(existingRaw);
         if ((existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
+          memoryRosterStore.set(targetKey, existingParsed);
           return station;
         }
       } catch {}
     }
 
+    memoryRosterStore.set(targetKey, updatedRoster);
     const jsonStr = JSON.stringify(updatedRoster);
-    localStorage.setItem(targetKey, jsonStr);
-    localStorage.setItem(CURRENT_ROSTER_KEY, jsonStr);
-    // Legacy compatibility for Sendling
-    if (station === 'Sendling') {
-      localStorage.setItem(`${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}`, jsonStr);
+    try {
+      localStorage.setItem(targetKey, jsonStr);
+    } catch {
+      // iOS Safari 5MB localStorage quota recovery: remove redundant legacy/clipboard cache keys and retry
+      try {
+        localStorage.removeItem(CURRENT_ROSTER_KEY);
+        localStorage.removeItem('careman_last_imported_clip');
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(STORAGE_KEY_PREFIX) && !k.includes('_')) {
+            localStorage.removeItem(k);
+          }
+        }
+        localStorage.setItem(targetKey, jsonStr);
+      } catch (retryErr) {
+        console.warn('localStorage quota exceeded, using memoryRosterStore:', retryErr);
+      }
     }
   } catch (e) {
+    memoryRosterStore.set(targetKey, updatedRoster);
     console.error('Error saving station roster:', e);
   }
 
@@ -567,11 +590,15 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
   const daysInMonth = new Date(y, m, 0).getDate();
   const monthLabel = `${monthNames[m - 1]} ${y}`;
 
-  // 1. Gather all stored station rosters for this month
+  // 1. Gather all stored station rosters for this month (checking memoryRosterStore + localStorage)
   const stationRosters = {};
   ROSTER_STATIONS.forEach(st => {
+    const key = `${STORAGE_KEY_PREFIX}${preferredYearMonth}_${st}`;
+    const mem = memoryRosterStore.get(key);
+    if (mem && !isCorruptedIstplanHourRoster(mem)) {
+      stationRosters[st] = normalizeRosterMultipleShifts(mem);
+    }
     try {
-      const key = `${STORAGE_KEY_PREFIX}${preferredYearMonth}_${st}`;
       const stored = localStorage.getItem(key);
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -579,7 +606,11 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
           localStorage.removeItem(key);
           return;
         }
-        stationRosters[st] = normalizeRosterMultipleShifts(parsed);
+        const norm = normalizeRosterMultipleShifts(parsed);
+        if (!stationRosters[st] || (norm.colleagues?.length || 0) >= (stationRosters[st].colleagues?.length || 0)) {
+          stationRosters[st] = norm;
+          memoryRosterStore.set(key, norm);
+        }
       }
     } catch (e) {}
   });
@@ -694,6 +725,13 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
  */
 export function getSavedRosterMonths() {
   const months = new Set(['2026-10']);
+  memoryRosterStore.forEach((_, key) => {
+    if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+      const rest = key.replace(STORAGE_KEY_PREFIX, '');
+      const ym = rest.split('_')[0];
+      if (ym.match(/^\d{4}-\d{2}$/)) months.add(ym);
+    }
+  });
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -721,12 +759,12 @@ export function getSavedRosterSummaries() {
     const monthLabel = combined.monthLabel || `${monthNames[m - 1]} ${y}`;
 
     const stationSummaries = ROSTER_STATIONS.map(st => {
-      let r = null;
+      let r = memoryRosterStore.get(`${STORAGE_KEY_PREFIX}${ym}_${st}`) || null;
       let isPreset = false;
       const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${ym}_${st}`);
       if (stored) {
         try { r = JSON.parse(stored); } catch (e) {}
-      } else if (ym === '2026-10' && !localStorage.getItem(`${STORAGE_KEY_PREFIX}2026-10_${st}`)) {
+      } else if (!r && ym === '2026-10' && !localStorage.getItem(`${STORAGE_KEY_PREFIX}2026-10_${st}`)) {
         const preset = getPresetRosterForMonth('2026-10');
         if (preset) {
           isPreset = true;
@@ -775,6 +813,7 @@ export function getSavedRosterSummaries() {
  */
 export function deleteStationTeamRoster(yearMonth, station) {
   if (!yearMonth || !station) return;
+  memoryRosterStore.delete(`${STORAGE_KEY_PREFIX}${yearMonth}_${station}`);
   try {
     localStorage.removeItem(`${STORAGE_KEY_PREFIX}${yearMonth}_${station}`);
     if (station === 'Sendling') {
@@ -947,7 +986,7 @@ export async function syncTeamRostersWithCloud(currentUser) {
       }
     }
 
-    // 2. Sync downloaded cloud docs to localStorage
+    // 2. Sync downloaded cloud docs to localStorage & memoryRosterStore
     cloudDocs.forEach((cData, docId) => {
       const localKey = `${STORAGE_KEY_PREFIX}${docId}`;
       const existing = localStorage.getItem(localKey);
@@ -961,11 +1000,17 @@ export async function syncTeamRostersWithCloud(currentUser) {
           }
         } catch {}
       }
+      memoryRosterStore.set(localKey, roster);
       const newStr = JSON.stringify(roster);
       if (!existing || existing !== newStr) {
-        localStorage.setItem(localKey, newStr);
-        if (cData.station === 'Sendling' || !cData.station) {
-          localStorage.setItem(`${STORAGE_KEY_PREFIX}${cData.yearMonth}`, newStr);
+        try {
+          localStorage.setItem(localKey, newStr);
+        } catch {
+          try {
+            localStorage.removeItem(CURRENT_ROSTER_KEY);
+            localStorage.removeItem('careman_last_imported_clip');
+            localStorage.setItem(localKey, newStr);
+          } catch {}
         }
         downloaded++;
       }
@@ -1011,15 +1056,22 @@ export function subscribeToCloudTeamRosters(currentUser, onChange) {
             }
           } catch {}
         }
+        memoryRosterStore.set(localKey, roster);
         const newStr = JSON.stringify(roster);
         if (currentLocal !== newStr) {
-          localStorage.setItem(localKey, newStr);
-          if (cData.station === 'Sendling' || !cData.station) {
-            localStorage.setItem(`${STORAGE_KEY_PREFIX}${cData.yearMonth}`, newStr);
+          try {
+            localStorage.setItem(localKey, newStr);
+          } catch {
+            try {
+              localStorage.removeItem(CURRENT_ROSTER_KEY);
+              localStorage.removeItem('careman_last_imported_clip');
+              localStorage.setItem(localKey, newStr);
+            } catch {}
           }
           hasChanges = true;
         }
       } else if (change.type === 'removed') {
+        memoryRosterStore.delete(localKey);
         if (localStorage.getItem(localKey)) {
           localStorage.removeItem(localKey);
           hasChanges = true;

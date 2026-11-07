@@ -485,44 +485,24 @@ export function isCorruptedIstplanHourRoster(roster) {
   if (!roster) return false;
   const cols = Array.isArray(roster.colleagues) ? roster.colleagues : [];
 
-  // Check if a non-November roster (e.g. Juli 2026) was accidentally saved under 2026-11
+  // A station team roster must have multiple colleagues (>= 2).
+  // Any 1-colleague Istplan fallback roster is not a valid station team roster and would hide team partners.
+  if (cols.length <= 1) return true;
+
+  // Check if a July 2026 roster was accidentally saved under 2026-11 by the v2.2.27 rangeMatches bug
   if (roster.yearMonth === '2026-11') {
     const selfRow = cols.find(c => c?.name && /backhaus/i.test(c.name));
     if (selfRow && selfRow.shifts) {
       const sMap = selfRow.shifts;
-      const validShiftCount = Object.values(sMap).filter(raw => {
-        const first = String(raw || '').split(',')[0].replace(/\*+$/, '').trim().toUpperCase();
-        return isValidPersonalShiftCode(first) && !isNonPartnerShiftCode(first);
-      }).length;
-      if (validShiftCount >= 2) {
-        const d04 = String(sMap['2026-11-04'] || sMap['4'] || sMap['04'] || '').toUpperCase();
-        const d05 = String(sMap['2026-11-05'] || sMap['5'] || sMap['05'] || '').toUpperCase();
-        if (!d04.includes('RFM') || !d05.includes('RT2M')) {
-          return true;
-        }
+      const d01 = String(sMap['2026-11-01'] || sMap['1'] || sMap['01'] || '').toUpperCase();
+      const d02 = String(sMap['2026-11-02'] || sMap['2'] || sMap['02'] || '').toUpperCase();
+      if (d01.includes('RSH') && d02.includes('RSH')) {
+        return true;
       }
     }
   }
 
-  if (cols.length !== 1) return false;
-  const shifts = cols[0]?.shifts || {};
-  const entries = Object.entries(shifts);
-  if (entries.length === 0) return true;
-  if (entries.some(([, rawCode]) => {
-    const firstCode = String(rawCode || '').split(',')[0].replace(/\*+$/, '').trim().toUpperCase();
-    return !isValidPersonalShiftCode(firstCode);
-  })) {
-    return true;
-  }
-  const hourDays = new Set([6, 7, 8, 14, 15, 19, 22]);
-  return entries.every(([k, rawCode]) => {
-    const dayPart = k.includes('-') ? parseInt(k.split('-')[2], 10) : parseInt(k, 10);
-    if (!hourDays.has(dayPart)) return false;
-    const baseCode = String(rawCode || '').split(',')[0].replace(/\*+$/, '').trim().toUpperCase();
-    const times = getTimesForCode(baseCode);
-    const startHour = parseInt((times?.startTime || '').split(':')[0], 10);
-    return dayPart === startHour || hourDays.has(dayPart);
-  });
+  return false;
 }
 
 /**
@@ -1182,7 +1162,7 @@ export function extractPersonalShiftsFromRoster(yearMonth, rosterOverride = null
           day: dayNum,
           code: baseCode,
           rawCode,
-          station: myEntry.station || getStationForCode(baseCode, roster.station || 'Sendling'),
+          station: preset?.station || getStationForCode(baseCode, myEntry.station || roster.station || 'Sendling'),
           startTime: preset?.startTime || myEntry.startTime || times.startTime,
           endTime: preset?.endTime || myEntry.endTime || times.endTime,
           partner,

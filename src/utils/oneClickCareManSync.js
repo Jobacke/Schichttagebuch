@@ -246,6 +246,14 @@ export async function importCareManPayloadAndSync({
   }
 
   if (isMultiStation && parsedMulti) {
+    const MULTI_STATION_ORDER = ['Sendling', 'Obersendling', 'Hohenbrunn'];
+    const stationCounts = {};
+    parsedMulti.rosters.forEach(r => {
+      if (r && r.station) stationCounts[r.station] = (stationCounts[r.station] || 0) + 1;
+    });
+    const hasDuplicateStationLabels = Object.values(stationCounts).some(c => c > 1);
+    const seenColleagueSigs = new Set();
+
     const stationsImported = [];
     let totalShiftsAll = 0;
     let totalColleaguesAll = 0;
@@ -256,16 +264,25 @@ export async function importCareManPayloadAndSync({
       const stRoster = parsedMulti.rosters[i];
       if (!stRoster || !Array.isArray(stRoster.colleagues) || stRoster.colleagues.length === 0) continue;
 
+      const colSig = stRoster.colleagues.map(c => `${c.name}:${JSON.stringify(c.shifts || {})}`).join('|');
+      if (hasDuplicateStationLabels && seenColleagueSigs.has(colSig)) {
+        continue;
+      }
+      seenColleagueSigs.add(colSig);
+
       if (onProgress) {
         onProgress(Math.round(20 + ((i + 1) / parsedMulti.rosters.length) * 60));
       }
 
-      const parsedRoster = await parseCareManHtml(JSON.stringify(stRoster));
+      const stName = (hasDuplicateStationLabels && MULTI_STATION_ORDER[i])
+        ? MULTI_STATION_ORDER[i]
+        : (stRoster.station || MULTI_STATION_ORDER[i] || 'Sendling');
+
+      const parsedRoster = await parseCareManHtml(JSON.stringify({ ...stRoster, station: stName }));
       if (!parsedRoster || !parsedRoster.yearMonth) continue;
 
       targetYearMonth = parsedRoster.yearMonth;
       targetMonthLabel = parsedRoster.monthLabel || targetMonthLabel;
-      const stName = stRoster.station || parsedRoster.station || detectRosterStation(parsedRoster);
 
       saveStationTeamRoster(parsedRoster, stName);
       if (currentUser) {
@@ -360,8 +377,11 @@ export async function importCareManPayloadAndSync({
     });
   }
 
-  // 3. Get combined active roster for the month
-  const activeCombined = getActiveTeamRoster(parsedRoster.yearMonth);
+  // 3. Get combined active roster for the month (or fallback to parsedRoster if it was a 1-person Istplan extract and no team roster is stored yet)
+  const storedCombined = getActiveTeamRoster(parsedRoster.yearMonth);
+  const activeCombined = (storedCombined && storedCombined.colleagues && storedCombined.colleagues.length > 0)
+    ? storedCombined
+    : parsedRoster;
 
   let singlePersonalTimes = {};
   if (trimmed.startsWith('{')) {
@@ -778,9 +798,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       });
 
       scored.sort((a, b) => {
+        if (a.isTopmost !== b.isTopmost) return a.isTopmost ? -1 : 1;
         if (a.onPgRow !== b.onPgRow) return a.onPgRow ? -1 : 1;
         if (a.lcaDepth !== b.lcaDepth) return b.lcaDepth - a.lcaDepth;
-        if (a.isTopmost !== b.isTopmost) return a.isTopmost ? -1 : 1;
         return b.domIdx - a.domIdx;
       });
 
@@ -942,41 +962,22 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       return { extractedAt: Date.now(), yearMonth: ym, monthLabel: ml, station, detectedStation, colleagues };
     };
 
-    const PG_ITEM_REGEX = /(\\b61\\s+Fahrzeugplanung|\\b61\\s+SKo|\\b61\\s+WL|\\b61\\d{3}\\b)/i;
+    const PG_ITEM_REGEX = /(61\\s+Fahrzeugplanung|61\\s+SKo|61\\s+WL|61000|61010|61300)/i;
 
-    const isElementVisible = (el, checkScrollClip = false) => {
+    const isElementVisible = (el) => {
       if (!el || !el.getBoundingClientRect) return false;
       const rect = el.getBoundingClientRect();
       if (rect.width < 45 || rect.height < 12 || rect.height > 95) return false;
       if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
-      const cy = rect.top + rect.height / 2;
-      let cur = el;
-      while (cur && cur !== document.body && cur !== document.documentElement) {
-        const style = window.getComputedStyle(cur);
-        if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) < 0.1 || style.pointerEvents === 'none') {
-          return false;
-        }
-        if (checkScrollClip && cur !== el && !(cur.closest && cur.closest('table'))) {
-          const isScrollBox =
-            cur.scrollHeight > cur.clientHeight + 4 ||
-            /(auto|scroll|hidden)/i.test(style.overflowY) ||
-            (cur.matches && cur.matches('.mat-select-panel, .mat-mdc-select-panel, md-content, .md-select-menu-container, .cdk-virtual-scroll-viewport, [role="listbox"]'));
-          if (isScrollBox && cur.getBoundingClientRect) {
-            const cr = cur.getBoundingClientRect();
-            if (cr.height >= 60 && cr.height <= 680) {
-              if (cy < cr.top + 2 || cy > cr.bottom - 2) return false;
-            }
-          }
-        }
-        cur = cur.parentElement;
-      }
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) < 0.1) return false;
       return true;
     };
 
-    const getVisiblePgElements = (checkScrollClip = false) => {
+    const getVisiblePgElements = () => {
       return Array.from(document.querySelectorAll('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option, li, div, span')).filter(el => {
         if (el.closest('[data-careman-sync-banner], table')) return false;
-        if (!isElementVisible(el, checkScrollClip)) return false;
+        if (!isElementVisible(el)) return false;
         const txt = (el.innerText || el.textContent || '').trim();
         if (!txt || txt.length > 110) return false;
         return PG_ITEM_REGEX.test(txt);
@@ -984,18 +985,11 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     };
 
     // Das Popup ist genau dann offen, wenn mindestens 3 verschiedene Zeilen (unterschiedliche Y-Positionen)
-    // mit Planungsgruppen ("61 Fahrzeugplanung", "61 SKo", "61 WL", "61000...", etc.) gleichzeitig im sichtbaren Popup-Bereich liegen!
+    // mit Planungsgruppen ("61 Fahrzeugplanung", "61 SKo", "61 WL", "61000...", etc.) gleichzeitig sichtbar sind!
     const isPopupOpen = () => {
-      const vis = getVisiblePgElements(true);
+      const vis = getVisiblePgElements();
       const distinctY = new Set(vis.map(el => Math.round(el.getBoundingClientRect().top / 16)));
-      if (distinctY.size < 3) return false;
-      let hitCount = 0;
-      for (const el of vis) {
-        const r = el.getBoundingClientRect();
-        const hit = document.elementFromPoint(r.left + Math.min(40, r.width / 2), r.top + r.height / 2);
-        if (!hit || !(hit.closest && hit.closest('table'))) hitCount++;
-      }
-      return hitCount >= 2;
+      return distinctY.size >= 3;
     };
 
     // Universeller Finder für das geschlossene Dropdown "Filter Planungsgruppe"
@@ -1010,7 +1004,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       const allSelects = Array.from(document.querySelectorAll(
         'mat-select, md-select, ng-select, select, [role="combobox"], [role="listbox"], .mat-select, .md-select, .ng-select'
-      )).filter(isElementVisible);
+      )).filter(el => isElementVisible(el));
       const byParentLabel = allSelects.find(el => {
         let p = el.parentElement;
         for (let d = 0; d < 5 && p && p !== document.body; d++) {
@@ -1104,71 +1098,43 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       } catch (e) {}
 
       // Automatisch rechts im Menü auf den orangenen Button "Abteilungs-dienstplan" klicken
-      const findAbtTile = (requireVisible = true) => {
+      const findAbtTile = () => {
         const candidates = Array.from(document.querySelectorAll('a, button, div, span, p, li')).filter(el => {
           if (el.closest('[data-careman-sync-banner]')) return false;
-          const norm = (el.innerText || el.textContent || '').replace(/[\\s\\-\\u00AD\\u2010-\\u2015]+/g, '').toLowerCase();
-          if (norm !== 'abteilungsdienstplan' && !(norm.includes('abteilungs') && norm.includes('dienstplan') && norm.length < 55)) return false;
-          if (!requireVisible) return true;
           if (!el.getBoundingClientRect) return false;
           const r = el.getBoundingClientRect();
-          if (r.width < 16 || r.width > 240 || r.height < 10 || r.height > 220) return false;
-          if (r.right <= 0 || r.left >= window.innerWidth) return false;
-          const st = window.getComputedStyle(el);
-          return st.display !== 'none' && st.visibility !== 'hidden' && parseFloat(st.opacity) >= 0.1;
+          if (r.width < 20 || r.width > 220 || r.height < 12 || r.height > 200) return false;
+          const norm = (el.innerText || el.textContent || '').replace(/[\\s\\-\\u00AD\\u2010-\\u2015]+/g, '').toLowerCase();
+          return norm === 'abteilungsdienstplan' || (norm.includes('abteilungs') && norm.includes('dienstplan') && norm.length < 55);
         });
         return candidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
       };
 
-      let abtEl = findAbtTile(true);
+      let abtEl = findAbtTile();
       if (!abtEl) {
-        // Falls das rechte "⠿ Menü" noch eingeklappt ist: Menü-Button oben rechts in der CareMan-Leiste öffnen!
-        const menuTriggerCandidates = Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, div, span')).filter(el => {
-          if (el.closest('[data-careman-sync-banner]')) return false;
-          const txt = (el.innerText || el.textContent || '').trim();
-          const aria = ((el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('mattooltip'))) || '').trim();
-          if (/^(Men[üu]|Menu|apps|grid_view|view_module|more_vert)$/i.test(txt) || /(Men[üu]|Menu|Apps)/i.test(aria)) return true;
-          return false;
-        });
-        // Zusätzlich den ganz rechten Icon-Button in der oberen CareMan-Kopfleiste (rechts neben Kalender & Profil-Icon) prüfen
-        const topRightProbe = document.elementFromPoint(window.innerWidth - 28, 32);
-        if (topRightProbe && !topRightProbe.closest('[data-careman-sync-banner]')) {
-          const topBtn = topRightProbe.closest('button, a, [role="button"], div') || topRightProbe;
-          menuTriggerCandidates.push(topBtn);
+        const menuBtn = Array.from(document.querySelectorAll('button, a, div, span')).find(
+          el => !el.closest('[data-careman-sync-banner]') && /^(Men[üu]|Menu)$/i.test((el.innerText || '').trim())
+        );
+        if (menuBtn && typeof menuBtn.click === 'function') {
+          menuBtn.click();
+          await sleep(350);
+          abtEl = findAbtTile();
         }
-        for (const mBtn of menuTriggerCandidates) {
-          try {
-            const host = (mBtn.closest && mBtn.closest('button, a, [role="button"]')) || mBtn;
-            if (host && typeof host.click === 'function') host.click();
-          } catch (e) {}
-          await sleep(320);
-          abtEl = findAbtTile(true);
-          if (abtEl) break;
-        }
-      }
-      if (!abtEl) {
-        abtEl = findAbtTile(false);
       }
 
       if (abtEl) {
         setStatus('⚡ Öffne Abteilungsdienstplan...');
-        const r = abtEl.getBoundingClientRect ? abtEl.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+        const r = abtEl.getBoundingClientRect();
         const cx = r.left + r.width / 2;
-        const iconAbove = (r.width > 0 && r.top > 20) ? document.elementFromPoint(cx, Math.max(10, r.top - 32)) : null;
+        const iconAbove = document.elementFromPoint(cx, Math.max(10, r.top - 32));
         const tileContainer = abtEl.closest('button, a, [role="button"], li, mat-list-item, .mat-ripple') || abtEl.parentElement || abtEl;
-        try {
-          if (typeof tileContainer.click === 'function') tileContainer.click();
-          if (typeof abtEl.click === 'function') abtEl.click();
-          const innerBtn = tileContainer.querySelector && tileContainer.querySelector('button, a, [role="button"], .mat-icon, mat-icon, svg');
-          if (innerBtn && typeof innerBtn.click === 'function') innerBtn.click();
-        } catch (e) {}
-        await sleep(550);
-        if (!findPlanungsgruppeTrigger() && !window.location.href.includes('team-duty')) {
+        const targets = [tileContainer, abtEl, iconAbove].filter(Boolean);
+        targets.forEach(t => {
           try {
-            const iconHost = iconAbove ? (iconAbove.closest('button, a, [role="button"], div, span') || iconAbove) : abtEl;
-            if (iconHost && typeof iconHost.click === 'function') iconHost.click();
+            if (typeof t.click === 'function') t.click();
+            else t.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
           } catch (e) {}
-        }
+        });
 
         // Bis zu 4 Sekunden warten, ob der Abteilungsdienstplan lädt
         for (let w = 0; w < 16; w++) {
@@ -1180,16 +1146,18 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
     // Warte bis zu 5 Sekunden, bis das Dropdown "Filter Planungsgruppe" UND die Tabelle geladen sind
     for (let w = 0; w < 20; w++) {
-      if (findPlanungsgruppeTrigger() && findAbteilungTable()) break;
+      if (findPlanungsgruppeTrigger() && document.querySelectorAll('table tr').length > 2) break;
       await sleep(250);
     }
-    await sleep(350);
+    await sleep(300);
 
     const resolveClickableHost = (node) => {
       if (!node || (node.closest && node.closest('[data-careman-sync-banner]'))) return null;
       const svgRoot = node.closest ? node.closest('svg') : null;
       const base = (svgRoot && svgRoot.parentElement) ? svgRoot.parentElement : node;
-      return (base.closest && base.closest('button, a, [role="button"], mat-icon, .mat-icon')) || base;
+      return (base.closest && base.closest('button, a, [role="button"]')) ||
+        (base.closest && base.closest('mat-icon, .mat-icon')) ||
+        base;
     };
 
     const clickChevronAt = (elOrNull, cx, cy) => {
@@ -1236,7 +1204,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const addClusterCandidate = (rawEl) => {
           const host = resolveClickableHost(rawEl);
           if (!host || !host.getBoundingClientRect) return;
-          if (curHeader?.el && (host === curHeader.el || host.contains(curHeader.el) || curHeader.el.contains(host))) return;
+          if (curHeader?.el && (host === curHeader.el || host.contains(curHeader.el))) return;
           const r = host.getBoundingClientRect();
           if (r.width < 6 || r.width > 64 || r.height < 6 || r.height > 64) return;
           const cy = r.top + r.height / 2;
@@ -1251,7 +1219,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           }
         };
 
-        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg, span, div')).forEach(addClusterCandidate);
+        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg')).forEach(addClusterCandidate);
         for (let probeX = Math.max(8, Math.round(mr.left - 96)); probeX <= Math.round(mr.left - 4); probeX += 4) {
           const hit = document.elementFromPoint(probeX, arrowY);
           if (hit) addClusterCandidate(hit);
@@ -1304,14 +1272,13 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     }
 
     const detectedAfterNav = getVisibleMonthHeaderInfo() || detectMonthYear();
-    const abtReachedTargetMonth = !wasOnIstplan || detectedAfterNav.yearMonth === initialMonthInfo.yearMonth;
     // WICHTIG: Wenn auf dem Istplan gestartet wurde (z.B. Juli 2026), bleibt der Zielmonat IMMER fest auf dem Istplan-Monat!
     const yearMonth = wasOnIstplan ? initialMonthInfo.yearMonth : detectedAfterNav.yearMonth;
     const monthLabel = wasOnIstplan ? initialMonthInfo.monthLabel : detectedAfterNav.monthLabel;
 
     const getPopupScrollContainers = () => {
       const containers = new Set();
-      const vis = getVisiblePgElements(false);
+      const vis = getVisiblePgElements();
       vis.forEach(el => {
         let p = el.parentElement;
         while (p && p !== document.body && p !== document.documentElement) {
@@ -1328,20 +1295,15 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           p = p.parentElement;
         }
       });
-      Array.from(document.querySelectorAll('.mat-select-panel, .mat-mdc-select-panel, md-content, .md-select-menu-container, .cdk-virtual-scroll-viewport, [role="listbox"]')).forEach(p => {
-        if (!p.closest('table') && p.getBoundingClientRect && p.getBoundingClientRect().height >= 40) {
-          containers.add(p);
-        }
-      });
       return Array.from(containers);
     };
 
-    const findOptionInPopup = (pattern, pgTrigger, requireInScrollView = false, fallbackPattern = null) => {
+    const findOptionInPopup = (pattern, pgTrigger) => {
       const triggerRect = pgTrigger ? pgTrigger.getBoundingClientRect() : null;
-      const filterFn = (pat) => getVisiblePgElements(requireInScrollView).filter(el => {
+      const candidates = getVisiblePgElements().filter(el => {
         if (pgTrigger && (el === pgTrigger || pgTrigger.contains(el) || el.contains(pgTrigger))) return false;
         const txt = (el.innerText || el.textContent || '').trim();
-        if (!pat.test(txt)) return false;
+        if (!pattern.test(txt)) return false;
         // Falls das geschlossene Trigger-Element an exakt derselben Y-Koordinate liegt und kein mat-option ist
         if (triggerRect && Math.abs(el.getBoundingClientRect().top - triggerRect.top) < 6 && !el.closest('mat-option, md-option, [role="option"], .cdk-overlay-container, .md-select-menu-container')) {
           return false;
@@ -1349,67 +1311,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         return true;
       });
 
-      let candidates = filterFn(pattern);
-      if (candidates.length === 0 && fallbackPattern) {
-        candidates = filterFn(fallbackPattern);
-      }
-
       const explicitOpt = candidates.find(el => el.matches('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option, li'));
       if (explicitOpt) return explicitOpt;
       return candidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
-    };
-
-    const centerOptionInPopup = async (optEl) => {
-      if (!optEl) return;
-      const scrollBoxes = getPopupScrollContainers();
-      scrollBoxes.forEach(sb => {
-        try {
-          if (sb.contains(optEl) && sb.getBoundingClientRect && optEl.getBoundingClientRect) {
-            const sbRect = sb.getBoundingClientRect();
-            const optRect = optEl.getBoundingClientRect();
-            const offset = (optRect.top - sbRect.top) - (sbRect.height / 2) + (optRect.height / 2);
-            if (Math.abs(offset) > 8) {
-              sb.scrollTop += offset;
-              sb.dispatchEvent(new Event('scroll'));
-            }
-          }
-        } catch (e) {}
-      });
-      try { optEl.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (e) {}
-      await sleep(160);
-    };
-
-    const clickPopupOption = async (matchOpt) => {
-      if (!matchOpt) return;
-      await centerOptionInPopup(matchOpt);
-      const optHost = matchOpt.closest('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, .ng-option, li') || matchOpt;
-      const r = (optHost.getBoundingClientRect ? optHost.getBoundingClientRect() : matchOpt.getBoundingClientRect());
-      const cx = r.left + Math.min(Math.max(r.width * 0.4, 24), 120);
-      const cy = r.top + r.height / 2;
-      const hitEl = document.elementFromPoint(cx, cy);
-
-      const fireOn = (el) => {
-        if (!el || (el.closest && el.closest('table'))) return;
-        try { if (typeof el.click === 'function') el.click(); } catch (e) {}
-        if (el.dispatchEvent) {
-          ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
-            try {
-              el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
-            } catch (e) {}
-          });
-        }
-      };
-
-      fireOn(matchOpt);
-      await sleep(120);
-      if (isPopupOpen() && optHost && optHost !== matchOpt) {
-        fireOn(optHost);
-        await sleep(120);
-      }
-      if (isPopupOpen() && hitEl && hitEl !== matchOpt && hitEl !== optHost) {
-        fireOn(hitEl);
-        await sleep(120);
-      }
     };
 
     const openDropdown = async (pgTrigger) => {
@@ -1426,7 +1330,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       // Versuch 2: Klick auf das umschließende mat-select / trigger Element
       const selectBox = (hitEl && hitEl.closest && hitEl.closest('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, mat-select, md-select, [role="combobox"], [role="listbox"]')) || pgTrigger;
-      if (selectBox && typeof selectBox.click === 'function') {
+      if (selectBox && selectBox !== hitEl && typeof selectBox.click === 'function') {
         selectBox.click();
         await sleep(260);
         if (isPopupOpen()) return true;
@@ -1435,7 +1339,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       // Versuch 3: Vollständige MouseEvent-Sequenz (mousedown -> mouseup -> click)
       ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
         try {
-          (selectBox || hitEl).dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
+          hitEl.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
         } catch (e) {}
       });
       await sleep(260);
@@ -1452,104 +1356,102 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     };
 
     const TARGET_STATIONS = [
-      { key: '61000', pattern: /61000.*Rettungswache\\s+M[üu]nchen/i, fallbackPattern: /61000.*M[üu]nchen/i, station: 'Sendling', label: '61000 Rettungswache München' },
-      { key: '61010', pattern: /61010.*Obersendling/i, fallbackPattern: /\\b61010\\b/i, station: 'Obersendling', label: '61010 Rettungswache Obersendling' },
-      { key: '61300', pattern: /61300.*Hohenbrunn/i, fallbackPattern: /\\b61300\\b/i, station: 'Hohenbrunn', label: '61300 Rettungswache Hohenbrunn' }
+      { key: '61000', pattern: /61000.*Rettungswache\\s+M[üu]nchen/i, station: 'Sendling', label: '61000 Rettungswache München' },
+      { key: '61010', pattern: /61010.*Obersendling/i, station: 'Obersendling', label: '61010 Rettungswache Obersendling' },
+      { key: '61300', pattern: /61300.*Hohenbrunn/i, station: 'Hohenbrunn', label: '61300 Rettungswache Hohenbrunn' }
     ];
 
     const rosters = [];
 
-    for (let i = 0; i < TARGET_STATIONS.length && abtReachedTargetMonth; i++) {
+    for (let i = 0; i < TARGET_STATIONS.length; i++) {
       const target = TARGET_STATIONS[i];
       setStatus(\`⚡ Lese Wache \${i + 1}/3: \${target.label}...\`);
 
-      const pgTriggerInitial = findPlanungsgruppeTrigger();
-      const triggerTextInitial = pgTriggerInitial ? (pgTriggerInitial.innerText || pgTriggerInitial.textContent || '').trim() : '';
+      // Prüfe bei Wache 1/3 (Sendling), ob diese Wache für den Zielmonat bereits geladen ist
       const currentSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
       const tableUpdatedForMonth = !didStepMonth || getAbtTableSig() !== sigBeforeMonthStep;
-
-      // Nur überspringen, wenn im geschlossenen Dropdown-Trigger bereits exakt diese Planungsgruppe steht (oder bei Wache 1/3 Sendling bereits geladen ist)
-      const isTriggerAlreadyTarget = target.pattern.test(triggerTextInitial) || (i === 0 && !/61\\d{3}|61\\s+/i.test(triggerTextInitial) && currentSnap.detectedStation === 'Sendling');
-      if (tableUpdatedForMonth && currentSnap.colleagues.length > 0 && isTriggerAlreadyTarget) {
+      if (i === 0 && tableUpdatedForMonth && currentSnap.colleagues.length > 0 && currentSnap.detectedStation === 'Sendling') {
         rosters.push({ ...currentSnap, station: target.station });
         continue;
       }
 
-      let stationSwitched = false;
-      for (let attempt = 0; attempt < 2 && !stationSwitched; attempt++) {
-        const pgTrigger = findPlanungsgruppeTrigger();
-        if (!pgTrigger) break;
+      const pgTrigger = findPlanungsgruppeTrigger();
+      if (!pgTrigger) break;
 
-        const prevSig = getAbtTableSig();
-        const opened = await openDropdown(pgTrigger);
-        if (!opened) {
-          await sleep(200);
-          continue;
-        }
+      const opened = await openDropdown(pgTrigger);
+      if (!opened) continue;
 
-        // Suche zuerst nach einer Option, die bereits im sichtbaren Scroll-Fenster des Popups liegt
-        let matchOpt = findOptionInPopup(target.pattern, pgTrigger, true, target.fallbackPattern);
+      let matchOpt = findOptionInPopup(target.pattern, pgTrigger);
 
-        // Falls im DOM vorhanden, aber noch unterhalb/oberhalb des sichtbaren Popup-Fensters (wie 61010 & 61300): gezielt in die Mitte scrollen!
-        if (!matchOpt) {
-          const domOpt = findOptionInPopup(target.pattern, pgTrigger, false, target.fallbackPattern);
-          if (domOpt) {
-            await centerOptionInPopup(domOpt);
-            matchOpt = findOptionInPopup(target.pattern, pgTrigger, true, target.fallbackPattern) || domOpt;
-          }
-        }
+      // Falls Option noch nicht sichtbar: erst im Popup ganz nach oben scrollen, dann schrittweise nach unten!
+      if (!matchOpt) {
+        const scrollBoxes = getPopupScrollContainers();
+        scrollBoxes.forEach(s => {
+          s.scrollTop = 0;
+          s.dispatchEvent(new Event('scroll'));
+        });
+        await sleep(160);
+        matchOpt = findOptionInPopup(target.pattern, pgTrigger);
 
-        // Falls Option noch nicht im DOM oder noch nicht im sichtbaren Bereich: Popup von oben nach unten durchscrollen!
-        if (!matchOpt) {
-          const scrollBoxes = getPopupScrollContainers();
-          scrollBoxes.forEach(s => {
-            s.scrollTop = 0;
+        for (let step = 0; step < 12 && !matchOpt; step++) {
+          const boxes = getPopupScrollContainers();
+          boxes.forEach(s => {
+            s.scrollTop += 150;
             s.dispatchEvent(new Event('scroll'));
           });
-          await sleep(160);
-          matchOpt = findOptionInPopup(target.pattern, pgTrigger, true, target.fallbackPattern) || findOptionInPopup(target.pattern, pgTrigger, false, target.fallbackPattern);
-
-          for (let step = 0; step < 14 && !matchOpt; step++) {
-            const boxes = getPopupScrollContainers();
-            boxes.forEach(s => {
-              s.scrollTop += 140;
-              s.dispatchEvent(new Event('scroll'));
-            });
-            await sleep(150);
-            matchOpt = findOptionInPopup(target.pattern, pgTrigger, true, target.fallbackPattern) || findOptionInPopup(target.pattern, pgTrigger, false, target.fallbackPattern);
-          }
-        }
-
-        if (matchOpt) {
-          await clickPopupOption(matchOpt);
-
-          for (let w = 0; w < 32; w++) {
-            await sleep(160);
-            const newSig = getAbtTableSig();
-            const curTrigger = findPlanungsgruppeTrigger();
-            const curTriggerTxt = curTrigger ? (curTrigger.innerText || curTrigger.textContent || '').trim() : '';
-            const triggerHasTarget = !isPopupOpen() && (target.pattern.test(curTriggerTxt) || (target.fallbackPattern && target.fallbackPattern.test(curTriggerTxt)));
-            const checkSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
-            const sigChanged = Boolean(newSig && newSig !== prevSig);
-            const validForMonth = !didStepMonth || Boolean(newSig && newSig !== sigBeforeMonthStep);
-            if (checkSnap.colleagues.length > 0 && (sigChanged || triggerHasTarget || (validForMonth && checkSnap.detectedStation === target.station))) {
-              stationSwitched = true;
-              break;
-            }
-          }
-          await sleep(300);
-        } else {
-          document.body.click();
           await sleep(150);
+          matchOpt = findOptionInPopup(target.pattern, pgTrigger);
         }
       }
 
-      const finalTrigger = findPlanungsgruppeTrigger();
-      const finalTriggerTxt = finalTrigger ? (finalTrigger.innerText || finalTrigger.textContent || '').trim() : '';
-      const triggerMatchesTarget = target.pattern.test(finalTriggerTxt) || (target.fallbackPattern && target.fallbackPattern.test(finalTriggerTxt));
-      const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
-      if (extracted.colleagues.length > 0 && (stationSwitched || triggerMatchesTarget || extracted.detectedStation === target.station)) {
-        rosters.push({ ...extracted, station: target.station });
+      if (matchOpt) {
+        const prevSig = getAbtTableSig();
+        try {
+          const scrollBoxes = getPopupScrollContainers();
+          scrollBoxes.forEach(sb => {
+            if (sb.contains(matchOpt) && sb.getBoundingClientRect && matchOpt.getBoundingClientRect) {
+              const sbRect = sb.getBoundingClientRect();
+              const optRect = matchOpt.getBoundingClientRect();
+              if (optRect.bottom > sbRect.bottom || optRect.top < sbRect.top) {
+                sb.scrollTop += (optRect.top - sbRect.top) - (sbRect.height / 2) + (optRect.height / 2);
+                sb.dispatchEvent(new Event('scroll'));
+              }
+            }
+          });
+          matchOpt.scrollIntoView({ block: 'nearest' });
+        } catch (e) {}
+        await sleep(80);
+        matchOpt.click();
+        await sleep(180);
+
+        // Falls das Popup nach Klick auf den inneren Text noch offen ist, auf das mat-option Element klicken
+        if (isPopupOpen()) {
+          const optHost = matchOpt.closest('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, li') || matchOpt.parentElement;
+          if (optHost && optHost !== matchOpt) {
+            optHost.click();
+            await sleep(180);
+          }
+        }
+
+        for (let w = 0; w < 32; w++) {
+          await sleep(160);
+          const newSig = getAbtTableSig();
+          const checkSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
+          const sigChanged = Boolean(newSig && newSig !== prevSig);
+          const validForMonth = !didStepMonth || Boolean(newSig && newSig !== sigBeforeMonthStep);
+          if (checkSnap.colleagues.length > 0 && (sigChanged || (i === 0 && validForMonth && checkSnap.detectedStation === 'Sendling'))) {
+            break;
+          }
+        }
+        await sleep(300);
+
+        const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
+        if (extracted.colleagues.length > 0) {
+          rosters.push({ ...extracted, station: target.station });
+        }
+      } else {
+        document.body.click();
+        await sleep(150);
       }
     }
 
@@ -1581,7 +1483,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     }
 
     if (rosters.length === 0) {
-      const fallbackSingle = abtReachedTargetMonth ? extractVisibleTable(null, yearMonth, monthLabel) : { colleagues: [] };
+      const fallbackSingle = extractVisibleTable(null, yearMonth, monthLabel);
       if (fallbackSingle.colleagues.length > 0) {
         rosters.push(fallbackSingle);
       } else if (Object.keys(istplanShifts).length > 0) {
@@ -1604,6 +1506,12 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     copySync(json);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try { await navigator.clipboard.writeText(json); } catch (e) {}
+    }
+
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload }, '*');
+      } catch (e) {}
     }
 
     // WICHTIG: #careman= IMMER an die Ziel-URL anhängen (URL-Fragmente nach # werden nie an den HTTP-Server gesendet

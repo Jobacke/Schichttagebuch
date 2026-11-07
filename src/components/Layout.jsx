@@ -97,6 +97,13 @@ export default function Layout() {
                 const lastImported = localStorage.getItem('careman_last_imported_clip') || '';
                 const ctx = latestRef.current;
 
+                let viewedJournalMonth = null;
+                try {
+                    viewedJournalMonth = sessionStorage.getItem('schichttagebuch_journal_month');
+                } catch {
+                    /* ignore */
+                }
+
                 // Determine target month in clipboard if JSON
                 let clipYearMonth = null;
                 if (trimmed.startsWith('{')) {
@@ -108,8 +115,9 @@ export default function Layout() {
                     }
                 }
 
-                const monthShiftCount = clipYearMonth
-                    ? (ctx.store?.shifts || []).filter(s => s.date && s.date.startsWith(clipYearMonth)).length
+                const effectiveCheckMonth = viewedJournalMonth || clipYearMonth;
+                const monthShiftCount = effectiveCheckMonth
+                    ? (ctx.store?.shifts || []).filter(s => s.date && s.date.startsWith(effectiveCheckMonth)).length
                     : -1;
 
                 let allowAfterDelete = false;
@@ -136,6 +144,7 @@ export default function Layout() {
 
                 const res = await importCareManPayloadAndSync({
                     rawText: trimmed,
+                    preferredYearMonth: viewedJournalMonth,
                     currentUser: ctx.currentUser,
                     store: ctx.store,
                     addShifts: ctx.addShifts,

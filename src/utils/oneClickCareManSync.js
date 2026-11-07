@@ -167,6 +167,7 @@ export async function transferPersonalRosterToJournal({
 export async function importCareManPayloadAndSync({
   rawText,
   stationOverride = 'AUTO',
+  preferredYearMonth = null,
   currentUser,
   store,
   addShifts,
@@ -174,7 +175,7 @@ export async function importCareManPayloadAndSync({
   ensureCodesAndTypes,
   onProgress
 }) {
-  const trimmed = (rawText || '').trim();
+  let trimmed = (rawText || '').trim();
   let isMultiStation = false;
   let parsedMulti = null;
 
@@ -184,9 +185,43 @@ export async function importCareManPayloadAndSync({
       if (candidate && candidate.multiStation && Array.isArray(candidate.rosters) && candidate.rosters.length > 0) {
         isMultiStation = true;
         parsedMulti = candidate;
+      } else if (
+        candidate &&
+        !candidate.extractedAt &&
+        !candidate.multiStation &&
+        Array.isArray(candidate.colleagues) &&
+        preferredYearMonth &&
+        /^\d{4}-\d{2}$/.test(preferredYearMonth) &&
+        candidate.yearMonth &&
+        candidate.yearMonth !== preferredYearMonth
+      ) {
+        // Legacy bookmarklet ("Abteilungs-DP kopieren") read ?date=YYYY-MM from the URL before page text.
+        // Check if Backhaus, Johannes in candidate matches the known November 2026 schedule:
+        const selfRow = candidate.colleagues.find(c => c?.name && /backhaus/i.test(c.name));
+        const sMap = selfRow?.shifts || {};
+        const isActuallyNov2026 =
+          Boolean(sMap['2026-11-04'] && sMap['2026-11-04'].includes('RFM')) &&
+          Boolean(sMap['2026-11-05'] && sMap['2026-11-05'].includes('RT2M'));
+
+        if (!isActuallyNov2026) {
+          const [py, pm] = preferredYearMonth.split('-').map(Number);
+          const mNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+          candidate.yearMonth = preferredYearMonth;
+          candidate.monthLabel = `${mNames[pm - 1]} ${py}`;
+          candidate.colleagues = candidate.colleagues.map(col => {
+            if (!col || !col.shifts) return col;
+            const remapped = {};
+            Object.entries(col.shifts).forEach(([k, v]) => {
+              const dayPart = k.includes('-') ? k.split('-')[2] : String(k).padStart(2, '0');
+              remapped[`${preferredYearMonth}-${dayPart}`] = v;
+            });
+            return { ...col, shifts: remapped };
+          });
+          trimmed = JSON.stringify(candidate);
+        }
       }
     } catch {
-      /* not multiStation JSON */
+      /* not JSON */
     }
   }
 
@@ -279,7 +314,7 @@ export async function importCareManPayloadAndSync({
   }
 
   // Single-station payload
-  const parsedRoster = await parseCareManHtml(rawText, onProgress);
+  const parsedRoster = await parseCareManHtml(trimmed, onProgress);
   if (!parsedRoster || !parsedRoster.yearMonth) {
     throw new Error('Dienstplan konnte nicht erkannt werden.');
   }
@@ -453,6 +488,7 @@ export async function runOneClickCareManSync({
         const res = await importCareManPayloadAndSync({
           rawText: clipText,
           stationOverride,
+          preferredYearMonth: targetYearMonth,
           currentUser,
           store,
           addShifts,
@@ -554,18 +590,6 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     }
   };
 
-  const fireClick = (el) => {
-    if (!el) return;
-    const inner = el.querySelector ? el.querySelector('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, input, button, [role="combobox"], [role="listbox"]') : null;
-    const targets = [inner, el].filter(Boolean);
-    targets.forEach(t => {
-      ['pointerdown', 'mousedown', 'mouseup', 'click'].forEach(type => {
-        t.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
-      });
-      if (typeof t.click === 'function') t.click();
-    });
-  };
-
   try {
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
     const detectMonthYear = () => {
@@ -573,12 +597,16 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       let month = new Date().getMonth() + 1;
       const pageText = document.body ? document.body.innerText : '';
       const textMatch = pageText.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);
+      const rangeMatch = pageText.match(/01\\.(\\d{2})\\.(\\d{4})\\s*-\\s*\\d{2}\\.\\d{2}\\.\\d{4}/);
       if (textMatch) {
         const idx = monthNames.findIndex(m => m.toLowerCase() === textMatch[1].toLowerCase());
         if (idx !== -1) {
           month = idx + 1;
           year = parseInt(textMatch[2], 10);
         }
+      } else if (rangeMatch) {
+        month = parseInt(rangeMatch[1], 10);
+        year = parseInt(rangeMatch[2], 10);
       } else {
         const urlMatch = window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);
         if (urlMatch) {
@@ -660,8 +688,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             });
 
             if (validCodes.length > 0) {
-              const dateStr = ym + '-' + String(dayNum).padStart(2, '0');
-              shifts[dateStr] = validCodes.join(', ');
+              shifts[String(dayNum)] = validCodes.join(', ');
             }
           }
         });
@@ -694,7 +721,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       });
       if (abtBtn) {
         setStatus('⚡ Öffne Abteilungsdienstplan...');
-        fireClick(abtBtn);
+        abtBtn.click();
         for (let i = 0; i < 30; i++) {
           await sleep(250);
           if (window.location.href.includes('team-duty') || /Planungsgruppe/i.test(document.body ? document.body.innerText : '')) break;
@@ -711,8 +738,12 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         'mat-select, md-select, ng-select, select, [role="combobox"], [role="listbox"], .mat-select, .md-select, .ng-select'
       ));
       const byParentLabel = allSelects.find(el => {
-        const container = el.closest('mat-form-field, md-input-container, .form-group, .form-field, div');
-        return container && /Planungsgruppe/i.test(container.innerText || container.textContent || '');
+        let p = el.parentElement;
+        for (let d = 0; d < 4 && p && p !== document.body; d++) {
+          if (/Planungsgruppe/i.test(p.innerText || p.textContent || '')) return true;
+          p = p.parentElement;
+        }
+        return false;
       });
       if (byParentLabel) return byParentLabel;
       if (allSelects.length > 0) return allSelects[0];
@@ -726,7 +757,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       if (labelEl) {
         let container = labelEl.parentElement;
-        for (let i = 0; i < 4 && container; i++) {
+        for (let i = 0; i < 4 && container && container !== document.body; i++) {
           const siblingOrChild = Array.from(container.querySelectorAll('input, select, button, [tabindex], [role], div, span')).find(
             c => c !== labelEl && !labelEl.contains(c) && !c.contains(labelEl) && /(61\\d*|Fahrzeugplanung|Rettungswache|SKo|WL|Oktoberfest|Aubing|M[üu]nchen|Obersendling|Hohenbrunn)/i.test((c.innerText || c.value || '').trim())
           );
@@ -762,6 +793,33 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       return allCandidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length)[0] || null;
     };
 
+    const isPopupOpen = (pgTrigger) => {
+      const opts = document.querySelectorAll('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option');
+      if (opts.length > 0) return true;
+      return Boolean(findOptionInPopup(/(61\\s+Fahrzeugplanung|61000|61010|61300)/i, pgTrigger));
+    };
+
+    // Opens the dropdown cleanly with a SINGLE click (never double-toggling!)
+    const openDropdown = async (pgTrigger) => {
+      if (isPopupOpen(pgTrigger)) return true;
+      const inner = pgTrigger.querySelector
+        ? pgTrigger.querySelector('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, [role="combobox"], [role="listbox"]')
+        : null;
+      if (inner && inner !== pgTrigger) {
+        inner.click();
+        await sleep(200);
+        if (isPopupOpen(pgTrigger)) return true;
+      }
+      pgTrigger.click();
+      await sleep(200);
+      if (isPopupOpen(pgTrigger)) return true;
+      const target = inner || pgTrigger;
+      target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+      target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+      await sleep(200);
+      return isPopupOpen(pgTrigger);
+    };
+
     const TARGET_STATIONS = [
       { key: '61000', pattern: /61000.*Rettungswache\\s+M[üu]nchen/i, station: 'Sendling', label: '61000 Rettungswache München' },
       { key: '61010', pattern: /61010.*Obersendling/i, station: 'Obersendling', label: '61010 Rettungswache Obersendling' },
@@ -783,10 +841,12 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         !Array.from(document.querySelectorAll('tr')).some(r => /^M-J\\s*\\d/i.test((r.children[0]?.textContent || '').trim()));
 
       if (!alreadySelected) {
-        fireClick(pgTrigger);
+        await openDropdown(pgTrigger);
 
         let matchOpt = null;
         for (let w = 0; w < 18; w++) {
+          matchOpt = findOptionInPopup(target.pattern, pgTrigger);
+          if (matchOpt) break;
           await sleep(130);
           matchOpt = findOptionInPopup(target.pattern, pgTrigger);
           if (matchOpt) break;
@@ -800,11 +860,8 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         if (matchOpt) {
           const prevSig = Array.from(document.querySelectorAll('tr')).slice(1, 6).map(r => (r.children[0]?.textContent || '').trim()).join('|');
           try { matchOpt.scrollIntoView({ block: 'nearest' }); } catch (e) {}
-          await sleep(80);
-          fireClick(matchOpt);
-          if (matchOpt.parentElement && matchOpt.parentElement !== document.body) {
-            fireClick(matchOpt.parentElement);
-          }
+          await sleep(60);
+          matchOpt.click();
 
           for (let w = 0; w < 30; w++) {
             await sleep(160);
@@ -819,7 +876,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         }
       }
 
-      const extracted = extractVisibleTable(target.station);
+      const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
       if (extracted.colleagues.length > 0) {
         rosters.push(extracted);
       }
@@ -847,26 +904,16 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       } catch (e) {}
     }
 
-    const targetUrl = 'https://schicht.vjbackhaus.de/journal#careman=' + encodeURIComponent(json);
+    const targetUrl = 'https://schicht.vjbackhaus.de/#careman=' + encodeURIComponent(json);
     banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-    banner.innerHTML = '';
-    const msgSpan = document.createElement('span');
-    msgSpan.textContent = \`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) bereit!\`;
-    const goBtn = document.createElement('button');
-    goBtn.textContent = '👉 Jetzt im Schichttagebuch eintragen';
-    goBtn.style.cssText = 'background:#fff;color:#065f46;border:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-    goBtn.onclick = () => {
-      copySync(json);
-      const w = window.open(targetUrl, 'schichttagebuch_app');
-      if (!w) window.location.href = targetUrl;
-    };
-    banner.appendChild(msgSpan);
-    banner.appendChild(goBtn);
+    setStatus(\`✅ \${rosters.length} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) ans Schichttagebuch übertragen!\`);
 
     const appWin = window.open(targetUrl, 'schichttagebuch_app');
-    if (appWin) {
+    if (!appWin) {
+      window.location.href = targetUrl;
+    } else {
       try { appWin.focus(); } catch (e) {}
-      setTimeout(() => banner.remove(), 8000);
+      setTimeout(() => banner.remove(), 6000);
     }
   } catch (err) {
     banner.style.background = '#dc2626';

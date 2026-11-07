@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calendar, CheckCircle2, AlertCircle, Trash2,
-  X, ChevronLeft, ChevronRight, Check, Users, Bookmark, Copy, ExternalLink
+  X, ChevronLeft, ChevronRight, Check, Users, Bookmark, Copy, ExternalLink, Sparkles
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import {
   CAREMAN_NOVEMBER_2026_BACKHAUS,
   getPresetForCode,
@@ -14,7 +15,9 @@ import {
 } from '../utils/teamRosterParser';
 import {
   BOOKMARKLET_CODE,
-  openCareManLiveWindow
+  openCareManLiveWindow,
+  importCareManPayloadAndSync,
+  looksLikeCareManData
 } from '../utils/oneClickCareManSync';
 
 export default function CareManImportModal({
@@ -26,6 +29,7 @@ export default function CareManImportModal({
   ensureCodesAndTypes,
   initialYearMonth
 }) {
+  const { currentUser } = useAuth();
   if (!isOpen) return null;
 
   // Determine starting month from prop or current date
@@ -104,6 +108,64 @@ export default function CareManImportModal({
     setStatusMessage(null);
     setStagedShifts(buildShiftsForMonth(newYearMonth));
   };
+
+  const handleReadClipboardForMonth = async (silentIfEmpty = false) => {
+    if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
+      if (!silentIfEmpty) {
+        setStatusMessage({ type: 'error', text: 'Zwischenablage konnte nicht gelesen werden.' });
+      }
+      return;
+    }
+    try {
+      const clipText = await navigator.clipboard.readText();
+      if (!clipText || !looksLikeCareManData(clipText)) {
+        if (!silentIfEmpty) {
+          setStatusMessage({
+            type: 'error',
+            text: `Noch keine CareMan-Daten in der Zwischenablage. Bitte in CareMan den Monat ${formattedSelectedMonth} öffnen und auf das Lesezeichen klicken!`
+          });
+        }
+        return;
+      }
+
+      setIsSubmitting(true);
+      const res = await importCareManPayloadAndSync({
+        rawText: clipText,
+        preferredYearMonth: selectedYearMonth,
+        currentUser,
+        store,
+        addShifts,
+        ensureCodesAndTypes
+      });
+
+      const targetYM = res?.yearMonth || selectedYearMonth;
+      setSelectedYearMonth(targetYM);
+      setStagedShifts(buildShiftsForMonth(targetYM));
+
+      if (res?.transferredCount > 0 && onImportSuccess) {
+        onImportSuccess(targetYM, res.transferredCount);
+        onClose();
+        return;
+      }
+
+      setStatusMessage({
+        type: 'success',
+        text: res?.message || `Dienstplan für ${formattedSelectedMonth} aus Zwischenablage geladen!`
+      });
+    } catch (err) {
+      if (!silentIfEmpty) {
+        setStatusMessage({ type: 'error', text: err.message || 'Fehler beim Lesen der Zwischenablage.' });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (stagedShifts.length === 0) {
+      handleReadClipboardForMonth(true);
+    }
+  }, [selectedYearMonth]);
 
   const stepMonth = (delta) => {
     const d = new Date(year, month - 1 + delta, 1);
@@ -278,7 +340,7 @@ export default function CareManImportModal({
               </button>
             </div>
             <p style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
-              Ziehe diesen grünen Button mit gedrückter Maustaste oben in Deine Browser-Lesezeichenleiste. Ein Klick darauf in CareMan liest automatisch alle 3 Wachen (München, Obersendling, Hohenbrunn) live aus:
+              Ziehe diesen grünen Button in Deine Browser-Lesezeichenleiste (falls dort noch das ältere Lesezeichen von heute Morgen liegt, lösche das alte kurz und ziehe dieses neue hinein). Ein Klick darauf in CareMan liest automatisch alle 3 Wachen (München, Obersendling, Hohenbrunn) live aus:
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
               <a
@@ -291,7 +353,7 @@ export default function CareManImportModal({
                 }}
               >
                 <Bookmark size={14} />
-                <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '⚡ CareMan 1-Klick Übernahme'}</span>
+                <span>{copiedBookmarklet ? 'Lesezeichen kopiert! ✅' : '⚡ CareMan 1-Klick Live-Sync'}</span>
               </a>
               <button
                 type="button"
@@ -454,7 +516,7 @@ export default function CareManImportModal({
             {stagedShifts.length === 0 ? (
               <div style={{
                 textAlign: 'center',
-                padding: '32px 20px',
+                padding: '28px 20px',
                 color: 'var(--color-text-muted)',
                 background: 'var(--color-bg)',
                 borderRadius: '14px',
@@ -462,15 +524,37 @@ export default function CareManImportModal({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '12px'
               }}>
                 <Users size={28} style={{ color: '#38bdf8', opacity: 0.8 }} />
                 <div style={{ fontSize: '13.5px', color: 'var(--color-text-main)', fontWeight: 600 }}>
                   Noch kein Abteilungsdienstplan für {formattedSelectedMonth} hinterlegt
                 </div>
-                <div style={{ fontSize: '12px', maxWidth: '420px', lineHeight: 1.45 }}>
-                  Füge zuerst im Modul <strong>Team</strong> den Abteilungsdienstplan für {formattedSelectedMonth} ein – daraus werden deine Schichten samt PartnerIn automatisch generiert.
+                <div style={{ fontSize: '12px', maxWidth: '440px', lineHeight: 1.45 }}>
+                  Öffne in CareMan den Monat <strong>{formattedSelectedMonth}</strong> (mit Wache <strong>61000 München</strong> oder mit dem aktualisierten Lesezeichen oben) und klicke auf das Lesezeichen – oder lies die Zwischenablage hier direkt ein:
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleReadClipboardForMonth(false)}
+                  disabled={isSubmitting}
+                  style={{
+                    background: 'linear-gradient(135deg, #059669, #10b981)',
+                    color: '#fff',
+                    border: '1px solid rgba(52, 211, 153, 0.5)',
+                    borderRadius: '10px',
+                    padding: '9px 16px',
+                    fontSize: '12.5px',
+                    fontWeight: 800,
+                    cursor: isSubmitting ? 'default' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                  }}
+                >
+                  <Sparkles size={15} />
+                  <span>{isSubmitting ? 'Lese ein...' : `⚡ Jetzt aus Zwischenablage für ${formattedSelectedMonth} übernehmen`}</span>
+                </button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '360px', overflowY: 'auto', paddingRight: '2px' }}>

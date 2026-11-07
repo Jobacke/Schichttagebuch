@@ -459,10 +459,33 @@ export function detectRosterStation(rosterData) {
 }
 
 /**
+ * Detects a corrupted 1-colleague Istplan roster created by the v2.2.23 inner-div hour regex bug
+ * (where all shift days in the roster equal the start-time hour: 6, 7, 8, 14, 15, 19, 22).
+ */
+export function isCorruptedIstplanHourRoster(roster) {
+  if (!roster) return false;
+  const cols = Array.isArray(roster.colleagues) ? roster.colleagues : [];
+  if (cols.length !== 1) return false;
+  const shifts = cols[0]?.shifts || {};
+  const entries = Object.entries(shifts);
+  if (entries.length === 0) return false;
+  const hourDays = new Set([6, 7, 8, 14, 15, 19, 22]);
+  return entries.every(([k, rawCode]) => {
+    const dayPart = k.includes('-') ? parseInt(k.split('-')[2], 10) : parseInt(k, 10);
+    if (!hourDays.has(dayPart)) return false;
+    const baseCode = String(rawCode || '').split(',')[0].replace(/\*+$/, '').trim().toUpperCase();
+    const times = getTimesForCode(baseCode);
+    const startHour = parseInt((times?.startTime || '').split(':')[0], 10);
+    return dayPart === startHour || hourDays.has(dayPart);
+  });
+}
+
+/**
  * Saves a station-specific team roster into localStorage
  */
 export function saveStationTeamRoster(rosterData, stationOverride) {
   if (!rosterData || !rosterData.yearMonth) return 'Sendling';
+  if (isCorruptedIstplanHourRoster(rosterData)) return 'Sendling';
   const normalized = normalizeRosterMultipleShifts(rosterData);
   const station = stationOverride || normalized.station || detectRosterStation(normalized);
   const updatedRoster = {
@@ -480,8 +503,20 @@ export function saveStationTeamRoster(rosterData, stationOverride) {
   }
 
   try {
+    const targetKey = `${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}_${station}`;
+    // Never overwrite a full multi-colleague team roster (>= 5 colleagues) with a 1-colleague Istplan fallback
+    const existingRaw = localStorage.getItem(targetKey);
+    if (existingRaw && (updatedRoster.colleagues?.length || 0) <= 1) {
+      try {
+        const existingParsed = JSON.parse(existingRaw);
+        if ((existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
+          return station;
+        }
+      } catch {}
+    }
+
     const jsonStr = JSON.stringify(updatedRoster);
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${updatedRoster.yearMonth}_${station}`, jsonStr);
+    localStorage.setItem(targetKey, jsonStr);
     localStorage.setItem(CURRENT_ROSTER_KEY, jsonStr);
     // Legacy compatibility for Sendling
     if (station === 'Sendling') {
@@ -511,23 +546,35 @@ export function getActiveTeamRoster(preferredYearMonth = '2026-10') {
   const stationRosters = {};
   ROSTER_STATIONS.forEach(st => {
     try {
-      const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${preferredYearMonth}_${st}`);
+      const key = `${STORAGE_KEY_PREFIX}${preferredYearMonth}_${st}`;
+      const stored = localStorage.getItem(key);
       if (stored) {
         const parsed = JSON.parse(stored);
+        if (isCorruptedIstplanHourRoster(parsed)) {
+          localStorage.removeItem(key);
+          return;
+        }
         stationRosters[st] = normalizeRosterMultipleShifts(parsed);
       }
     } catch (e) {}
   });
 
-  // 2. Check legacy unsuffixed key if no station rosters found
-  if (Object.keys(stationRosters).length === 0) {
+  // 2. Check legacy unsuffixed key if no station rosters found (or if Sendling was missing because it was cleaned)
+  if (!stationRosters['Sendling']) {
     try {
-      const legacy = localStorage.getItem(`${STORAGE_KEY_PREFIX}${preferredYearMonth}`);
+      const legacyKey = `${STORAGE_KEY_PREFIX}${preferredYearMonth}`;
+      const legacy = localStorage.getItem(legacyKey);
       if (legacy) {
         const parsed = JSON.parse(legacy);
-        const normalized = normalizeRosterMultipleShifts(parsed);
-        const detected = detectRosterStation(normalized);
-        stationRosters[detected] = normalized;
+        if (isCorruptedIstplanHourRoster(parsed)) {
+          localStorage.removeItem(legacyKey);
+        } else {
+          const normalized = normalizeRosterMultipleShifts(parsed);
+          const detected = detectRosterStation(normalized);
+          if (!stationRosters[detected]) {
+            stationRosters[detected] = normalized;
+          }
+        }
       }
     } catch (e) {}
   }
@@ -742,6 +789,7 @@ export function deleteTeamRoster(yearMonth) {
  */
 export async function saveStationTeamRosterToCloud(rosterData, stationOverride, currentUser) {
   if (!currentUser || !currentUser.uid || !db || !rosterData || !rosterData.yearMonth) return;
+  if (isCorruptedIstplanHourRoster(rosterData)) return;
   const station = stationOverride || rosterData.station || detectRosterStation(rosterData);
   const docId = `${rosterData.yearMonth}_${station}`;
 
@@ -809,7 +857,13 @@ export async function syncTeamRostersWithCloud(currentUser) {
     const snap = await getDocs(colRef);
     const cloudDocs = new Map();
     snap.forEach(d => {
-      cloudDocs.set(d.id, d.data());
+      const cData = d.data();
+      const r = cData?.roster || cData;
+      if (isCorruptedIstplanHourRoster(r)) {
+        deleteDoc(doc(db, 'users', currentUser.uid, 'team_rosters', d.id)).catch(() => {});
+        return;
+      }
+      cloudDocs.set(d.id, cData);
     });
 
     let uploaded = 0;
@@ -832,6 +886,10 @@ export async function syncTeamRostersWithCloud(currentUser) {
         const docId = rest;
         try {
           const localData = JSON.parse(localStorage.getItem(key));
+          if (isCorruptedIstplanHourRoster(localData)) {
+            localStorage.removeItem(key);
+            continue;
+          }
           if (localData && (localData.totalShifts > 0 || (localData.colleagues && localData.colleagues.length > 0))) {
             const cloudDoc = cloudDocs.get(docId);
             if (!cloudDoc || (localData.totalShifts > (cloudDoc.totalShifts || 0))) {
@@ -847,6 +905,10 @@ export async function syncTeamRostersWithCloud(currentUser) {
         const ym = parts[0];
         try {
           const localData = JSON.parse(localStorage.getItem(key));
+          if (isCorruptedIstplanHourRoster(localData)) {
+            localStorage.removeItem(key);
+            continue;
+          }
           if (localData && (localData.totalShifts > 0 || (localData.colleagues && localData.colleagues.length > 0))) {
             const detected = detectRosterStation(localData);
             const docId = `${ym}_${detected}`;
@@ -865,6 +927,15 @@ export async function syncTeamRostersWithCloud(currentUser) {
       const localKey = `${STORAGE_KEY_PREFIX}${docId}`;
       const existing = localStorage.getItem(localKey);
       const roster = cData.roster || cData;
+      if (isCorruptedIstplanHourRoster(roster)) return;
+      if (existing && (roster?.colleagues?.length || 0) <= 1) {
+        try {
+          const existingParsed = JSON.parse(existing);
+          if ((existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
+            return;
+          }
+        } catch {}
+      }
       const newStr = JSON.stringify(roster);
       if (!existing || existing !== newStr) {
         localStorage.setItem(localKey, newStr);
@@ -902,7 +973,19 @@ export function subscribeToCloudTeamRosters(currentUser, onChange) {
       if (change.type === 'added' || change.type === 'modified') {
         const cData = change.doc.data();
         const roster = cData.roster || cData;
+        if (isCorruptedIstplanHourRoster(roster)) {
+          deleteDoc(doc(db, 'users', currentUser.uid, 'team_rosters', docId)).catch(() => {});
+          return;
+        }
         const currentLocal = localStorage.getItem(localKey);
+        if (currentLocal && (roster?.colleagues?.length || 0) <= 1) {
+          try {
+            const existingParsed = JSON.parse(currentLocal);
+            if ((existingParsed?.colleagues?.length || 0) >= 5 && !isCorruptedIstplanHourRoster(existingParsed)) {
+              return;
+            }
+          } catch {}
+        }
         const newStr = JSON.stringify(roster);
         if (currentLocal !== newStr) {
           localStorage.setItem(localKey, newStr);

@@ -6,7 +6,8 @@ import {
   detectRosterStation,
   syncTeamRostersWithCloud,
   extractPersonalShiftsFromRoster,
-  getPartnersForShiftFromRoster
+  getPartnersForShiftFromRoster,
+  isCorruptedIstplanHourRoster
 } from './teamRosterParser';
 import {
   CAREMAN_NOVEMBER_2026_BACKHAUS,
@@ -112,6 +113,17 @@ export async function transferPersonalRosterToJournal({
     if (updated) effectiveSettings = updated;
   }
 
+  // Guard against old v2.2.23 bookmarklet personalTimes where day-of-month equaled start-time hour (6, 14, 15, 22)
+  const ptEntries = Object.entries(personalTimesOverride || {});
+  const isCorruptedPersonalTimes =
+    ptEntries.length > 0 &&
+    ptEntries.every(([dateKey, val]) => {
+      const dNum = parseInt(dateKey.split('-')[2], 10);
+      const sHour = parseInt((val?.startTime || '').split(':')[0], 10);
+      return dNum === sHour;
+    });
+  const safeTimesOverride = isCorruptedPersonalTimes ? {} : (personalTimesOverride || {});
+
   const newShifts = personalShifts.map(s => {
     const partnerStr = s.partner || getPartnersForShiftFromRoster(s.date, s.code, rosterToUse) || '';
     const base = buildShiftFromPreset({
@@ -120,11 +132,21 @@ export async function transferPersonalRosterToJournal({
       partner: partnerStr,
       storeSettings: effectiveSettings
     });
-    const customTime = personalTimesOverride?.[s.date];
+    const defaultStart = s.startTime || base.startTime;
+    const defaultEnd = s.endTime || base.endTime;
+    const customTime = safeTimesOverride?.[s.date];
+    let useCustom = Boolean(customTime?.startTime && customTime?.endTime);
+    if (useCustom && defaultStart) {
+      const defH = parseInt(defaultStart.split(':')[0], 10);
+      const cusH = parseInt(customTime.startTime.split(':')[0], 10);
+      if (!isNaN(defH) && !isNaN(cusH) && Math.abs(defH - cusH) >= 6) {
+        useCustom = false;
+      }
+    }
     return {
       ...base,
-      startTime: customTime?.startTime || s.startTime || base.startTime,
-      endTime: customTime?.endTime || s.endTime || base.endTime,
+      startTime: useCustom ? customTime.startTime : defaultStart,
+      endTime: useCustom ? customTime.endTime : defaultEnd,
       partner: partnerStr
     };
   });
@@ -609,19 +631,22 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       let year = new Date().getFullYear();
       let month = new Date().getMonth() + 1;
       const pageText = document.body ? document.body.innerText : '';
-      const textMatch = pageText.match(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\\s+(\\d{4})/i);
-      const rangeMatch = pageText.match(/01\\.(\\d{2})\\.(\\d{4})\\s*-\\s*\\d{2}\\.\\d{2}\\.\\d{4}/);
-      if (textMatch) {
-        const idx = monthNames.findIndex(m => m.toLowerCase() === textMatch[1].toLowerCase());
+      // Verwende das LETZTE Vorkommen im DOM (da ein geöffneter Abteilungsdienstplan-Dialog im DOM hinter dem Hintergrund-Istplan liegt)
+      const rangeMatches = Array.from(pageText.matchAll(/01\.(\d{2})\.(\d{4})\s*-\s*\d{2}\.\d{2}\.\d{4}/g));
+      const textMatches = Array.from(pageText.matchAll(/(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+(\d{4})/gi));
+      if (rangeMatches.length > 0) {
+        const lastRange = rangeMatches[rangeMatches.length - 1];
+        month = parseInt(lastRange[1], 10);
+        year = parseInt(lastRange[2], 10);
+      } else if (textMatches.length > 0) {
+        const lastText = textMatches[textMatches.length - 1];
+        const idx = monthNames.findIndex(m => m.toLowerCase() === lastText[1].toLowerCase());
         if (idx !== -1) {
           month = idx + 1;
-          year = parseInt(textMatch[2], 10);
+          year = parseInt(lastText[2], 10);
         }
-      } else if (rangeMatch) {
-        month = parseInt(rangeMatch[1], 10);
-        year = parseInt(rangeMatch[2], 10);
       } else {
-        const urlMatch = window.location.href.match(/date=(\\d{4})-(\\d{1,2})/);
+        const urlMatch = window.location.href.match(/date=(\d{4})-(\d{1,2})/);
         if (urlMatch) {
           year = parseInt(urlMatch[1], 10);
           month = parseInt(urlMatch[2], 10);
@@ -784,12 +809,15 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     if (wasOnIstplan) {
       try {
         const { yearMonth: istYm } = initialMonthInfo;
-        const rawCells = Array.from(document.querySelectorAll('td, div, mat-grid-tile')).filter(c => {
+        const rawCells = Array.from(document.querySelectorAll('td, mat-grid-tile, div')).filter(c => {
           if (!c.getBoundingClientRect) return false;
           const r = c.getBoundingClientRect();
-          if (r.width < 55 || r.width > 300 || r.height < 45 || r.height > 230) return false;
+          if (r.width < 55 || r.width > 320 || r.height < 50 || r.height > 250) return false;
           const t = (c.innerText || '').trim();
-          return /\\b([0-3]?\\d)\\b/.test(t) && /\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(t);
+          if (!/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(t)) return false;
+          // Wichtig: Uhrzeit vorher entfernen, damit NIEMALS die Startstunde (06, 14, 15, 22) im inneren grauen Kasten als Kalendertag erkannt wird!
+          const withoutTime = t.replace(/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/g, '').trim();
+          return /^([0-3]?\\d)\\b/.test(withoutTime);
         });
         const istCells = rawCells
           .filter(c => !rawCells.some(other => other !== c && c.contains(other)))
@@ -801,7 +829,8 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
         istCells.forEach((cell, idx) => {
           const txt = (cell.innerText || '').trim();
-          const dayM = txt.match(/\\b([0-3]?\\d)\\b/);
+          const withoutTime = txt.replace(/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/g, '').trim();
+          const dayM = withoutTime.match(/^([0-3]?\\d)\\b/);
           const timeM = txt.match(/(\\d{2}:\\d{2})\\s*-\\s*(\\d{2}:\\d{2})/);
           if (!dayM || !timeM) return;
           const dNum = parseInt(dayM[1], 10);
@@ -814,10 +843,10 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           if (timeM[1] !== '00:00' || timeM[2] !== '00:00') {
             personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
           }
-          const lines = txt.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
-          for (const line of lines) {
+          const lines = withoutTime.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
+          for (let li = 1; li < lines.length; li++) {
+            const line = lines[li];
             if (/^\\d{1,2}(\\s+KW\\s*\\d+)?$/i.test(line)) continue;
-            if (/\\d{2}:\\d{2}\\s*-\\s*\\d{2}:\\d{2}/.test(line)) continue;
             const codeCandidate = line.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '').toUpperCase();
             if (codeCandidate && codeCandidate.length >= 2 && !['KW', 'FREI', '00', 'WKS', 'U', 'XW', 'STAR', 'GRADE'].includes(codeCandidate)) {
               istplanShifts[String(dNum)] = codeCandidate;
@@ -844,7 +873,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const menuBtn = Array.from(document.querySelectorAll('button, a, div, span')).find(
           el => /^(Men[üu]|Menu)$/i.test((el.innerText || '').trim())
         );
-        if (menuBtn) {
+        if (menuBtn && typeof menuBtn.click === 'function') {
           menuBtn.click();
           await sleep(350);
           abtEl = findAbtTile();
@@ -855,13 +884,15 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         setStatus('⚡ Öffne Abteilungsdienstplan...');
         const r = abtEl.getBoundingClientRect();
         const cx = r.left + r.width / 2;
-
-        // Einmal gezielt auf den orangenen Kreis über "Abteilungs-dienstplan" klicken
         const iconAbove = document.elementFromPoint(cx, Math.max(10, r.top - 30));
-        const clickTarget = (iconAbove && iconAbove !== document.body)
-          ? (iconAbove.closest('button, a, [role="button"]') || iconAbove)
-          : abtEl;
-        clickTarget.click();
+        const tileContainer = abtEl.closest('button, a, [role="button"], li, mat-list-item, .mat-ripple') || abtEl.parentElement || abtEl;
+        const targets = [tileContainer, abtEl, iconAbove].filter(Boolean);
+        targets.forEach(t => {
+          try {
+            if (typeof t.click === 'function') t.click();
+            else t.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+          } catch (e) {}
+        });
 
         // Bis zu 4 Sekunden warten, ob der Abteilungsdienstplan lädt
         for (let w = 0; w < 16; w++) {

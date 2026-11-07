@@ -2,7 +2,14 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { collection, doc, setDoc, onSnapshot, query, orderBy, deleteDoc, writeBatch } from 'firebase/firestore';
-import { syncTeamRostersWithCloud, subscribeToCloudTeamRosters } from '../utils/teamRosterParser';
+import {
+  syncTeamRostersWithCloud,
+  subscribeToCloudTeamRosters,
+  getActiveTeamRoster,
+  extractPersonalShiftsFromRoster,
+  getPartnersForShiftFromRoster
+} from '../utils/teamRosterParser';
+import { getPresetForCode, buildShiftFromPreset, CAREMAN_NOVEMBER_2026_BACKHAUS } from '../utils/shiftPresets';
 
 const StoreContext = createContext();
 
@@ -97,6 +104,7 @@ export function StoreProvider({ children }) {
 
       const dedupedData = [];
       const duplicateIdsToDelete = [];
+      const shiftsToUpsertInCleanup = [];
 
       groups.forEach(group => {
         if (group.length === 1) {
@@ -130,16 +138,153 @@ export function StoreProvider({ children }) {
         dedupedData.push(winner);
       });
 
-      shiftsRef.current = dedupedData;
-      setShifts(dedupedData);
+      // Self-heal shifts corrupted by the v2.2.23 Istplan start-hour bug (where start hours 06, 14, 15, 22 became days 6, 14, 15, 22)
+      const byMonth = new Map();
+      dedupedData.forEach(s => {
+        const ym = (s.date || '').slice(0, 7);
+        if (!/^\d{4}-\d{2}$/.test(ym)) return;
+        if (!byMonth.has(ym)) byMonth.set(ym, []);
+        byMonth.get(ym).push(s);
+      });
+
+      const ghostIdsSet = new Set();
+      const hourDaysSet = new Set([6, 7, 8, 14, 15, 19, 22]);
+
+      byMonth.forEach((mShifts, ym) => {
+        const roster = getActiveTeamRoster(ym);
+        const hasFullRoster = (roster?.colleagues?.length || 0) >= 5;
+        let validPersonal = hasFullRoster ? extractPersonalShiftsFromRoster(ym, roster) : [];
+
+        if (validPersonal.length === 0 && ym === '2026-11') {
+          validPersonal = CAREMAN_NOVEMBER_2026_BACKHAUS.map(item => ({
+            date: `2026-11-${String(item.day).padStart(2, '0')}`,
+            code: item.code,
+            startTime: item.startTime,
+            endTime: item.endTime
+          }));
+        }
+
+        if (validPersonal.length > 0) {
+          const validDateCodeSet = new Set(validPersonal.map(p => `${p.date}_${p.code.toUpperCase()}`));
+          const validDatesMap = new Map();
+          validPersonal.forEach(p => validDatesMap.set(p.date, p));
+          let monthHadGhost = false;
+
+          mShifts.forEach(s => {
+            const code = resolveShiftCode(s, settingsRef.current);
+            const dayNum = parseInt((s.date || '').split('-')[2], 10);
+            const startHour = parseInt((s.startTime || '').split(':')[0], 10);
+            const isExactValid = validDateCodeSet.has(`${s.date}_${code}`);
+
+            if (!isExactValid && (hourDaysSet.has(dayNum) || dayNum === startHour)) {
+              monthHadGhost = true;
+              const expectedOnDate = validDatesMap.get(s.date);
+              if (!expectedOnDate) {
+                // Ghost shift on a free day (e.g. 14.11. RSM, 15.11. RT4M, 22.11. RNM)
+                ghostIdsSet.add(s.id);
+                duplicateIdsToDelete.push(s.id);
+              } else if (expectedOnDate.code.toUpperCase() !== code) {
+                // Wrong shift code on a real workday (e.g. 06.11. RFM instead of RT4M)
+                const alreadyHasExpected = mShifts.some(
+                  other => other.id !== s.id && other.date === s.date && resolveShiftCode(other, settingsRef.current) === expectedOnDate.code.toUpperCase()
+                );
+                if (alreadyHasExpected) {
+                  ghostIdsSet.add(s.id);
+                  duplicateIdsToDelete.push(s.id);
+                } else {
+                  const partnerStr = getPartnersForShiftFromRoster(s.date, expectedOnDate.code, roster) || '';
+                  const rebuilt = buildShiftFromPreset({
+                    dateStr: s.date,
+                    code: expectedOnDate.code,
+                    partner: partnerStr,
+                    storeSettings: settingsRef.current
+                  });
+                  const fixedShift = {
+                    ...s,
+                    ...rebuilt,
+                    id: s.id,
+                    hasBonus: Boolean(s.hasBonus),
+                    bonusAmount: s.bonusAmount ?? (settingsRef.current?.defaultBonusAmount ?? 75),
+                    partner: partnerStr,
+                    updatedAt: Date.now()
+                  };
+                  Object.assign(s, fixedShift);
+                  shiftsToUpsertInCleanup.push(fixedShift);
+                }
+              }
+            } else if (isExactValid) {
+              // Check if personalTimes start-hour bug overwrote the time of a valid shift (e.g. 06.11. RT4M given 06:54 - 15:06)
+              const preset = getPresetForCode(code);
+              if (preset && preset.startTime && s.startTime && s.startTime !== preset.startTime) {
+                const presetHour = parseInt(preset.startTime.split(':')[0], 10);
+                if (Math.abs(startHour - presetHour) >= 6 && dayNum === startHour) {
+                  monthHadGhost = true;
+                  s.startTime = preset.startTime;
+                  s.endTime = preset.endTime;
+                  shiftsToUpsertInCleanup.push({ ...s, updatedAt: Date.now() });
+                }
+              }
+            }
+          });
+
+          // If this month was hit by the Istplan start-hour bug, ensure all valid personal shifts for this month are present
+          if (monthHadGhost) {
+            validPersonal.forEach(vp => {
+              const vpCode = vp.code.toUpperCase();
+              const existsNow = mShifts.some(
+                s => !ghostIdsSet.has(s.id) && s.date === vp.date && resolveShiftCode(s, settingsRef.current) === vpCode
+              );
+              if (!existsNow) {
+                const partnerStr = vp.partner || getPartnersForShiftFromRoster(vp.date, vpCode, roster) || '';
+                const rebuilt = buildShiftFromPreset({
+                  dateStr: vp.date,
+                  code: vpCode,
+                  partner: partnerStr,
+                  storeSettings: settingsRef.current
+                });
+                const restored = {
+                  ...rebuilt,
+                  startTime: vp.startTime || rebuilt.startTime,
+                  endTime: vp.endTime || rebuilt.endTime,
+                  partner: partnerStr,
+                  updatedAt: Date.now()
+                };
+                dedupedData.push(restored);
+                shiftsToUpsertInCleanup.push(restored);
+              }
+            });
+          }
+        } else if (mShifts.length > 0 && mShifts.length <= 6) {
+          // If a month has no full roster and ALL shifts in that month sit on their start-time hour (6, 14, 15, 22), remove them
+          const allMatchStartHour = mShifts.every(s => {
+            const dNum = parseInt((s.date || '').split('-')[2], 10);
+            const sHour = parseInt((s.startTime || '').split(':')[0], 10);
+            return hourDaysSet.has(dNum) && dNum === sHour;
+          });
+          if (allMatchStartHour) {
+            mShifts.forEach(s => {
+              ghostIdsSet.add(s.id);
+              duplicateIdsToDelete.push(s.id);
+            });
+          }
+        }
+      });
+
+      const finalShifts = dedupedData.filter(s => !ghostIdsSet.has(s.id));
+
+      shiftsRef.current = finalShifts;
+      setShifts(finalShifts);
       setShiftsLoaded(true);
 
-      // Automatically remove duplicate documents from Firestore in the background
-      if (duplicateIdsToDelete.length > 0 && !isCleaningDuplicatesRef.current) {
+      // Automatically remove duplicate/ghost documents and repair overwritten shifts in Firestore in the background
+      if ((duplicateIdsToDelete.length > 0 || shiftsToUpsertInCleanup.length > 0) && !isCleaningDuplicatesRef.current) {
         isCleaningDuplicatesRef.current = true;
         const cleanBatch = writeBatch(db);
         duplicateIdsToDelete.forEach(dupId => {
           cleanBatch.delete(doc(db, `users/${currentUser.uid}/shifts`, dupId));
+        });
+        shiftsToUpsertInCleanup.forEach(fixed => {
+          cleanBatch.set(doc(db, `users/${currentUser.uid}/shifts`, fixed.id), fixed);
         });
         cleanBatch.commit()
           .catch(err => console.warn('Auto-deduplication batch warning:', err))

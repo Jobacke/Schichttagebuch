@@ -881,13 +881,19 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           personalTimes[dStr] = { startTime: timeM[1], endTime: timeM[2] };
           const validShiftRegex = /^(RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT\\d?[MHO]|RC[MHO]|RH[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\\d?|RZF|R-SAN)\\*?$/i;
           const lines = withoutTime.split(/[\\n\\r]+/).map(l => l.trim()).filter(Boolean);
+          const matchedIstCodes = [];
           for (let li = 1; li < lines.length; li++) {
             const line = lines[li];
-            const codeCandidate = line.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '').toUpperCase();
-            if (validShiftRegex.test(codeCandidate)) {
-              istplanShifts[String(dNum)] = codeCandidate.replace(/^RD(\\*?)$/, 'RDÜ$1');
-              break;
-            }
+            const tokens = line.split(/[,;/+|\\s]+/).map(t => t.trim()).filter(Boolean);
+            tokens.forEach(tok => {
+              const codeCandidate = tok.replace(/[^A-ZÄÖÜ0-9\\-*]/gi, '').toUpperCase();
+              if (validShiftRegex.test(codeCandidate)) {
+                matchedIstCodes.push(codeCandidate.replace(/^RD(\\*?)$/, 'RDÜ$1'));
+              }
+            });
+          }
+          if (matchedIstCodes.length > 0) {
+            istplanShifts[String(dNum)] = matchedIstCodes.join(', ');
           }
         });
       } catch (e) {}
@@ -965,16 +971,16 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         const mr = monthLabelEl.getBoundingClientRect();
         const arrowY = mr.top + mr.height / 2;
 
-        // Suche alle klickbaren Pfeil-Buttons links neben dem Monatsnamen (in CareMan: [ < ] [ > ] [ Heute ] Monat Jahr)
+        // Suche die Pfeil-Buttons "<" (zurück) und ">" (vor) links neben dem Monatsnamen
         const leftButtons = [];
         const seenBtns = new Set();
-        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg')).forEach(el => {
-          const btn = el.closest('button, a, [role="button"]') || el;
-          if (!btn || seenBtns.has(btn) || !btn.getBoundingClientRect) return;
+        Array.from(document.querySelectorAll('button, a, [role="button"], mat-icon, .mat-icon, i, svg, span')).forEach(el => {
+          const btn = el.closest('button, a, [role="button"], mat-icon, .mat-icon') || el;
+          if (!btn || seenBtns.has(btn) || !btn.getBoundingClientRect || btn === monthLabelEl || btn.contains(monthLabelEl)) return;
           const r = btn.getBoundingClientRect();
-          if (r.width < 12 || r.width > 65 || r.height < 12 || r.height > 65) return;
-          if (Math.abs((r.top + r.height / 2) - arrowY) > 28) return;
-          if (r.right <= mr.left + 8 && r.left >= Math.max(0, mr.left - 240)) {
+          if (r.width < 8 || r.width > 58 || r.height < 8 || r.height > 58) return;
+          if (Math.abs((r.top + r.height / 2) - arrowY) > 26) return;
+          if (r.right <= mr.left + 6 && r.left >= Math.max(0, mr.left - 130)) {
             seenBtns.add(btn);
             leftButtons.push({ btn, left: r.left, cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
           }
@@ -984,12 +990,12 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         let arrowBtn = null;
         if (leftButtons.length >= 2) {
           arrowBtn = diff < 0 ? leftButtons[0].btn : leftButtons[1].btn;
-        } else if (leftButtons.length === 1) {
-          arrowBtn = leftButtons[0].btn;
         } else {
-          const arrowX = diff < 0 ? Math.max(12, mr.left - 135) : Math.max(24, mr.left - 95);
+          // Exakte CareMan-Koordinaten links neben dem Monatsnamen ("<  >  Monat Jahr"):
+          // "<" liegt ca. 54px links von mr.left, ">" liegt ca. 22px links von mr.left
+          const arrowX = diff < 0 ? Math.max(12, mr.left - 54) : Math.max(24, mr.left - 22);
           const arrowEl = document.elementFromPoint(arrowX, arrowY);
-          arrowBtn = arrowEl ? (arrowEl.closest('button, a, [role="button"], mat-icon') || arrowEl) : null;
+          arrowBtn = arrowEl ? (arrowEl.closest('button, a, [role="button"], mat-icon, .mat-icon') || arrowEl) : null;
         }
 
         if (!arrowBtn) break;

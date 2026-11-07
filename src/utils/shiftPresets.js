@@ -153,6 +153,87 @@ export const SHIFT_PRESETS = {
     vehicle: 'RTW Akkon Obersendling 71/1',
     callSign: 'Akkon Obersendling 71/1'
   },
+  'FFO': {
+    code: 'FFO',
+    shiftTypeName: 'Frühschicht',
+    startTime: '07:54',
+    endTime: '16:06',
+    hours: 8.2,
+    station: 'Wache Obersendling',
+    vehicle: 'RTW Akkon Obersendling 71/1',
+    callSign: 'Akkon Obersendling 71/1'
+  },
+  'NFO': {
+    code: 'NFO',
+    shiftTypeName: 'Nachtschicht',
+    startTime: '22:54',
+    endTime: '07:06',
+    hours: 8.2,
+    station: 'Wache Obersendling',
+    vehicle: 'RTW Akkon Obersendling 71/1',
+    callSign: 'Akkon Obersendling 71/1'
+  },
+  // Weitere Sendling / Hohenbrunn / Sonderdienst-Schichten
+  'RCM': {
+    code: 'RCM',
+    shiftTypeName: 'Tagschicht',
+    startTime: '08:54',
+    endTime: '19:06',
+    hours: 10.2,
+    station: 'Wache Sendling',
+    vehicle: 'RTW Akkon Sendling 71/1',
+    callSign: 'Akkon Sendling 71/1'
+  },
+  'RHM': {
+    code: 'RHM',
+    shiftTypeName: 'Tagschicht',
+    startTime: '08:54',
+    endTime: '19:06',
+    hours: 10.2,
+    station: 'Wache Sendling',
+    vehicle: 'RTW Akkon Sendling 71/1',
+    callSign: 'Akkon Sendling 71/1'
+  },
+  'RS2M': {
+    code: 'RS2M',
+    shiftTypeName: 'Spätschicht',
+    startTime: '14:54',
+    endTime: '23:06',
+    hours: 8.2,
+    station: 'Wache Sendling',
+    vehicle: 'RTW Akkon Sendling 71/2',
+    callSign: 'Akkon Sendling 71/2'
+  },
+  'DDM': {
+    code: 'DDM',
+    shiftTypeName: 'Tagschicht',
+    startTime: '08:54',
+    endTime: '19:06',
+    hours: 10.2,
+    station: 'Wache Sendling',
+    vehicle: 'RTW Akkon Sendling 71/1',
+    callSign: 'Akkon Sendling 71/1'
+  },
+  'RHH': {
+    code: 'RHH',
+    shiftTypeName: 'Tagschicht',
+    startTime: '08:54',
+    endTime: '19:06',
+    hours: 10.2,
+    station: 'Wache Hohenbrunn',
+    vehicle: 'RTW Akkon HBN 71/1',
+    callSign: 'Akkon HBN 71/1'
+  },
+  'RCH': {
+    code: 'RCH',
+    shiftTypeName: 'Tagschicht',
+    startTime: '08:54',
+    endTime: '19:06',
+    hours: 10.2,
+    station: 'Wache Hohenbrunn',
+    vehicle: 'RTW Akkon HBN 71/1',
+    callSign: 'Akkon HBN 71/1'
+  },
   'RDÜ': {
     code: 'RDÜ',
     shiftTypeName: 'Sonderdienst',
@@ -162,6 +243,66 @@ export const SHIFT_PRESETS = {
     station: 'Wache Sendling',
     vehicle: 'Sonderdienst',
     callSign: 'Sonderdienst'
+  },
+  'BDR': {
+    code: 'BDR',
+    shiftTypeName: 'Sonderdienst',
+    startTime: '08:00',
+    endTime: '16:00',
+    hours: 8.0,
+    station: 'Wache Sendling',
+    vehicle: 'Sonderdienst',
+    callSign: 'Sonderdienst'
+  },
+  'LGI': {
+    code: 'LGI',
+    shiftTypeName: 'Fortbildung',
+    startTime: '08:00',
+    endTime: '17:00',
+    hours: 9.0,
+    station: 'Wache Sendling',
+    vehicle: 'Fortbildung',
+    callSign: 'Fortbildung'
+  },
+  'ACLS': {
+    code: 'ACLS',
+    shiftTypeName: 'Fortbildung',
+    startTime: '08:00',
+    endTime: '17:00',
+    hours: 9.0,
+    station: 'Wache Sendling',
+    vehicle: 'Fortbildung',
+    callSign: 'Fortbildung'
+  },
+  'PALS': {
+    code: 'PALS',
+    shiftTypeName: 'Fortbildung',
+    startTime: '08:00',
+    endTime: '17:00',
+    hours: 9.0,
+    station: 'Wache Sendling',
+    vehicle: 'Fortbildung',
+    callSign: 'Fortbildung'
+  },
+  'SMT': {
+    code: 'SMT',
+    shiftTypeName: 'Fortbildung',
+    startTime: '08:00',
+    endTime: '17:00',
+    hours: 9.0,
+    station: 'Wache Sendling',
+    vehicle: 'Fortbildung',
+    callSign: 'Fortbildung'
+  },
+  'RAJ': {
+    code: 'RAJ',
+    shiftTypeName: 'Fortbildung',
+    startTime: '08:00',
+    endTime: '17:00',
+    hours: 9.0,
+    station: 'Wache Sendling',
+    vehicle: 'Fortbildung',
+    callSign: 'Fortbildung'
   }
 };
 
@@ -191,7 +332,55 @@ export function getPresetForCode(rawCode) {
   if (!rawCode) return null;
   const clean = rawCode.trim().toUpperCase().replace(/[^A-ZÄÖÜ0-9\-]/g, '');
   if (clean === 'RD') return SHIFT_PRESETS['RDÜ'] || null;
-  return SHIFT_PRESETS[clean] || null;
+  if (SHIFT_PRESETS[clean]) return SHIFT_PRESETS[clean];
+
+  // Dynamischer Fallback anhand der Stations-Endung (M = Sendling, O = Obersendling, H = Hohenbrunn)
+  if (!clean) return null;
+  let station = 'Wache Sendling';
+  let vehicle = 'RTW Akkon Sendling 71/1';
+  let callSign = 'Akkon Sendling 71/1';
+  if (clean.endsWith('H') || clean.startsWith('RH') || clean.includes('HBN')) {
+    station = 'Wache Hohenbrunn';
+    vehicle = 'RTW Akkon HBN 71/1';
+    callSign = 'Akkon HBN 71/1';
+  } else if (clean.endsWith('O') || clean.startsWith('RO') || clean.includes('OBS') || clean.endsWith('FO')) {
+    station = 'Wache Obersendling';
+    vehicle = 'RTW Akkon Obersendling 71/1';
+    callSign = 'Akkon Obersendling 71/1';
+  } else if (clean.includes('2') || clean.includes('4') || clean.includes('3') || clean.includes('1')) {
+    vehicle = 'RTW Akkon Sendling 71/2';
+    callSign = 'Akkon Sendling 71/2';
+  }
+
+  let shiftTypeName = 'Tagdienst';
+  let startTime = '08:54';
+  let endTime = '19:06';
+  let hours = 8.2;
+
+  if (clean.includes('RN') || clean.endsWith('NM') || clean.endsWith('NH') || clean.endsWith('NO') || clean.startsWith('NF')) {
+    shiftTypeName = 'Nachtschicht';
+    startTime = '22:54';
+    endTime = '07:06';
+  } else if (clean.includes('RF') || clean.endsWith('FM') || clean.endsWith('FH') || clean.endsWith('FO') || clean === 'RT1M' || clean === 'RT3M') {
+    shiftTypeName = 'Frühschicht';
+    startTime = clean.endsWith('O') ? '07:54' : '06:54';
+    endTime = clean.endsWith('O') ? '16:06' : (clean.includes('3') ? '15:36' : '15:06');
+  } else if (clean.includes('RS') || clean.endsWith('SM') || clean.endsWith('SH') || clean.endsWith('SO') || clean.includes('RT2') || clean.includes('RT4')) {
+    shiftTypeName = 'Spätschicht';
+    startTime = clean.endsWith('O') ? '15:54' : (clean.includes('4') ? '15:24' : '14:54');
+    endTime = (clean.endsWith('O') || clean.includes('4')) ? '00:06' : '23:06';
+  }
+
+  return {
+    code: clean,
+    shiftTypeName,
+    startTime,
+    endTime,
+    hours,
+    station,
+    vehicle,
+    callSign
+  };
 }
 
 export function buildShiftFromPreset({ dateStr, code, partner = '', storeSettings = {} }) {
@@ -218,11 +407,11 @@ export function buildShiftFromPreset({ dateStr, code, partner = '', storeSetting
     codeId: codeId,
     typeId: typeId,
     shiftTypeName: typeName,
-    startTime: preset?.startTime || '07:00',
-    endTime: preset?.endTime || '19:00',
-    station: preset?.station || storeSettings.stations?.[0] || 'Wache Sendling',
-    vehicle: preset?.vehicle || storeSettings.vehicles?.[0] || 'RTW Akkon Sendling 71/1',
-    callSign: preset?.callSign || storeSettings.callSigns?.[0] || 'Akkon Sendling 71/1',
+    startTime: preset?.startTime || '06:54',
+    endTime: preset?.endTime || '15:06',
+    station: preset?.station || 'Wache Sendling',
+    vehicle: preset?.vehicle || 'RTW Akkon Sendling 71/1',
+    callSign: preset?.callSign || 'Akkon Sendling 71/1',
     partner: partner || '',
     timestamp: Date.now()
   };

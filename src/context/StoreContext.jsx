@@ -151,6 +151,18 @@ export function StoreProvider({ children }) {
           duplicateIdsToDelete.push(s.id);
           const ym = (s.date || '').slice(0, 7);
           if (/^\d{4}-\d{2}$/.test(ym)) monthsWithGarbage.add(ym);
+          return;
+        }
+        // Automatically repair any valid shift that previously got fallback "Hauptwache" / "R-RTW-1" because its preset was missing
+        if (code && (s.station === 'Hauptwache' || s.vehicle === 'R-RTW-1' || !s.station)) {
+          const preset = getPresetForCode(code);
+          if (preset && preset.station && preset.station !== 'Hauptwache') {
+            s.station = preset.station;
+            s.vehicle = preset.vehicle || s.vehicle;
+            s.callSign = preset.callSign || s.callSign;
+            s.shiftTypeName = preset.shiftTypeName || s.shiftTypeName;
+            shiftsToUpsertInCleanup.push({ ...s, updatedAt: Date.now() });
+          }
         }
       });
 

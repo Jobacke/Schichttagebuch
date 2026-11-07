@@ -72,6 +72,8 @@ export function StoreProvider({ children }) {
   const shiftsRef = useRef([]);
   const settingsRef = useRef(INITIAL_SETTINGS);
   const isCleaningDuplicatesRef = useRef(false);
+  const pendingOptimisticWritesRef = useRef(new Map());
+  const pendingOptimisticDeletesRef = useRef(new Set());
 
   const loading = Boolean(currentUser) && (!shiftsLoaded || !settingsLoaded);
 
@@ -84,7 +86,25 @@ export function StoreProvider({ children }) {
       return;
     }
 
-    setShiftsLoaded(false);
+    const shiftsCacheKey = `schichttagebuch_cache_shifts_${currentUser.uid}`;
+    let hydratedFromCache = false;
+    try {
+      const rawCache = localStorage.getItem(shiftsCacheKey);
+      if (rawCache) {
+        const parsedCache = JSON.parse(rawCache);
+        if (Array.isArray(parsedCache)) {
+          shiftsRef.current = parsedCache;
+          setShifts(parsedCache);
+          setShiftsLoaded(true);
+          hydratedFromCache = true;
+        }
+      }
+    } catch {
+      /* ignore cache read error */
+    }
+    if (!hydratedFromCache) {
+      setShiftsLoaded(false);
+    }
 
     // Reference: users/{uid}/shifts
     const q = query(
@@ -93,7 +113,19 @@ export function StoreProvider({ children }) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const rawData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const rawSnapshotDocs = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => !pendingOptimisticDeletesRef.current.has(d.id));
+
+      // Merge any in-flight optimistic writes so a fast page-load import never flickers
+      const mergedMap = new Map();
+      rawSnapshotDocs.forEach(d => mergedMap.set(d.id, d));
+      pendingOptimisticWritesRef.current.forEach((optShift, optId) => {
+        if (!pendingOptimisticDeletesRef.current.has(optId)) {
+          mergedMap.set(optId, optShift);
+        }
+      });
+      const rawData = Array.from(mergedMap.values());
 
       // Group by (date, code) to automatically detect and clean any duplicate shifts
       const groups = new Map();
@@ -310,6 +342,11 @@ export function StoreProvider({ children }) {
       shiftsRef.current = finalShifts;
       setShifts(finalShifts);
       setShiftsLoaded(true);
+      try {
+        localStorage.setItem(shiftsCacheKey, JSON.stringify(finalShifts));
+      } catch {
+        /* ignore storage quota error */
+      }
 
       // Automatically remove duplicate/ghost documents and repair overwritten shifts in Firestore in the background
       if ((duplicateIdsToDelete.length > 0 || shiftsToUpsertInCleanup.length > 0) && !isCleaningDuplicatesRef.current) {
@@ -342,7 +379,25 @@ export function StoreProvider({ children }) {
       return;
     }
 
-    setSettingsLoaded(false);
+    const settingsCacheKey = `schichttagebuch_cache_settings_${currentUser.uid}`;
+    let hydratedSettingsFromCache = false;
+    try {
+      const rawSettingsCache = localStorage.getItem(settingsCacheKey);
+      if (rawSettingsCache) {
+        const parsedSettings = JSON.parse(rawSettingsCache);
+        if (parsedSettings && typeof parsedSettings === 'object') {
+          settingsRef.current = parsedSettings;
+          setSettings(parsedSettings);
+          setSettingsLoaded(true);
+          hydratedSettingsFromCache = true;
+        }
+      }
+    } catch {
+      /* ignore cache read error */
+    }
+    if (!hydratedSettingsFromCache) {
+      setSettingsLoaded(false);
+    }
 
     // Reference: users/{uid}/data/settings (Single Document)
     const settingsRefDoc = doc(db, `users/${currentUser.uid}/data`, 'settings');
@@ -361,6 +416,11 @@ export function StoreProvider({ children }) {
         }
         settingsRef.current = data;
         setSettings(data);
+        try {
+          localStorage.setItem(settingsCacheKey, JSON.stringify(data));
+        } catch {
+          /* ignore */
+        }
       } else {
         // Init if empty
         settingsRef.current = INITIAL_SETTINGS;
@@ -378,15 +438,13 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     if (!currentUser || !db) return;
 
-    // 1. Initial sync of rosters from Cloud Firestore into localStorage
-    syncTeamRostersWithCloud(currentUser)
-      .then(() => setRosterVersion(v => v + 1))
-      .catch(err => console.error('Initial team rosters sync error:', err));
-
-    // 2. Real-time subscription to team_rosters collection
-    const unsubscribe = subscribeToCloudTeamRosters(currentUser, () => {
-      setRosterVersion(v => v + 1);
-    });
+    let unsubscribe = () => {};
+    // Defer heavy team_rosters collection snapshot slightly so shifts & settings finish loading first
+    const timer = setTimeout(() => {
+      unsubscribe = subscribeToCloudTeamRosters(currentUser, () => {
+        setRosterVersion(v => v + 1);
+      });
+    }, 350);
 
     const onLocalSync = () => setRosterVersion(v => v + 1);
     if (typeof window !== 'undefined') {
@@ -394,6 +452,7 @@ export function StoreProvider({ children }) {
     }
 
     return () => {
+      clearTimeout(timer);
       unsubscribe();
       if (typeof window !== 'undefined') {
         window.removeEventListener('careman-oneclick-synced', onLocalSync);
@@ -554,34 +613,56 @@ export function StoreProvider({ children }) {
         batch.set(ref, docPayload);
       });
 
-      // Optimistically update shiftsRef.current before awaiting commit so concurrent calls never duplicate
+      // Track optimistic writes & deletes so an in-flight Firestore snapshot never reverts them
+      deletedIds.forEach(delId => {
+        pendingOptimisticDeletesRef.current.add(delId);
+        pendingOptimisticWritesRef.current.delete(delId);
+      });
+      writtenShiftsById.forEach((docPayload, docId) => {
+        pendingOptimisticDeletesRef.current.delete(docId);
+        pendingOptimisticWritesRef.current.set(docId, docPayload);
+      });
+
+      // Optimistically update shiftsRef.current AND React state immediately (0ms UI update!)
       const nextShifts = currentShifts
         .filter(s => !deletedIds.has(s.id) && !writtenShiftsById.has(s.id))
         .concat(Array.from(writtenShiftsById.values()));
       shiftsRef.current = nextShifts;
+      setShifts(nextShifts);
+      try {
+        localStorage.setItem(`schichttagebuch_cache_shifts_${currentUser.uid}`, JSON.stringify(nextShifts));
+      } catch {
+        /* ignore */
+      }
 
-      await batch.commit();
+      // Commit to Firestore asynchronously so the Journal UI renders in < 10ms without waiting on network latency
+      batch.commit()
+        .then(() => {
+          setTimeout(() => {
+            deletedIds.forEach(delId => pendingOptimisticDeletesRef.current.delete(delId));
+            writtenShiftsById.forEach((_, docId) => pendingOptimisticWritesRef.current.delete(docId));
+          }, 4000);
+        })
+        .catch(e => {
+          console.warn("Batch failed, attempting fallback:", e);
+          Promise.all(cleanIncoming.map(shift => {
+            const key = getShiftDedupeKey(shift, currentSettings);
+            const existingSame = currentShifts.find(el => getShiftDedupeKey(el, currentSettings) === key);
+            const id = shift.id || existingSame?.id || crypto.randomUUID();
+            return setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), {
+              ...shift,
+              id,
+              timestamp: shift.timestamp || Date.now(),
+              updatedAt: Date.now()
+            });
+          })).catch(err => {
+            console.error("Batch Add Shifts Failed", err);
+          });
+        });
       return true;
     } catch (e) {
-      console.warn("Batch failed, attempting fallback:", e);
-      try {
-        await Promise.all(cleanIncoming.map(shift => {
-          const key = getShiftDedupeKey(shift, currentSettings);
-          const existingSame = currentShifts.find(e => getShiftDedupeKey(e, currentSettings) === key);
-          const id = shift.id || existingSame?.id || crypto.randomUUID();
-          return setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), {
-            ...shift,
-            id,
-            timestamp: shift.timestamp || Date.now(),
-            updatedAt: Date.now()
-          });
-        }));
-        return true;
-      } catch (err) {
-        console.error("Batch Add Shifts Failed", err);
-        alert("Fehler beim Speichern der Schichten: " + err.message);
-        return false;
-      }
+      console.error("Prepare Shifts Failed", e);
+      return false;
     }
   };
 
@@ -624,7 +705,12 @@ export function StoreProvider({ children }) {
       };
       settingsRef.current = newSettings;
       setSettings(newSettings);
-      await _updateSettingsDoc(newSettings);
+      try {
+        localStorage.setItem(`schichttagebuch_cache_settings_${currentUser.uid}`, JSON.stringify(newSettings));
+      } catch {
+        /* ignore */
+      }
+      _updateSettingsDoc(newSettings).catch(err => console.error("Update settings failed:", err));
       return newSettings;
     }
     return baseSettings;
@@ -633,7 +719,14 @@ export function StoreProvider({ children }) {
   const deleteShift = async (id) => {
     if (!currentUser) return;
     try {
-      shiftsRef.current = (shiftsRef.current || []).filter(s => s.id !== id);
+      pendingOptimisticDeletesRef.current.add(id);
+      pendingOptimisticWritesRef.current.delete(id);
+      const next = (shiftsRef.current || []).filter(s => s.id !== id);
+      shiftsRef.current = next;
+      setShifts(next);
+      try {
+        localStorage.setItem(`schichttagebuch_cache_shifts_${currentUser.uid}`, JSON.stringify(next));
+      } catch {}
       await deleteDoc(doc(db, `users/${currentUser.uid}/shifts`, id));
       try { sessionStorage.setItem('careman_allow_reimport_after_tab_switch', '1'); } catch {}
     } catch (e) {
@@ -645,26 +738,37 @@ export function StoreProvider({ children }) {
     if (!currentUser || !shiftIds || shiftIds.length === 0) return true;
     try {
       const idSet = new Set(shiftIds);
-      shiftsRef.current = (shiftsRef.current || []).filter(s => !idSet.has(s.id));
+      shiftIds.forEach(id => {
+        pendingOptimisticDeletesRef.current.add(id);
+        pendingOptimisticWritesRef.current.delete(id);
+      });
+      const next = (shiftsRef.current || []).filter(s => !idSet.has(s.id));
+      shiftsRef.current = next;
+      setShifts(next);
+      try {
+        localStorage.setItem(`schichttagebuch_cache_shifts_${currentUser.uid}`, JSON.stringify(next));
+        sessionStorage.setItem('careman_allow_reimport_after_tab_switch', '1');
+      } catch {}
       const batch = writeBatch(db);
       shiftIds.forEach(id => {
         batch.delete(doc(db, `users/${currentUser.uid}/shifts`, id));
       });
-      await batch.commit();
-      try { sessionStorage.setItem('careman_allow_reimport_after_tab_switch', '1'); } catch {}
+      batch.commit()
+        .then(() => {
+          setTimeout(() => {
+            shiftIds.forEach(id => pendingOptimisticDeletesRef.current.delete(id));
+          }, 4000);
+        })
+        .catch(e => {
+          console.warn("Batch delete failed, attempting fallback:", e);
+          Promise.all(shiftIds.map(id => deleteDoc(doc(db, `users/${currentUser.uid}/shifts`, id)))).catch(err => {
+            console.error("Delete Shifts Failed", err);
+          });
+        });
       return true;
     } catch (e) {
-      console.warn("Batch delete failed, attempting fallback:", e);
-      try {
-        await Promise.all(shiftIds.map(id => {
-          return deleteDoc(doc(db, `users/${currentUser.uid}/shifts`, id));
-        }));
-        return true;
-      } catch (err) {
-        console.error("Delete Shifts Failed", err);
-        alert("Fehler beim Löschen: " + err.message);
-        return false;
-      }
+      console.error("Prepare Delete Shifts Failed", e);
+      return false;
     }
   };
 

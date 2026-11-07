@@ -1444,9 +1444,9 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
     // Falls wir auf dem persönlichen Istplan starten: Istplan-Schichten & Uhrzeiten (z.B. 19:14 - 23:06) vorab sichern
     // (Auch auf dem iPhone, wo 7 Kalender-Spalten ~44px-53px breit sind!)
     if (wasOnIstplan) {
-      if (desiredAutoYm && detectMonthYear().yearMonth !== initialMonthInfo.yearMonth) {
+      if (desiredAutoYm && !urlYearMonth && detectMonthYear().yearMonth !== initialMonthInfo.yearMonth) {
         const didStepIst = await stepVisibleHeaderToMonth(initialMonthInfo.yearMonth, initialMonthInfo.monthLabel, 'Istplan');
-        if (didStepIst) await sleep(350);
+        if (didStepIst) await sleep(200);
       }
       const istVisibleMatchesTarget = !desiredAutoYm || detectMonthYear().yearMonth === initialMonthInfo.yearMonth;
       if (istVisibleMatchesTarget) {
@@ -1593,19 +1593,19 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         });
 
         // Bis zu 4.5 Sekunden warten, ob der Abteilungsdienstplan lädt
-        for (let w = 0; w < 18; w++) {
-          await sleep(250);
+        for (let w = 0; w < 36; w++) {
+          await sleep(110);
           if (window.location.href.includes('team-duty') || findPlanungsgruppeTrigger()) break;
         }
       }
     }
 
     // Warte bis zu 5 Sekunden, bis das Dropdown "Filter Planungsgruppe" UND die Tabelle geladen sind
-    for (let w = 0; w < 20; w++) {
+    for (let w = 0; w < 40; w++) {
       if (findPlanungsgruppeTrigger() && document.querySelectorAll('table tr').length > 2) break;
-      await sleep(250);
+      await sleep(110);
     }
-    await sleep(300);
+    await sleep(120);
 
     // WICHTIG FÜR IPHONE / SCHMALE BILDSCHIRME:
     // Falls das rechte "Menü"-Drawer (mit "Nacherfassung" / "Urlaub & Fehlzeiten") auf einem schmalen Bildschirm (< 950px)
@@ -1707,8 +1707,8 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         clickChevronAt(chosen ? chosen.host : null, clickX, clickY);
 
         let monthChanged = false;
-        for (let w = 0; w < 8; w++) {
-          await sleep(130);
+        for (let w = 0; w < 14; w++) {
+          await sleep(50);
           if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
             monthChanged = true;
             break;
@@ -1719,8 +1719,8 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         if (!monthChanged) {
           const fallbackEl = document.elementFromPoint(coordX, arrowY);
           clickChevronAt(fallbackEl, coordX, arrowY);
-          for (let w = 0; w < 12; w++) {
-            await sleep(140);
+          for (let w = 0; w < 16; w++) {
+            await sleep(60);
             if ((getVisibleMonthHeaderInfo() || detectMonthYear()).yearMonth !== curInfo.yearMonth) {
               monthChanged = true;
               break;
@@ -1731,17 +1731,17 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         if (monthChanged) {
           didStepMonth = true;
         }
-        await sleep(200);
+        await sleep(45);
       }
 
       if (didStepMonth) {
         // Warte nach dem Monatswechsel kurz, bis CareMan die Tabelle / Planungsgruppen für den Zielmonat geladen hat
-        for (let w = 0; w < 18; w++) {
-          await sleep(160);
+        for (let w = 0; w < 35; w++) {
+          await sleep(65);
           const curSig = getAbtTableSig();
           if (curSig && curSig !== sigBeforeMonthStep) break;
         }
-        await sleep(300);
+        await sleep(100);
       }
     }
 
@@ -1803,14 +1803,14 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       // Versuch 1: Nativer Einzel-Klick auf den sichtbaren Punkt im Dropdown
       if (hitEl && typeof hitEl.click === 'function') hitEl.click();
-      await sleep(260);
+      await sleep(120);
       if (isPopupOpen()) return true;
 
       // Versuch 2: Klick auf das umschließende mat-select / trigger Element
       const selectBox = (hitEl && hitEl.closest && hitEl.closest('.mat-select-trigger, .mat-mdc-select-trigger, .md-select-value, mat-select, md-select, [role="combobox"], [role="listbox"]')) || pgTrigger;
       if (selectBox && selectBox !== hitEl && typeof selectBox.click === 'function') {
         selectBox.click();
-        await sleep(260);
+        await sleep(140);
         if (isPopupOpen()) return true;
       }
 
@@ -1820,7 +1820,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           hitEl.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
         } catch (e) {}
       });
-      await sleep(260);
+      await sleep(140);
       if (isPopupOpen()) return true;
 
       // Versuch 4: Tastatur-Event (ArrowDown) auf dem fokussierten Dropdown
@@ -1829,7 +1829,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       if (focusTarget && focusTarget.dispatchEvent) {
         focusTarget.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
       }
-      await sleep(260);
+      await sleep(140);
       return isPopupOpen();
     };
 
@@ -1868,7 +1868,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           s.scrollTop = 0;
           s.dispatchEvent(new Event('scroll'));
         });
-        await sleep(160);
+        await sleep(90);
         matchOpt = findOptionInPopup(target.pattern, pgTrigger);
 
         for (let step = 0; step < 12 && !matchOpt; step++) {
@@ -1877,7 +1877,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             s.scrollTop += 150;
             s.dispatchEvent(new Event('scroll'));
           });
-          await sleep(150);
+          await sleep(80);
           matchOpt = findOptionInPopup(target.pattern, pgTrigger);
         }
       }
@@ -1898,21 +1898,21 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           });
           matchOpt.scrollIntoView({ block: 'nearest' });
         } catch (e) {}
-        await sleep(80);
+        await sleep(40);
         matchOpt.click();
-        await sleep(180);
+        await sleep(85);
 
         // Falls das Popup nach Klick auf den inneren Text noch offen ist, auf das mat-option Element klicken
         if (isPopupOpen()) {
           const optHost = matchOpt.closest('mat-option, md-option, [role="option"], .mat-option, .md-option, .mat-mdc-option, li') || matchOpt.parentElement;
           if (optHost && optHost !== matchOpt) {
             optHost.click();
-            await sleep(180);
+            await sleep(85);
           }
         }
 
-        for (let w = 0; w < 32; w++) {
-          await sleep(160);
+        for (let w = 0; w < 55; w++) {
+          await sleep(65);
           const newSig = getAbtTableSig();
           const checkSnap = extractVisibleTable(target.station, yearMonth, monthLabel);
           const sigChanged = Boolean(newSig && newSig !== prevSig);
@@ -1921,7 +1921,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
             break;
           }
         }
-        await sleep(300);
+        await sleep(90);
 
         const extracted = extractVisibleTable(target.station, yearMonth, monthLabel);
         if (extracted.colleagues.length > 0) {

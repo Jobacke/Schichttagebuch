@@ -234,12 +234,14 @@ export default function Layout() {
         checkAndRunHashOrPending();
         checkClipboardOnTabReturn(true);
         window.addEventListener('hashchange', checkAndRunHashOrPending);
+        window.addEventListener('careman-autopilot-ready', checkAndRunHashOrPending);
         window.addEventListener('message', handleWindowMessage);
         window.addEventListener('blur', onWindowBlur);
         window.addEventListener('focus', onWindowFocus);
         document.addEventListener('visibilitychange', onVisibilityChange);
         return () => {
             window.removeEventListener('hashchange', checkAndRunHashOrPending);
+            window.removeEventListener('careman-autopilot-ready', checkAndRunHashOrPending);
             window.removeEventListener('message', handleWindowMessage);
             window.removeEventListener('blur', onWindowBlur);
             window.removeEventListener('focus', onWindowFocus);

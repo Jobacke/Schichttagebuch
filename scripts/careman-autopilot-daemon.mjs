@@ -197,6 +197,13 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin }) {
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-popup-blocking',
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-default-apps',
+    '--disable-domain-reliability',
+    '--disable-sync',
+    '--metrics-recording-only',
+    '--simulate-outdated-no-au="Tue, 31 Dec 2099 23:59:59 GMT"',
     '--window-size=1240,860',
     '--window-position=100,50',
     `--app=${targetCareManUrl}`
@@ -285,6 +292,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin }) {
         currentJob.resultJson = pageState.daemonResult;
         currentJob.stepMessage = `✅ Alle 3 Wachen (${ym}) erfolgreich ausgelesen – übertrage in die App...`;
         currentJob.status = 'done';
+        await cdp.send('Browser.close').catch(() => {});
         killHelperChrome();
         break;
       }
@@ -448,7 +456,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin }) {
           }
         }
 
-        await sleep(450);
+        await sleep(250);
         continue;
       }
 
@@ -469,7 +477,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin }) {
 
           if (isCareManUiReady) {
             extractorInjected = true;
-            await sleep(600);
+            await sleep(200);
             const apPayload = JSON.stringify({
               autoRun: true,
               targetYearMonth: ym,
@@ -487,7 +495,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin }) {
         }
       }
 
-      await sleep(450);
+      await sleep(250);
     }
   } catch (err) {
     if (currentJob.id === jobId && currentJob.status === 'running') {
@@ -597,7 +605,7 @@ function renderStatusHtml() {
           msgEl.style.color = '#f87171';
         }
       } catch (e) {}
-      setTimeout(poll, 500);
+      setTimeout(poll, 250);
     }
     poll();
   </script>
@@ -622,7 +630,7 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, version: '2.2.36' }));
+    res.end(JSON.stringify({ ok: true, version: '2.2.37' }));
     return;
   }
 
@@ -641,6 +649,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === '/api/cancel') {
+    killHelperChrome();
+    currentJob.status = 'idle';
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
   if (pathname === '/cancel') {
     killHelperChrome();
     currentJob.status = 'idle';
@@ -650,7 +666,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (pathname === '/start') {
+  if (pathname === '/api/start' || pathname === '/start') {
     const now = new Date();
     const defaultYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const ym = parsedUrl.searchParams.get('ym') || defaultYm;
@@ -660,6 +676,12 @@ const server = http.createServer((req, res) => {
     const returnOrigin = parsedUrl.searchParams.get('returnOrigin') || 'https://schicht.vjbackhaus.de';
 
     runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin });
+
+    if (pathname === '/api/start') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, jobId: currentJob.id, ym, targetDate }));
+      return;
+    }
 
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(renderStatusHtml());
@@ -671,5 +693,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.36 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.37 listening on http://127.0.0.1:${PORT}`);
 });

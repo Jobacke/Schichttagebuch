@@ -85,7 +85,7 @@ export async function parseCareManHtml(fileOrHtmlText, onProgress) {
             normalizedShifts[dateStr] = codes.join(', ');
             codes.forEach(cleanCode => {
               const st = getShiftTypeForCode(cleanCode);
-              const station = getStationForCode(cleanCode);
+              const station = getStationForCode(cleanCode, parsedJson.station || 'Sendling');
               const times = getTimesForCode(cleanCode, st);
 
               shiftsByDateMap[dateStr].push({

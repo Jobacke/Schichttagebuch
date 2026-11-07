@@ -4,16 +4,16 @@ import { SHIFT_PRESETS } from './shiftPresets.js';
  * Detect station from shift object, station string, code, or preset
  */
 export function detectStation({ station = '', code = '', codeId = '', vehicle = '' } = {}) {
+    const c = (code || (typeof codeId === 'string' && codeId.replace('preset_', '')) || '').toUpperCase().trim();
+    const base = c.replace(/\*+$/, '').trim();
+    if (base.endsWith('O') || base === 'RFO' || base === 'RSO' || base.startsWith('NFO') || base.startsWith('FFO')) return 'Obersendling';
+    if (base.endsWith('H') || base.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH', 'RCH'].includes(base)) return 'Hohenbrunn';
+    if (base.endsWith('M') || base.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(base)) return 'Sendling';
+
     const st = (station || '').toLowerCase().trim();
     if (st.includes('ober') || st.includes('obs')) return 'Obersendling';
     if (st.includes('hohenbrunn') || st.includes('hbn')) return 'Hohenbrunn';
     if (st.includes('sendling') || st.includes('sen')) return 'Sendling';
-
-    const c = (code || (typeof codeId === 'string' && codeId.replace('preset_', '')) || '').toUpperCase().trim();
-    const base = c.replace(/\*+$/, '').trim();
-    if (base.endsWith('O') || base === 'RFO' || base === 'RSO' || base.startsWith('NFO') || base.startsWith('FFO')) return 'Obersendling';
-    if (base.endsWith('H') || base.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(base)) return 'Hohenbrunn';
-    if (base.endsWith('M') || base.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(base)) return 'Sendling';
 
     // Check presets
     const preset = SHIFT_PRESETS[c] || SHIFT_PRESETS[base];

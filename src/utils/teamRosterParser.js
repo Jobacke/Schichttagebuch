@@ -186,7 +186,7 @@ export function normalizeRosterMultipleShifts(roster) {
           seenShiftsByDate[dateStr].add(dedupeKey);
 
           const st = getShiftTypeForCode(c);
-          const station = shift.station || getStationForCode(c);
+          const station = getStationForCode(c, shift.station || roster.station || 'Sendling');
           const times = (shift.startTime && shift.endTime && codes.length <= 1 && c === shift.code)
             ? { startTime: shift.startTime, endTime: shift.endTime }
             : getTimesForCode(c, st);
@@ -236,12 +236,15 @@ export function normalizeRosterMultipleShifts(roster) {
 /**
  * Helper to determine station from code or text
  */
-export function getStationForCode(code = '') {
+export function getStationForCode(code = '', fallbackStation = 'Sendling') {
   const c = code.toUpperCase().trim();
   const clean = c.replace(/\*+$/, '').trim();
-  if (clean.endsWith('H') || clean.startsWith('RH') || clean.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH'].includes(clean)) return 'Wache Hohenbrunn';
+  if (clean.endsWith('H') || clean.startsWith('RH') || clean.includes('HBN') || ['RFH', 'RTH', 'RT1H', 'RT2H', 'RSH', 'RNH', 'RHH', 'RCH'].includes(clean)) return 'Wache Hohenbrunn';
   if (clean.endsWith('O') || clean.startsWith('RO') || clean.includes('OBS') || clean.includes('FO') || clean.startsWith('NFO') || clean.startsWith('FFO')) return 'Wache Obersendling';
-  if (clean.endsWith('M') || clean.startsWith('RM') || clean.includes('SEN') || clean.includes('SJ') || clean.includes('-M')) return 'Wache Sendling';
+  if (clean.endsWith('M') || clean.startsWith('RM') || clean.includes('SEN') || clean.includes('SJ') || clean.includes('-M') || ['RFM', 'RSM', 'RNM', 'RT1M', 'RT2M', 'RT3M', 'RT4M', 'RS2M', 'RCM', 'RHM', 'DDM'].includes(clean)) return 'Wache Sendling';
+  const fb = String(fallbackStation || '').toLowerCase();
+  if (fb.includes('ober') || fb.includes('obs') || fb.includes('61010')) return 'Wache Obersendling';
+  if (fb.includes('hohenbrunn') || fb.includes('hbn') || fb.includes('61300')) return 'Wache Hohenbrunn';
   return 'Wache Sendling';
 }
 
@@ -1179,6 +1182,7 @@ export function extractPersonalShiftsFromRoster(yearMonth, rosterOverride = null
           day: dayNum,
           code: baseCode,
           rawCode,
+          station: myEntry.station || getStationForCode(baseCode, roster.station || 'Sendling'),
           startTime: preset?.startTime || myEntry.startTime || times.startTime,
           endTime: preset?.endTime || myEntry.endTime || times.endTime,
           partner,

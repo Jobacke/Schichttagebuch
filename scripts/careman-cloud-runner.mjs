@@ -280,37 +280,64 @@ async function main() {
   });
   if (!authRes.ok) return;
   const auth = await authRes.json();
-  const docUrl = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT_ID}/databases/(default)/documents/users/${auth.localId}/team_rosters/autopilot_bridge`;
+  const ghToken = (auth.displayName || '').trim();
+  if (!ghToken) return;
 
-  const getBridgeDoc = async () => {
-    const r = await fetch(docUrl, { headers: { 'Authorization': `Bearer ${auth.idToken}` } });
-    if (!r.ok) return null;
-    return r.json();
+  const issueUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1';
+  const blobsUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/git/blobs';
+  const ghHeaders = {
+    'Authorization': `Bearer ${ghToken}`,
+    'Accept': 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'User-Agent': 'Schichttagebuch-CloudRunner'
   };
 
-  const patchBridge = async (fieldsObj) => {
-    const mask = Object.keys(fieldsObj).map(k => `updateMask.fieldPaths=${k}`).join('&');
-    await fetch(`${docUrl}?${mask}`, {
+  let bridgeState = {};
+  const getBridgeState = async () => {
+    const r = await fetch(`${issueUrl}?t=${Date.now()}`, { headers: ghHeaders });
+    if (!r.ok) return null;
+    const iss = await r.json();
+    try {
+      bridgeState = JSON.parse(iss.body || '{}');
+      return bridgeState;
+    } catch {
+      return null;
+    }
+  };
+
+  const patchBridge = async (partialObj) => {
+    bridgeState = { ...bridgeState, ...partialObj };
+    await fetch(issueUrl, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${auth.idToken}`
-      },
-      body: JSON.stringify({ fields: fieldsObj })
+      headers: ghHeaders,
+      body: JSON.stringify({ body: JSON.stringify(bridgeState, null, 2) })
     }).catch(() => {});
   };
 
-  const doc = await getBridgeDoc();
-  const f = doc?.fields || {};
-  const reqStatus = f.status?.stringValue || '';
-  const reqId = f.requestId?.stringValue || '';
-  const reqAt = Number(f.requestedAt?.integerValue || 0);
-  const ym = f.ym?.stringValue || '2026-11';
-  const targetDate = f.targetDate?.stringValue || '2026-11-7';
-  const credsUser = f.credsUser?.stringValue || 'johannes.backhaus@johanniter.de';
-  const credsPass = f.credsPass?.stringValue || '';
-  const myPlanToken = f.myPlanToken?.stringValue ||
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MDk0MjAzIiwiZXhwIjoiMTc5NDEyMzAwMyJ9.ys8mmRZc6yVOwDmSKSmqa5urcrbwo9v5ijUJ1LDMYz8';
+  const createResultBlob = async (jsonStr) => {
+    const r = await fetch(blobsUrl, {
+      method: 'POST',
+      headers: ghHeaders,
+      body: JSON.stringify({
+        content: Buffer.from(String(jsonStr), 'utf8').toString('base64'),
+        encoding: 'base64'
+      })
+    });
+    if (!r.ok) return '';
+    const d = await r.json();
+    return d.sha || '';
+  };
+
+  const f = (await getBridgeState()) || {};
+  const reqStatus = f.status || '';
+  const reqId = f.requestId || '';
+  const reqAt = Number(f.requestedAt || 0);
+  const ym = f.ym || '2026-11';
+  const targetDate = f.targetDate || '2026-11-7';
+  const credsUser = f.credsUser || 'johannes.backhaus@johanniter.de';
+  const credsPass = f.credsPass || '';
+  const myPlanToken = f.myPlanToken ||
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MTc4MDM3IiwiZXhwIjoiMTc5NDIwNjgzNyJ9.i3ONReX48RFmLhSbjHwd1_quZ4ua1npCj732aiJZiH4';
 
   const seedMyPlanScript = `
     try {
@@ -331,9 +358,9 @@ async function main() {
 
   console.log(`☁️ Starting CareMan Cloud Auto-Pilot for ${ym} (${targetDate}), requestId=${reqId}...`);
   await patchBridge({
-    status: { stringValue: 'running' },
-    stepMessage: { stringValue: `☁️ Cloud-Auto-Pilot verbunden – öffne Johanniter-Anmeldung für ${ym}...` },
-    updatedAt: { integerValue: String(Date.now()) }
+    status: 'running',
+    stepMessage: `☁️ Cloud-Auto-Pilot verbunden – öffne Johanniter-Anmeldung für ${ym}...`,
+    updatedAt: Date.now()
   });
 
   const targetCareManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
@@ -376,8 +403,9 @@ async function main() {
 
   if (!pageTarget) {
     await patchBridge({
-      status: { stringValue: 'error' },
-      stepMessage: { stringValue: '⚠️ Cloud-Browser konnte nicht gestartet werden.' }
+      status: 'error',
+      stepMessage: '⚠️ Cloud-Browser konnte nicht gestartet werden.',
+      updatedAt: Date.now()
     });
     proc.kill('SIGTERM');
     return;
@@ -389,15 +417,16 @@ async function main() {
   let lastPasswordSubmitAt = 0;
   let last2faSelectAt = 0;
   let lastStepMsg = '';
+  let seedAttempts = 0;
 
   const updateStep = async (msg) => {
     if (!msg || msg === lastStepMsg) return;
     lastStepMsg = msg;
     console.log('[Cloud Auto-Pilot]', msg);
     await patchBridge({
-      status: { stringValue: 'running' },
-      stepMessage: { stringValue: msg },
-      updatedAt: { integerValue: String(Date.now()) }
+      status: 'running',
+      stepMessage: msg,
+      updatedAt: Date.now()
     });
   };
 
@@ -445,14 +474,15 @@ async function main() {
       }
 
       if (pageState.daemonResult && pageState.daemonResult.length > 20) {
+        const blobSha = await createResultBlob(pageState.daemonResult);
         await patchBridge({
-          status: { stringValue: 'done' },
-          stepMessage: { stringValue: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...` },
-          resultJson: { stringValue: pageState.daemonResult },
-          ...(pageState.freshMyPlanToken ? { myPlanToken: { stringValue: pageState.freshMyPlanToken } } : {}),
-          updatedAt: { integerValue: String(Date.now()) }
+          status: 'done',
+          stepMessage: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...`,
+          resultBlobSha: blobSha,
+          ...(pageState.freshMyPlanToken ? { myPlanToken: pageState.freshMyPlanToken } : {}),
+          updatedAt: Date.now()
         });
-        console.log('✅ Cloud Auto-Pilot finished successfully!');
+        console.log('✅ Cloud Auto-Pilot finished successfully! blobSha=' + blobSha);
         break;
       }
 
@@ -544,12 +574,46 @@ async function main() {
 
       if (/dienstplan-bayern\.secure\.johanniter\.de/i.test(pageState.host)) {
         if (!pageState.freshMyPlanToken || pageState.href.includes('/identity/')) {
-          await cdp.evalInPage(`(() => {
-            ${seedMyPlanScript}
-            window.location.href = ${JSON.stringify(targetCareManUrl)};
-          })()`).catch(() => {});
-          await sleep(800);
-          continue;
+          if (seedAttempts < 2) {
+            seedAttempts++;
+            await cdp.evalInPage(`(() => {
+              ${seedMyPlanScript}
+              window.location.href = ${JSON.stringify(targetCareManUrl)};
+            })()`).catch(() => {});
+            await sleep(800);
+            continue;
+          } else if (pageState.hasPassInput && credsPass && Date.now() - lastPasswordSubmitAt > 3000) {
+            lastPasswordSubmitAt = Date.now();
+            await cdp.evalInPage(`(async () => {
+              const sleep = ms => new Promise(r => setTimeout(r, ms));
+              const fillField = (el, val) => {
+                if (!el) return;
+                el.focus();
+                try { el.select(); document.execCommand('insertText', false, val); } catch (e) {}
+                if (el.value !== val) {
+                  const proto = Object.getPrototypeOf(el);
+                  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set ||
+                    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+                  if (setter) setter.call(el, val);
+                  else el.value = val;
+                }
+                ['input', 'change', 'blur'].forEach(ev => el.dispatchEvent(new Event(ev, { bubbles: true })));
+              };
+              const passInput = document.querySelector('input[type="password"]');
+              const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="password"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"])'));
+              const userInput = allInputs[0];
+              if (userInput) fillField(userInput, ${JSON.stringify(credsUser)});
+              await sleep(80);
+              if (passInput) fillField(passInput, ${JSON.stringify(credsPass)});
+              await sleep(220);
+              const loginBtn = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]')).find(b =>
+                /^(Anmelden|Login|Sign\\s*in|Weiter|Next|OK|Submit)$/i.test((b.innerText || b.value || b.textContent || '').trim())
+              ) || document.querySelector('button[type="submit"], input[type="submit"]');
+              if (loginBtn) loginBtn.click();
+            })()`, true).catch(() => {});
+            await sleep(800);
+            continue;
+          }
         }
 
         if (pageState.bannerText) {
@@ -592,8 +656,9 @@ async function main() {
   } catch (err) {
     console.error('Cloud runner loop error:', err);
     await patchBridge({
-      status: { stringValue: 'error' },
-      stepMessage: { stringValue: '⚠️ Cloud-Fehler: ' + (err.message || String(err)) }
+      status: 'error',
+      stepMessage: '⚠️ Cloud-Fehler: ' + (err.message || String(err)),
+      updatedAt: Date.now()
     });
   } finally {
     if (cdp) cdp.close();

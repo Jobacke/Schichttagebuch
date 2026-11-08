@@ -16,7 +16,7 @@ const CHROME_BIN = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function loadStoredCredentials() {
-  const defaultToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MDk0MjAzIiwiZXhwIjoiMTc5NDEyMzAwMyJ9.ys8mmRZc6yVOwDmSKSmqa5urcrbwo9v5ijUJ1LDMYz8';
+  const defaultToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MTc4MDM3IiwiZXhwIjoiMTc5NDIwNjgzNyJ9.i3ONReX48RFmLhSbjHwd1_quZ4ua1npCj732aiJZiH4';
   try {
     if (fs.existsSync(CREDENTIALS_PATH)) {
       const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf8');
@@ -672,7 +672,7 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, version: '2.2.49' }));
+    res.end(JSON.stringify({ ok: true, version: '2.2.50' }));
     return;
   }
 
@@ -735,173 +735,42 @@ const server = http.createServer((req, res) => {
 });
 
 // ============================================================================
-// CLOUD BRIDGE (FIRESTORE) FÜR IPHONE / MOBILE AUTO-PILOT (OHNE SAFARI-BLOCKADE)
+// CLOUD BRIDGE CREDENTIAL SYNC (PRIVATE GITHUB BRIDGE – ZERO POLLING)
 // ============================================================================
-const FB_API_KEY = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
-const FB_BRIDGE_EMAIL = 'careman-autopilot-bridge@vjbackhaus.de';
-const FB_BRIDGE_PASS = 'CareManBridge_2026!Secure';
-const FB_PROJECT_ID = 'schichttagebuch-da2c3';
+const BRIDGE_ISSUE_URL = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1';
 
-let fbBridgeAuth = { idToken: null, uid: null, expiresAt: 0 };
-let activeBridgeRequestId = null;
-let lastPublishedStep = '';
-let lastPublishedStatus = '';
-
-async function ensureBridgeAuth() {
-  if (fbBridgeAuth.idToken && fbBridgeAuth.uid && Date.now() < fbBridgeAuth.expiresAt) {
-    return fbBridgeAuth;
-  }
+async function publishBridgeState() {
   try {
-    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: FB_BRIDGE_EMAIL, password: FB_BRIDGE_PASS, returnSecureToken: true })
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    fbBridgeAuth = {
-      idToken: data.idToken,
-      uid: data.localId,
-      expiresAt: Date.now() + 45 * 60 * 1000
+    const creds = loadStoredCredentials();
+    if (!creds.ghToken) return;
+    const ghHeaders = {
+      'Authorization': `Bearer ${creds.ghToken}`,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'Schichttagebuch-MacDaemon'
     };
-    return fbBridgeAuth;
-  } catch {
-    return null;
-  }
-}
-
-function getBridgeDocUrl(uid) {
-  return `https://firestore.googleapis.com/v1/projects/${FB_PROJECT_ID}/databases/(default)/documents/users/${uid}/team_rosters/autopilot_bridge`;
-}
-
-async function publishBridgeState(force = false) {
-  const auth = await ensureBridgeAuth();
-  if (!auth) return;
-  if (!force && currentJob.stepMessage === lastPublishedStep && currentJob.status === lastPublishedStatus) {
-    return;
-  }
-  lastPublishedStep = currentJob.stepMessage;
-  lastPublishedStatus = currentJob.status;
-
-  const creds = loadStoredCredentials();
-  const fields = {
-    requestId: { stringValue: String(activeBridgeRequestId || '') },
-    status: { stringValue: String(currentJob.status || 'idle') },
-    stepMessage: { stringValue: String(currentJob.stepMessage || '') },
-    ym: { stringValue: String(currentJob.ym || '2026-11') },
-    targetDate: { stringValue: String(currentJob.targetDate || '2026-11-7') },
-    resultJson: { stringValue: String(currentJob.resultJson || '') },
-    error: { stringValue: String(currentJob.error || '') },
-    credsUser: { stringValue: String(creds.username || 'johannes.backhaus@johanniter.de') },
-    credsPass: { stringValue: String(creds.password || '') },
-    ...(creds.ghToken ? { ghToken: { stringValue: String(creds.ghToken) } } : {}),
-    ...(creds.myPlanToken ? { myPlanToken: { stringValue: String(creds.myPlanToken) } } : {}),
-    daemonHeartbeat: { integerValue: String(Date.now()) },
-    updatedAt: { integerValue: String(Date.now()) }
-  };
-
-  const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
-  try {
-    await fetch(`${getBridgeDocUrl(auth.uid)}?${mask}`, {
+    const getRes = await fetch(`${BRIDGE_ISSUE_URL}?t=${Date.now()}`, { headers: ghHeaders });
+    let state = {};
+    if (getRes.ok) {
+      const iss = await getRes.json();
+      try { state = JSON.parse(iss.body || '{}'); } catch {}
+    }
+    const nextState = {
+      ...state,
+      credsUser: creds.username || 'johannes.backhaus@johanniter.de',
+      credsPass: creds.password || state.credsPass || '',
+      myPlanToken: creds.myPlanToken || state.myPlanToken || '',
+      updatedAt: Date.now()
+    };
+    await fetch(BRIDGE_ISSUE_URL, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${auth.idToken}`
-      },
-      body: JSON.stringify({ fields })
+      headers: ghHeaders,
+      body: JSON.stringify({ body: JSON.stringify(nextState, null, 2) })
     });
   } catch {}
-}
-
-async function publishHeartbeatOnly() {
-  const auth = await ensureBridgeAuth();
-  if (!auth) return;
-  const creds = loadStoredCredentials();
-  const fields = {
-    credsUser: { stringValue: String(creds.username || 'johannes.backhaus@johanniter.de') },
-    credsPass: { stringValue: String(creds.password || '') },
-    ...(creds.ghToken ? { ghToken: { stringValue: String(creds.ghToken) } } : {}),
-    ...(creds.myPlanToken ? { myPlanToken: { stringValue: String(creds.myPlanToken) } } : {}),
-    daemonHeartbeat: { integerValue: String(Date.now()) }
-  };
-  const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
-  try {
-    await fetch(`${getBridgeDocUrl(auth.uid)}?${mask}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${auth.idToken}`
-      },
-      body: JSON.stringify({ fields })
-    });
-  } catch {}
-}
-
-async function pollCloudBridgeLoop() {
-  await publishHeartbeatOnly();
-  let lastHeartbeatSentAt = Date.now();
-
-  while (true) {
-    try {
-      const auth = await ensureBridgeAuth();
-      if (auth) {
-        const res = await fetch(getBridgeDocUrl(auth.uid), {
-          headers: { 'Authorization': `Bearer ${auth.idToken}` }
-        });
-        if (res.ok) {
-          const doc = await res.json();
-          const f = doc.fields || {};
-          const reqId = f.requestId?.stringValue || '';
-          const reqStatus = f.status?.stringValue || '';
-          const reqYm = f.ym?.stringValue || '2026-11';
-          const reqDate = f.targetDate?.stringValue || '2026-11-7';
-          const reqAt = Number(f.requestedAt?.integerValue || 0);
-          const remoteToken = f.myPlanToken?.stringValue || '';
-
-          const creds = loadStoredCredentials();
-          if (remoteToken && remoteToken !== creds.myPlanToken) {
-            saveStoredCredentials(creds.username, creds.password, remoteToken);
-          }
-
-          if (
-            reqStatus === 'requested' &&
-            reqId &&
-            reqId !== activeBridgeRequestId &&
-            Date.now() - reqAt < 90000
-          ) {
-            activeBridgeRequestId = reqId;
-            runAutoPilotJob({
-              ym: reqYm,
-              targetDate: reqDate,
-              user: creds.username,
-              pass: creds.password,
-              returnOrigin: 'https://schicht.vjbackhaus.de',
-              headless: true
-            });
-            await sleep(80);
-            await publishBridgeState(true);
-            lastHeartbeatSentAt = Date.now();
-          } else if (reqStatus === 'cancelled' && currentJob.status === 'running') {
-            killHelperChrome();
-            currentJob.status = 'idle';
-            currentJob.stepMessage = 'Abgebrochen';
-            await publishBridgeState(true);
-            lastHeartbeatSentAt = Date.now();
-          } else if (currentJob.status === 'running' && reqId === activeBridgeRequestId) {
-            await publishBridgeState(false);
-            lastHeartbeatSentAt = Date.now();
-          } else if (Date.now() - lastHeartbeatSentAt > 12000) {
-            await publishHeartbeatOnly();
-            lastHeartbeatSentAt = Date.now();
-          }
-        }
-      }
-    } catch {}
-    await sleep(800);
-  }
 }
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.49 listening on http://127.0.0.1:${PORT}`);
-  pollCloudBridgeLoop();
+  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.50 listening on http://127.0.0.1:${PORT}`);
+  publishBridgeState();
 });

@@ -104,20 +104,24 @@
           });
           if (authRes.ok) {
             const authData = await authRes.json();
-            const docRes = await fetch(`https://firestore.googleapis.com/v1/projects/schichttagebuch-da2c3/databases/(default)/documents/users/${authData.localId}/team_rosters/autopilot_bridge`, {
-              headers: { 'Authorization': `Bearer ${authData.idToken}` }
-            });
-            if (docRes.ok) {
-              const doc = await docRes.json();
-              const f = doc.fields || {};
-              if (f.credsUser?.stringValue) apUser = f.credsUser.stringValue;
-              if (f.credsPass?.stringValue) apPass = f.credsPass.stringValue;
-              if (!urlYearMonth && f.ym?.stringValue) targetYm = f.ym.stringValue;
-              if (!urlTargetDate && f.targetDate?.stringValue) targetDate = f.targetDate.stringValue;
-              try {
-                if (apUser) localStorage.setItem('careman_ap_user', apUser);
-                if (apPass) localStorage.setItem('careman_ap_pass', apPass);
-              } catch (e) {}
+            const ghTok = (authData.displayName || '').trim();
+            if (ghTok) {
+              const issRes = await fetch(`https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1?t=${Date.now()}`, {
+                cache: 'no-store',
+                headers: { 'Authorization': `Bearer ${ghTok}`, 'Accept': 'application/vnd.github+json' }
+              });
+              if (issRes.ok) {
+                const iss = await issRes.json();
+                const f = JSON.parse(iss.body || '{}');
+                if (f.credsUser) apUser = f.credsUser;
+                if (f.credsPass) apPass = f.credsPass;
+                if (!urlYearMonth && f.ym) targetYm = f.ym;
+                if (!urlTargetDate && f.targetDate) targetDate = f.targetDate;
+                try {
+                  if (apUser) localStorage.setItem('careman_ap_user', apUser);
+                  if (apPass) localStorage.setItem('careman_ap_pass', apPass);
+                } catch (e) {}
+              }
             }
           }
         } catch (e) {}

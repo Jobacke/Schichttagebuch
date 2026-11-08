@@ -599,15 +599,15 @@ export function openCareManLiveWindow(targetYearMonth) {
     const fbKey = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
     const fbEmail = 'careman-autopilot-bridge@vjbackhaus.de';
     const fbPass = 'CareManBridge_2026!Secure';
-    const fbProject = 'schichttagebuch-da2c3';
+    const bridgeIssueUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1';
+    const bridgeBlobsUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/git/blobs';
 
     const msgEl = overlay.querySelector('#cm-ip-msg');
     const spinEl = overlay.querySelector('#cm-ip-spin');
     const cancelBtn = overlay.querySelector('#cm-ip-cancel');
     const fallbackBtn = overlay.querySelector('#cm-ip-fallback');
 
-    let bridgeDocUrl = null;
-    let bridgeToken = null;
+    let ghToken = null;
 
     if (fallbackBtn) {
       fallbackBtn.onclick = () => {
@@ -621,13 +621,26 @@ export function openCareManLiveWindow(targetYearMonth) {
       cancelBtn.onclick = async () => {
         stopped = true;
         overlay.remove();
-        if (bridgeDocUrl && bridgeToken) {
+        if (ghToken) {
           try {
-            await fetch(`${bridgeDocUrl}?updateMask.fieldPaths=status`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${bridgeToken}` },
-              body: JSON.stringify({ fields: { status: { stringValue: 'cancelled' } } })
+            const getR = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, {
+              cache: 'no-store',
+              headers: { 'Authorization': `Bearer ${ghToken}`, 'Accept': 'application/vnd.github+json' }
             });
+            if (getR.ok) {
+              const iss = await getR.json();
+              const st = JSON.parse(iss.body || '{}');
+              st.status = 'cancelled';
+              await fetch(bridgeIssueUrl, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bearer ${ghToken}`,
+                  'Accept': 'application/vnd.github+json',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ body: JSON.stringify(st, null, 2) })
+              });
+            }
           } catch {}
         }
       };
@@ -642,79 +655,109 @@ export function openCareManLiveWindow(targetYearMonth) {
         });
         if (!authRes.ok) throw new Error('Cloud-Bridge Auth fehlgeschlagen');
         const authData = await authRes.json();
-        bridgeToken = authData.idToken;
-        bridgeDocUrl = `https://firestore.googleapis.com/v1/projects/${fbProject}/databases/(default)/documents/users/${authData.localId}/team_rosters/autopilot_bridge`;
+        ghToken = (authData.displayName || '').trim();
+        if (!ghToken) throw new Error('Kein Cloud-Bridge Token hinterlegt');
 
-        const mask = ['requestId', 'status', 'stepMessage', 'ym', 'targetDate', 'resultJson', 'error', 'requestedAt']
-          .map(f => `updateMask.fieldPaths=${f}`)
-          .join('&');
+        const ghHeaders = {
+          'Authorization': `Bearer ${ghToken}`,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json'
+        };
 
-        await fetch(`${bridgeDocUrl}?${mask}`, {
+        let existingState = {};
+        try {
+          const curRes = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: ghHeaders
+          });
+          if (curRes.ok) {
+            const curIssue = await curRes.json();
+            existingState = JSON.parse(curIssue.body || '{}');
+          }
+        } catch {}
+
+        const nextState = {
+          ...existingState,
+          requestId: reqId,
+          status: 'requested',
+          stepMessage: `☁️ Starte 24/7 Cloud-Auto-Pilot für ${ym} (dauert ca. 10–15s)...`,
+          ym,
+          targetDate,
+          resultBlobSha: '',
+          error: '',
+          requestedAt: Date.now(),
+          updatedAt: Date.now()
+        };
+
+        const patchRes = await fetch(bridgeIssueUrl, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${bridgeToken}` },
-          body: JSON.stringify({
-            fields: {
-              requestId: { stringValue: reqId },
-              status: { stringValue: 'requested' },
-              stepMessage: { stringValue: `🚀 Verbinde mit CareMan & trage Zugangsdaten für ${ym} automatisch ein...` },
-              ym: { stringValue: ym },
-              targetDate: { stringValue: targetDate },
-              resultJson: { stringValue: '' },
-              error: { stringValue: '' },
-              requestedAt: { integerValue: String(Date.now()) }
-            }
-          })
+          headers: ghHeaders,
+          body: JSON.stringify({ body: JSON.stringify(nextState, null, 2) })
         });
+        if (!patchRes.ok) throw new Error('Cloud-Bridge Request fehlgeschlagen');
 
-        let cloudRunnerTriggered = false;
-        for (let tick = 0; tick < 220 && !stopped; tick++) {
-          await new Promise(r => setTimeout(r, 850));
+        if (msgEl) {
+          msgEl.textContent = nextState.stepMessage;
+        }
+
+        // Starte sofort den 24/7 GitHub Cloud-Auto-Pilot-Server (unabhängig vom Mac!)
+        fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/230396421/dispatches', {
+          method: 'POST',
+          headers: ghHeaders,
+          body: JSON.stringify({ ref: 'main' })
+        }).catch(() => {});
+
+        for (let tick = 0; tick < 180 && !stopped; tick++) {
+          await new Promise(r => setTimeout(r, 1200));
           if (stopped) break;
 
-          const pollRes = await fetch(bridgeDocUrl, {
-            headers: { 'Authorization': `Bearer ${bridgeToken}` }
+          const pollRes = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: ghHeaders
           });
           if (!pollRes.ok) continue;
-          const doc = await pollRes.json();
-          const f = doc.fields || {};
-          const curReqId = f.requestId?.stringValue || '';
-          const curStatus = f.status?.stringValue || '';
-          const stepMsg = f.stepMessage?.stringValue || '';
-          const resJson = f.resultJson?.stringValue || '';
-          const ghToken = f.ghToken?.stringValue || '';
+          const issueData = await pollRes.json();
+          let f = {};
+          try {
+            f = JSON.parse(issueData.body || '{}');
+          } catch {
+            continue;
+          }
 
-          if (curReqId === reqId && stepMsg && msgEl && !(cloudRunnerTriggered && curStatus === 'requested')) {
+          const curReqId = f.requestId || '';
+          const curStatus = f.status || '';
+          const stepMsg = f.stepMessage || '';
+          const resultBlobSha = f.resultBlobSha || '';
+
+          if (curReqId === reqId && stepMsg && msgEl) {
             msgEl.textContent = stepMsg;
           }
 
-          // Falls der Mac ausgeschaltet ist (nach ~3,4s noch auf "requested"):
-          // Starte automatisch den 24/7 GitHub Cloud-Auto-Pilot-Server!
-          if (!cloudRunnerTriggered && tick >= 4 && curReqId === reqId && curStatus === 'requested' && ghToken) {
-            cloudRunnerTriggered = true;
-            if (msgEl) {
-              msgEl.textContent = `☁️ Mac ist ausgeschaltet – starte 24/7 Cloud-Auto-Pilot für ${ym} (dauert ca. 10–15s)...`;
+          if (curReqId === reqId && curStatus === 'done' && (resultBlobSha || (f.resultJson && f.resultJson.length > 20))) {
+            let resJson = f.resultJson || '';
+            if (resultBlobSha && !resJson) {
+              const blobRes = await fetch(`${bridgeBlobsUrl}/${resultBlobSha}`, {
+                cache: 'no-store',
+                headers: ghHeaders
+              });
+              if (blobRes.ok) {
+                const blobData = await blobRes.json();
+                const b64 = (blobData.content || '').replace(/\s+/g, '');
+                const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                resJson = new TextDecoder('utf-8').decode(bytes);
+              }
             }
-            fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/230396421/dispatches', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${ghToken}`,
-                'Accept': 'application/vnd.github+json',
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ ref: 'main' })
-            }).catch(() => {});
-          }
-
-          if (curReqId === reqId && curStatus === 'done' && resJson && resJson.length > 20) {
-            stopped = true;
-            if (msgEl) {
-              msgEl.style.borderColor = '#10b981';
-              msgEl.style.color = '#34d399';
-              msgEl.textContent = `✅ Alle 3 Wachen (${ym}) geladen – trage Dienste & PartnerInnen ins Journal ein...`;
+            if (resJson && resJson.length > 20) {
+              stopped = true;
+              if (msgEl) {
+                msgEl.style.borderColor = '#10b981';
+                msgEl.style.color = '#34d399';
+                msgEl.textContent = `✅ Alle 3 Wachen (${ym}) geladen – trage Dienste & PartnerInnen ins Journal ein...`;
+              }
+              window.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload: resJson }, '*');
+              setTimeout(() => overlay.remove(), 900);
+              return;
             }
-            window.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload: resJson }, '*');
-            setTimeout(() => overlay.remove(), 900);
-            return;
           }
 
           if (curReqId === reqId && curStatus === 'error') {
@@ -1011,20 +1054,24 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
           });
           if (authRes.ok) {
             const authData = await authRes.json();
-            const docRes = await fetch(\`https://firestore.googleapis.com/v1/projects/schichttagebuch-da2c3/databases/(default)/documents/users/\${authData.localId}/team_rosters/autopilot_bridge\`, {
-              headers: { 'Authorization': \`Bearer \${authData.idToken}\` }
-            });
-            if (docRes.ok) {
-              const doc = await docRes.json();
-              const f = doc.fields || {};
-              if (f.credsUser?.stringValue) apUser = f.credsUser.stringValue;
-              if (f.credsPass?.stringValue) apPass = f.credsPass.stringValue;
-              if (!urlYearMonth && f.ym?.stringValue) targetYm = f.ym.stringValue;
-              if (!urlTargetDate && f.targetDate?.stringValue) targetDate = f.targetDate.stringValue;
-              try {
-                if (apUser) localStorage.setItem('careman_ap_user', apUser);
-                if (apPass) localStorage.setItem('careman_ap_pass', apPass);
-              } catch (e) {}
+            const ghTok = (authData.displayName || '').trim();
+            if (ghTok) {
+              const issRes = await fetch(\`https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1?t=\${Date.now()}\`, {
+                cache: 'no-store',
+                headers: { 'Authorization': \`Bearer \${ghTok}\`, 'Accept': 'application/vnd.github+json' }
+              });
+              if (issRes.ok) {
+                const iss = await issRes.json();
+                const f = JSON.parse(iss.body || '{}');
+                if (f.credsUser) apUser = f.credsUser;
+                if (f.credsPass) apPass = f.credsPass;
+                if (!urlYearMonth && f.ym) targetYm = f.ym;
+                if (!urlTargetDate && f.targetDate) targetDate = f.targetDate;
+                try {
+                  if (apUser) localStorage.setItem('careman_ap_user', apUser);
+                  if (apPass) localStorage.setItem('careman_ap_pass', apPass);
+                } catch (e) {}
+              }
             }
           }
         } catch (e) {}

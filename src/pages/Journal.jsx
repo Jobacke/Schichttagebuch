@@ -376,11 +376,12 @@ export default function Journal() {
                                 padding: '2px 8px',
                                 fontSize: '11px',
                                 fontWeight: 700,
+                                whiteSpace: 'nowrap',
                                 cursor: 'pointer'
                             }}
                             title="Zum aktuellen Monat springen"
                         >
-                            Heute
+                            Aktueller Monat
                         </button>
                     )}
                 </div>

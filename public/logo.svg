@@ -1,18 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Schichttagebuch">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F0164B"/>
-      <stop offset="1" stop-color="#C70033"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF2A5C"/><stop offset="0.55" stop-color="#EB003C"/><stop offset="1" stop-color="#8E1033"/>
     </linearGradient>
+    <radialGradient id="shine" cx="0.3" cy="0.18" r="0.75">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.35"/><stop offset="0.6" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <!-- Kalenderblatt -->
-  <rect x="112" y="132" width="288" height="264" rx="44" fill="#FFFFFF"/>
-  <rect x="112" y="132" width="288" height="70" rx="44" fill="#FFFFFF"/>
-  <rect x="112" y="186" width="288" height="14" fill="#F3D3DB"/>
-  <rect x="170" y="100" width="30" height="70" rx="15" fill="#FFFFFF" stroke="#C70033" stroke-width="10"/>
-  <rect x="312" y="100" width="30" height="70" rx="15" fill="#FFFFFF" stroke="#C70033" stroke-width="10"/>
-  <!-- Uhr / Schicht -->
-  <circle cx="256" cy="296" r="70" fill="none" stroke="#EB003C" stroke-width="22"/>
-  <path d="M256 258 V298 L284 318" fill="none" stroke="#6A2436" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="512" height="512" rx="112" fill="url(#shine)"/>
+  <!-- 24h-Ring: Tag (hell) / Nacht (gedimmt) -->
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="22"/>
+  <path d="M256 106 A150 150 0 1 1 181 386" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round"/>
+  <!-- Sonne & Mond an den Ringenden -->
+  <circle cx="256" cy="106" r="20" fill="#FFD84D"/>
+  <mask id="moon"><rect width="512" height="512" fill="#fff"/><circle cx="148" cy="332" r="24" fill="#000"/></mask><circle cx="134" cy="346" r="28" fill="#fff" mask="url(#moon)"/>
+  <!-- EKG-Puls durch die Mitte -->
+  <path d="M150 262 H200 L224 206 L254 318 L284 172 L308 262 H362" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
 </svg>

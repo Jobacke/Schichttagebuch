@@ -293,7 +293,7 @@ export default function Layout() {
             <header className="app-topbar">
                 <div className="app-topbar-inner">
                     <div className="app-brand">
-                        <img src="/logo.svg" alt="" className="app-brand-logo" />
+                        <img src="/logo.svg?v=4" alt="" className="app-brand-logo" />
                         <div className="app-brand-text">
                             <span className="app-brand-title">Schichttagebuch</span>
                             <span className="app-brand-sub">Rettungsdienst · Dienstplan</span>

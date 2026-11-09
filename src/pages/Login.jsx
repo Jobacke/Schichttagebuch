@@ -51,7 +51,7 @@ export default function Login() {
             {/* Hero Section */}
             <div style={{ textAlign: 'center', marginBottom: '40px' }} className="animate-in">
                 <img
-                    src="/logo.svg"
+                    src="/logo.svg?v=4"
                     alt="Schichttagebuch Logo"
                     style={{
                         width: '88px',

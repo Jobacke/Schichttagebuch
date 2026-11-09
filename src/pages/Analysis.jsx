@@ -1716,7 +1716,12 @@ export default function Analysis() {
 
                     <div className="card-premium">
                         <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>📋 Schichten im Detail ({filteredData.length})</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))',
+                            gap: '10px',
+                            alignItems: 'stretch'
+                        }}>
                             {[...filteredData].sort((a, b) => a.date.localeCompare(b.date)).map((s, index) => {
                                 const resolvedShift = resolveShiftDetails(s, store.settings);
                                 const d = new Date(s.date);
@@ -1727,96 +1732,104 @@ export default function Analysis() {
                                         key={s.id}
                                         style={{
                                             display: 'flex',
+                                            flexDirection: 'column',
                                             justifyContent: 'space-between',
-                                            alignItems: 'center',
                                             padding: '10px 12px',
                                             background: '#1e293b',
-                                            border: bAmt > 0 ? '1px solid rgba(250, 204, 21, 0.35)' : '1px solid transparent',
-                                            borderRadius: '8px',
-                                            fontSize: '13px',
-                                            flexWrap: 'wrap',
-                                            gap: '6px'
+                                            border: bAmt > 0 ? '1px solid rgba(250, 204, 21, 0.4)' : `1px solid ${resolvedShift.colorInfo.border}44`,
+                                            borderLeft: `3px solid ${resolvedShift.colorInfo.color}`,
+                                            borderRadius: '10px',
+                                            fontSize: '12.5px',
+                                            gap: '8px'
                                         }}
                                     >
-                                        <div style={{ flex: 1, minWidth: '200px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, flexWrap: 'wrap' }}>
-                                                <span style={{ color: '#64748b', fontSize: '11px', minWidth: '16px' }}>#{index + 1}</span>
-                                                <span style={{ color: 'var(--color-primary)' }}>{dateFormatted}</span>
-                                                {resolvedShift.code && (
-                                                    <span style={{
-                                                        background: resolvedShift.colorInfo.bg,
-                                                        color: resolvedShift.colorInfo.color,
-                                                        border: `1px solid ${resolvedShift.colorInfo.border}`,
-                                                        padding: '1px 6px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '11px',
-                                                        fontWeight: 700
-                                                    }}>
-                                                        {resolvedShift.code}
-                                                    </span>
-                                                )}
-                                                <span style={{ color: '#f1f5f9' }}>{resolvedShift.typeName}</span>
-                                                <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 'normal' }}>({s.startTime} - {s.endTime})</span>
+                                        {/* Top Row: #Index, Date, Shift Code, Time + Bonus button */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
+                                                <span style={{ color: '#64748b', fontSize: '10.5px', fontWeight: 700 }}>#{index + 1}</span>
+                                                <span style={{ color: 'var(--color-primary)', fontWeight: 800, fontSize: '13px' }}>{dateFormatted}</span>
+                                                <span style={{
+                                                    background: resolvedShift.colorInfo.bg,
+                                                    color: resolvedShift.colorInfo.color,
+                                                    border: `1px solid ${resolvedShift.colorInfo.border}`,
+                                                    padding: '1px 6px',
+                                                    borderRadius: '5px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 800
+                                                }}>
+                                                    {resolvedShift.code || resolvedShift.typeName}
+                                                </span>
+                                                <span style={{
+                                                    color: '#cbd5e1',
+                                                    fontSize: '11px',
+                                                    background: '#0f172a',
+                                                    padding: '1px 5px',
+                                                    borderRadius: '4px',
+                                                    fontWeight: 600,
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    {s.startTime}–{s.endTime}
+                                                </span>
+                                            </div>
+
+                                            {/* Quick Bonus Checkbox Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleShiftBonus(s)}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    padding: '3px 7px',
+                                                    borderRadius: '5px',
+                                                    fontSize: '10.5px',
+                                                    fontWeight: 700,
+                                                    cursor: 'pointer',
+                                                    background: s.hasBonus ? 'rgba(250, 204, 21, 0.18)' : 'rgba(15, 23, 42, 0.6)',
+                                                    color: s.hasBonus ? '#facc15' : '#64748b',
+                                                    border: s.hasBonus ? '1px solid rgba(250, 204, 21, 0.5)' : '1px solid #334155',
+                                                    transition: 'all 0.15s ease',
+                                                    flexShrink: 0
+                                                }}
+                                                title={s.hasBonus ? `Bonus (${bAmt} €) deaktivieren` : `Bonus (${store.settings?.defaultBonusAmount ?? 75} €) aktivieren`}
+                                            >
+                                                <span>{s.hasBonus ? '☑' : '☐'}</span>
+                                                <span>{bAmt > 0 ? `+${bAmt}€` : 'Bonus'}</span>
+                                            </button>
+                                        </div>
+
+                                        {/* Bottom Row: Station, Vehicle, Partner */}
+                                        <div style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '4px',
+                                            paddingTop: '6px',
+                                            borderTop: '1px solid rgba(51, 65, 85, 0.45)'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                                 <span style={{
                                                     background: resolvedShift.colorInfo.stationBg,
                                                     color: resolvedShift.colorInfo.stationColor,
                                                     border: `1px solid ${resolvedShift.colorInfo.stationBorder}`,
                                                     padding: '1px 6px',
                                                     borderRadius: '4px',
-                                                    fontSize: '11px',
+                                                    fontSize: '10.5px',
                                                     fontWeight: 700
                                                 }}>
                                                     📍 {resolvedShift.station}
                                                 </span>
                                                 {s.vehicle && (
-                                                    <span style={{ color: '#94a3b8', fontSize: '11.5px', fontWeight: 'normal' }}>
+                                                    <span style={{ color: '#94a3b8', fontSize: '11.5px', fontWeight: 500 }}>
                                                         🚑 {s.vehicle}
-                                                    </span>
-                                                )}
-                                                {bAmt > 0 && (
-                                                    <span style={{
-                                                        background: 'rgba(250, 204, 21, 0.15)',
-                                                        color: '#facc15',
-                                                        border: '1px solid rgba(250, 204, 21, 0.4)',
-                                                        padding: '1px 6px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '11px',
-                                                        fontWeight: 800
-                                                    }}>
-                                                        💰 +{bAmt} €
                                                     </span>
                                                 )}
                                             </div>
                                             {s.partner && (
-                                                <div style={{ color: '#38bdf8', fontSize: '12.5px', marginTop: '3px', fontWeight: 500 }}>
-                                                    👤 {s.partner}
+                                                <div style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 600, lineHeight: 1.3 }}>
+                                                    👤 {s.partner.toLowerCase().startsWith('mit ') ? s.partner : `mit ${s.partner}`}
                                                 </div>
                                             )}
                                         </div>
-
-                                        {/* Quick Bonus Checkbox Button */}
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleShiftBonus(s)}
-                                            style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                padding: '4px 9px',
-                                                borderRadius: '6px',
-                                                fontSize: '11.5px',
-                                                fontWeight: 700,
-                                                cursor: 'pointer',
-                                                background: s.hasBonus ? 'rgba(250, 204, 21, 0.18)' : 'rgba(15, 23, 42, 0.6)',
-                                                color: s.hasBonus ? '#facc15' : '#64748b',
-                                                border: s.hasBonus ? '1px solid rgba(250, 204, 21, 0.5)' : '1px solid #334155',
-                                                transition: 'all 0.15s ease'
-                                            }}
-                                            title={s.hasBonus ? `Bonus (${bAmt} €) deaktivieren` : `Bonus (${store.settings?.defaultBonusAmount ?? 75} €) aktivieren`}
-                                        >
-                                            <span>{s.hasBonus ? '☑' : '☐'}</span>
-                                            <span>Bonus</span>
-                                        </button>
                                     </div>
                                 );
                             })}

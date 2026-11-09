@@ -631,8 +631,12 @@ export default function Journal() {
                 </div>
             )}
 
-            {/* Shift List Cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Shift List Cards (Responsive Multi-Column Tile Grid) */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: visibleShifts.length > 0 ? 'repeat(auto-fill, minmax(240px, 1fr))' : '1fr',
+                gap: '10px'
+            }}>
                 {visibleShifts
                     .slice()
                     .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || '').localeCompare(b.startTime || ''))
@@ -661,157 +665,180 @@ export default function Journal() {
                                 }}
                                 style={{
                                     display: 'flex',
-                                    alignItems: 'center',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between',
+                                    gap: '8px',
                                     cursor: 'pointer',
-                                    padding: '12px',
+                                    padding: '11px 12px',
+                                    marginBottom: 0,
                                     border: isSelected ? '1px solid var(--color-primary)' : 'var(--glass-border)',
                                     background: isSelected ? 'rgba(249, 115, 22, 0.08)' : 'var(--color-surface)',
                                     transition: 'all 0.15s ease'
                                 }}
                             >
-                                {/* Checkbox in select mode */}
-                                {isSelectMode && (
-                                    <div
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleSelectShift(shift.id);
-                                        }}
-                                        style={{ marginRight: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => toggleSelectShift(shift.id)}
-                                            style={{
-                                                width: '18px',
-                                                height: '18px',
-                                                accentColor: 'var(--color-primary)',
-                                                cursor: 'pointer'
-                                            }}
-                                        />
-                                    </div>
-                                )}
+                                {/* Top Row: Date Badge + Shift Code & Time + Actions */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
+                                        {isSelectMode && (
+                                            <div
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleSelectShift(shift.id);
+                                                }}
+                                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleSelectShift(shift.id)}
+                                                    style={{
+                                                        width: '17px',
+                                                        height: '17px',
+                                                        accentColor: 'var(--color-primary)',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
 
-                                {/* Date Box in station colors */}
-                                <div style={{
-                                    background: shiftCol.stationBg,
-                                    color: shiftCol.stationColor,
-                                    border: `1px solid ${shiftCol.stationBorder}`,
-                                    borderRadius: '12px',
-                                    minWidth: '50px',
-                                    height: '50px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginRight: '16px'
-                                }}>
-                                    <span style={{ fontSize: '10px', fontWeight: 'bold' }}>{dayName}</span>
-                                    <span style={{ fontSize: '18px', fontWeight: 'bold', lineHeight: 1 }}>{dayNum}</span>
-                                </div>
+                                        {/* Compact Date Box in station colors */}
+                                        <div style={{
+                                            background: shiftCol.stationBg,
+                                            color: shiftCol.stationColor,
+                                            border: `1px solid ${shiftCol.stationBorder}`,
+                                            borderRadius: '10px',
+                                            minWidth: '40px',
+                                            height: '40px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0
+                                        }}>
+                                            <span style={{ fontSize: '9px', fontWeight: 800, lineHeight: 1.1 }}>{dayName}</span>
+                                            <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1.05 }}>{dayNum}</span>
+                                        </div>
 
-                                {/* Details */}
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '8px', flexWrap: 'wrap' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ fontSize: '16px', fontWeight: 'bold', color: shiftCol.color }}>
-                                                {displayCode}
-                                            </span>
-                                            {shift.hasBonus && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '15px', fontWeight: 800, color: shiftCol.color }}>
+                                                    {displayCode}
+                                                </span>
                                                 <span style={{
                                                     fontSize: '11px',
+                                                    background: '#334155',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '4px',
+                                                    color: '#cbd5e1',
+                                                    fontWeight: 600,
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    {shift.startTime}–{shift.endTime}
+                                                </span>
+                                            </div>
+                                            {shift.hasBonus && (
+                                                <span style={{
+                                                    fontSize: '10px',
                                                     fontWeight: 700,
                                                     background: 'rgba(16, 185, 129, 0.18)',
                                                     color: '#34d399',
                                                     border: '1px solid rgba(16, 185, 129, 0.4)',
-                                                    padding: '1px 6px',
-                                                    borderRadius: '5px'
+                                                    padding: '0px 5px',
+                                                    borderRadius: '4px',
+                                                    width: 'fit-content'
                                                 }}>
                                                     +{getShiftBonusAmount(shift, store.settings)} € Bonus
                                                 </span>
                                             )}
                                         </div>
-                                        <span style={{ fontSize: '12px', background: '#334155', padding: '2px 8px', borderRadius: '4px', color: '#cbd5e1' }}>
-                                            {shift.startTime} - {shift.endTime}
-                                        </span>
                                     </div>
-                                    {(shift.station || shift.vehicle) && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#94a3b8', flexWrap: 'wrap' }}>
-                                            {shift.station && (
-                                                <>
-                                                    <MapPin size={12} color={shiftCol.stationColor} />
-                                                    <span style={{ color: shiftCol.stationColor, fontWeight: 600 }}>{shift.station}</span>
-                                                </>
-                                            )}
-                                            {shift.station && shift.vehicle && <span>•</span>}
-                                            {shift.vehicle && <span>{shift.vehicle}</span>}
-                                        </div>
-                                    )}
-                                    {partnerDisplay && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#38bdf8', fontWeight: 500, marginTop: '3px' }}>
-                                            <span>👤 {partnerDisplay}</span>
+
+                                    {/* Bonus Checkmark Toggle + Delete & Edit Icons */}
+                                    {!isSelectMode && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleShiftBonus(shift);
+                                                }}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    padding: '4px 7px',
+                                                    borderRadius: '7px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    cursor: 'pointer',
+                                                    border: shift.hasBonus
+                                                        ? '1px solid #10b981'
+                                                        : '1px solid rgba(148, 163, 184, 0.25)',
+                                                    background: shift.hasBonus
+                                                        ? 'rgba(16, 185, 129, 0.18)'
+                                                        : 'rgba(15, 23, 42, 0.5)',
+                                                    color: shift.hasBonus ? '#34d399' : '#94a3b8',
+                                                    transition: 'all 0.15s ease'
+                                                }}
+                                                title={shift.hasBonus ? `Bonus aktiv (${getShiftBonusAmount(shift, store.settings)} €) – Klicken zum Entfernen` : `Bonus-Haken setzen (+${store.settings?.defaultBonusAmount ?? 75} €)`}
+                                            >
+                                                <span>{shift.hasBonus ? '✓' : '☐'}</span>
+                                                <span>Bonus</span>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setConfirmDeleteModal({
+                                                        type: 'selected',
+                                                        count: 1,
+                                                        ids: [shift.id],
+                                                        label: `den Dienst am ${new Date(shift.date).toLocaleDateString('de-DE')} (${displayCode})`
+                                                    });
+                                                }}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--color-text-muted)',
+                                                    cursor: 'pointer',
+                                                    padding: '4px'
+                                                }}
+                                                title="Diesen Dienst löschen"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                            <PenSquare size={14} style={{ opacity: 0.5 }} />
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Bonus Checkmark Toggle + Single Delete or Edit Icon */}
-                                {!isSelectMode && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px', flexShrink: 0 }}>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleShiftBonus(shift);
-                                            }}
-                                            style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                padding: '5px 8px',
-                                                borderRadius: '8px',
-                                                fontSize: '11.5px',
-                                                fontWeight: 700,
-                                                cursor: 'pointer',
-                                                border: shift.hasBonus
-                                                    ? '1px solid #10b981'
-                                                    : '1px solid rgba(148, 163, 184, 0.25)',
-                                                background: shift.hasBonus
-                                                    ? 'rgba(16, 185, 129, 0.18)'
-                                                    : 'rgba(15, 23, 42, 0.5)',
-                                                color: shift.hasBonus ? '#34d399' : '#94a3b8',
-                                                transition: 'all 0.15s ease'
-                                            }}
-                                            title={shift.hasBonus ? `Bonus aktiv (${getShiftBonusAmount(shift, store.settings)} €) – Klicken zum Entfernen` : `Bonus-Haken setzen (+${store.settings?.defaultBonusAmount ?? 75} €)`}
-                                        >
-                                            <span>{shift.hasBonus ? '✓' : '☐'}</span>
-                                            <span>Bonus</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setConfirmDeleteModal({
-                                                    type: 'selected',
-                                                    count: 1,
-                                                    ids: [shift.id],
-                                                    label: `den Dienst am ${new Date(shift.date).toLocaleDateString('de-DE')} (${displayCode})`
-                                                });
-                                            }}
-                                            style={{
-                                                background: 'none',
-                                                border: 'none',
-                                                color: 'var(--color-text-muted)',
-                                                cursor: 'pointer',
-                                                padding: '6px'
-                                            }}
-                                            title="Diesen Dienst löschen"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                        <PenSquare size={16} style={{ opacity: 0.5, marginLeft: '2px' }} />
-                                    </div>
-                                )}
+                                {/* Bottom Details: Station, Vehicle & Partner */}
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '3px',
+                                    paddingTop: '6px',
+                                    borderTop: '1px solid rgba(148, 163, 184, 0.1)'
+                                }}>
+                                    {(shift.station || shift.vehicle) && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                                            {shift.station && (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: shiftCol.stationColor, fontWeight: 600 }}>
+                                                    <MapPin size={11} color={shiftCol.stationColor} />
+                                                    {shift.station}
+                                                </span>
+                                            )}
+                                            {shift.station && shift.vehicle && <span>•</span>}
+                                            {shift.vehicle && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shift.vehicle}</span>}
+                                        </div>
+                                    )}
+                                    {partnerDisplay && (
+                                        <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 600, lineHeight: 1.35 }}>
+                                            👤 {partnerDisplay}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
-import { APP_VERSION } from '../version';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { getPartnersForShiftFromRoster } from '../utils/teamRosterParser';
 
@@ -186,7 +185,6 @@ export default function Entry() {
                 <div>
                     <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         {editId ? 'Eintrag bearbeiten' : 'Neue Schicht'}
-                        <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>v{APP_VERSION}</span>
                     </h1>
                     <div className="subtitle" style={{ margin: '4px 0 0 0' }}>
                         {editId ? 'Änderungen vornehmen' : 'Dienst erfassen'}
@@ -197,7 +195,7 @@ export default function Entry() {
                         onClick={handleDelete}
                         style={{
                             padding: '10px',
-                            background: 'rgba(239, 68, 68, 0.1)',
+                            background: 'rgb(var(--rgb-danger) / 0.1)',
                             color: 'var(--color-danger)',
                             border: 'none',
                             borderRadius: '12px',
@@ -362,10 +360,10 @@ export default function Entry() {
                     className="card-premium"
                     style={{
                         border: formData.hasBonus
-                            ? '1px solid rgba(16, 185, 129, 0.5)'
+                            ? '1px solid rgb(var(--rgb-success) / 0.5)'
                             : 'var(--glass-border)',
                         background: formData.hasBonus
-                            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.85))'
+                            ? 'linear-gradient(135deg, rgb(var(--rgb-success) / 0.12), rgb(var(--rgb-bg) / 0.85))'
                             : 'var(--color-surface)',
                         transition: 'all 0.2s ease'
                     }}
@@ -389,8 +387,8 @@ export default function Entry() {
                                 width: '24px',
                                 height: '24px',
                                 borderRadius: '7px',
-                                border: formData.hasBonus ? '2px solid #10b981' : '2px solid #475569',
-                                background: formData.hasBonus ? '#10b981' : 'transparent',
+                                border: formData.hasBonus ? '2px solid var(--c-success-strong)' : '2px solid var(--c-border-strong)',
+                                background: formData.hasBonus ? 'var(--c-success-strong)' : 'transparent',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -404,16 +402,16 @@ export default function Entry() {
                             </div>
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ fontSize: '16px', fontWeight: 700, color: formData.hasBonus ? '#34d399' : 'var(--color-text-main)' }}>
+                                    <span style={{ fontSize: '16px', fontWeight: 700, color: formData.hasBonus ? 'var(--c-success)' : 'var(--color-text-main)' }}>
                                         💰 Bonus-Schicht
                                     </span>
                                     {formData.hasBonus && (
                                         <span style={{
                                             fontSize: '12px',
                                             fontWeight: 700,
-                                            background: 'rgba(16, 185, 129, 0.2)',
-                                            color: '#34d399',
-                                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                                            background: 'rgb(var(--rgb-success) / 0.2)',
+                                            color: 'var(--c-success)',
+                                            border: '1px solid rgb(var(--rgb-success) / 0.4)',
                                             padding: '2px 8px',
                                             borderRadius: '6px'
                                         }}>
@@ -432,13 +430,13 @@ export default function Entry() {
                         <div style={{
                             marginTop: '14px',
                             paddingTop: '14px',
-                            borderTop: '1px solid rgba(16, 185, 129, 0.25)',
+                            borderTop: '1px solid rgb(var(--rgb-success) / 0.25)',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '10px'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                                <label className="text-label" style={{ margin: 0, color: '#cbd5e1' }}>
+                                <label className="text-label" style={{ margin: 0, color: 'var(--c-text-soft)' }}>
                                     Bonus-Betrag (€)
                                 </label>
                                 <div style={{ position: 'relative', width: '130px' }}>
@@ -456,8 +454,8 @@ export default function Entry() {
                                             paddingRight: '30px',
                                             textAlign: 'right',
                                             fontWeight: 700,
-                                            color: '#34d399',
-                                            borderColor: 'rgba(16, 185, 129, 0.4)'
+                                            color: 'var(--c-success)',
+                                            borderColor: 'rgb(var(--rgb-success) / 0.4)'
                                         }}
                                     />
                                     <span style={{
@@ -465,7 +463,7 @@ export default function Entry() {
                                         right: '10px',
                                         top: '50%',
                                         transform: 'translateY(-50%)',
-                                        color: '#34d399',
+                                        color: 'var(--c-success)',
                                         fontWeight: 700,
                                         pointerEvents: 'none'
                                     }}>
@@ -488,9 +486,9 @@ export default function Entry() {
                                                 borderRadius: '8px',
                                                 fontSize: '12px',
                                                 fontWeight: isActive ? 700 : 500,
-                                                background: isActive ? '#10b981' : 'rgba(15, 23, 42, 0.7)',
-                                                color: isActive ? '#0f172a' : '#94a3b8',
-                                                border: isActive ? '1px solid #10b981' : '1px solid #334155',
+                                                background: isActive ? 'var(--c-success-strong)' : 'rgb(var(--rgb-bg) / 0.7)',
+                                                color: isActive ? 'var(--c-bg)' : 'var(--c-text-muted)',
+                                                border: isActive ? '1px solid var(--c-success-strong)' : '1px solid var(--c-surface-3)',
                                                 cursor: 'pointer'
                                             }}
                                         >

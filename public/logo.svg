@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Schichttagebuch">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F0164B"/>
+      <stop offset="1" stop-color="#C70033"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Kalenderblatt -->
+  <rect x="112" y="132" width="288" height="264" rx="44" fill="#FFFFFF"/>
+  <rect x="112" y="132" width="288" height="70" rx="44" fill="#FFFFFF"/>
+  <rect x="112" y="186" width="288" height="14" fill="#F3D3DB"/>
+  <rect x="170" y="100" width="30" height="70" rx="15" fill="#FFFFFF" stroke="#C70033" stroke-width="10"/>
+  <rect x="312" y="100" width="30" height="70" rx="15" fill="#FFFFFF" stroke="#C70033" stroke-width="10"/>
+  <!-- Uhr / Schicht -->
+  <circle cx="256" cy="296" r="70" fill="none" stroke="#EB003C" stroke-width="22"/>
+  <path d="M256 258 V298 L284 318" fill="none" stroke="#6A2436" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -3,8 +3,8 @@
     "short_name": "Schicht",
     "start_url": ".",
     "display": "browser",
-    "background_color": "#0f172a",
-    "theme_color": "#0f172a",
+    "background_color": "#F2F3F5",
+    "theme_color": "#EB003C",
     "description": "Persönliches Schichttagebuch für den Rettungsdienst",
     "icons": [
         {

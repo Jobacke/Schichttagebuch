@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { APP_VERSION } from '../version';
 import { useAnalysisLogic, resolveShiftTypeName } from '../hooks/useAnalysisLogic';
 import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { exportToPDF } from '../utils/pdfExport';
@@ -95,8 +94,8 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
         return (
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '13px', color: '#94a3b8' }}>Jahresübersicht {year}</span>
-                    <span style={{ fontSize: '12px', background: 'rgba(249, 115, 22, 0.15)', color: '#f97316', padding: '2px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                    <span style={{ fontSize: '13px', color: 'var(--c-text-muted)' }}>Jahresübersicht {year}</span>
+                    <span style={{ fontSize: '12px', background: 'rgb(var(--rgb-primary) / 0.15)', color: 'var(--c-primary)', padding: '2px 8px', borderRadius: '6px', fontWeight: 600 }}>
                         {filteredData.length} Schichten gesamt
                     </span>
                 </div>
@@ -127,38 +126,38 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                             <div
                                 key={mName}
                                 style={{
-                                    background: hasShifts ? '#1e293b' : '#0f172a',
+                                    background: hasShifts ? 'var(--c-surface)' : 'var(--c-bg)',
                                     border: isCurrentMonth
-                                        ? '1.5px solid #f97316'
-                                        : (mBonusCount > 0 ? '1px solid rgba(250, 204, 21, 0.4)' : (hasShifts ? '1px solid #334155' : '1px solid rgba(255,255,255,0.03)')),
-                                    boxShadow: isCurrentMonth ? '0 0 10px rgba(249, 115, 22, 0.25)' : 'none',
+                                        ? '1.5px solid var(--c-primary)'
+                                        : (mBonusCount > 0 ? '1px solid rgb(var(--rgb-warning) / 0.4)' : (hasShifts ? '1px solid var(--c-surface-3)' : '1px solid rgb(var(--rgb-overlay) / 0.03)')),
+                                    boxShadow: isCurrentMonth ? '0 0 10px rgb(var(--rgb-primary) / 0.25)' : 'none',
                                     borderRadius: '8px',
                                     padding: '8px 10px'
                                 }}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <span style={{ fontWeight: 700, fontSize: '13px', color: isCurrentMonth ? '#f97316' : (hasShifts ? '#f8fafc' : '#64748b') }}>{mName}</span>
+                                        <span style={{ fontWeight: 700, fontSize: '13px', color: isCurrentMonth ? 'var(--c-primary)' : (hasShifts ? 'var(--c-text)' : 'var(--c-text-subtle)') }}>{mName}</span>
                                         {isCurrentMonth && (
-                                            <span style={{ fontSize: '9px', background: '#f97316', color: '#fff', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>
+                                            <span style={{ fontSize: '9px', background: 'var(--c-primary)', color: '#fff', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>
                                                 Jetzt
                                             </span>
                                         )}
                                     </div>
                                     {hasShifts && (
-                                        <span style={{ fontSize: '11px', background: '#334155', color: '#facc15', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                        <span style={{ fontSize: '11px', background: 'var(--c-surface-3)', color: 'var(--c-warning)', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
                                             {monthShifts.length} {monthShifts.length === 1 ? 'Dst' : 'Dste'}
                                         </span>
                                     )}
                                 </div>
-                                <div style={{ fontSize: '12px', fontWeight: 600, color: hasShifts ? '#38bdf8' : '#475569' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 600, color: hasShifts ? 'var(--c-info)' : 'var(--c-border-strong)' }}>
                                     {mHours.toFixed(1)} h
-                                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal', marginLeft: '4px' }}>
+                                    <span style={{ fontSize: '10px', color: 'var(--c-text-subtle)', fontWeight: 'normal', marginLeft: '4px' }}>
                                         / {mTarget.toFixed(0)}h
                                     </span>
                                 </div>
                                 {mBonusCount > 0 && (
-                                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#facc15', marginTop: '3px' }}>
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-warning)', marginTop: '3px' }}>
                                         💰 {mBonusCount}x ({mBonusSum.toFixed(0)} €)
                                     </div>
                                 )}
@@ -222,8 +221,8 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                 <h3 className="text-label" style={{ margin: 0 }}>📅 Schicht-Rhythmus</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{
-                        background: 'rgba(249, 115, 22, 0.15)',
-                        color: '#f97316',
+                        background: 'rgb(var(--rgb-primary) / 0.15)',
+                        color: 'var(--c-primary)',
                         padding: '3px 8px',
                         borderRadius: '6px',
                         fontSize: '12px',
@@ -233,9 +232,9 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                     </span>
                     {nightShiftEndDaysCount > 0 && (
                         <span style={{
-                            background: 'rgba(168, 85, 247, 0.15)',
-                            color: '#c084fc',
-                            border: '1px solid rgba(168, 85, 247, 0.35)',
+                            background: 'rgb(var(--rgb-violet) / 0.15)',
+                            color: 'var(--c-violet)',
+                            border: '1px solid rgb(var(--rgb-violet) / 0.35)',
                             padding: '3px 8px',
                             borderRadius: '6px',
                             fontSize: '12px',
@@ -245,8 +244,8 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                         </span>
                     )}
                     <span style={{
-                        background: 'rgba(148, 163, 184, 0.12)',
-                        color: '#94a3b8',
+                        background: 'rgb(var(--rgb-muted) / 0.12)',
+                        color: 'var(--c-text-muted)',
                         padding: '3px 8px',
                         borderRadius: '6px',
                         fontSize: '12px',
@@ -266,7 +265,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                             textAlign: 'center',
                             fontSize: '11px',
                             fontWeight: 700,
-                            color: i >= 5 ? '#f97316' : '#64748b',
+                            color: i >= 5 ? 'var(--c-primary)' : 'var(--c-text-subtle)',
                             padding: '2px 0'
                         }}
                     >
@@ -307,21 +306,21 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                 transition: 'all 0.15s ease',
                                 background: hasShift
                                     ? shiftColor.bg
-                                    : (incomingNightShift ? 'rgba(88, 28, 135, 0.22)' : (item.isWeekend ? 'rgba(30, 41, 59, 0.4)' : '#0f172a')),
+                                    : (incomingNightShift ? 'rgb(var(--rgb-violet-deep) / 0.22)' : (item.isWeekend ? 'rgb(var(--rgb-surface) / 0.4)' : 'var(--c-bg)')),
                                 border: isSelected
-                                    ? '2px solid #38bdf8'
+                                    ? '2px solid var(--c-info)'
                                     : (isToday
-                                        ? '2px solid #f97316'
+                                        ? '2px solid var(--c-primary)'
                                         : (hasBonusDay
-                                            ? '1px solid #facc15'
+                                            ? '1px solid var(--c-warning)'
                                             : (hasShift
                                                 ? `1px solid ${shiftColor.border}`
-                                                : (incomingNightShift ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid #1e293b')))),
+                                                : (incomingNightShift ? '1px solid rgb(var(--rgb-violet) / 0.4)' : '1px solid var(--c-surface)')))),
                                 boxShadow: isSelected
-                                    ? '0 0 10px rgba(56, 189, 248, 0.35)'
+                                    ? '0 0 10px rgb(var(--rgb-info) / 0.35)'
                                     : (isToday
-                                        ? '0 0 10px rgba(249, 115, 22, 0.45)'
-                                        : (incomingNightShift ? '0 0 6px rgba(168, 85, 247, 0.15)' : 'none'))
+                                        ? '0 0 10px rgb(var(--rgb-primary) / 0.45)'
+                                        : (incomingNightShift ? '0 0 6px rgb(var(--rgb-violet) / 0.15)' : 'none'))
                             }}
                             title={hasShift
                                 ? `${resolved.code} (${firstShift.startTime} - ${firstShift.endTime})${hasBonusDay ? ' • 💰 Bonus' : ''}${isToday ? ' • Heute' : ''}`
@@ -333,7 +332,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 2px' }}>
                                 {isToday ? (
                                     <span style={{
-                                        background: '#f97316',
+                                        background: 'var(--c-primary)',
                                         color: '#ffffff',
                                         borderRadius: '50%',
                                         width: '18px',
@@ -344,7 +343,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                         fontSize: '10.5px',
                                         fontWeight: 800,
                                         lineHeight: 1,
-                                        boxShadow: '0 2px 5px rgba(249, 115, 22, 0.6)'
+                                        boxShadow: '0 2px 5px rgb(var(--rgb-primary) / 0.6)'
                                     }}>
                                         {item.dayNum}
                                     </span>
@@ -352,7 +351,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                     <span style={{
                                         fontSize: '11px',
                                         fontWeight: hasShift ? 800 : (item.isWeekend ? 600 : 500),
-                                        color: hasShift ? '#f8fafc' : (item.isWeekend ? '#94a3b8' : '#475569'),
+                                        color: hasShift ? 'var(--c-text)' : (item.isWeekend ? 'var(--c-text-muted)' : 'var(--c-border-strong)'),
                                         lineHeight: 1
                                     }}>
                                         {item.dayNum}
@@ -375,8 +374,8 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                     <span style={{
                                         fontSize: '7.5px',
                                         fontWeight: 800,
-                                        color: '#c084fc',
-                                        background: 'rgba(168, 85, 247, 0.2)',
+                                        color: 'var(--c-violet)',
+                                        background: 'rgb(var(--rgb-violet) / 0.2)',
                                         padding: '1px 3px',
                                         borderRadius: '3px',
                                         lineHeight: 1
@@ -406,7 +405,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                 <div style={{
                                     fontSize: '8.5px',
                                     fontWeight: 700,
-                                    color: '#c084fc',
+                                    color: 'var(--c-violet)',
                                     lineHeight: 1,
                                     marginTop: '2px',
                                     textAlign: 'center',
@@ -421,7 +420,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                 <div style={{
                                     fontSize: '9px',
                                     fontWeight: 800,
-                                    color: '#f97316',
+                                    color: 'var(--c-primary)',
                                     lineHeight: 1,
                                     letterSpacing: '0.2px'
                                 }}>
@@ -432,7 +431,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                     width: '4px',
                                     height: '4px',
                                     borderRadius: '50%',
-                                    background: '#1e293b',
+                                    background: 'var(--c-surface)',
                                     marginBottom: '2px'
                                 }} />
                             )}
@@ -448,20 +447,20 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                     padding: '12px 14px',
                     borderRadius: '10px',
                     background: selectedDayInfo.shifts.length > 0
-                        ? '#1e293b'
-                        : (selectedDayInfo.incomingNightShift ? 'rgba(88, 28, 135, 0.25)' : 'rgba(15, 23, 42, 0.6)'),
+                        ? 'var(--c-surface)'
+                        : (selectedDayInfo.incomingNightShift ? 'rgb(var(--rgb-violet-deep) / 0.25)' : 'rgb(var(--rgb-bg) / 0.6)'),
                     border: selectedDayInfo.shifts.length > 0
-                        ? '1px solid #334155'
-                        : (selectedDayInfo.incomingNightShift ? '1px solid rgba(168, 85, 247, 0.4)' : '1px dashed #334155')
+                        ? '1px solid var(--c-surface-3)'
+                        : (selectedDayInfo.incomingNightShift ? '1px solid rgb(var(--rgb-violet) / 0.4)' : '1px dashed var(--c-surface-3)')
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (selectedDayInfo.shifts.length > 0 || selectedDayInfo.incomingNightShift) ? '8px' : 0 }}>
-                        <span style={{ fontWeight: 700, fontSize: '13px', color: '#f8fafc' }}>
+                        <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--c-text)' }}>
                             📅 {selectedDayInfo.dateFormatted}{selectedDayInfo.dateStr === todayStr ? ' (Heute)' : ''}
                         </span>
                         <button
                             type="button"
                             onClick={() => setSelectedDateStr(null)}
-                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 6px', fontSize: '14px' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--c-text-subtle)', cursor: 'pointer', padding: '2px 6px', fontSize: '14px' }}
                             title="Schließen"
                         >
                             ✕
@@ -473,13 +472,13 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            background: 'rgba(168, 85, 247, 0.12)',
-                            border: '1px solid rgba(168, 85, 247, 0.3)',
+                            background: 'rgb(var(--rgb-violet) / 0.12)',
+                            border: '1px solid rgb(var(--rgb-violet) / 0.3)',
                             borderRadius: '6px',
                             padding: '4px 8px',
                             marginBottom: '10px',
                             fontSize: '12px',
-                            color: '#c084fc'
+                            color: 'var(--c-violet)'
                         }}>
                             <span style={{ fontWeight: 800 }}>🌙 {selectedDayInfo.incomingNightShift.code}</span>
                             <span>{((selectedDayInfo.incomingNightShift.shiftTypeName || '').toLowerCase().includes('spät') || (selectedDayInfo.incomingNightShift.code || '').startsWith('RT')) ? 'Spätschicht-Ende' : 'Nachtschicht-Ende'} um {selectedDayInfo.incomingNightShift.endTime} Uhr{selectedDayInfo.incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''} (aus Vortag)</span>
@@ -493,12 +492,12 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                             const shiftWord = isIncSpät ? 'Spätschicht' : 'Nachtschicht';
 
                             return (
-                                <div style={{ fontSize: '12.5px', color: '#cbd5e1', paddingTop: '2px' }}>
+                                <div style={{ fontSize: '12.5px', color: 'var(--c-text-soft)', paddingTop: '2px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
                                         <span style={{
-                                            background: 'rgba(168, 85, 247, 0.25)',
-                                            color: '#c084fc',
-                                            border: '1px solid rgba(168, 85, 247, 0.45)',
+                                            background: 'rgb(var(--rgb-violet) / 0.25)',
+                                            color: 'var(--c-violet)',
+                                            border: '1px solid rgb(var(--rgb-violet) / 0.45)',
                                             padding: '2px 8px',
                                             borderRadius: '5px',
                                             fontSize: '12px',
@@ -506,17 +505,17 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                         }}>
                                             🌙 {selectedDayInfo.incomingNightShift.code}
                                         </span>
-                                        <span style={{ fontWeight: 700, fontSize: '13px', color: '#f1f5f9' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--c-text)' }}>
                                             {folgetagTitle}
                                         </span>
-                                        <span style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--c-text-soft)' }}>
                                             🕒 Dienstende um {selectedDayInfo.incomingNightShift.endTime} Uhr{selectedDayInfo.incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''}
                                         </span>
                                         {selectedDayInfo.incomingNightShift.station && (
                                             <span style={{
-                                                background: 'rgba(15, 23, 42, 0.8)',
-                                                color: '#94a3b8',
-                                                border: '1px solid #334155',
+                                                background: 'rgb(var(--rgb-bg) / 0.8)',
+                                                color: 'var(--c-text-muted)',
+                                                border: '1px solid var(--c-surface-3)',
                                                 padding: '1px 6px',
                                                 borderRadius: '4px',
                                                 fontSize: '11px',
@@ -526,13 +525,13 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                             </span>
                                         )}
                                     </div>
-                                    <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                    <div style={{ fontSize: '12px', color: 'var(--c-text-muted)', fontStyle: 'italic' }}>
                                         🛌 Dienstende der {shiftWord} vom Vortag um {selectedDayInfo.incomingNightShift.endTime} Uhr{selectedDayInfo.incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''} – danach frei
                                     </div>
                                 </div>
                             );
                         })() : (
-                            <div style={{ fontSize: '12.5px', color: '#94a3b8', fontStyle: 'italic', paddingTop: '4px' }}>
+                            <div style={{ fontSize: '12.5px', color: 'var(--c-text-muted)', fontStyle: 'italic', paddingTop: '4px' }}>
                                 🌴 Dienstfrei – kein Einsatz an diesem Tag
                             </div>
                         )
@@ -543,7 +542,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                             const shiftCol = resolvedShift.colorInfo;
                             const bAmt = getShiftBonusAmount(s, storeSettings);
                             return (
-                                <div key={s.id || idx} style={{ marginTop: idx > 0 ? '10px' : 0, borderTop: idx > 0 ? '1px solid #334155' : 'none', paddingTop: idx > 0 ? '8px' : 0 }}>
+                                <div key={s.id || idx} style={{ marginTop: idx > 0 ? '10px' : 0, borderTop: idx > 0 ? '1px solid var(--c-surface-3)' : 'none', paddingTop: idx > 0 ? '8px' : 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                         <span style={{
                                             background: shiftCol.bg,
@@ -556,10 +555,10 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                         }}>
                                             {resolvedShift.code}
                                         </span>
-                                        <span style={{ fontWeight: 600, fontSize: '13px', color: '#f1f5f9' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--c-text)' }}>
                                             {resolvedShift.typeName}
                                         </span>
-                                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--c-text-muted)' }}>
                                             🕒 {s.startTime} – {s.endTime} Uhr {dur ? `(${dur} Std)` : ''}
                                         </span>
                                         <span style={{
@@ -575,9 +574,9 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                         </span>
                                         {bAmt > 0 && (
                                             <span style={{
-                                                background: 'rgba(250, 204, 21, 0.15)',
-                                                color: '#facc15',
-                                                border: '1px solid rgba(250, 204, 21, 0.4)',
+                                                background: 'rgb(var(--rgb-warning) / 0.15)',
+                                                color: 'var(--c-warning)',
+                                                border: '1px solid rgb(var(--rgb-warning) / 0.4)',
                                                 padding: '1px 6px',
                                                 borderRadius: '4px',
                                                 fontSize: '11px',
@@ -588,12 +587,12 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                                         )}
                                     </div>
                                     {s.vehicle && (
-                                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '12px', color: 'var(--c-text-muted)', marginTop: '4px' }}>
                                             🚑 {s.vehicle}
                                         </div>
                                     )}
                                     {s.partner && (
-                                        <div style={{ fontSize: '12px', color: '#38bdf8', marginTop: '3px', fontWeight: 500 }}>
+                                        <div style={{ fontSize: '12px', color: 'var(--c-info)', marginTop: '3px', fontWeight: 500 }}>
                                             👤 {s.partner}
                                         </div>
                                     )}
@@ -613,11 +612,11 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                 flexWrap: 'wrap',
                 marginTop: '14px',
                 paddingTop: '10px',
-                borderTop: '1px solid rgba(255,255,255,0.05)',
+                borderTop: '1px solid rgb(var(--rgb-overlay) / 0.05)',
                 fontSize: '11px',
-                color: '#94a3b8'
+                color: 'var(--c-text-muted)'
             }}>
-                <span style={{ fontWeight: 700, color: '#64748b' }}>Wachen:</span>
+                <span style={{ fontWeight: 700, color: 'var(--c-text-subtle)' }}>Wachen:</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Sendling.primaryHex }} />
                     <span>Sendling (Blau)</span>
@@ -631,7 +630,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                     <span>Obersendling (Bernstein)</span>
                 </span>
 
-                <span style={{ fontWeight: 700, color: '#64748b', marginLeft: '6px' }}>Schichten:</span>
+                <span style={{ fontWeight: 700, color: 'var(--c-text-subtle)', marginLeft: '6px' }}>Schichten:</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#06b6d4' }} />
                     <span>Früh (Cyan)</span>
@@ -653,7 +652,7 @@ function ShiftRhythmCalendar({ baseDate, filterMode, filteredData, allShifts, st
                     <span>Nacht-Ende</span>
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#64748b' }} />
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--c-text-subtle)' }} />
                     <span>Dienstfrei</span>
                 </span>
             </div>
@@ -739,7 +738,7 @@ export default function Analysis() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div>
                     <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                        Auswertung <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>v{APP_VERSION}</span>
+                        Auswertung
                     </h1>
                 </div>
             </div>
@@ -758,10 +757,10 @@ export default function Analysis() {
                     {/* Segmented Mode Selector: Monat | Jahr | Zeitraum */}
                     <div style={{
                         display: 'inline-flex',
-                        background: '#0f172a',
+                        background: 'var(--c-bg)',
                         padding: '3px',
                         borderRadius: '9px',
-                        border: '1px solid #334155',
+                        border: '1px solid var(--c-surface-3)',
                         flexShrink: 0
                     }}>
                         {[
@@ -778,7 +777,7 @@ export default function Analysis() {
                                     borderRadius: '7px',
                                     border: 'none',
                                     background: filterMode === m.id ? 'var(--color-primary)' : 'transparent',
-                                    color: filterMode === m.id ? '#ffffff' : '#94a3b8',
+                                    color: filterMode === m.id ? '#ffffff' : 'var(--c-text-muted)',
                                     fontWeight: filterMode === m.id ? 700 : 500,
                                     fontSize: '12px',
                                     cursor: 'pointer',
@@ -799,9 +798,9 @@ export default function Analysis() {
                                     type="button"
                                     onClick={() => setBaseDate(addMonths(baseDate, -1))}
                                     style={{
-                                        background: '#0f172a',
-                                        border: '1px solid #334155',
-                                        color: '#cbd5e1',
+                                        background: 'var(--c-bg)',
+                                        border: '1px solid var(--c-surface-3)',
+                                        color: 'var(--c-text-soft)',
                                         borderRadius: '7px',
                                         padding: '5px 7px',
                                         cursor: 'pointer',
@@ -816,7 +815,7 @@ export default function Analysis() {
                                 <div style={{
                                     fontWeight: 700,
                                     fontSize: '13.5px',
-                                    color: '#f8fafc',
+                                    color: 'var(--c-text)',
                                     padding: '0 4px',
                                     whiteSpace: 'nowrap',
                                     textAlign: 'center'
@@ -828,9 +827,9 @@ export default function Analysis() {
                                     type="button"
                                     onClick={() => setBaseDate(addMonths(baseDate, 1))}
                                     style={{
-                                        background: '#0f172a',
-                                        border: '1px solid #334155',
-                                        color: '#cbd5e1',
+                                        background: 'var(--c-bg)',
+                                        border: '1px solid var(--c-surface-3)',
+                                        color: 'var(--c-text-soft)',
                                         borderRadius: '7px',
                                         padding: '5px 7px',
                                         cursor: 'pointer',
@@ -847,9 +846,9 @@ export default function Analysis() {
                                         type="button"
                                         onClick={() => setBaseDate(new Date())}
                                         style={{
-                                            background: 'rgba(249, 115, 22, 0.12)',
-                                            border: '1px solid rgba(249, 115, 22, 0.3)',
-                                            color: '#f97316',
+                                            background: 'rgb(var(--rgb-primary) / 0.12)',
+                                            border: '1px solid rgb(var(--rgb-primary) / 0.3)',
+                                            color: 'var(--c-primary)',
                                             borderRadius: '7px',
                                             padding: '4px 7px',
                                             fontSize: '11px',
@@ -871,9 +870,9 @@ export default function Analysis() {
                                     type="button"
                                     onClick={() => setBaseDate(addMonths(baseDate, -12))}
                                     style={{
-                                        background: '#0f172a',
-                                        border: '1px solid #334155',
-                                        color: '#cbd5e1',
+                                        background: 'var(--c-bg)',
+                                        border: '1px solid var(--c-surface-3)',
+                                        color: 'var(--c-text-soft)',
                                         borderRadius: '7px',
                                         padding: '5px 7px',
                                         cursor: 'pointer',
@@ -888,7 +887,7 @@ export default function Analysis() {
                                 <div style={{
                                     fontWeight: 700,
                                     fontSize: '14px',
-                                    color: '#f8fafc',
+                                    color: 'var(--c-text)',
                                     padding: '0 4px',
                                     whiteSpace: 'nowrap',
                                     textAlign: 'center'
@@ -900,9 +899,9 @@ export default function Analysis() {
                                     type="button"
                                     onClick={() => setBaseDate(addMonths(baseDate, 12))}
                                     style={{
-                                        background: '#0f172a',
-                                        border: '1px solid #334155',
-                                        color: '#cbd5e1',
+                                        background: 'var(--c-bg)',
+                                        border: '1px solid var(--c-surface-3)',
+                                        color: 'var(--c-text-soft)',
                                         borderRadius: '7px',
                                         padding: '5px 7px',
                                         cursor: 'pointer',
@@ -919,9 +918,9 @@ export default function Analysis() {
                                         type="button"
                                         onClick={() => setBaseDate(new Date())}
                                         style={{
-                                            background: 'rgba(249, 115, 22, 0.12)',
-                                            border: '1px solid rgba(249, 115, 22, 0.3)',
-                                            color: '#f97316',
+                                            background: 'rgb(var(--rgb-primary) / 0.12)',
+                                            border: '1px solid rgb(var(--rgb-primary) / 0.3)',
+                                            color: 'var(--c-primary)',
                                             borderRadius: '7px',
                                             padding: '4px 7px',
                                             fontSize: '11px',
@@ -943,23 +942,23 @@ export default function Analysis() {
                                     value={customStart}
                                     onChange={(e) => setCustomStart(e.target.value)}
                                     style={{
-                                        background: '#0f172a',
-                                        border: '1px solid #334155',
-                                        color: '#fff',
+                                        background: 'var(--c-bg)',
+                                        border: '1px solid var(--c-surface-3)',
+                                        color: 'var(--c-text)',
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '12px'
                                     }}
                                 />
-                                <span style={{ color: '#64748b', fontSize: '12px' }}>bis</span>
+                                <span style={{ color: 'var(--c-text-subtle)', fontSize: '12px' }}>bis</span>
                                 <input
                                     type="date"
                                     value={customEnd}
                                     onChange={(e) => setCustomEnd(e.target.value)}
                                     style={{
-                                        background: '#0f172a',
-                                        border: '1px solid #334155',
-                                        color: '#fff',
+                                        background: 'var(--c-bg)',
+                                        border: '1px solid var(--c-surface-3)',
+                                        color: 'var(--c-text)',
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '12px'
@@ -977,9 +976,9 @@ export default function Analysis() {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '5px',
-                                    background: hasActiveFilters ? 'rgba(249, 115, 22, 0.15)' : '#0f172a',
-                                    border: hasActiveFilters ? '1px solid rgba(249, 115, 22, 0.45)' : '1px solid #334155',
-                                    color: hasActiveFilters ? '#f97316' : '#cbd5e1',
+                                    background: hasActiveFilters ? 'rgb(var(--rgb-primary) / 0.15)' : 'var(--c-bg)',
+                                    border: hasActiveFilters ? '1px solid rgb(var(--rgb-primary) / 0.45)' : '1px solid var(--c-surface-3)',
+                                    color: hasActiveFilters ? 'var(--c-primary)' : 'var(--c-text-soft)',
                                     borderRadius: '7px',
                                     padding: '5px 8px',
                                     fontSize: '12px',
@@ -1001,9 +1000,9 @@ export default function Analysis() {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        background: 'rgba(239, 68, 68, 0.12)',
-                                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                                        color: '#ef4444',
+                                        background: 'rgb(var(--rgb-danger) / 0.12)',
+                                        border: '1px solid rgb(var(--rgb-danger) / 0.3)',
+                                        color: 'var(--c-danger)',
                                         borderRadius: '8px',
                                         padding: '6px 7px',
                                         cursor: 'pointer'
@@ -1045,21 +1044,21 @@ export default function Analysis() {
                     style={{
                         padding: '14px 12px',
                         cursor: 'pointer',
-                        border: stats.bonusCount > 0 || onlyBonus ? '1px solid rgba(250, 204, 21, 0.45)' : undefined,
-                        background: onlyBonus ? 'rgba(250, 204, 21, 0.12)' : undefined,
+                        border: stats.bonusCount > 0 || onlyBonus ? '1px solid rgb(var(--rgb-warning) / 0.45)' : undefined,
+                        background: onlyBonus ? 'rgb(var(--rgb-warning) / 0.12)' : undefined,
                         position: 'relative',
                         transition: 'all 0.15s ease'
                     }}
                     title="Klicken für detaillierte Bonus-Auswertung"
                 >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                        <span className="text-label" style={{ color: stats.bonusCount > 0 ? '#facc15' : undefined, marginBottom: '4px' }}>
+                        <span className="text-label" style={{ color: stats.bonusCount > 0 ? 'var(--c-warning)' : undefined, marginBottom: '4px' }}>
                             💰 Bonus ({stats.bonusCount}x)
                         </span>
                         <span style={{
                             fontSize: '10px',
-                            color: '#fde047',
-                            background: 'rgba(250, 204, 21, 0.14)',
+                            color: 'var(--c-warning)',
+                            background: 'rgb(var(--rgb-warning) / 0.14)',
                             padding: '1px 5px',
                             borderRadius: '4px',
                             fontWeight: 700
@@ -1067,7 +1066,7 @@ export default function Analysis() {
                             Details ↗
                         </span>
                     </div>
-                    <span className="text-value" style={{ fontSize: '22px', color: stats.bonusCount > 0 ? '#facc15' : '#64748b' }}>
+                    <span className="text-value" style={{ fontSize: '22px', color: stats.bonusCount > 0 ? 'var(--c-warning)' : 'var(--c-text-subtle)' }}>
                         {stats.bonusTotalAmount.toFixed(0)} €
                     </span>
                 </div>
@@ -1096,9 +1095,9 @@ export default function Analysis() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
-                        background: 'rgba(56, 189, 248, 0.1)',
-                        border: '1px solid rgba(56, 189, 248, 0.35)',
-                        color: '#38bdf8',
+                        background: 'rgb(var(--rgb-info) / 0.1)',
+                        border: '1px solid rgb(var(--rgb-info) / 0.35)',
+                        color: 'var(--c-info)',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                         textAlign: 'center'
@@ -1120,7 +1119,7 @@ export default function Analysis() {
                         position: 'fixed',
                         inset: 0,
                         zIndex: 2500,
-                        background: 'rgba(2, 6, 23, 0.78)',
+                        background: 'rgb(var(--rgb-deep) / 0.78)',
                         backdropFilter: 'blur(6px)',
                         WebkitBackdropFilter: 'blur(6px)',
                         display: 'flex',
@@ -1137,24 +1136,24 @@ export default function Analysis() {
                             maxWidth: '480px',
                             maxHeight: '85vh',
                             overflowY: 'auto',
-                            background: '#0f172a',
-                            border: '1px solid #334155',
+                            background: 'var(--c-bg)',
+                            border: '1px solid var(--c-surface-3)',
                             borderRadius: '18px',
                             padding: '18px',
                             boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)'
                         }}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #1e293b' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--c-surface)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <SlidersHorizontal size={17} color="#f97316" />
-                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>
+                                <SlidersHorizontal size={17} style={{ color: 'var(--c-primary)' }} />
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--c-text)' }}>
                                     Schichtfilter
                                 </h3>
                                 {hasActiveFilters && (
                                     <span style={{
                                         fontSize: '11px',
-                                        background: 'rgba(249, 115, 22, 0.15)',
-                                        color: '#f97316',
+                                        background: 'rgb(var(--rgb-primary) / 0.15)',
+                                        color: 'var(--c-primary)',
                                         padding: '2px 7px',
                                         borderRadius: '10px',
                                         fontWeight: 700
@@ -1167,9 +1166,9 @@ export default function Analysis() {
                                 type="button"
                                 onClick={() => setShowFilterModal(false)}
                                 style={{
-                                    background: '#1e293b',
-                                    border: '1px solid #334155',
-                                    color: '#94a3b8',
+                                    background: 'var(--c-surface)',
+                                    border: '1px solid var(--c-surface-3)',
+                                    color: 'var(--c-text-muted)',
                                     borderRadius: '8px',
                                     padding: '4px 8px',
                                     cursor: 'pointer',
@@ -1183,7 +1182,7 @@ export default function Analysis() {
 
                         {/* Section 1: Schnellauswahl */}
                         <div style={{ marginBottom: '14px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                                 Auswahl
                             </div>
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1195,9 +1194,9 @@ export default function Analysis() {
                                         borderRadius: '20px',
                                         fontSize: '12.5px',
                                         fontWeight: !hasActiveFilters ? 700 : 500,
-                                        background: !hasActiveFilters ? '#334155' : '#1e293b',
-                                        border: !hasActiveFilters ? '1px solid #64748b' : '1px solid #334155',
-                                        color: !hasActiveFilters ? '#f8fafc' : '#94a3b8',
+                                        background: !hasActiveFilters ? 'var(--c-surface-3)' : 'var(--c-surface)',
+                                        border: !hasActiveFilters ? '1px solid var(--c-text-subtle)' : '1px solid var(--c-surface-3)',
+                                        color: !hasActiveFilters ? 'var(--c-text)' : 'var(--c-text-muted)',
                                         cursor: 'pointer'
                                     }}
                                 >
@@ -1215,9 +1214,9 @@ export default function Analysis() {
                                         borderRadius: '20px',
                                         fontSize: '12.5px',
                                         fontWeight: onlyBonus ? 800 : 600,
-                                        background: onlyBonus ? 'rgba(250, 204, 21, 0.18)' : '#1e293b',
-                                        border: onlyBonus ? '1px solid #facc15' : '1px solid #334155',
-                                        color: onlyBonus ? '#facc15' : '#94a3b8',
+                                        background: onlyBonus ? 'rgb(var(--rgb-warning) / 0.18)' : 'var(--c-surface)',
+                                        border: onlyBonus ? '1px solid var(--c-warning)' : '1px solid var(--c-surface-3)',
+                                        color: onlyBonus ? 'var(--c-warning)' : 'var(--c-text-muted)',
                                         cursor: 'pointer'
                                     }}
                                 >
@@ -1230,7 +1229,7 @@ export default function Analysis() {
 
                         {/* Section 2: Wachen */}
                         <div style={{ marginBottom: '14px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                                 Wachen
                             </div>
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1250,9 +1249,9 @@ export default function Analysis() {
                                                 borderRadius: '20px',
                                                 fontSize: '12.5px',
                                                 fontWeight: active ? 700 : 500,
-                                                background: active ? theme.badgeBg : '#1e293b',
-                                                border: active ? `1px solid ${theme.primaryHex}` : '1px solid #334155',
-                                                color: active ? theme.primaryHex : '#cbd5e1',
+                                                background: active ? theme.badgeBg : 'var(--c-surface)',
+                                                border: active ? `1px solid ${theme.primaryHex}` : '1px solid var(--c-surface-3)',
+                                                color: active ? theme.primaryHex : 'var(--c-text-soft)',
                                                 cursor: 'pointer'
                                             }}
                                         >
@@ -1267,7 +1266,7 @@ export default function Analysis() {
 
                         {/* Section 3: Schichtarten */}
                         <div style={{ marginBottom: '14px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                                 Schichtarten
                             </div>
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1287,9 +1286,9 @@ export default function Analysis() {
                                                 borderRadius: '20px',
                                                 fontSize: '12.5px',
                                                 fontWeight: active ? 700 : 500,
-                                                background: active ? shiftCol.bg : '#1e293b',
-                                                border: active ? `1px solid ${shiftCol.border}` : '1px solid #334155',
-                                                color: active ? shiftCol.color : '#cbd5e1',
+                                                background: active ? shiftCol.bg : 'var(--c-surface)',
+                                                border: active ? `1px solid ${shiftCol.border}` : '1px solid var(--c-surface-3)',
+                                                color: active ? shiftCol.color : 'var(--c-text-soft)',
                                                 cursor: 'pointer'
                                             }}
                                         >
@@ -1305,7 +1304,7 @@ export default function Analysis() {
                         {/* Section 4: Fahrzeuge */}
                         {(store.settings?.vehicles || []).length > 0 && (
                             <div style={{ marginBottom: '16px' }}>
-                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                                     Fahrzeuge
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1321,9 +1320,9 @@ export default function Analysis() {
                                                     borderRadius: '16px',
                                                     fontSize: '12px',
                                                     fontWeight: active ? 700 : 500,
-                                                    background: active ? 'rgba(34, 197, 94, 0.15)' : '#1e293b',
-                                                    border: active ? '1px solid #22c55e' : '1px solid #334155',
-                                                    color: active ? '#22c55e' : '#94a3b8',
+                                                    background: active ? 'rgb(var(--rgb-success) / 0.15)' : 'var(--c-surface)',
+                                                    border: active ? '1px solid var(--c-success)' : '1px solid var(--c-surface-3)',
+                                                    color: active ? 'var(--c-success)' : 'var(--c-text-muted)',
                                                     cursor: 'pointer'
                                                 }}
                                             >
@@ -1336,7 +1335,7 @@ export default function Analysis() {
                         )}
 
                         {/* Modal Footer */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', paddingTop: '12px', borderTop: '1px solid #1e293b' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', paddingTop: '12px', borderTop: '1px solid var(--c-surface)' }}>
                             {hasActiveFilters ? (
                                 <button
                                     type="button"
@@ -1345,9 +1344,9 @@ export default function Analysis() {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '5px',
-                                        background: 'rgba(239, 68, 68, 0.12)',
-                                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                                        color: '#ef4444',
+                                        background: 'rgb(var(--rgb-danger) / 0.12)',
+                                        border: '1px solid rgb(var(--rgb-danger) / 0.3)',
+                                        color: 'var(--c-danger)',
                                         padding: '8px 12px',
                                         borderRadius: '10px',
                                         fontSize: '12.5px',
@@ -1389,7 +1388,7 @@ export default function Analysis() {
                         position: 'fixed',
                         inset: 0,
                         zIndex: 2500,
-                        background: 'rgba(2, 6, 23, 0.78)',
+                        background: 'rgb(var(--rgb-deep) / 0.78)',
                         backdropFilter: 'blur(6px)',
                         WebkitBackdropFilter: 'blur(6px)',
                         display: 'flex',
@@ -1406,20 +1405,20 @@ export default function Analysis() {
                             maxWidth: '540px',
                             maxHeight: '85vh',
                             overflowY: 'auto',
-                            background: '#0f172a',
-                            border: '1px solid rgba(250, 204, 21, 0.4)',
+                            background: 'var(--c-bg)',
+                            border: '1px solid rgb(var(--rgb-warning) / 0.4)',
                             borderRadius: '18px',
                             padding: '18px',
                             boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)'
                         }}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #1e293b' }}>
-                            <h3 className="text-label" style={{ margin: 0, color: '#facc15', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--c-surface)' }}>
+                            <h3 className="text-label" style={{ margin: 0, color: 'var(--c-warning)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span>💰 Bonus-Auswertung</span>
                                 <span style={{
                                     fontSize: '11px',
-                                    background: 'rgba(250, 204, 21, 0.15)',
-                                    color: '#fde047',
+                                    background: 'rgb(var(--rgb-warning) / 0.15)',
+                                    color: 'var(--c-warning)',
                                     padding: '2px 7px',
                                     borderRadius: '6px',
                                     fontWeight: 700,
@@ -1434,9 +1433,9 @@ export default function Analysis() {
                                     type="button"
                                     onClick={() => setOnlyBonus(!onlyBonus)}
                                     style={{
-                                        background: onlyBonus ? '#facc15' : 'rgba(250, 204, 21, 0.12)',
-                                        color: onlyBonus ? '#0f172a' : '#facc15',
-                                        border: '1px solid rgba(250, 204, 21, 0.4)',
+                                        background: onlyBonus ? 'var(--c-warning)' : 'rgb(var(--rgb-warning) / 0.12)',
+                                        color: onlyBonus ? 'var(--c-bg)' : 'var(--c-warning)',
+                                        border: '1px solid rgb(var(--rgb-warning) / 0.4)',
                                         borderRadius: '8px',
                                         padding: '5px 10px',
                                         fontSize: '11.5px',
@@ -1450,9 +1449,9 @@ export default function Analysis() {
                                     type="button"
                                     onClick={() => setShowBonusModal(false)}
                                     style={{
-                                        background: '#1e293b',
-                                        border: '1px solid #334155',
-                                        color: '#94a3b8',
+                                        background: 'var(--c-surface)',
+                                        border: '1px solid var(--c-surface-3)',
+                                        color: 'var(--c-text-muted)',
                                         borderRadius: '8px',
                                         padding: '5px 8px',
                                         cursor: 'pointer',
@@ -1469,69 +1468,69 @@ export default function Analysis() {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '8px', marginBottom: '14px' }}>
                             {/* Box 1: Gewählter Zeitraum */}
                             <div style={{
-                                background: '#1e293b',
-                                border: '1px solid rgba(250, 204, 21, 0.3)',
+                                background: 'var(--c-surface)',
+                                border: '1px solid rgb(var(--rgb-warning) / 0.3)',
                                 borderRadius: '8px',
                                 padding: '10px 12px'
                             }}>
-                                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--c-text-muted)', fontWeight: 600, marginBottom: '3px' }}>
                                     Gewählter Zeitraum ({label})
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#facc15' }}>
+                                    <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--c-warning)' }}>
                                         {stats.bonusTotalAmount.toFixed(0)} €
                                     </span>
-                                    <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                    <span style={{ fontSize: '12px', color: 'var(--c-text-soft)', fontWeight: 700 }}>
                                         {stats.bonusCount} {stats.bonusCount === 1 ? 'Schicht' : 'Schichten'}
                                     </span>
                                 </div>
-                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--c-text-subtle)', marginTop: '3px' }}>
                                     {stats.bonusHours.toFixed(1)} Std. in Bonus-Schichten
                                 </div>
                             </div>
 
                             {/* Box 2: Laufendes Jahr */}
                             <div style={{
-                                background: '#1e293b',
-                                border: '1px solid #334155',
+                                background: 'var(--c-surface)',
+                                border: '1px solid var(--c-surface-3)',
                                 borderRadius: '8px',
                                 padding: '10px 12px'
                             }}>
-                                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--c-text-muted)', fontWeight: 600, marginBottom: '3px' }}>
                                     Jahressumme {bonusOverview.year}
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8' }}>
+                                    <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--c-info)' }}>
                                         {bonusOverview.yearBonusAmount.toFixed(0)} €
                                     </span>
-                                    <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                    <span style={{ fontSize: '12px', color: 'var(--c-text-soft)', fontWeight: 700 }}>
                                         {bonusOverview.yearBonusCount} {bonusOverview.yearBonusCount === 1 ? 'Schicht' : 'Schichten'}
                                     </span>
                                 </div>
-                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--c-text-subtle)', marginTop: '3px' }}>
                                     {bonusOverview.yearBonusHours.toFixed(1)} Std. im Jahr {bonusOverview.year}
                                 </div>
                             </div>
 
                             {/* Box 3: Alle Jahre / Gesamt */}
                             <div style={{
-                                background: '#1e293b',
-                                border: '1px solid #334155',
+                                background: 'var(--c-surface)',
+                                border: '1px solid var(--c-surface-3)',
                                 borderRadius: '8px',
                                 padding: '10px 12px'
                             }}>
-                                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '3px' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--c-text-muted)', fontWeight: 600, marginBottom: '3px' }}>
                                     Gesamt (Alle Jahre)
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#4ade80' }}>
+                                    <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--c-success)' }}>
                                         {bonusOverview.allTimeBonusAmount.toFixed(0)} €
                                     </span>
-                                    <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 700 }}>
+                                    <span style={{ fontSize: '12px', color: 'var(--c-text-soft)', fontWeight: 700 }}>
                                         {bonusOverview.allTimeBonusCount} {bonusOverview.allTimeBonusCount === 1 ? 'Schicht' : 'Schichten'}
                                     </span>
                                 </div>
-                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--c-text-subtle)', marginTop: '3px' }}>
                                     {bonusOverview.byYear.length > 0
                                         ? bonusOverview.byYear.map(y => `${y.year}: ${y.amount.toFixed(0)}€ (${y.count}x)`).join(' • ')
                                         : 'Noch keine Bonus-Schichten markiert'}
@@ -1541,7 +1540,7 @@ export default function Analysis() {
 
                         {/* Monthly Breakdown Grid (Jan - Dez for selected Year) */}
                         <div style={{ marginBottom: (stats.bonusByStation.length > 0 || stats.bonusByCode.length > 0) ? '12px' : 0 }}>
-                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
                                 Monatsübersicht Bonus {bonusOverview.year}:
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '6px' }}>
@@ -1559,10 +1558,10 @@ export default function Analysis() {
                                                 setFilterMode('month');
                                             }}
                                             style={{
-                                                background: hasB ? 'rgba(250, 204, 21, 0.1)' : '#1e293b',
+                                                background: hasB ? 'rgb(var(--rgb-warning) / 0.1)' : 'var(--c-surface)',
                                                 border: isSelectedMonth
-                                                    ? '1.5px solid #38bdf8'
-                                                    : (hasB ? '1px solid rgba(250, 204, 21, 0.4)' : '1px solid #334155'),
+                                                    ? '1.5px solid var(--c-info)'
+                                                    : (hasB ? '1px solid rgb(var(--rgb-warning) / 0.4)' : '1px solid var(--c-surface-3)'),
                                                 borderRadius: '7px',
                                                 padding: '6px 6px',
                                                 textAlign: 'center',
@@ -1570,13 +1569,13 @@ export default function Analysis() {
                                             }}
                                             title={`${m.monthName} ${bonusOverview.year}: ${m.count}x Bonus (${m.amount.toFixed(0)} €)`}
                                         >
-                                            <div style={{ fontSize: '11px', fontWeight: 700, color: hasB ? '#f8fafc' : '#64748b' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 700, color: hasB ? 'var(--c-text)' : 'var(--c-text-subtle)' }}>
                                                 {m.monthName}
                                             </div>
-                                            <div style={{ fontSize: '12px', fontWeight: 800, color: hasB ? '#facc15' : '#475569', marginTop: '2px' }}>
+                                            <div style={{ fontSize: '12px', fontWeight: 800, color: hasB ? 'var(--c-warning)' : 'var(--c-border-strong)', marginTop: '2px' }}>
                                                 {hasB ? `${m.amount.toFixed(0)} €` : '—'}
                                             </div>
-                                            <div style={{ fontSize: '10px', color: hasB ? '#fde047' : '#475569' }}>
+                                            <div style={{ fontSize: '10px', color: hasB ? 'var(--c-warning)' : 'var(--c-border-strong)' }}>
                                                 {hasB ? `${m.count}x` : '0x'}
                                             </div>
                                         </div>
@@ -1592,12 +1591,12 @@ export default function Analysis() {
                                 flexWrap: 'wrap',
                                 gap: '12px',
                                 paddingTop: '10px',
-                                borderTop: '1px solid rgba(255,255,255,0.06)',
+                                borderTop: '1px solid rgb(var(--rgb-overlay) / 0.06)',
                                 fontSize: '12px'
                             }}>
                                 {stats.bonusByStation.length > 0 && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                        <span style={{ color: '#94a3b8', fontWeight: 600 }}>Nach Wache ({label}):</span>
+                                        <span style={{ color: 'var(--c-text-muted)', fontWeight: 600 }}>Nach Wache ({label}):</span>
                                         {stats.bonusByStation.map(bs => {
                                             const th = STATION_THEMES[bs.station] || STATION_THEMES.Sendling;
                                             return (
@@ -1618,12 +1617,12 @@ export default function Analysis() {
                                 )}
                                 {stats.bonusByCode.length > 0 && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                        <span style={{ color: '#94a3b8', fontWeight: 600 }}>Nach Kürzel:</span>
+                                        <span style={{ color: 'var(--c-text-muted)', fontWeight: 600 }}>Nach Kürzel:</span>
                                         {stats.bonusByCode.map(bc => (
                                             <span key={bc.code} style={{
-                                                background: '#1e293b',
-                                                color: '#facc15',
-                                                border: '1px solid rgba(250, 204, 21, 0.3)',
+                                                background: 'var(--c-surface)',
+                                                color: 'var(--c-warning)',
+                                                border: '1px solid rgb(var(--rgb-warning) / 0.3)',
                                                 padding: '2px 8px',
                                                 borderRadius: '6px',
                                                 fontSize: '11.5px',
@@ -1642,7 +1641,7 @@ export default function Analysis() {
 
             {/* Charts & Verteilung */}
             {stats.count === 0 ? (
-                <div className="card-premium center" style={{ padding: '40px', color: '#64748b' }}>
+                <div className="card-premium center" style={{ padding: '40px', color: 'var(--c-text-subtle)' }}>
                     <div style={{ fontSize: '40px', marginBottom: '10px' }}>📊</div>
                     Keine weiteren Daten für diesen Zeitraum vorhanden.
                 </div>
@@ -1654,7 +1653,7 @@ export default function Analysis() {
                         {/* Wachen-Verteilung (Eigenständige Farbstruktur) */}
                         {stationDistribution.length > 0 && (
                             <div style={{ marginBottom: '16px' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
                                     Einsätze nach Wachen:
                                 </span>
                                 {stationDistribution.map((st) => (
@@ -1664,14 +1663,14 @@ export default function Analysis() {
                                                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.theme.primaryHex }} />
                                                 <span style={{ fontWeight: 600 }}>{st.theme.name}</span>
                                             </span>
-                                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                            <span style={{ fontSize: '12px', color: 'var(--c-text-muted)' }}>
                                                 <strong style={{ color: st.theme.primaryHex, fontSize: '13px', marginRight: '4px' }}>
                                                     {st.count} {st.count === 1 ? 'Schicht' : 'Schichten'}
                                                 </strong>
                                                 ({st.hours.toFixed(1)} h)
                                             </span>
                                         </div>
-                                        <div style={{ height: '6px', background: '#334155', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                        <div style={{ height: '6px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
                                             <div style={{
                                                 width: `${(st.count / stats.count) * 100}%`,
                                                 height: '100%',
@@ -1686,7 +1685,7 @@ export default function Analysis() {
 
                         {/* Schichtarten-Verteilung */}
                         <div>
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
                                 Schichtarten:
                             </span>
                             {stats.distributionData.map((d, i) => {
@@ -1700,7 +1699,7 @@ export default function Analysis() {
                                             </span>
                                             <strong style={{ color: shiftCol.color }}>{d.value}</strong>
                                         </div>
-                                        <div style={{ height: '6px', background: '#334155', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                        <div style={{ height: '6px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
                                             <div style={{
                                                 width: `${(d.value / stats.count) * 100}%`,
                                                 height: '100%',
@@ -1735,8 +1734,8 @@ export default function Analysis() {
                                             flexDirection: 'column',
                                             justifyContent: 'space-between',
                                             padding: '10px 12px',
-                                            background: '#1e293b',
-                                            border: bAmt > 0 ? '1px solid rgba(250, 204, 21, 0.4)' : `1px solid ${resolvedShift.colorInfo.border}44`,
+                                            background: 'var(--c-surface)',
+                                            border: bAmt > 0 ? '1px solid rgb(var(--rgb-warning) / 0.4)' : `1px solid ${resolvedShift.colorInfo.border}44`,
                                             borderLeft: `3px solid ${resolvedShift.colorInfo.color}`,
                                             borderRadius: '10px',
                                             fontSize: '12.5px',
@@ -1746,7 +1745,7 @@ export default function Analysis() {
                                         {/* Top Row: #Index, Date, Shift Code, Time + Bonus button */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
-                                                <span style={{ color: '#64748b', fontSize: '10.5px', fontWeight: 700 }}>#{index + 1}</span>
+                                                <span style={{ color: 'var(--c-text-subtle)', fontSize: '10.5px', fontWeight: 700 }}>#{index + 1}</span>
                                                 <span style={{ color: 'var(--color-primary)', fontWeight: 800, fontSize: '13px' }}>{dateFormatted}</span>
                                                 <span style={{
                                                     background: resolvedShift.colorInfo.bg,
@@ -1760,9 +1759,9 @@ export default function Analysis() {
                                                     {resolvedShift.code || resolvedShift.typeName}
                                                 </span>
                                                 <span style={{
-                                                    color: '#cbd5e1',
+                                                    color: 'var(--c-text-soft)',
                                                     fontSize: '11px',
-                                                    background: '#0f172a',
+                                                    background: 'var(--c-bg)',
                                                     padding: '1px 5px',
                                                     borderRadius: '4px',
                                                     fontWeight: 600,
@@ -1785,9 +1784,9 @@ export default function Analysis() {
                                                     fontSize: '10.5px',
                                                     fontWeight: 700,
                                                     cursor: 'pointer',
-                                                    background: s.hasBonus ? 'rgba(250, 204, 21, 0.18)' : 'rgba(15, 23, 42, 0.6)',
-                                                    color: s.hasBonus ? '#facc15' : '#64748b',
-                                                    border: s.hasBonus ? '1px solid rgba(250, 204, 21, 0.5)' : '1px solid #334155',
+                                                    background: s.hasBonus ? 'rgb(var(--rgb-warning) / 0.18)' : 'rgb(var(--rgb-bg) / 0.6)',
+                                                    color: s.hasBonus ? 'var(--c-warning)' : 'var(--c-text-subtle)',
+                                                    border: s.hasBonus ? '1px solid rgb(var(--rgb-warning) / 0.5)' : '1px solid var(--c-surface-3)',
                                                     transition: 'all 0.15s ease',
                                                     flexShrink: 0
                                                 }}
@@ -1804,7 +1803,7 @@ export default function Analysis() {
                                             flexDirection: 'column',
                                             gap: '4px',
                                             paddingTop: '6px',
-                                            borderTop: '1px solid rgba(51, 65, 85, 0.45)'
+                                            borderTop: '1px solid rgb(var(--rgb-surface-3) / 0.45)'
                                         }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                                 <span style={{
@@ -1819,13 +1818,13 @@ export default function Analysis() {
                                                     📍 {resolvedShift.station}
                                                 </span>
                                                 {s.vehicle && (
-                                                    <span style={{ color: '#94a3b8', fontSize: '11.5px', fontWeight: 500 }}>
+                                                    <span style={{ color: 'var(--c-text-muted)', fontSize: '11.5px', fontWeight: 500 }}>
                                                         🚑 {s.vehicle}
                                                     </span>
                                                 )}
                                             </div>
                                             {s.partner && (
-                                                <div style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 600, lineHeight: 1.3 }}>
+                                                <div style={{ color: 'var(--c-info)', fontSize: '12px', fontWeight: 600, lineHeight: 1.3 }}>
                                                     👤 {s.partner.toLowerCase().startsWith('mit ') ? s.partner : `mit ${s.partner}`}
                                                 </div>
                                             )}

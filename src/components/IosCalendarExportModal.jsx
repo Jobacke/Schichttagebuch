@@ -167,7 +167,7 @@ export default function IosCalendarExportModal({
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
-    color: '#94a3b8',
+    color: 'var(--c-text-muted)',
     marginBottom: '6px'
   };
 
@@ -181,7 +181,7 @@ export default function IosCalendarExportModal({
         alignItems: 'center',
         padding: '16px',
         backdropFilter: 'blur(10px)',
-        backgroundColor: 'rgba(2, 6, 23, 0.78)'
+        backgroundColor: 'rgb(var(--rgb-deep) / 0.78)'
       }}
     >
       <div
@@ -194,8 +194,8 @@ export default function IosCalendarExportModal({
           borderRadius: '24px',
           display: 'flex',
           flexDirection: 'column',
-          background: 'linear-gradient(180deg, #162033 0%, #0f172a 100%)',
-          border: '1px solid rgba(148, 163, 184, 0.16)',
+          background: 'linear-gradient(180deg, var(--c-surface-2) 0%, var(--c-bg) 100%)',
+          border: '1px solid rgb(var(--rgb-muted) / 0.16)',
           boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.75)',
           overflow: 'hidden',
           position: 'relative'
@@ -204,26 +204,26 @@ export default function IosCalendarExportModal({
         {/* Top Header with Integrated Shift Count Badge */}
         <div style={{
           padding: '16px 22px',
-          borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
+          borderBottom: '1px solid rgb(var(--rgb-muted) / 0.12)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '12px',
-          background: 'rgba(15, 23, 42, 0.5)',
+          background: 'rgb(var(--rgb-bg) / 0.5)',
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(234, 179, 8, 0.08) 100%)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
-              color: '#fbbf24',
+              background: 'linear-gradient(135deg, rgb(var(--rgb-warning) / 0.22) 0%, rgb(var(--rgb-warning) / 0.08) 100%)',
+              border: '1px solid rgb(var(--rgb-warning) / 0.35)',
+              color: 'var(--c-warning)',
               borderRadius: '12px',
               width: '40px',
               height: '40px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.15)',
+              boxShadow: '0 4px 14px rgb(var(--rgb-warning) / 0.15)',
               flexShrink: 0
             }}>
               <Calendar size={20} />
@@ -233,14 +233,14 @@ export default function IosCalendarExportModal({
                 margin: 0,
                 fontSize: '18px',
                 fontWeight: 700,
-                color: '#f8fafc',
+                color: 'var(--c-text)',
                 letterSpacing: '-0.01em',
                 textTransform: 'none'
               }}>
                 In iOS Kalender übertragen
               </h2>
-              <div style={{ fontSize: '12.5px', color: '#94a3b8', marginTop: '1px' }}>
-                Dienstplan für <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{currentMonthLabel}</span> exportieren
+              <div style={{ fontSize: '12.5px', color: 'var(--c-text-muted)', marginTop: '1px' }}>
+                Dienstplan für <span style={{ color: 'var(--c-text)', fontWeight: 600 }}>{currentMonthLabel}</span> exportieren
               </div>
             </div>
           </div>
@@ -248,9 +248,9 @@ export default function IosCalendarExportModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {/* Shift Count Pill */}
             <div style={{
-              background: 'rgba(245, 158, 11, 0.14)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
-              color: '#fbbf24',
+              background: 'rgb(var(--rgb-warning) / 0.14)',
+              border: '1px solid rgb(var(--rgb-warning) / 0.35)',
+              color: 'var(--c-warning)',
               height: '34px',
               padding: '0 12px',
               borderRadius: '10px',
@@ -267,9 +267,9 @@ export default function IosCalendarExportModal({
               type="button"
               onClick={() => setIsTipPopupOpen(true)}
               style={{
-                background: 'rgba(148, 163, 184, 0.1)',
-                border: '1px solid rgba(148, 163, 184, 0.2)',
-                color: '#cbd5e1',
+                background: 'rgb(var(--rgb-muted) / 0.1)',
+                border: '1px solid rgb(var(--rgb-muted) / 0.2)',
+                color: 'var(--c-text-soft)',
                 height: '34px',
                 padding: '0 11px',
                 borderRadius: '10px',
@@ -283,7 +283,7 @@ export default function IosCalendarExportModal({
               }}
               title="Hilfe & Tipp zum Überschreiben und Löschen im Apple Kalender anzeigen"
             >
-              <HelpCircle size={15} style={{ color: '#fbbf24' }} />
+              <HelpCircle size={15} style={{ color: 'var(--c-warning)' }} />
               <span>Tipp</span>
             </button>
 
@@ -291,9 +291,9 @@ export default function IosCalendarExportModal({
               type="button"
               onClick={onClose}
               style={{
-                background: 'rgba(148, 163, 184, 0.1)',
-                border: '1px solid rgba(148, 163, 184, 0.15)',
-                color: '#94a3b8',
+                background: 'rgb(var(--rgb-muted) / 0.1)',
+                border: '1px solid rgb(var(--rgb-muted) / 0.15)',
+                color: 'var(--c-text-muted)',
                 width: '34px',
                 height: '34px',
                 borderRadius: '10px',
@@ -323,9 +323,9 @@ export default function IosCalendarExportModal({
           {/* Feedback Banners */}
           {downloadSuccess === 'export' && (
             <div style={{
-              background: 'rgba(16, 185, 129, 0.14)',
-              border: '1px solid rgba(16, 185, 129, 0.4)',
-              color: '#34d399',
+              background: 'rgb(var(--rgb-success) / 0.14)',
+              border: '1px solid rgb(var(--rgb-success) / 0.4)',
+              color: 'var(--c-success)',
               padding: '10px 14px',
               borderRadius: '12px',
               fontSize: '12.5px',
@@ -344,9 +344,9 @@ export default function IosCalendarExportModal({
 
           {downloadSuccess === 'deleteShortcut' && (
             <div style={{
-              background: 'rgba(16, 185, 129, 0.14)',
-              border: '1px solid rgba(16, 185, 129, 0.4)',
-              color: '#34d399',
+              background: 'rgb(var(--rgb-success) / 0.14)',
+              border: '1px solid rgb(var(--rgb-success) / 0.4)',
+              color: 'var(--c-success)',
               padding: '10px 14px',
               borderRadius: '12px',
               fontSize: '12.5px',
@@ -365,9 +365,9 @@ export default function IosCalendarExportModal({
 
           {downloadSuccess === 'installShortcut' && (
             <div style={{
-              background: 'rgba(245, 158, 11, 0.14)',
-              border: '1px solid rgba(245, 158, 11, 0.4)',
-              color: '#fbbf24',
+              background: 'rgb(var(--rgb-warning) / 0.14)',
+              border: '1px solid rgb(var(--rgb-warning) / 0.4)',
+              color: 'var(--c-warning)',
               padding: '10px 14px',
               borderRadius: '12px',
               fontSize: '12.5px',
@@ -389,8 +389,8 @@ export default function IosCalendarExportModal({
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
             gap: '12px 14px',
-            background: 'rgba(15, 23, 42, 0.45)',
-            border: '1px solid rgba(148, 163, 184, 0.12)',
+            background: 'rgb(var(--rgb-bg) / 0.45)',
+            border: '1px solid rgb(var(--rgb-muted) / 0.12)',
             borderRadius: '14px',
             padding: '14px',
             flexShrink: 0
@@ -407,11 +407,11 @@ export default function IosCalendarExportModal({
                     height: controlHeight,
                     appearance: 'none',
                     WebkitAppearance: 'none',
-                    background: '#1e293b',
-                    border: '1px solid rgba(148, 163, 184, 0.22)',
+                    background: 'var(--c-surface)',
+                    border: '1px solid rgb(var(--rgb-muted) / 0.22)',
                     borderRadius: '10px',
                     padding: '0 32px 0 12px',
-                    color: '#f8fafc',
+                    color: 'var(--c-text)',
                     fontSize: '12.5px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -429,7 +429,7 @@ export default function IosCalendarExportModal({
                     right: '10px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    color: '#94a3b8',
+                    color: 'var(--c-text-muted)',
                     pointerEvents: 'none'
                   }}
                 />
@@ -448,11 +448,11 @@ export default function IosCalendarExportModal({
                     height: controlHeight,
                     appearance: 'none',
                     WebkitAppearance: 'none',
-                    background: '#1e293b',
-                    border: '1px solid rgba(148, 163, 184, 0.22)',
+                    background: 'var(--c-surface)',
+                    border: '1px solid rgb(var(--rgb-muted) / 0.22)',
                     borderRadius: '10px',
                     padding: '0 32px 0 12px',
-                    color: '#f8fafc',
+                    color: 'var(--c-text)',
                     fontSize: '12.5px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -475,7 +475,7 @@ export default function IosCalendarExportModal({
                     right: '10px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    color: '#94a3b8',
+                    color: 'var(--c-text-muted)',
                     pointerEvents: 'none'
                   }}
                 />
@@ -490,8 +490,8 @@ export default function IosCalendarExportModal({
                 gridTemplateColumns: '1fr 1fr',
                 gap: '4px',
                 height: controlHeight,
-                background: '#0f172a',
-                border: '1px solid rgba(148, 163, 184, 0.22)',
+                background: 'var(--c-bg)',
+                border: '1px solid rgb(var(--rgb-muted) / 0.22)',
                 borderRadius: '10px',
                 padding: '3px'
               }}>
@@ -501,8 +501,8 @@ export default function IosCalendarExportModal({
                   style={{
                     border: 'none',
                     borderRadius: '7px',
-                    background: overwriteMode === 'update' ? '#334155' : 'transparent',
-                    color: overwriteMode === 'update' ? '#f8fafc' : '#94a3b8',
+                    background: overwriteMode === 'update' ? 'var(--c-surface-3)' : 'transparent',
+                    color: overwriteMode === 'update' ? 'var(--c-text)' : 'var(--c-text-muted)',
                     fontSize: '12px',
                     fontWeight: overwriteMode === 'update' ? 700 : 500,
                     cursor: 'pointer',
@@ -519,8 +519,8 @@ export default function IosCalendarExportModal({
                   style={{
                     border: 'none',
                     borderRadius: '7px',
-                    background: overwriteMode === 'forceNew' ? '#334155' : 'transparent',
-                    color: overwriteMode === 'forceNew' ? '#f8fafc' : '#94a3b8',
+                    background: overwriteMode === 'forceNew' ? 'var(--c-surface-3)' : 'transparent',
+                    color: overwriteMode === 'forceNew' ? 'var(--c-text)' : 'var(--c-text-muted)',
                     fontSize: '12px',
                     fontWeight: overwriteMode === 'forceNew' ? 700 : 500,
                     cursor: 'pointer',
@@ -542,8 +542,8 @@ export default function IosCalendarExportModal({
                 gridTemplateColumns: '1.25fr 0.95fr',
                 gap: '4px',
                 height: controlHeight,
-                background: '#0f172a',
-                border: '1px solid rgba(148, 163, 184, 0.22)',
+                background: 'var(--c-bg)',
+                border: '1px solid rgb(var(--rgb-muted) / 0.22)',
                 borderRadius: '10px',
                 padding: '3px'
               }}>
@@ -553,8 +553,8 @@ export default function IosCalendarExportModal({
                   style={{
                     border: 'none',
                     borderRadius: '7px',
-                    background: '#1e293b',
-                    color: '#f8fafc',
+                    background: 'var(--c-surface)',
+                    color: 'var(--c-text)',
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -567,7 +567,7 @@ export default function IosCalendarExportModal({
                   }}
                   title="Löscht alle bisherigen Dienste dieses Monats per iOS-Kurzbefehl aus dem iPhone-Kalender"
                 >
-                  <Trash2 size={13} style={{ color: '#f87171', flexShrink: 0 }} />
+                  <Trash2 size={13} style={{ color: 'var(--c-danger)', flexShrink: 0 }} />
                   <span>Termine löschen</span>
                 </button>
                 <button
@@ -576,8 +576,8 @@ export default function IosCalendarExportModal({
                   style={{
                     border: 'none',
                     borderRadius: '7px',
-                    background: 'rgba(245, 158, 11, 0.12)',
-                    color: '#fbbf24',
+                    background: 'rgb(var(--rgb-warning) / 0.12)',
+                    color: 'var(--c-warning)',
                     fontSize: '11.5px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -618,9 +618,9 @@ export default function IosCalendarExportModal({
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
-                color: '#94a3b8'
+                color: 'var(--c-text-muted)'
               }}>
-                Zu übertragende Dienste <span style={{ color: '#e2e8f0' }}>({selectedShifts.length} von {shifts.length})</span>
+                Zu übertragende Dienste <span style={{ color: 'var(--c-text)' }}>({selectedShifts.length} von {shifts.length})</span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -629,9 +629,9 @@ export default function IosCalendarExportModal({
                     type="button"
                     onClick={selectOnlyChanged}
                     style={{
-                      background: 'rgba(249, 115, 22, 0.14)',
-                      border: '1px solid rgba(249, 115, 22, 0.35)',
-                      color: '#fb923c',
+                      background: 'rgb(var(--rgb-orange) / 0.14)',
+                      border: '1px solid rgb(var(--rgb-orange) / 0.35)',
+                      color: 'var(--c-orange)',
                       fontSize: '11px',
                       padding: '3px 9px',
                       borderRadius: '7px',
@@ -646,9 +646,9 @@ export default function IosCalendarExportModal({
                   type="button"
                   onClick={toggleSelectAll}
                   style={{
-                    background: 'rgba(148, 163, 184, 0.1)',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    color: '#e2e8f0',
+                    background: 'rgb(var(--rgb-muted) / 0.1)',
+                    border: '1px solid rgb(var(--rgb-muted) / 0.2)',
+                    color: 'var(--c-text)',
                     fontSize: '11px',
                     padding: '3px 9px',
                     borderRadius: '7px',
@@ -665,10 +665,10 @@ export default function IosCalendarExportModal({
               <div style={{
                 padding: '28px',
                 textAlign: 'center',
-                color: '#64748b',
-                background: 'rgba(15, 23, 42, 0.5)',
+                color: 'var(--c-text-subtle)',
+                background: 'rgb(var(--rgb-bg) / 0.5)',
                 borderRadius: '14px',
-                border: '1px dashed rgba(148, 163, 184, 0.2)'
+                border: '1px dashed rgb(var(--rgb-muted) / 0.2)'
               }}>
                 Keine Dienste in diesem Monat vorhanden.
               </div>
@@ -712,11 +712,11 @@ export default function IosCalendarExportModal({
                         padding: '9px 12px',
                         borderRadius: '12px',
                         background: isChecked
-                          ? 'rgba(30, 41, 59, 0.78)'
-                          : 'rgba(15, 23, 42, 0.4)',
+                          ? 'rgb(var(--rgb-surface) / 0.78)'
+                          : 'rgb(var(--rgb-bg) / 0.4)',
                         border: status === 'modified'
-                          ? '1px solid rgba(249, 115, 22, 0.45)'
-                          : (isChecked ? '1px solid rgba(148, 163, 184, 0.18)' : '1px solid rgba(148, 163, 184, 0.06)'),
+                          ? '1px solid rgb(var(--rgb-orange) / 0.45)'
+                          : (isChecked ? '1px solid rgb(var(--rgb-muted) / 0.18)' : '1px solid rgb(var(--rgb-muted) / 0.06)'),
                         cursor: 'pointer',
                         opacity: isChecked ? 1 : 0.48,
                         transition: 'all 0.15s ease'
@@ -727,12 +727,12 @@ export default function IosCalendarExportModal({
                         width: '19px',
                         height: '19px',
                         borderRadius: '6px',
-                        background: isChecked ? '#eab308' : 'rgba(15, 23, 42, 0.8)',
-                        border: isChecked ? '1.5px solid #eab308' : '1.5px solid #475569',
+                        background: isChecked ? 'var(--c-warning-strong)' : 'rgb(var(--rgb-bg) / 0.8)',
+                        border: isChecked ? '1.5px solid var(--c-warning-strong)' : '1.5px solid var(--c-border-strong)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#0f172a',
+                        color: 'var(--c-bg)',
                         flexShrink: 0,
                         transition: 'all 0.15s ease'
                       }}>
@@ -744,14 +744,14 @@ export default function IosCalendarExportModal({
                         minWidth: '46px',
                         padding: '3px 5px',
                         borderRadius: '9px',
-                        background: 'rgba(15, 23, 42, 0.65)',
-                        border: '1px solid rgba(148, 163, 184, 0.12)',
+                        background: 'rgb(var(--rgb-bg) / 0.65)',
+                        border: '1px solid rgb(var(--rgb-muted) / 0.12)',
                         textAlign: 'center',
                         flexShrink: 0
                       }}>
                         <span style={{
                           fontSize: '9.5px',
-                          color: '#fbbf24',
+                          color: 'var(--c-warning)',
                           fontWeight: 700,
                           textTransform: 'uppercase',
                           display: 'block',
@@ -762,7 +762,7 @@ export default function IosCalendarExportModal({
                         <span style={{
                           fontSize: '13px',
                           fontWeight: 800,
-                          color: '#f8fafc',
+                          color: 'var(--c-text)',
                           lineHeight: 1.2
                         }}>
                           {formattedDate}
@@ -794,7 +794,7 @@ export default function IosCalendarExportModal({
                           gap: '8px',
                           flexWrap: 'wrap'
                         }}>
-                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--c-text)' }}>
                             {shift.startTime} – {shift.endTime} Uhr
                           </span>
 
@@ -803,9 +803,9 @@ export default function IosCalendarExportModal({
                               <span style={{
                                 fontSize: '10px',
                                 fontWeight: 700,
-                                background: 'rgba(249, 115, 22, 0.18)',
-                                border: '1px solid rgba(249, 115, 22, 0.35)',
-                                color: '#fb923c',
+                                background: 'rgb(var(--rgb-orange) / 0.18)',
+                                border: '1px solid rgb(var(--rgb-orange) / 0.35)',
+                                color: 'var(--c-orange)',
                                 padding: '1px 7px',
                                 borderRadius: '999px'
                               }}>
@@ -816,9 +816,9 @@ export default function IosCalendarExportModal({
                               <span style={{
                                 fontSize: '10px',
                                 fontWeight: 700,
-                                background: 'rgba(56, 189, 248, 0.18)',
-                                border: '1px solid rgba(56, 189, 248, 0.35)',
-                                color: '#38bdf8',
+                                background: 'rgb(var(--rgb-info) / 0.18)',
+                                border: '1px solid rgb(var(--rgb-info) / 0.35)',
+                                color: 'var(--c-info)',
                                 padding: '1px 7px',
                                 borderRadius: '999px'
                               }}>
@@ -829,9 +829,9 @@ export default function IosCalendarExportModal({
                               <span style={{
                                 fontSize: '10px',
                                 fontWeight: 600,
-                                background: 'rgba(16, 185, 129, 0.12)',
-                                border: '1px solid rgba(16, 185, 129, 0.28)',
-                                color: '#34d399',
+                                background: 'rgb(var(--rgb-success) / 0.12)',
+                                border: '1px solid rgb(var(--rgb-success) / 0.28)',
+                                color: 'var(--c-success)',
                                 padding: '1px 7px',
                                 borderRadius: '999px'
                               }}>
@@ -847,7 +847,7 @@ export default function IosCalendarExportModal({
                           gap: '7px',
                           marginTop: '2px',
                           fontSize: '11.5px',
-                          color: '#94a3b8',
+                          color: 'var(--c-text-muted)',
                           flexWrap: 'wrap'
                         }}>
                           {shift.station && (
@@ -864,7 +864,7 @@ export default function IosCalendarExportModal({
                           )}
                           {shift.vehicle && (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              <span style={{ color: '#475569' }}>•</span>
+                              <span style={{ color: 'var(--c-border-strong)' }}>•</span>
                               <Truck size={11} />
                               {shift.vehicle}
                             </span>
@@ -874,10 +874,10 @@ export default function IosCalendarExportModal({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
-                              color: '#38bdf8',
+                              color: 'var(--c-info)',
                               fontWeight: 500
                             }}>
-                              <span style={{ color: '#475569' }}>•</span>
+                              <span style={{ color: 'var(--c-border-strong)' }}>•</span>
                               <Users size={11} />
                               {cleanPartner}
                             </span>
@@ -895,8 +895,8 @@ export default function IosCalendarExportModal({
         {/* Sticky Footer */}
         <div style={{
           padding: '14px 22px',
-          background: 'rgba(15, 23, 42, 0.9)',
-          borderTop: '1px solid rgba(148, 163, 184, 0.12)',
+          background: 'rgb(var(--rgb-bg) / 0.9)',
+          borderTop: '1px solid rgb(var(--rgb-muted) / 0.12)',
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
@@ -907,9 +907,9 @@ export default function IosCalendarExportModal({
             onClick={onClose}
             style={{
               flex: 0.8,
-              background: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
-              color: '#cbd5e1',
+              background: 'rgb(var(--rgb-surface) / 0.8)',
+              border: '1px solid rgb(var(--rgb-muted) / 0.2)',
+              color: 'var(--c-text-soft)',
               padding: '11px 16px',
               borderRadius: '12px',
               fontWeight: 600,
@@ -929,10 +929,10 @@ export default function IosCalendarExportModal({
               flex: 2.5,
               background: selectedShifts.length > 0
                 ? (needsShortcutCleanBeforeExport
-                    ? 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)'
-                    : 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)')
-                : 'rgba(234, 179, 8, 0.3)',
-              color: needsShortcutCleanBeforeExport ? '#ffffff' : '#0f172a',
+                    ? 'linear-gradient(135deg, var(--c-info) 0%, var(--c-info-strong) 100%)'
+                    : 'linear-gradient(135deg, var(--c-warning) 0%, var(--c-warning-strong) 100%)')
+                : 'rgb(var(--rgb-warning) / 0.3)',
+              color: needsShortcutCleanBeforeExport ? '#ffffff' : 'var(--c-bg)',
               border: 'none',
               padding: '11px 18px',
               borderRadius: '12px',
@@ -945,8 +945,8 @@ export default function IosCalendarExportModal({
               gap: '8px',
               boxShadow: selectedShifts.length > 0
                 ? (needsShortcutCleanBeforeExport
-                    ? '0 8px 20px -4px rgba(14, 165, 233, 0.4)'
-                    : '0 8px 20px -4px rgba(234, 179, 8, 0.4)')
+                    ? '0 8px 20px -4px rgb(var(--rgb-info) / 0.4)'
+                    : '0 8px 20px -4px rgb(var(--rgb-warning) / 0.4)')
                 : 'none',
               opacity: selectedShifts.length > 0 ? 1 : 0.5,
               transition: 'all 0.15s ease'
@@ -978,7 +978,7 @@ export default function IosCalendarExportModal({
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'rgba(2, 6, 23, 0.78)',
+              background: 'rgb(var(--rgb-deep) / 0.78)',
               backdropFilter: 'blur(6px)',
               display: 'flex',
               alignItems: 'center',
@@ -991,8 +991,8 @@ export default function IosCalendarExportModal({
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                background: '#1e293b',
-                border: '1px solid rgba(245, 158, 11, 0.35)',
+                background: 'var(--c-surface)',
+                border: '1px solid rgb(var(--rgb-warning) / 0.35)',
                 borderRadius: '18px',
                 padding: '20px 22px',
                 maxWidth: '490px',
@@ -1009,8 +1009,8 @@ export default function IosCalendarExportModal({
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{
-                    background: 'rgba(245, 158, 11, 0.16)',
-                    color: '#fbbf24',
+                    background: 'rgb(var(--rgb-warning) / 0.16)',
+                    color: 'var(--c-warning)',
                     borderRadius: '10px',
                     padding: '8px',
                     display: 'flex',
@@ -1019,7 +1019,7 @@ export default function IosCalendarExportModal({
                   }}>
                     <Smartphone size={18} />
                   </div>
-                  <h3 style={{ margin: 0, fontSize: '15.5px', fontWeight: 700, color: '#f8fafc', textTransform: 'none' }}>
+                  <h3 style={{ margin: 0, fontSize: '15.5px', fontWeight: 700, color: 'var(--c-text)', textTransform: 'none' }}>
                     So funktionieren Aktualisieren & Löschen auf dem iPhone
                   </h3>
                 </div>
@@ -1027,9 +1027,9 @@ export default function IosCalendarExportModal({
                   type="button"
                   onClick={() => setIsTipPopupOpen(false)}
                   style={{
-                    background: 'rgba(148, 163, 184, 0.12)',
+                    background: 'rgb(var(--rgb-muted) / 0.12)',
                     border: 'none',
-                    color: '#94a3b8',
+                    color: 'var(--c-text-muted)',
                     width: '30px',
                     height: '30px',
                     borderRadius: '8px',
@@ -1043,17 +1043,17 @@ export default function IosCalendarExportModal({
                 </button>
               </div>
 
-              <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--c-text-soft)', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
-                  <strong style={{ color: '#f8fafc' }}>1. Aktualisieren (Intelligent ohne Duplikate):</strong><br />
+                  <strong style={{ color: 'var(--c-text)' }}>1. Aktualisieren (Intelligent ohne Duplikate):</strong><br />
                   Berechnet für jeden Dienst einen <strong>Inhalts-Fingerabdruck</strong>. Unveränderte Dienste behalten ihre ID (iOS überspringt sie automatisch – <strong>keine Dopplungen</strong>), während geänderte oder neue Dienste automatisch eine neue ID erhalten und sofort übernommen werden.
                 </div>
                 <div>
-                  <strong style={{ color: '#f8fafc' }}>2. Termine löschen (per iOS-Kurzbefehl):</strong><br />
+                  <strong style={{ color: 'var(--c-text)' }}>2. Termine löschen (per iOS-Kurzbefehl):</strong><br />
                   Da Apple Safari das Löschen über normale .ics-Dateien blockiert, nutzt das iPhone dafür einen nativen Kurzbefehl: Tippe einmalig auf <strong>„Kurzbefehl (1×)“</strong> → <em>„Kurzbefehl hinzufügen“</em>. Danach entfernt <strong>„Termine löschen“</strong> mit 1 Klick alle bisherigen Monats-Dienste aus dem Kalender!
                 </div>
                 <div>
-                  <strong style={{ color: '#f8fafc' }}>3. Neu erzwingen:</strong><br />
+                  <strong style={{ color: 'var(--c-text)' }}>3. Neu erzwingen:</strong><br />
                   Vergibt für alle ausgewählten Dienste eine komplett neue ID, um alle Termine unabhängig vom bisherigen Status neu einzutragen.
                 </div>
               </div>
@@ -1064,8 +1064,8 @@ export default function IosCalendarExportModal({
                 style={{
                   marginTop: '16px',
                   width: '100%',
-                  background: 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)',
-                  color: '#0f172a',
+                  background: 'linear-gradient(135deg, var(--c-warning) 0%, var(--c-warning-strong) 100%)',
+                  color: 'var(--c-bg)',
                   border: 'none',
                   padding: '10px',
                   borderRadius: '10px',

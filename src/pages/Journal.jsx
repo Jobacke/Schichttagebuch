@@ -267,8 +267,8 @@ export default function Journal() {
             {/* Toast Notification */}
             {toastMessage && (
                 <div style={{
-                    background: 'rgba(34, 197, 94, 0.15)',
-                    border: '1px solid rgba(34, 197, 94, 0.4)',
+                    background: 'rgb(var(--rgb-success) / 0.15)',
+                    border: '1px solid rgb(var(--rgb-success) / 0.4)',
                     color: 'var(--color-success)',
                     padding: '12px 16px',
                     borderRadius: '12px',
@@ -288,17 +288,6 @@ export default function Journal() {
             {/* Header */}
             <div className="calendar-header" style={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <img
-                        src="/icon.png"
-                        alt="Schichttagebuch Logo"
-                        style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '11px',
-                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-                            flexShrink: 0
-                        }}
-                    />
                     <div>
                         <h1 style={{ margin: 0, fontSize: '24px', lineHeight: 1.15 }}>Übersicht</h1>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
@@ -309,9 +298,9 @@ export default function Journal() {
                                 <span style={{
                                     fontSize: '11px',
                                     fontWeight: 700,
-                                    color: '#34d399',
-                                    background: 'rgba(16, 185, 129, 0.15)',
-                                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                                    color: 'var(--c-success)',
+                                    background: 'rgb(var(--rgb-success) / 0.15)',
+                                    border: '1px solid rgb(var(--rgb-success) / 0.35)',
                                     padding: '1px 7px',
                                     borderRadius: '6px'
                                 }}>
@@ -327,9 +316,9 @@ export default function Journal() {
                         type="button"
                         onClick={() => openCareManLiveWindow(currentYearMonthStr)}
                         style={{
-                            background: 'linear-gradient(135deg, #059669, #10b981)',
+                            background: 'linear-gradient(135deg, var(--c-success-deep), var(--c-success-strong))',
                             color: '#ffffff',
-                            border: '1px solid rgba(52, 211, 153, 0.55)',
+                            border: '1px solid rgb(var(--rgb-success) / 0.55)',
                             fontWeight: 800,
                             padding: '8px 13px',
                             borderRadius: '12px',
@@ -339,7 +328,7 @@ export default function Journal() {
                             cursor: 'pointer',
                             fontSize: '12.5px',
                             whiteSpace: 'nowrap',
-                            boxShadow: '0 3px 12px rgba(16, 185, 129, 0.3)',
+                            boxShadow: '0 3px 12px rgb(var(--rgb-success) / 0.3)',
                             transition: 'all 0.15s ease'
                         }}
                         title={`Neueste Dienstpläne für "Rettungswache München", "Rettungswache Obersendling" & "Rettungswache Hohenbrunn" (${currentMonthLabel}) laden`}
@@ -380,8 +369,8 @@ export default function Journal() {
                                 }
                             }}
                             style={{
-                                background: 'rgba(249, 115, 22, 0.14)',
-                                border: '1px solid rgba(249, 115, 22, 0.35)',
+                                background: 'rgb(var(--rgb-primary) / 0.14)',
+                                border: '1px solid rgb(var(--rgb-primary) / 0.35)',
                                 color: 'var(--color-primary)',
                                 borderRadius: '6px',
                                 padding: '2px 8px',
@@ -542,7 +531,7 @@ export default function Journal() {
                                     borderRadius: '8px',
                                     gap: '4px',
                                     color: 'var(--color-danger)',
-                                    borderColor: 'rgba(239, 68, 68, 0.3)'
+                                    borderColor: 'rgb(var(--rgb-danger) / 0.3)'
                                 }}
                                 title="Alle Dienste dieses Monats auf einmal löschen"
                             >
@@ -598,7 +587,7 @@ export default function Journal() {
                             onClick={requestDeleteSelected}
                             disabled={selectedShiftIds.size === 0}
                             style={{
-                                background: selectedShiftIds.size > 0 ? 'var(--color-danger)' : 'rgba(239, 68, 68, 0.2)',
+                                background: selectedShiftIds.size > 0 ? 'var(--color-danger)' : 'rgb(var(--rgb-danger) / 0.2)',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '8px',
@@ -672,7 +661,7 @@ export default function Journal() {
                                     padding: '11px 12px',
                                     marginBottom: 0,
                                     border: isSelected ? '1px solid var(--color-primary)' : 'var(--glass-border)',
-                                    background: isSelected ? 'rgba(249, 115, 22, 0.08)' : 'var(--color-surface)',
+                                    background: isSelected ? 'rgb(var(--rgb-primary) / 0.08)' : 'var(--color-surface)',
                                     transition: 'all 0.15s ease'
                                 }}
                             >
@@ -726,10 +715,10 @@ export default function Journal() {
                                                 </span>
                                                 <span style={{
                                                     fontSize: '11px',
-                                                    background: '#334155',
+                                                    background: 'var(--c-surface-3)',
                                                     padding: '1px 6px',
                                                     borderRadius: '4px',
-                                                    color: '#cbd5e1',
+                                                    color: 'var(--c-text-soft)',
                                                     fontWeight: 600,
                                                     whiteSpace: 'nowrap'
                                                 }}>
@@ -740,9 +729,9 @@ export default function Journal() {
                                                 <span style={{
                                                     fontSize: '10px',
                                                     fontWeight: 700,
-                                                    background: 'rgba(16, 185, 129, 0.18)',
-                                                    color: '#34d399',
-                                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                                    background: 'rgb(var(--rgb-success) / 0.18)',
+                                                    color: 'var(--c-success)',
+                                                    border: '1px solid rgb(var(--rgb-success) / 0.4)',
                                                     padding: '0px 5px',
                                                     borderRadius: '4px',
                                                     width: 'fit-content'
@@ -772,12 +761,12 @@ export default function Journal() {
                                                     fontWeight: 700,
                                                     cursor: 'pointer',
                                                     border: shift.hasBonus
-                                                        ? '1px solid #10b981'
-                                                        : '1px solid rgba(148, 163, 184, 0.25)',
+                                                        ? '1px solid var(--c-success-strong)'
+                                                        : '1px solid rgb(var(--rgb-muted) / 0.25)',
                                                     background: shift.hasBonus
-                                                        ? 'rgba(16, 185, 129, 0.18)'
-                                                        : 'rgba(15, 23, 42, 0.5)',
-                                                    color: shift.hasBonus ? '#34d399' : '#94a3b8',
+                                                        ? 'rgb(var(--rgb-success) / 0.18)'
+                                                        : 'rgb(var(--rgb-bg) / 0.5)',
+                                                    color: shift.hasBonus ? 'var(--c-success)' : 'var(--c-text-muted)',
                                                     transition: 'all 0.15s ease'
                                                 }}
                                                 title={shift.hasBonus ? `Bonus aktiv (${getShiftBonusAmount(shift, store.settings)} €) – Klicken zum Entfernen` : `Bonus-Haken setzen (+${store.settings?.defaultBonusAmount ?? 75} €)`}
@@ -819,10 +808,10 @@ export default function Journal() {
                                     flexDirection: 'column',
                                     gap: '3px',
                                     paddingTop: '6px',
-                                    borderTop: '1px solid rgba(148, 163, 184, 0.1)'
+                                    borderTop: '1px solid rgb(var(--rgb-muted) / 0.1)'
                                 }}>
                                     {(shift.station || shift.vehicle) && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--c-text-muted)', flexWrap: 'wrap' }}>
                                             {shift.station && (
                                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: shiftCol.stationColor, fontWeight: 600 }}>
                                                     <MapPin size={11} color={shiftCol.stationColor} />
@@ -834,7 +823,7 @@ export default function Journal() {
                                         </div>
                                     )}
                                     {partnerDisplay && (
-                                        <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 600, lineHeight: 1.35 }}>
+                                        <div style={{ fontSize: '12px', color: 'var(--c-info)', fontWeight: 600, lineHeight: 1.35 }}>
                                             👤 {partnerDisplay}
                                         </div>
                                     )}
@@ -859,19 +848,19 @@ export default function Journal() {
                                 const shiftWord = isIncSpät ? 'Spätschicht' : 'Nachtschicht';
                                 return (
                                     <div>
-                                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#c084fc', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                        <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--c-violet)', letterSpacing: '0.5px', marginBottom: '6px' }}>
                                             🌙 {incTitle}
                                         </div>
-                                        <div style={{ fontSize: '13.5px', color: '#cbd5e1', marginBottom: '4px', fontWeight: 600 }}>
+                                        <div style={{ fontSize: '13.5px', color: 'var(--c-text-soft)', marginBottom: '4px', fontWeight: 600 }}>
                                             Dienstende um {incomingNightShift.endTime} Uhr{incomingNightShift.isOvertime ? ' (inkl. Überstunde)' : ''}
                                         </div>
-                                        <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                        <div style={{ fontSize: '12px', color: 'var(--c-text-muted)', fontStyle: 'italic' }}>
                                             Aus {shiftWord} ({incomingNightShift.code}) vom Vortag • danach FREI
                                         </div>
                                     </div>
                                 );
                             })() : (
-                                <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', letterSpacing: '1.5px' }}>
+                                <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--c-text)', letterSpacing: '1.5px' }}>
                                     FREI
                                 </div>
                             )
@@ -904,7 +893,7 @@ export default function Journal() {
                             </button>
                         </div>
 
-                        <div className="modal-body" style={{ padding: '16px 20px', fontSize: '14px', lineHeight: 1.5, color: '#cbd5e1' }}>
+                        <div className="modal-body" style={{ padding: '16px 20px', fontSize: '14px', lineHeight: 1.5, color: 'var(--c-text-soft)' }}>
                             Möchtest du wirklich <strong>{confirmDeleteModal.label}</strong> unwiderruflich aus der App löschen?
                         </div>
 

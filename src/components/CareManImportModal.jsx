@@ -72,8 +72,8 @@ export default function CareManImportModal({
         <div className="modal-header" style={{ padding: '18px 22px', borderBottom: '1px solid var(--color-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              background: 'rgba(16, 185, 129, 0.15)',
-              color: '#34d399',
+              background: 'rgb(var(--rgb-success) / 0.15)',
+              color: 'var(--c-success)',
               borderRadius: '12px',
               padding: '10px',
               display: 'flex',
@@ -100,12 +100,12 @@ export default function CareManImportModal({
         <div className="modal-body" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Direct Auto-Pilot Launch Box */}
           <div style={{
-            background: 'rgba(15, 23, 42, 0.85)',
-            border: '1px solid rgba(16, 185, 129, 0.45)',
+            background: 'rgb(var(--rgb-bg) / 0.85)',
+            border: '1px solid rgb(var(--rgb-success) / 0.45)',
             borderRadius: '16px',
             padding: '15px'
           }}>
-            <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#34d399', marginBottom: '8px' }}>
+            <div style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--c-success)', marginBottom: '8px' }}>
               ⚡ Vollautomatischer Ablauf ({initialYearMonth || 'Ausgewählter Monat'})
             </div>
             <ol style={{
@@ -118,9 +118,9 @@ export default function CareManImportModal({
               flexDirection: 'column',
               gap: '3px'
             }}>
-              <li>Öffnet <strong style={{ color: '#f8fafc' }}>my.secure.johanniter.de</strong>, trägt Benutzername & Passwort automatisch ein und klickt auf <strong style={{ color: '#f8fafc' }}>Anmelden</strong>.</li>
-              <li>Du bestätigst nur manuell in <strong style={{ color: '#38bdf8' }}>Airlock 2FA</strong> auf dem Smartphone.</li>
-              <li>Öffnet automatisch <strong style={{ color: '#f8fafc' }}>Dienstplan Bayern</strong> für den gewählten Monat, liest alle 3 Wachen + Teampartner aus und kehrt direkt in die App zurück.</li>
+              <li>Öffnet <strong style={{ color: 'var(--c-text)' }}>my.secure.johanniter.de</strong>, trägt Benutzername & Passwort automatisch ein und klickt auf <strong style={{ color: 'var(--c-text)' }}>Anmelden</strong>.</li>
+              <li>Du bestätigst nur manuell in <strong style={{ color: 'var(--c-info)' }}>Airlock 2FA</strong> auf dem Smartphone.</li>
+              <li>Öffnet automatisch <strong style={{ color: 'var(--c-text)' }}>Dienstplan Bayern</strong> für den gewählten Monat, liest alle 3 Wachen + Teampartner aus und kehrt direkt in die App zurück.</li>
             </ol>
 
             <button
@@ -128,9 +128,9 @@ export default function CareManImportModal({
               onClick={handleLaunchAutoPilot}
               style={{
                 width: '100%',
-                background: 'linear-gradient(135deg, #059669, #10b981)',
+                background: 'linear-gradient(135deg, var(--c-success-deep), var(--c-success-strong))',
                 color: '#ffffff',
-                border: '1px solid rgba(52, 211, 153, 0.55)',
+                border: '1px solid rgb(var(--rgb-success) / 0.55)',
                 borderRadius: '12px',
                 padding: '11px 16px',
                 fontSize: '13.5px',
@@ -140,7 +140,7 @@ export default function CareManImportModal({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                boxShadow: '0 4px 14px rgb(var(--rgb-success) / 0.35)'
               }}
             >
               <ExternalLink size={16} />
@@ -160,11 +160,11 @@ export default function CareManImportModal({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', fontWeight: 700, color: 'var(--color-text-main)' }}>
-                <KeyRound size={15} style={{ color: '#38bdf8' }} />
+                <KeyRound size={15} style={{ color: 'var(--c-info)' }} />
                 <span>Login-Daten für automatisches Ausfüllen (nur lokal)</span>
               </div>
               {savedCredentials && (
-                <span style={{ fontSize: '11.5px', color: '#34d399', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '11.5px', color: 'var(--c-success)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <CheckCircle2 size={13} /> Gespeichert
                 </span>
               )}
@@ -184,7 +184,7 @@ export default function CareManImportModal({
                     padding: '8px 10px',
                     borderRadius: '9px',
                     border: '1px solid var(--color-border)',
-                    background: 'rgba(15, 23, 42, 0.65)',
+                    background: 'rgb(var(--rgb-bg) / 0.65)',
                     color: 'var(--color-text-main)',
                     fontSize: '12px'
                   }}
@@ -204,7 +204,7 @@ export default function CareManImportModal({
                     padding: '8px 10px',
                     borderRadius: '9px',
                     border: '1px solid var(--color-border)',
-                    background: 'rgba(15, 23, 42, 0.65)',
+                    background: 'rgb(var(--rgb-bg) / 0.65)',
                     color: 'var(--color-text-main)',
                     fontSize: '12px'
                   }}
@@ -244,9 +244,9 @@ export default function CareManImportModal({
                   fontSize: '11.5px',
                   padding: '7px 11px',
                   textDecoration: 'none',
-                  background: 'rgba(14, 165, 233, 0.18)',
-                  color: '#38bdf8',
-                  border: '1px solid rgba(56, 189, 248, 0.45)',
+                  background: 'rgb(var(--rgb-info) / 0.18)',
+                  color: 'var(--c-info)',
+                  border: '1px solid rgb(var(--rgb-info) / 0.45)',
                   fontWeight: 700
                 }}
               >

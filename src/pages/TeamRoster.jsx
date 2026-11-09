@@ -911,7 +911,7 @@ export default function TeamRoster() {
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 4000,
-          background: '#10b981',
+          background: 'var(--c-success-strong)',
           color: 'white',
           padding: '10px 18px',
           borderRadius: '20px',
@@ -931,7 +931,7 @@ export default function TeamRoster() {
       {/* Top Header: Title & 1-Click + Upload Buttons */}
       <div className="team-roster-header" style={{ marginBottom: '8px', paddingBottom: '0', gap: '8px', flexWrap: 'wrap' }}>
         <h1 className="team-roster-title" style={{ whiteSpace: 'nowrap' }}>
-          <Users style={{ color: '#38bdf8' }} size={24} />
+          <Users style={{ color: 'var(--c-info)' }} size={24} />
           <span>Wer hat Dienst?</span>
         </h1>
 
@@ -940,9 +940,9 @@ export default function TeamRoster() {
             type="button"
             onClick={() => setIsUploadOpen(true)}
             style={{
-              background: 'rgba(14, 165, 233, 0.18)',
-              color: '#38bdf8',
-              border: '1px solid rgba(56, 189, 248, 0.45)',
+              background: 'rgb(var(--rgb-info) / 0.18)',
+              color: 'var(--c-info)',
+              border: '1px solid rgb(var(--rgb-info) / 0.45)',
               fontWeight: 700,
               padding: '7px 11px',
               borderRadius: '12px',
@@ -953,7 +953,7 @@ export default function TeamRoster() {
               fontSize: '12.5px',
               whiteSpace: 'nowrap',
               flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)',
+              boxShadow: '0 2px 8px rgb(var(--rgb-info) / 0.2)',
               transition: 'all 0.15s ease'
             }}
             title="Dienstplan importieren (SIEDA einfügen oder Datei)"
@@ -1033,9 +1033,9 @@ export default function TeamRoster() {
               </span>
               {selectedDate === currentTodayStr && (
                 <span style={{
-                  background: 'rgba(249, 115, 22, 0.2)',
-                  color: '#f97316',
-                  border: '1px solid rgba(249, 115, 22, 0.45)',
+                  background: 'rgb(var(--rgb-primary) / 0.2)',
+                  color: 'var(--c-primary)',
+                  border: '1px solid rgb(var(--rgb-primary) / 0.45)',
                   padding: '1px 5px',
                   borderRadius: '5px',
                   fontSize: '11px',
@@ -1055,9 +1055,9 @@ export default function TeamRoster() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px',
-                  background: hasTeamFilter ? 'rgba(14, 165, 233, 0.18)' : 'rgba(255, 255, 255, 0.05)',
-                  border: hasTeamFilter ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid var(--color-border)',
-                  color: hasTeamFilter ? '#38bdf8' : 'var(--color-text-main)',
+                  background: hasTeamFilter ? 'rgb(var(--rgb-info) / 0.18)' : 'rgb(var(--rgb-overlay) / 0.05)',
+                  border: hasTeamFilter ? '1px solid rgb(var(--rgb-info) / 0.5)' : '1px solid var(--color-border)',
+                  color: hasTeamFilter ? 'var(--c-info)' : 'var(--color-text-main)',
                   fontSize: '12px',
                   fontWeight: hasTeamFilter ? 700 : 600,
                   padding: '6px 10px',
@@ -1083,9 +1083,9 @@ export default function TeamRoster() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: 'rgba(239, 68, 68, 0.14)',
-                    border: '1px solid rgba(239, 68, 68, 0.35)',
-                    color: '#ef4444',
+                    background: 'rgb(var(--rgb-danger) / 0.14)',
+                    border: '1px solid rgb(var(--rgb-danger) / 0.35)',
+                    color: 'var(--c-danger)',
                     padding: '6px 7px',
                     borderRadius: '8px',
                     cursor: 'pointer'
@@ -1160,7 +1160,7 @@ export default function TeamRoster() {
               position: 'fixed',
               inset: 0,
               zIndex: 3100,
-              background: 'rgba(2, 6, 23, 0.78)',
+              background: 'rgb(var(--rgb-deep) / 0.78)',
               backdropFilter: 'blur(6px)',
               WebkitBackdropFilter: 'blur(6px)',
               display: 'flex',
@@ -1175,18 +1175,18 @@ export default function TeamRoster() {
               style={{
                 width: '100%',
                 maxWidth: '420px',
-                background: '#0f172a',
-                border: '1px solid #334155',
+                background: 'var(--c-bg)',
+                border: '1px solid var(--c-surface-3)',
                 borderRadius: '18px',
                 padding: '18px',
                 boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)'
               }}
             >
               {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #1e293b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--c-surface)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Calendar size={17} color="#fb923c" />
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>
+                  <Calendar size={17} style={{ color: 'var(--c-primary-text)' }} />
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--c-text)' }}>
                     Springe zu Datum
                   </h3>
                 </div>
@@ -1194,9 +1194,9 @@ export default function TeamRoster() {
                   type="button"
                   onClick={() => setShowJumpModal(false)}
                   style={{
-                    background: '#1e293b',
-                    border: '1px solid #334155',
-                    color: '#94a3b8',
+                    background: 'var(--c-surface)',
+                    border: '1px solid var(--c-surface-3)',
+                    color: 'var(--c-text-muted)',
                     borderRadius: '8px',
                     padding: '4px 8px',
                     cursor: 'pointer',
@@ -1215,9 +1215,9 @@ export default function TeamRoster() {
                     type="button"
                     onClick={handlePrevMonth}
                     style={{
-                      background: '#1e293b',
-                      border: '1px solid #334155',
-                      color: '#cbd5e1',
+                      background: 'var(--c-surface)',
+                      border: '1px solid var(--c-surface-3)',
+                      color: 'var(--c-text-soft)',
                       borderRadius: '8px',
                       padding: '5px 8px',
                       cursor: 'pointer',
@@ -1227,16 +1227,16 @@ export default function TeamRoster() {
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc', minWidth: '120px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-text)', minWidth: '120px', textAlign: 'center' }}>
                     {roster.monthLabel || yearMonth}
                   </span>
                   <button
                     type="button"
                     onClick={handleNextMonth}
                     style={{
-                      background: '#1e293b',
-                      border: '1px solid #334155',
-                      color: '#cbd5e1',
+                      background: 'var(--c-surface)',
+                      border: '1px solid var(--c-surface-3)',
+                      color: 'var(--c-text-soft)',
                       borderRadius: '8px',
                       padding: '5px 8px',
                       cursor: 'pointer',
@@ -1255,9 +1255,9 @@ export default function TeamRoster() {
                     setShowJumpModal(false);
                   }}
                   style={{
-                    background: 'rgba(14, 165, 233, 0.15)',
-                    border: '1px solid rgba(56, 189, 248, 0.35)',
-                    color: '#38bdf8',
+                    background: 'rgb(var(--rgb-info) / 0.15)',
+                    border: '1px solid rgb(var(--rgb-info) / 0.35)',
+                    color: 'var(--c-info)',
                     borderRadius: '8px',
                     padding: '5px 10px',
                     fontSize: '12px',
@@ -1278,7 +1278,7 @@ export default function TeamRoster() {
                       textAlign: 'center',
                       fontSize: '11px',
                       fontWeight: 700,
-                      color: i >= 5 ? '#fb923c' : '#64748b'
+                      color: i >= 5 ? 'var(--c-primary-text)' : 'var(--c-text-subtle)'
                     }}
                   >
                     {wd}
@@ -1312,29 +1312,29 @@ export default function TeamRoster() {
                         gap: '2px',
                         cursor: 'pointer',
                         background: cell.isSelected
-                          ? 'rgba(14, 165, 233, 0.25)'
+                          ? 'rgb(var(--rgb-info) / 0.25)'
                           : cell.myCode
                             ? myShiftColor.bg
-                            : (cell.isWeekend ? 'rgba(30, 41, 59, 0.6)' : '#1e293b'),
+                            : (cell.isWeekend ? 'rgb(var(--rgb-surface) / 0.6)' : 'var(--c-surface)'),
                         border: cell.isSelected
-                          ? '2px solid #38bdf8'
+                          ? '2px solid var(--c-info)'
                           : cell.isToday
-                            ? '2px solid #f97316'
+                            ? '2px solid var(--c-primary)'
                             : cell.myCode
                               ? `1px solid ${myShiftColor.border}`
-                              : '1px solid #334155',
+                              : '1px solid var(--c-surface-3)',
                         boxShadow: cell.isSelected
-                          ? '0 0 10px rgba(56, 189, 248, 0.35)'
+                          ? '0 0 10px rgb(var(--rgb-info) / 0.35)'
                           : cell.isToday
-                            ? '0 0 10px rgba(249, 115, 22, 0.45)'
+                            ? '0 0 10px rgb(var(--rgb-primary) / 0.45)'
                             : 'none',
-                        color: '#f8fafc',
+                        color: 'var(--c-text)',
                         transition: 'all 0.12s ease'
                       }}
                     >
                       {cell.isToday ? (
                         <span style={{
-                          background: '#f97316',
+                          background: 'var(--c-primary)',
                           color: '#ffffff',
                           borderRadius: '50%',
                           width: '18px',
@@ -1345,7 +1345,7 @@ export default function TeamRoster() {
                           fontSize: '11px',
                           fontWeight: 800,
                           lineHeight: 1,
-                          boxShadow: '0 2px 5px rgba(249, 115, 22, 0.6)'
+                          boxShadow: '0 2px 5px rgb(var(--rgb-primary) / 0.6)'
                         }}>
                           {cell.dayNum}
                         </span>
@@ -1353,7 +1353,7 @@ export default function TeamRoster() {
                         <span style={{
                           fontSize: '12.5px',
                           fontWeight: cell.isSelected || cell.myCode ? 800 : 600,
-                          color: cell.isSelected ? '#38bdf8' : '#f8fafc',
+                          color: cell.isSelected ? 'var(--c-info)' : 'var(--c-text)',
                           lineHeight: 1.1
                         }}>
                           {cell.dayNum}
@@ -1372,7 +1372,7 @@ export default function TeamRoster() {
                         <span style={{
                           fontSize: '9px',
                           fontWeight: 800,
-                          color: '#f97316',
+                          color: 'var(--c-primary)',
                           lineHeight: 1
                         }}>
                           Heute
@@ -1380,7 +1380,7 @@ export default function TeamRoster() {
                       ) : cell.shiftCount > 0 ? (
                         <span style={{
                           fontSize: '9px',
-                          color: '#64748b',
+                          color: 'var(--c-text-subtle)',
                           lineHeight: 1
                         }}>
                           {cell.shiftCount}
@@ -1398,9 +1398,9 @@ export default function TeamRoster() {
                 justifyContent: 'space-between',
                 gap: '10px',
                 paddingTop: '10px',
-                borderTop: '1px solid #1e293b'
+                borderTop: '1px solid var(--c-surface)'
               }}>
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
+                <span style={{ fontSize: '12px', color: 'var(--c-text-muted)', fontWeight: 600 }}>
                   Direktes Datum:
                 </span>
                 <input
@@ -1418,9 +1418,9 @@ export default function TeamRoster() {
                     setShowJumpModal(false);
                   }}
                   style={{
-                    background: '#1e293b',
-                    border: '1px solid #334155',
-                    color: '#f8fafc',
+                    background: 'var(--c-surface)',
+                    border: '1px solid var(--c-surface-3)',
+                    color: 'var(--c-text)',
                     borderRadius: '8px',
                     padding: '6px 10px',
                     fontSize: '12.5px',
@@ -1445,7 +1445,7 @@ export default function TeamRoster() {
               position: 'fixed',
               inset: 0,
               zIndex: 3100,
-              background: 'rgba(2, 6, 23, 0.78)',
+              background: 'rgb(var(--rgb-deep) / 0.78)',
               backdropFilter: 'blur(6px)',
               WebkitBackdropFilter: 'blur(6px)',
               display: 'flex',
@@ -1460,18 +1460,18 @@ export default function TeamRoster() {
               style={{
                 width: '100%',
                 maxWidth: '440px',
-                background: '#0f172a',
-                border: '1px solid #334155',
+                background: 'var(--c-bg)',
+                border: '1px solid var(--c-surface-3)',
                 borderRadius: '18px',
                 padding: '18px',
                 boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)'
               }}
             >
               {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #1e293b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--c-surface)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <SlidersHorizontal size={17} color="#38bdf8" />
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>
+                  <SlidersHorizontal size={17} style={{ color: 'var(--c-info)' }} />
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--c-text)' }}>
                     Team-Filter & Suche
                   </h3>
                 </div>
@@ -1479,9 +1479,9 @@ export default function TeamRoster() {
                   type="button"
                   onClick={() => setShowFilterModal(false)}
                   style={{
-                    background: '#1e293b',
-                    border: '1px solid #334155',
-                    color: '#94a3b8',
+                    background: 'var(--c-surface)',
+                    border: '1px solid var(--c-surface-3)',
+                    color: 'var(--c-text-muted)',
                     borderRadius: '8px',
                     padding: '4px 8px',
                     cursor: 'pointer',
@@ -1495,7 +1495,7 @@ export default function TeamRoster() {
 
               {/* Section 0: Kollege oder Kürzel suchen */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                   Kollege oder Kürzel suchen
                 </div>
                 <div style={{ position: 'relative' }}>
@@ -1506,7 +1506,7 @@ export default function TeamRoster() {
                       left: '12px',
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      color: '#64748b',
+                      color: 'var(--c-text-subtle)',
                       pointerEvents: 'none'
                     }}
                   />
@@ -1519,9 +1519,9 @@ export default function TeamRoster() {
                       width: '100%',
                       padding: '10px 34px 10px 36px',
                       borderRadius: '12px',
-                      background: '#1e293b',
-                      border: searchQuery.trim() ? '1px solid #38bdf8' : '1px solid #334155',
-                      color: '#f8fafc',
+                      background: 'var(--c-surface)',
+                      border: searchQuery.trim() ? '1px solid var(--c-info)' : '1px solid var(--c-surface-3)',
+                      color: 'var(--c-text)',
                       fontSize: '13.5px',
                       fontFamily: 'inherit',
                       outline: 'none',
@@ -1539,7 +1539,7 @@ export default function TeamRoster() {
                         transform: 'translateY(-50%)',
                         background: 'transparent',
                         border: 'none',
-                        color: '#94a3b8',
+                        color: 'var(--c-text-muted)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -1554,7 +1554,7 @@ export default function TeamRoster() {
 
               {/* Section 1: Wachen */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                   Wachen ({formattedSelectedDate})
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1566,9 +1566,9 @@ export default function TeamRoster() {
                       borderRadius: '20px',
                       fontSize: '12.5px',
                       fontWeight: selectedStation === 'ALL' ? 700 : 500,
-                      background: selectedStation === 'ALL' ? 'rgba(14, 165, 233, 0.2)' : '#1e293b',
-                      border: selectedStation === 'ALL' ? '1px solid #38bdf8' : '1px solid #334155',
-                      color: selectedStation === 'ALL' ? '#38bdf8' : '#cbd5e1',
+                      background: selectedStation === 'ALL' ? 'rgb(var(--rgb-info) / 0.2)' : 'var(--c-surface)',
+                      border: selectedStation === 'ALL' ? '1px solid var(--c-info)' : '1px solid var(--c-surface-3)',
+                      color: selectedStation === 'ALL' ? 'var(--c-info)' : 'var(--c-text-soft)',
                       cursor: 'pointer'
                     }}
                   >
@@ -1591,9 +1591,9 @@ export default function TeamRoster() {
                           borderRadius: '20px',
                           fontSize: '12.5px',
                           fontWeight: active ? 700 : 500,
-                          background: active ? theme.badgeBg : '#1e293b',
-                          border: active ? `1px solid ${theme.primaryHex}` : '1px solid #334155',
-                          color: active ? theme.primaryHex : '#cbd5e1',
+                          background: active ? theme.badgeBg : 'var(--c-surface)',
+                          border: active ? `1px solid ${theme.primaryHex}` : '1px solid var(--c-surface-3)',
+                          color: active ? theme.primaryHex : 'var(--c-text-soft)',
                           cursor: 'pointer'
                         }}
                       >
@@ -1608,7 +1608,7 @@ export default function TeamRoster() {
 
               {/* Section 2: Schichtgruppen */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                   Schichtgruppe
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1620,9 +1620,9 @@ export default function TeamRoster() {
                       borderRadius: '20px',
                       fontSize: '12.5px',
                       fontWeight: selectedShiftGroup === 'ALL' ? 700 : 500,
-                      background: selectedShiftGroup === 'ALL' ? '#334155' : '#1e293b',
-                      border: selectedShiftGroup === 'ALL' ? '1px solid #64748b' : '1px solid #334155',
-                      color: selectedShiftGroup === 'ALL' ? '#f8fafc' : '#94a3b8',
+                      background: selectedShiftGroup === 'ALL' ? 'var(--c-surface-3)' : 'var(--c-surface)',
+                      border: selectedShiftGroup === 'ALL' ? '1px solid var(--c-text-subtle)' : '1px solid var(--c-surface-3)',
+                      color: selectedShiftGroup === 'ALL' ? 'var(--c-text)' : 'var(--c-text-muted)',
                       cursor: 'pointer'
                     }}
                   >
@@ -1641,9 +1641,9 @@ export default function TeamRoster() {
                           borderRadius: '20px',
                           fontSize: '12.5px',
                           fontWeight: active ? 700 : 500,
-                          background: active ? 'rgba(56, 189, 248, 0.18)' : '#1e293b',
-                          border: active ? '1px solid #38bdf8' : '1px solid #334155',
-                          color: active ? '#38bdf8' : '#cbd5e1',
+                          background: active ? 'rgb(var(--rgb-info) / 0.18)' : 'var(--c-surface)',
+                          border: active ? '1px solid var(--c-info)' : '1px solid var(--c-surface-3)',
+                          color: active ? 'var(--c-info)' : 'var(--c-text-soft)',
                           cursor: 'pointer'
                         }}
                       >
@@ -1655,7 +1655,7 @@ export default function TeamRoster() {
               </div>
 
               {/* Footer */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', paddingTop: '12px', borderTop: '1px solid #1e293b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', paddingTop: '12px', borderTop: '1px solid var(--c-surface)' }}>
                 {hasTeamFilter ? (
                   <button
                     type="button"
@@ -1668,9 +1668,9 @@ export default function TeamRoster() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      background: 'rgba(239, 68, 68, 0.12)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      color: '#ef4444',
+                      background: 'rgb(var(--rgb-danger) / 0.12)',
+                      border: '1px solid rgb(var(--rgb-danger) / 0.3)',
+                      color: 'var(--c-danger)',
                       padding: '8px 12px',
                       borderRadius: '10px',
                       fontSize: '12.5px',
@@ -1687,7 +1687,7 @@ export default function TeamRoster() {
                   type="button"
                   onClick={() => setShowFilterModal(false)}
                   style={{
-                    background: '#0284c7',
+                    background: 'var(--c-info-strong)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '8px 18px',
@@ -1712,15 +1712,15 @@ export default function TeamRoster() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {staffingAnalysis.hasUnderstaffed ? (
                 <>
-                  <AlertTriangle size={17} style={{ color: '#f59e0b', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>
+                  <AlertTriangle size={17} style={{ color: 'var(--c-warning-strong)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--c-warning-strong)' }}>
                     Fehlende Besetzung ({staffingAnalysis.understaffed.length})
                   </span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 size={16} style={{ color: '#10b981', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#10b981' }}>
+                  <CheckCircle2 size={16} style={{ color: 'var(--c-success-strong)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--c-success-strong)' }}>
                     Alle Schichten voll besetzt (mind. 2x)
                   </span>
                 </>
@@ -1756,12 +1756,12 @@ export default function TeamRoster() {
                         fontSize: '10px',
                         padding: '1px 5px',
                         borderRadius: '4px',
-                        background: item.station === 'Hohenbrunn' ? 'rgba(16, 185, 129, 0.2)' :
-                                    item.station === 'Obersendling' ? 'rgba(245, 158, 11, 0.2)' :
-                                    'rgba(56, 189, 248, 0.2)',
-                        color: item.station === 'Hohenbrunn' ? '#34d399' :
-                               item.station === 'Obersendling' ? '#fbbf24' :
-                               '#38bdf8',
+                        background: item.station === 'Hohenbrunn' ? 'rgb(var(--rgb-success) / 0.2)' :
+                                    item.station === 'Obersendling' ? 'rgb(var(--rgb-warning) / 0.2)' :
+                                    'rgb(var(--rgb-info) / 0.2)',
+                        color: item.station === 'Hohenbrunn' ? 'var(--c-success)' :
+                               item.station === 'Obersendling' ? 'var(--c-warning)' :
+                               'var(--c-info)',
                         fontWeight: 600
                       }}>
                         {item.station}
@@ -1784,8 +1784,8 @@ export default function TeamRoster() {
         const countText = `${count} ${count === 1 ? 'Dienst' : 'Dienste'}`;
         return (
           <div style={{
-            background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(15, 23, 42, 0.85))',
-            border: '1px solid rgba(56, 189, 248, 0.35)',
+            background: 'linear-gradient(135deg, rgb(var(--rgb-info) / 0.14), rgb(var(--rgb-bg) / 0.85))',
+            border: '1px solid rgb(var(--rgb-info) / 0.35)',
             borderRadius: '14px',
             padding: '10px 14px',
             marginBottom: '12px',
@@ -1796,7 +1796,7 @@ export default function TeamRoster() {
             flexWrap: 'wrap'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={16} style={{ color: '#38bdf8', flexShrink: 0 }} />
+              <Sparkles size={16} style={{ color: 'var(--c-info)', flexShrink: 0 }} />
               <div style={{ fontSize: '13px', color: 'var(--color-text-main)', fontWeight: 600 }}>
                 Dein Dienstplan ({countText}, {roster.monthLabel})
               </div>
@@ -1806,9 +1806,9 @@ export default function TeamRoster() {
               onClick={() => setIsCalendarExportModalOpen(true)}
               style={{
                 justifyContent: 'center',
-                background: 'rgba(234, 179, 8, 0.14)',
-                color: '#facc15',
-                border: '1px solid rgba(234, 179, 8, 0.38)',
+                background: 'rgb(var(--rgb-warning) / 0.14)',
+                color: 'var(--c-warning)',
+                border: '1px solid rgb(var(--rgb-warning) / 0.38)',
                 borderRadius: '9px',
                 padding: '7px 14px',
                 fontSize: '12.5px',
@@ -1849,9 +1849,9 @@ export default function TeamRoster() {
                 borderRadius: '10px',
                 fontSize: '12px',
                 fontWeight: selectedStation === 'ALL' ? 800 : 600,
-                background: selectedStation === 'ALL' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(30, 41, 59, 0.75)',
-                border: selectedStation === 'ALL' ? '1px solid #38bdf8' : '1px solid rgba(148, 163, 184, 0.2)',
-                color: selectedStation === 'ALL' ? '#38bdf8' : '#cbd5e1',
+                background: selectedStation === 'ALL' ? 'rgb(var(--rgb-info) / 0.2)' : 'rgb(var(--rgb-surface) / 0.75)',
+                border: selectedStation === 'ALL' ? '1px solid var(--c-info)' : '1px solid rgb(var(--rgb-muted) / 0.2)',
+                color: selectedStation === 'ALL' ? 'var(--c-info)' : 'var(--c-text-soft)',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
@@ -1861,9 +1861,9 @@ export default function TeamRoster() {
               Alle Wachen ({stationCounts.ALL})
             </button>
             {[
-              { id: 'Sendling', label: 'München', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.18)' },
-              { id: 'Hohenbrunn', label: 'Hohenbrunn', color: '#34d399', bg: 'rgba(16, 185, 129, 0.18)' },
-              { id: 'Obersendling', label: 'Obersendling', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.18)' }
+              { id: 'Sendling', label: 'München', color: 'var(--c-info)', bg: 'rgb(var(--rgb-info) / 0.18)' },
+              { id: 'Hohenbrunn', label: 'Hohenbrunn', color: 'var(--c-success)', bg: 'rgb(var(--rgb-success) / 0.18)' },
+              { id: 'Obersendling', label: 'Obersendling', color: 'var(--c-warning)', bg: 'rgb(var(--rgb-warning) / 0.18)' }
             ].map(st => {
               const active = selectedStation === st.id;
               return (
@@ -1879,9 +1879,9 @@ export default function TeamRoster() {
                     borderRadius: '10px',
                     fontSize: '12px',
                     fontWeight: active ? 800 : 600,
-                    background: active ? st.bg : 'rgba(30, 41, 59, 0.75)',
-                    border: active ? `1px solid ${st.color}` : '1px solid rgba(148, 163, 184, 0.2)',
-                    color: active ? st.color : '#cbd5e1',
+                    background: active ? st.bg : 'rgb(var(--rgb-surface) / 0.75)',
+                    border: active ? `1px solid ${st.color}` : '1px solid rgb(var(--rgb-muted) / 0.2)',
+                    color: active ? st.color : 'var(--c-text-soft)',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
@@ -1906,7 +1906,7 @@ export default function TeamRoster() {
           }}>
             {roster.totalShifts === 0 ? (
               <div>
-                <UploadCloud size={32} style={{ color: '#38bdf8', marginBottom: '8px' }} />
+                <UploadCloud size={32} style={{ color: 'var(--c-info)', marginBottom: '8px' }} />
                 <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-main)', margin: '0 0 6px 0' }}>
                   Noch kein Dienstplan für {roster.monthLabel || yearMonth} geladen
                 </p>
@@ -1940,7 +1940,7 @@ export default function TeamRoster() {
                       marginTop: '10px',
                       background: 'none',
                       border: 'none',
-                      color: '#38bdf8',
+                      color: 'var(--c-info)',
                       fontSize: '13px',
                       cursor: 'pointer',
                       textDecoration: 'underline'
@@ -1968,8 +1968,8 @@ export default function TeamRoster() {
 
               <div style={{
                 display: 'inline-flex',
-                background: 'rgba(15, 23, 42, 0.75)',
-                border: '1px solid rgba(148, 163, 184, 0.2)',
+                background: 'rgb(var(--rgb-bg) / 0.75)',
+                border: '1px solid rgb(var(--rgb-muted) / 0.2)',
                 borderRadius: '9px',
                 padding: '2px'
               }}>
@@ -1983,8 +1983,8 @@ export default function TeamRoster() {
                     fontSize: '11.5px',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    background: viewMode === 'crews' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
-                    color: viewMode === 'crews' ? '#38bdf8' : '#94a3b8'
+                    background: viewMode === 'crews' ? 'rgb(var(--rgb-info) / 0.2)' : 'transparent',
+                    color: viewMode === 'crews' ? 'var(--c-info)' : 'var(--c-text-muted)'
                   }}
                 >
                   Besatzungen
@@ -1999,8 +1999,8 @@ export default function TeamRoster() {
                     fontSize: '11.5px',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    background: viewMode === 'list' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
-                    color: viewMode === 'list' ? '#38bdf8' : '#94a3b8'
+                    background: viewMode === 'list' ? 'rgb(var(--rgb-info) / 0.2)' : 'transparent',
+                    color: viewMode === 'list' ? 'var(--c-info)' : 'var(--c-text-muted)'
                   }}
                 >
                   Liste
@@ -2027,25 +2027,25 @@ export default function TeamRoster() {
               });
 
               const groupMeta = {
-                'Frühdienst': { icon: '☀️', accent: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' },
-                'Tagschicht': { icon: '🌤️', accent: '#60a5fa', bg: 'rgba(96, 165, 250, 0.1)' },
-                'Spätdienst': { icon: '🌆', accent: '#fb923c', bg: 'rgba(251, 146, 60, 0.1)' },
-                'Nachtdienst': { icon: '🌙', accent: '#c084fc', bg: 'rgba(192, 132, 252, 0.1)' },
-                'Sonderdienste': { icon: '✨', accent: '#34d399', bg: 'rgba(52, 211, 153, 0.1)' },
-                'Fortbildung': { icon: '🎓', accent: '#facc15', bg: 'rgba(250, 204, 21, 0.1)' },
-                'Urlaub / Abwesend': { icon: '🏖️', accent: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)' }
+                'Frühdienst': { icon: '☀️', accent: 'var(--c-info)', bg: 'rgb(var(--rgb-info) / 0.1)' },
+                'Tagschicht': { icon: '🌤️', accent: 'var(--c-info)', bg: 'rgb(var(--rgb-info) / 0.1)' },
+                'Spätdienst': { icon: '🌆', accent: 'var(--c-orange)', bg: 'rgb(var(--rgb-orange) / 0.1)' },
+                'Nachtdienst': { icon: '🌙', accent: 'var(--c-violet)', bg: 'rgb(var(--rgb-violet) / 0.1)' },
+                'Sonderdienste': { icon: '✨', accent: 'var(--c-success)', bg: 'rgb(var(--rgb-success) / 0.1)' },
+                'Fortbildung': { icon: '🎓', accent: 'var(--c-warning)', bg: 'rgb(var(--rgb-warning) / 0.1)' },
+                'Urlaub / Abwesend': { icon: '🏖️', accent: 'var(--c-text-muted)', bg: 'rgb(var(--rgb-muted) / 0.1)' }
               };
 
               const stationLabels = {
-                Sendling: { label: 'München', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' },
-                Hohenbrunn: { label: 'Hohenbrunn', color: '#34d399', bg: 'rgba(16, 185, 129, 0.15)' },
-                Obersendling: { label: 'Obersendling', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.15)' }
+                Sendling: { label: 'München', color: 'var(--c-info)', bg: 'rgb(var(--rgb-info) / 0.15)' },
+                Hohenbrunn: { label: 'Hohenbrunn', color: 'var(--c-success)', bg: 'rgb(var(--rgb-success) / 0.15)' },
+                Obersendling: { label: 'Obersendling', color: 'var(--c-warning)', bg: 'rgb(var(--rgb-warning) / 0.15)' }
               };
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {Array.from(groupMap.entries()).map(([grpName, codeMap]) => {
-                    const meta = groupMeta[grpName] || { icon: '📋', accent: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' };
+                    const meta = groupMeta[grpName] || { icon: '📋', accent: 'var(--c-info)', bg: 'rgb(var(--rgb-info) / 0.1)' };
                     const crews = Array.from(codeMap.values());
                     const totalPeopleInGroup = crews.reduce((sum, c) => sum + c.members.length, 0);
 
@@ -2053,8 +2053,8 @@ export default function TeamRoster() {
                       <div
                         key={grpName}
                         style={{
-                          background: 'rgba(15, 23, 42, 0.55)',
-                          border: '1px solid rgba(148, 163, 184, 0.16)',
+                          background: 'rgb(var(--rgb-bg) / 0.55)',
+                          border: '1px solid rgb(var(--rgb-muted) / 0.16)',
                           borderRadius: '16px',
                           padding: '12px'
                         }}
@@ -2085,8 +2085,8 @@ export default function TeamRoster() {
                           <span style={{
                             fontSize: '11px',
                             fontWeight: 700,
-                            color: '#cbd5e1',
-                            background: 'rgba(15, 23, 42, 0.6)',
+                            color: 'var(--c-text-soft)',
+                            background: 'rgb(var(--rgb-bg) / 0.6)',
                             padding: '2px 8px',
                             borderRadius: '999px'
                           }}>
@@ -2112,19 +2112,19 @@ export default function TeamRoster() {
                                 key={crew.baseCode}
                                 style={{
                                   background: hasJohannes
-                                    ? 'linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(30, 41, 59, 0.92))'
-                                    : 'rgba(30, 41, 59, 0.82)',
+                                    ? 'linear-gradient(135deg, rgb(var(--rgb-info) / 0.16), rgb(var(--rgb-surface) / 0.92))'
+                                    : 'rgb(var(--rgb-surface) / 0.82)',
                                   border: hasJohannes
-                                    ? '1.5px solid #38bdf8'
+                                    ? '1.5px solid var(--c-info)'
                                     : isUnderstaffed
-                                      ? '1px solid rgba(245, 158, 11, 0.5)'
-                                      : '1px solid rgba(148, 163, 184, 0.18)',
+                                      ? '1px solid rgb(var(--rgb-warning) / 0.5)'
+                                      : '1px solid rgb(var(--rgb-muted) / 0.18)',
                                   borderRadius: '13px',
                                   padding: '10px 12px',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   gap: '8px',
-                                  boxShadow: hasJohannes ? '0 4px 16px rgba(14, 165, 233, 0.22)' : '0 2px 6px rgba(0,0,0,0.2)'
+                                  boxShadow: hasJohannes ? '0 4px 16px rgb(var(--rgb-info) / 0.22)' : '0 2px 6px rgba(0,0,0,0.2)'
                                 }}
                               >
                                 {/* Card Top Header: Shift Code Badge + Station + Time + Status */}
@@ -2134,7 +2134,7 @@ export default function TeamRoster() {
                                   justifyContent: 'space-between',
                                   gap: '6px',
                                   paddingBottom: '6px',
-                                  borderBottom: '1px solid rgba(148, 163, 184, 0.12)'
+                                  borderBottom: '1px solid rgb(var(--rgb-muted) / 0.12)'
                                 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                     <span
@@ -2166,7 +2166,7 @@ export default function TeamRoster() {
                                     {preset?.startTime && preset?.endTime && (
                                       <span style={{
                                         fontSize: '10.5px',
-                                        color: '#94a3b8',
+                                        color: 'var(--c-text-muted)',
                                         fontWeight: 600
                                       }}>
                                         {preset.startTime}–{preset.endTime}
@@ -2198,7 +2198,7 @@ export default function TeamRoster() {
                                           gap: '6px',
                                           padding: '4px 6px',
                                           borderRadius: '7px',
-                                          background: isMe ? 'rgba(14, 165, 233, 0.18)' : 'rgba(15, 23, 42, 0.45)'
+                                          background: isMe ? 'rgb(var(--rgb-info) / 0.18)' : 'rgb(var(--rgb-bg) / 0.45)'
                                         }}
                                       >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
@@ -2206,8 +2206,8 @@ export default function TeamRoster() {
                                             width: '18px',
                                             height: '18px',
                                             borderRadius: '50%',
-                                            background: isStar ? 'rgba(245, 158, 11, 0.2)' : 'rgba(148, 163, 184, 0.16)',
-                                            color: isStar ? '#fbbf24' : '#cbd5e1',
+                                            background: isStar ? 'rgb(var(--rgb-warning) / 0.2)' : 'rgb(var(--rgb-muted) / 0.16)',
+                                            color: isStar ? 'var(--c-warning)' : 'var(--c-text-soft)',
                                             fontSize: '10px',
                                             fontWeight: 800,
                                             display: 'inline-flex',
@@ -2220,7 +2220,7 @@ export default function TeamRoster() {
                                           <span style={{
                                             fontSize: '13.5px',
                                             fontWeight: isMe ? 800 : 600,
-                                            color: isMe ? '#38bdf8' : '#f1f5f9',
+                                            color: isMe ? 'var(--c-info)' : 'var(--c-text)',
                                             whiteSpace: 'nowrap',
                                             overflow: 'hidden',
                                             textOverflow: 'ellipsis'
@@ -2234,9 +2234,9 @@ export default function TeamRoster() {
                                             <span style={{
                                               fontSize: '10px',
                                               fontWeight: 700,
-                                              color: '#fbbf24',
-                                              background: 'rgba(245, 158, 11, 0.16)',
-                                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                                              color: 'var(--c-warning)',
+                                              background: 'rgb(var(--rgb-warning) / 0.16)',
+                                              border: '1px solid rgb(var(--rgb-warning) / 0.35)',
                                               padding: '1px 5px',
                                               borderRadius: '4px'
                                             }}>
@@ -2248,7 +2248,7 @@ export default function TeamRoster() {
                                               fontSize: '10px',
                                               padding: '1px 6px',
                                               borderRadius: '4px',
-                                              background: '#0284c7',
+                                              background: 'var(--c-info-strong)',
                                               color: 'white',
                                               fontWeight: 800
                                             }}>
@@ -2293,7 +2293,7 @@ export default function TeamRoster() {
                             <span style={{
                               fontSize: '14px',
                               fontWeight: isJohannes ? 700 : 500,
-                              color: isJohannes ? '#38bdf8' : 'var(--color-text-main)',
+                              color: isJohannes ? 'var(--c-info)' : 'var(--color-text-main)',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis'
@@ -2305,7 +2305,7 @@ export default function TeamRoster() {
                                 fontSize: '10px',
                                 padding: '1px 6px',
                                 borderRadius: '4px',
-                                background: '#0284c7',
+                                background: 'var(--c-info-strong)',
                                 color: 'white',
                                 fontWeight: 800,
                                 flexShrink: 0
@@ -2317,7 +2317,7 @@ export default function TeamRoster() {
                           {isJohannes && johannesPartnerStr && (
                             <span style={{
                               fontSize: '11.5px',
-                              color: '#7dd3fc',
+                              color: 'var(--c-info)',
                               fontWeight: 600,
                               marginTop: '2px',
                               whiteSpace: 'nowrap',
@@ -2367,7 +2367,7 @@ export default function TeamRoster() {
             maxWidth: '460px',
             borderRadius: '24px',
             background: 'var(--color-surface)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgb(var(--rgb-overlay) / 0.1)',
             boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)',
             overflow: 'hidden',
             display: 'flex',
@@ -2377,8 +2377,8 @@ export default function TeamRoster() {
             <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
-                  background: 'rgba(14, 165, 233, 0.15)',
-                  color: '#38bdf8',
+                  background: 'rgb(var(--rgb-info) / 0.15)',
+                  color: 'var(--c-info)',
                   borderRadius: '10px',
                   padding: '8px',
                   display: 'flex',
@@ -2416,7 +2416,7 @@ export default function TeamRoster() {
               {/* Tab Switcher */}
               <div style={{
                 display: 'flex',
-                background: 'rgba(15, 23, 42, 0.7)',
+                background: 'rgb(var(--rgb-bg) / 0.7)',
                 padding: '4px',
                 borderRadius: '12px',
                 border: '1px solid var(--color-border)',
@@ -2429,9 +2429,9 @@ export default function TeamRoster() {
                     flex: 1,
                     padding: '8px 4px',
                     borderRadius: '8px',
-                    border: activeModalTab === 'paste' ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
-                    background: activeModalTab === 'paste' ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
-                    color: activeModalTab === 'paste' ? '#38bdf8' : 'var(--color-text-muted)',
+                    border: activeModalTab === 'paste' ? '1px solid rgb(var(--rgb-info) / 0.4)' : 'none',
+                    background: activeModalTab === 'paste' ? 'rgb(var(--rgb-info) / 0.2)' : 'transparent',
+                    color: activeModalTab === 'paste' ? 'var(--c-info)' : 'var(--color-text-muted)',
                     fontSize: '11px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -2452,9 +2452,9 @@ export default function TeamRoster() {
                     flex: 1,
                     padding: '8px 4px',
                     borderRadius: '8px',
-                    border: activeModalTab === 'file' ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
-                    background: activeModalTab === 'file' ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
-                    color: activeModalTab === 'file' ? '#38bdf8' : 'var(--color-text-muted)',
+                    border: activeModalTab === 'file' ? '1px solid rgb(var(--rgb-info) / 0.4)' : 'none',
+                    background: activeModalTab === 'file' ? 'rgb(var(--rgb-info) / 0.2)' : 'transparent',
+                    color: activeModalTab === 'file' ? 'var(--c-info)' : 'var(--color-text-muted)',
                     fontSize: '11px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -2475,9 +2475,9 @@ export default function TeamRoster() {
                     flex: 1,
                     padding: '8px 4px',
                     borderRadius: '8px',
-                    border: activeModalTab === 'saved' ? '1px solid rgba(14, 165, 233, 0.4)' : 'none',
-                    background: activeModalTab === 'saved' ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
-                    color: activeModalTab === 'saved' ? '#38bdf8' : 'var(--color-text-muted)',
+                    border: activeModalTab === 'saved' ? '1px solid rgb(var(--rgb-info) / 0.4)' : 'none',
+                    background: activeModalTab === 'saved' ? 'rgb(var(--rgb-info) / 0.2)' : 'transparent',
+                    color: activeModalTab === 'saved' ? 'var(--c-info)' : 'var(--color-text-muted)',
                     fontSize: '11px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -2508,8 +2508,8 @@ export default function TeamRoster() {
                   />
 
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <FileCode size={28} style={{ color: '#10b981' }} />
-                    <FileText size={28} style={{ color: '#38bdf8' }} />
+                    <FileCode size={28} style={{ color: 'var(--c-success-strong)' }} />
+                    <FileText size={28} style={{ color: 'var(--c-info)' }} />
                     <UploadCloud size={28} style={{ color: 'var(--color-text-muted)' }} />
                   </div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '8px' }}>
@@ -2519,14 +2519,14 @@ export default function TeamRoster() {
                   <div style={{
                     fontSize: '11px',
                     color: 'var(--color-text-muted)',
-                    background: 'rgba(15, 23, 42, 0.8)',
+                    background: 'rgb(var(--rgb-bg) / 0.8)',
                     borderRadius: '12px',
                     padding: '10px 12px',
                     border: '1px solid var(--color-border)',
                     textAlign: 'left',
                     lineHeight: '1.4'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontWeight: 700, marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--c-success-strong)', fontWeight: 700, marginBottom: '4px' }}>
                       <CheckCircle2 size={14} />
                       <span>Empfehlung: Website als HTML speichern</span>
                     </div>
@@ -2545,9 +2545,9 @@ export default function TeamRoster() {
                     onClick={handleOneClickCareManSync}
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(135deg, #059669, #10b981)',
+                      background: 'linear-gradient(135deg, var(--c-success-deep), var(--c-success-strong))',
                       color: '#ffffff',
-                      border: '1px solid rgba(52, 211, 153, 0.5)',
+                      border: '1px solid rgb(var(--rgb-success) / 0.5)',
                       fontWeight: 800,
                       fontSize: '13.5px',
                       padding: '12px 14px',
@@ -2558,7 +2558,7 @@ export default function TeamRoster() {
                       justifyContent: 'center',
                       gap: '8px',
                       marginBottom: '12px',
-                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                      boxShadow: '0 4px 14px rgb(var(--rgb-success) / 0.35)'
                     }}
                   >
                     <Sparkles size={16} />
@@ -2568,16 +2568,16 @@ export default function TeamRoster() {
                   {/* SIEDA Helper Card: Bookmarklet + Copy Command */}
                   <div className="team-roster-helper-card">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--c-info)' }}>
                         ⚡ Live-Auto-Pilot für alle 3 Wachen (61000, 61010, 61300)
                       </span>
                       <button
                         type="button"
                         onClick={() => openCareManLiveWindow(yearMonth)}
                         style={{
-                          background: 'rgba(14, 165, 233, 0.2)',
-                          color: '#38bdf8',
-                          border: '1px solid rgba(56, 189, 248, 0.45)',
+                          background: 'rgb(var(--rgb-info) / 0.2)',
+                          color: 'var(--c-info)',
+                          border: '1px solid rgb(var(--rgb-info) / 0.45)',
                           borderRadius: '8px',
                           padding: '4px 9px',
                           fontSize: '11px',
@@ -2629,7 +2629,7 @@ export default function TeamRoster() {
                       </button>
                     </div>
 
-                    <div style={{ fontSize: '11px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--c-success-strong)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <CheckCircle2 size={12} />
                       <span>Mit dem bestehenden Lesezeichen reicht oben <strong>1 Klick auf den grünen Button</strong> (kein Einfügen mehr nötig)!</span>
                     </div>
@@ -2655,9 +2655,9 @@ export default function TeamRoster() {
                             flex: 1,
                             padding: '6px 4px',
                             borderRadius: '8px',
-                            border: uploadStationOverride === opt.id ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid var(--color-border)',
-                            background: uploadStationOverride === opt.id ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.03)',
-                            color: uploadStationOverride === opt.id ? '#38bdf8' : 'var(--color-text-muted)',
+                            border: uploadStationOverride === opt.id ? '1px solid rgb(var(--rgb-info) / 0.4)' : '1px solid var(--color-border)',
+                            background: uploadStationOverride === opt.id ? 'rgb(var(--rgb-info) / 0.2)' : 'rgb(var(--rgb-overlay) / 0.03)',
+                            color: uploadStationOverride === opt.id ? 'var(--c-info)' : 'var(--color-text-muted)',
                             fontSize: '11px',
                             fontWeight: uploadStationOverride === opt.id ? 700 : 500,
                             cursor: 'pointer',
@@ -2681,7 +2681,7 @@ export default function TeamRoster() {
                       fontSize: '12px',
                       resize: 'none',
                       marginBottom: '10px',
-                      background: 'rgba(15, 23, 42, 0.8)'
+                      background: 'rgb(var(--rgb-bg) / 0.8)'
                     }}
                     disabled={isProcessing}
                   />
@@ -2692,7 +2692,7 @@ export default function TeamRoster() {
                     className="btn-primary"
                     style={{
                       width: '100%',
-                      background: '#0284c7',
+                      background: 'var(--c-info-strong)',
                       color: 'white',
                       fontWeight: 600,
                       fontSize: '13px',
@@ -2709,8 +2709,8 @@ export default function TeamRoster() {
                 <div>
                   {/* Cloud Sync Status Card */}
                   <div style={{
-                    background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(99, 102, 241, 0.12))',
-                    border: '1px solid rgba(14, 165, 233, 0.3)',
+                    background: 'linear-gradient(135deg, rgb(var(--rgb-info) / 0.12), rgb(var(--rgb-info) / 0.12))',
+                    border: '1px solid rgb(var(--rgb-info) / 0.3)',
                     borderRadius: '12px',
                     padding: '12px',
                     marginBottom: '12px',
@@ -2724,11 +2724,11 @@ export default function TeamRoster() {
                           width: '28px',
                           height: '28px',
                           borderRadius: '8px',
-                          background: 'rgba(14, 165, 233, 0.2)',
+                          background: 'rgb(var(--rgb-info) / 0.2)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#38bdf8',
+                          color: 'var(--c-info)',
                           flexShrink: 0
                         }}>
                           <Cloud size={16} />
@@ -2757,9 +2757,9 @@ export default function TeamRoster() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '5px',
-                          background: 'rgba(14, 165, 233, 0.25)',
-                          border: '1px solid rgba(14, 165, 233, 0.4)',
-                          color: '#38bdf8',
+                          background: 'rgb(var(--rgb-info) / 0.25)',
+                          border: '1px solid rgb(var(--rgb-info) / 0.4)',
+                          color: 'var(--c-info)',
                           padding: '5px 10px',
                           borderRadius: '8px',
                           fontSize: '11px',
@@ -2790,21 +2790,21 @@ export default function TeamRoster() {
                         <div
                           key={sr.yearMonth}
                           style={{
-                            background: isActive ? 'rgba(14, 165, 233, 0.08)' : 'rgba(15, 23, 42, 0.7)',
-                            border: isActive ? '1px solid rgba(14, 165, 233, 0.4)' : '1px solid var(--color-border)',
+                            background: isActive ? 'rgb(var(--rgb-info) / 0.08)' : 'rgb(var(--rgb-bg) / 0.7)',
+                            border: isActive ? '1px solid rgb(var(--rgb-info) / 0.4)' : '1px solid var(--color-border)',
                             borderRadius: '14px',
                             padding: '12px 14px'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontWeight: 700, fontSize: '13px', color: isActive ? '#38bdf8' : 'var(--color-text-main)' }}>
+                              <span style={{ fontWeight: 700, fontSize: '13px', color: isActive ? 'var(--c-info)' : 'var(--color-text-main)' }}>
                                 {sr.monthLabel}
                               </span>
                               {isActive && (
                                 <span style={{
                                   fontSize: '10px',
-                                  background: '#0284c7',
+                                  background: 'var(--c-info-strong)',
                                   color: 'white',
                                   padding: '1px 6px',
                                   borderRadius: '4px',
@@ -2834,9 +2834,9 @@ export default function TeamRoster() {
                                   type="button"
                                   onClick={() => handleDeleteMonthRoster(sr.yearMonth)}
                                   style={{
-                                    background: 'rgba(239, 68, 68, 0.15)',
-                                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                                    color: '#f87171',
+                                    background: 'rgb(var(--rgb-danger) / 0.15)',
+                                    border: '1px solid rgb(var(--rgb-danger) / 0.3)',
+                                    color: 'var(--c-danger)',
                                     padding: '4px 8px',
                                     borderRadius: '6px',
                                     cursor: 'pointer',
@@ -2852,9 +2852,9 @@ export default function TeamRoster() {
                           </div>
 
                           {/* 3 Stations Breakdown */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgb(var(--rgb-overlay) / 0.06)', paddingTop: '8px' }}>
                             {sr.stations.map(stInfo => {
-                              const stationTheme = stInfo.station === 'Sendling' ? '#38bdf8' : (stInfo.station === 'Hohenbrunn' ? '#34d399' : '#fb923c');
+                              const stationTheme = stInfo.station === 'Sendling' ? 'var(--c-info)' : (stInfo.station === 'Hohenbrunn' ? 'var(--c-success)' : 'var(--c-orange)');
                               return (
                                 <div
                                   key={stInfo.station}
@@ -2863,7 +2863,7 @@ export default function TeamRoster() {
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     padding: '6px 10px',
-                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    background: 'rgb(var(--rgb-overlay) / 0.03)',
                                     borderRadius: '8px',
                                     fontSize: '11px'
                                   }}
@@ -2873,7 +2873,7 @@ export default function TeamRoster() {
                                       width: '7px',
                                       height: '7px',
                                       borderRadius: '50%',
-                                      background: stInfo.hasData ? stationTheme : '#64748b'
+                                      background: stInfo.hasData ? stationTheme : 'var(--c-text-subtle)'
                                     }} />
                                     <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>
                                       Wache {stInfo.station}
@@ -2884,7 +2884,7 @@ export default function TeamRoster() {
                                   </div>
 
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span style={{ fontSize: '11px', color: stInfo.hasData ? 'var(--color-text-muted)' : '#64748b' }}>
+                                    <span style={{ fontSize: '11px', color: stInfo.hasData ? 'var(--color-text-muted)' : 'var(--c-text-subtle)' }}>
                                       {stInfo.hasData ? `${stInfo.totalColleagues} Kollege${stInfo.totalColleagues === 1 ? '' : 'n'} · ${stInfo.totalShifts} Dienste` : 'Kein Plan'}
                                     </span>
                                     {stInfo.hasData && !stInfo.isPreset && (
@@ -2894,7 +2894,7 @@ export default function TeamRoster() {
                                         style={{
                                           background: 'transparent',
                                           border: 'none',
-                                          color: '#f87171',
+                                          color: 'var(--c-danger)',
                                           cursor: 'pointer',
                                           padding: '2px',
                                           display: 'flex',
@@ -2923,16 +2923,16 @@ export default function TeamRoster() {
                 <div style={{ marginTop: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--color-text-main)', marginBottom: '6px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Sparkles size={14} style={{ color: '#38bdf8' }} />
+                      <Sparkles size={14} style={{ color: 'var(--c-info)' }} />
                       Dienstplan wird eingelesen...
                     </span>
-                    <span style={{ fontWeight: 700, color: '#38bdf8' }}>{uploadProgress}%</span>
+                    <span style={{ fontWeight: 700, color: 'var(--c-info)' }}>{uploadProgress}%</span>
                   </div>
-                  <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '6px', background: 'rgb(var(--rgb-overlay) / 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                     <div style={{
                       width: `${uploadProgress}%`,
                       height: '100%',
-                      background: '#38bdf8',
+                      background: 'var(--c-info)',
                       transition: 'width 0.2s ease'
                     }} />
                   </div>
@@ -2945,9 +2945,9 @@ export default function TeamRoster() {
                   marginTop: '12px',
                   padding: '10px 12px',
                   borderRadius: '10px',
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#f87171',
+                  background: 'rgb(var(--rgb-danger) / 0.15)',
+                  border: '1px solid rgb(var(--rgb-danger) / 0.3)',
+                  color: 'var(--c-danger)',
                   fontSize: '12px',
                   display: 'flex',
                   alignItems: 'center',

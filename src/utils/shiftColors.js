@@ -45,7 +45,7 @@ export const STATION_THEMES = {
         short: 'SEN',
         hueName: 'Retter-Blau',
         primaryHex: '#0284c7',
-        color: '#38bdf8',
+        color: 'var(--station-sen, #38bdf8)',
         primaryRGB: [2, 132, 199],
         badgeBg: 'rgba(2, 132, 199, 0.18)',
         badgeBorder: 'rgba(2, 132, 199, 0.45)'
@@ -56,7 +56,7 @@ export const STATION_THEMES = {
         short: 'HBN',
         hueName: 'Smaragd-Grün',
         primaryHex: '#10b981',
-        color: '#34d399',
+        color: 'var(--station-hbn, #34d399)',
         primaryRGB: [16, 185, 129],
         badgeBg: 'rgba(16, 185, 129, 0.18)',
         badgeBorder: 'rgba(16, 185, 129, 0.45)'
@@ -67,7 +67,7 @@ export const STATION_THEMES = {
         short: 'OBS',
         hueName: 'Bernstein-Gelb',
         primaryHex: '#eab308',
-        color: '#facc15',
+        color: 'var(--station-obs, #facc15)',
         primaryRGB: [234, 179, 8],
         badgeBg: 'rgba(234, 179, 8, 0.18)',
         badgeBorder: 'rgba(234, 179, 8, 0.45)'
@@ -88,7 +88,7 @@ export const SHIFT_TYPE_COLORS = {
     frueh: {
         id: 'frueh',
         name: 'Frühschicht',
-        color: '#06b6d4', // Vibrant Cyan / Türkis
+        color: 'var(--shift-frueh, #06b6d4)', // Vibrant Cyan / Türkis
         bg: 'rgba(6, 182, 212, 0.16)',
         border: 'rgba(6, 182, 212, 0.45)',
         badgeBg: 'rgba(6, 182, 212, 0.22)',
@@ -97,7 +97,7 @@ export const SHIFT_TYPE_COLORS = {
     tag: {
         id: 'tag',
         name: 'Tagschicht',
-        color: '#3b82f6', // Royal Blue
+        color: 'var(--shift-tag, #3b82f6)', // Royal Blue
         bg: 'rgba(59, 130, 246, 0.16)',
         border: 'rgba(59, 130, 246, 0.45)',
         badgeBg: 'rgba(59, 130, 246, 0.22)',
@@ -106,7 +106,7 @@ export const SHIFT_TYPE_COLORS = {
     spaat: {
         id: 'spaat',
         name: 'Spätschicht',
-        color: '#f97316', // Warm Sunset Amber-Orange
+        color: 'var(--shift-spaet, #f97316)', // Warm Sunset Amber-Orange
         bg: 'rgba(249, 115, 22, 0.16)',
         border: 'rgba(249, 115, 22, 0.45)',
         badgeBg: 'rgba(249, 115, 22, 0.22)',
@@ -115,7 +115,7 @@ export const SHIFT_TYPE_COLORS = {
     nacht: {
         id: 'nacht',
         name: 'Nachtschicht',
-        color: '#a855f7', // Deep Midnight Purple
+        color: 'var(--shift-nacht, #a855f7)', // Deep Midnight Purple
         bg: 'rgba(168, 85, 247, 0.18)',
         border: 'rgba(168, 85, 247, 0.48)',
         badgeBg: 'rgba(168, 85, 247, 0.25)',
@@ -124,7 +124,7 @@ export const SHIFT_TYPE_COLORS = {
     nachtEnde: {
         id: 'nachtEnde',
         name: 'Nachtschicht-Ende',
-        color: '#c084fc', // Soft Lilac / Lavendel
+        color: 'var(--shift-nacht-ende, #c084fc)', // Soft Lilac / Lavendel
         bg: 'rgba(168, 85, 247, 0.14)',
         border: 'rgba(168, 85, 247, 0.35)',
         badgeBg: 'rgba(168, 85, 247, 0.25)',
@@ -133,7 +133,7 @@ export const SHIFT_TYPE_COLORS = {
     fortbildung: {
         id: 'fortbildung',
         name: 'Fortbildung',
-        color: '#ec4899', // Pink / Rose
+        color: 'var(--shift-fobi, #ec4899)', // Pink / Rose
         bg: 'rgba(236, 72, 153, 0.16)',
         border: 'rgba(236, 72, 153, 0.45)',
         badgeBg: 'rgba(236, 72, 153, 0.22)',
@@ -142,7 +142,7 @@ export const SHIFT_TYPE_COLORS = {
     default: {
         id: 'default',
         name: 'Dienst',
-        color: '#3b82f6',
+        color: 'var(--shift-tag, #3b82f6)',
         bg: 'rgba(59, 130, 246, 0.16)',
         border: 'rgba(59, 130, 246, 0.45)',
         badgeBg: 'rgba(59, 130, 246, 0.22)',

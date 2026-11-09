@@ -90,19 +90,19 @@ export default function Settings() {
             <h2>Dienstplan</h2>
             <div className="settings-list">
                 <SettingsItem
-                    icon={CalendarDays} color="#eab308" label="Sollstunden & Arbeitszeit"
+                    icon={CalendarDays} color="var(--c-warning-strong)" label="Sollstunden & Arbeitszeit"
                     value={`${store.settings?.defaultWeeklyHours ?? 20} h/Woche`} onClick={() => setActiveScreen('targetHours')}
                 />
                 <SettingsItem
-                    icon={Coins} color="#10b981" label="Bonus-Betrag (Standard)"
+                    icon={Coins} color="var(--c-success-strong)" label="Bonus-Betrag (Standard)"
                     value={`${store.settings?.defaultBonusAmount ?? 75} €`} onClick={() => setActiveScreen('bonus')}
                 />
                 <SettingsItem
-                    icon={Clock} color="#f97316" label="Schichtkürzel & Zeiten"
+                    icon={Clock} color="var(--c-primary)" label="Schichtkürzel & Zeiten"
                     value={store.settings.shiftCodes.length} onClick={() => setActiveScreen('codes')}
                 />
                 <SettingsItem
-                    icon={Tag} color="#38bdf8" label="Schichtarten"
+                    icon={Tag} color="var(--c-info)" label="Schichtarten"
                     value={store.settings.shiftTypes.length} onClick={() => setActiveScreen('types')}
                 />
             </div>
@@ -110,15 +110,15 @@ export default function Settings() {
             <h2 style={{ marginTop: '32px' }}>Ressourcen</h2>
             <div className="settings-list">
                 <SettingsItem
-                    icon={MapPin} color="#ef4444" label="Wachen"
+                    icon={MapPin} color="var(--c-danger)" label="Wachen"
                     value={store.settings.stations.length} onClick={() => setActiveScreen('stations')}
                 />
                 <SettingsItem
-                    icon={Truck} color="#22c55e" label="Fahrzeuge"
+                    icon={Truck} color="var(--c-success)" label="Fahrzeuge"
                     value={store.settings.vehicles.length} onClick={() => setActiveScreen('vehicles')}
                 />
                 <SettingsItem
-                    icon={Hash} color="#a855f7" label="Funkrufnamen"
+                    icon={Hash} color="var(--c-violet-strong)" label="Funkrufnamen"
                     value={store.settings.callSigns.length} onClick={() => setActiveScreen('callSigns')}
                 />
             </div>
@@ -155,16 +155,18 @@ function DetailScreen({ title, onBack, children }) {
             display: 'flex', flexDirection: 'column'
         }}>
             <div style={{
-                height: '60px', borderBottom: '1px solid var(--color-border)',
-                display: 'flex', alignItems: 'center', padding: '0 16px',
-                background: 'rgba(15,23,42,0.9)', backdropFilter: 'blur(10px)'
+                minHeight: '60px', flexShrink: 0, borderBottom: '1px solid var(--color-border)',
+                display: 'flex', alignItems: 'center', padding: '0 12px',
+                paddingTop: 'env(safe-area-inset-top)',
+                background: 'var(--glass-bg)', backdropFilter: 'var(--backdrop-blur)', WebkitBackdropFilter: 'var(--backdrop-blur)',
+                borderTop: '3px solid var(--juh-red)'
             }}>
-                <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', fontSize: '16px', padding: 0 }}>
-                    <ChevronLeft /> Zurück
+                <button onClick={onBack} style={{ background: 'rgb(var(--rgb-primary) / 0.08)', border: 'none', borderRadius: '999px', color: 'var(--c-primary-text)', display: 'flex', alignItems: 'center', gap: '2px', fontSize: '15px', fontWeight: 600, padding: '7px 12px 7px 6px', cursor: 'pointer' }}>
+                    <ChevronLeft size={20} /> Zurück
                 </button>
-                <span style={{ fontWeight: 'bold', flex: 1, textAlign: 'center', marginRight: '60px' }}>{title}</span>
+                <span style={{ fontWeight: 700, fontSize: '17px', flex: 1, textAlign: 'center', marginRight: '84px' }}>{title}</span>
             </div>
-            <div style={{ padding: '16px', overflowY: 'auto', paddingBottom: '100px' }}>
+            <div style={{ padding: '16px', overflowY: 'auto', paddingBottom: '100px', flex: 1 }}>
                 {children}
             </div>
         </div>
@@ -240,7 +242,7 @@ function CodeEditModal({ isOpen, initialData, onClose, onSave, storeSettings }) 
                 <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
-                            background: 'rgba(249, 115, 22, 0.15)',
+                            background: 'rgb(var(--rgb-primary) / 0.15)',
                             color: 'var(--color-primary)',
                             padding: '8px',
                             borderRadius: '10px',
@@ -511,15 +513,15 @@ function CodeManager({ data = [], storeSettings = {}, onAdd, onUpdate, onRemove 
                                 gap: '12px',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease',
-                                border: '1px solid #334155',
-                                background: '#1e293b'
+                                border: '1px solid var(--c-surface-3)',
+                                background: 'var(--c-surface)'
                             }}
                         >
                             {/* Code Badge */}
                             <div style={{
-                                background: 'rgba(249, 115, 22, 0.15)',
-                                color: '#f97316',
-                                border: '1px solid rgba(249, 115, 22, 0.35)',
+                                background: 'rgb(var(--rgb-primary) / 0.15)',
+                                color: 'var(--c-primary)',
+                                border: '1px solid rgb(var(--rgb-primary) / 0.35)',
                                 padding: '6px 10px',
                                 borderRadius: '8px',
                                 fontWeight: 'bold',
@@ -534,12 +536,12 @@ function CodeManager({ data = [], storeSettings = {}, onAdd, onUpdate, onRemove 
                             {/* Details */}
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--c-text)' }}>
                                         {effectiveType || 'Schicht'}
                                     </span>
                                     <span style={{
-                                        background: '#334155',
-                                        color: '#facc15',
+                                        background: 'var(--c-surface-3)',
+                                        color: 'var(--c-warning)',
                                         padding: '1px 6px',
                                         borderRadius: '4px',
                                         fontSize: '11px',
@@ -553,18 +555,18 @@ function CodeManager({ data = [], storeSettings = {}, onAdd, onUpdate, onRemove 
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    color: '#94a3b8',
+                                    color: 'var(--c-text-muted)',
                                     fontSize: '12px',
                                     marginTop: '3px',
                                     flexWrap: 'wrap'
                                 }}>
                                     {effectiveStart && effectiveEnd ? (
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#cbd5e1' }}>
-                                            <Clock size={12} style={{ color: '#f97316' }} />
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--c-text-soft)' }}>
+                                            <Clock size={12} style={{ color: 'var(--c-primary)' }} />
                                             {effectiveStart} - {effectiveEnd} Uhr
                                         </span>
                                     ) : (
-                                        <span style={{ color: '#64748b', fontStyle: 'italic' }}>Keine festen Zeiten</span>
+                                        <span style={{ color: 'var(--c-text-subtle)', fontStyle: 'italic' }}>Keine festen Zeiten</span>
                                     )}
 
                                     {effectiveStation && (
@@ -586,9 +588,9 @@ function CodeManager({ data = [], storeSettings = {}, onAdd, onUpdate, onRemove 
                                     type="button"
                                     onClick={() => setEditingItem(item)}
                                     style={{
-                                        background: 'rgba(56, 189, 248, 0.12)',
-                                        border: '1px solid rgba(56, 189, 248, 0.3)',
-                                        color: '#38bdf8',
+                                        background: 'rgb(var(--rgb-info) / 0.12)',
+                                        border: '1px solid rgb(var(--rgb-info) / 0.3)',
+                                        color: 'var(--c-info)',
                                         padding: '7px',
                                         borderRadius: '8px',
                                         cursor: 'pointer',
@@ -604,9 +606,9 @@ function CodeManager({ data = [], storeSettings = {}, onAdd, onUpdate, onRemove 
                                     type="button"
                                     onClick={() => onRemove(item.id)}
                                     style={{
-                                        background: 'rgba(239, 68, 68, 0.12)',
-                                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                                        color: '#ef4444',
+                                        background: 'rgb(var(--rgb-danger) / 0.12)',
+                                        border: '1px solid rgb(var(--rgb-danger) / 0.3)',
+                                        color: 'var(--c-danger)',
                                         padding: '7px',
                                         borderRadius: '8px',
                                         cursor: 'pointer',
@@ -627,8 +629,8 @@ function CodeManager({ data = [], storeSettings = {}, onAdd, onUpdate, onRemove 
                     <div style={{
                         padding: '32px 16px',
                         textAlign: 'center',
-                        color: '#64748b',
-                        background: '#1e293b',
+                        color: 'var(--c-text-subtle)',
+                        background: 'var(--c-surface)',
                         borderRadius: '12px'
                     }}>
                         Keine Schichtkürzel gefunden.
@@ -672,11 +674,11 @@ function SimpleManager({ data, type, onAdd, onRemove }) {
                         <button onClick={() => onRemove(type === 'object' ? item.id : item)} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
                     </div>
                 ))}
-                {data.length === 0 && <div style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>Liste leer</div>}
+                {data.length === 0 && <div style={{ padding: '16px', textAlign: 'center', color: 'var(--c-text-subtle)' }}>Liste leer</div>}
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-                <input placeholder="Neuer Eintrag" value={val} onChange={e => setVal(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #334155', background: '#0f172a', color: 'white' }} />
+                <input placeholder="Neuer Eintrag" value={val} onChange={e => setVal(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid var(--c-surface-3)', background: 'var(--c-bg)', color: 'var(--c-text)' }} />
                 <button onClick={handleAdd} className="btn-primary" style={{ width: 'auto' }}><Plus /></button>
             </div>
         </>
@@ -730,9 +732,9 @@ function TargetHoursManager({ defaultWeeklyHours, monthlyWeeklyHours, onUpdateWe
                                 width: '100%',
                                 padding: '12px 85px 12px 14px',
                                 borderRadius: '12px',
-                                border: '1px solid #334155',
-                                background: '#0f172a',
-                                color: 'white',
+                                border: '1px solid var(--c-surface-3)',
+                                background: 'var(--c-bg)',
+                                color: 'var(--c-text)',
                                 fontSize: '16px',
                                 fontWeight: 600
                             }}
@@ -760,7 +762,7 @@ function TargetHoursManager({ defaultWeeklyHours, monthlyWeeklyHours, onUpdateWe
                         <small style={{ color: 'var(--color-text-muted)' }}>Wochenstunden pro Monat individuell einstellbar</small>
                     </div>
                     {/* Year Selector */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#1e293b', padding: '4px 8px', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--c-surface)', padding: '4px 8px', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
                         <button
                             onClick={() => setSelectedYear(y => y - 1)}
                             style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
@@ -840,7 +842,7 @@ function MonthTargetRow({ monthName, daysInMonth, defaultWeekly, hasCustom, cust
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 600, fontSize: '15px' }}>{monthName}</span>
                     {hasCustom ? (
-                        <span style={{ fontSize: '11px', background: 'rgba(249, 115, 22, 0.15)', color: 'var(--color-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                        <span style={{ fontSize: '11px', background: 'rgb(var(--rgb-primary) / 0.15)', color: 'var(--color-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                             {activeWeekly} h/Woche
                         </span>
                     ) : (
@@ -878,9 +880,9 @@ function MonthTargetRow({ monthName, daysInMonth, defaultWeekly, hasCustom, cust
                             width: '100%',
                             padding: '8px 46px 8px 10px',
                             borderRadius: '8px',
-                            border: hasCustom ? '1px solid var(--color-primary)' : '1px solid #334155',
-                            background: '#0f172a',
-                            color: hasCustom ? 'var(--color-primary)' : 'white',
+                            border: hasCustom ? '1px solid var(--color-primary)' : '1px solid var(--c-surface-3)',
+                            background: 'var(--c-bg)',
+                            color: hasCustom ? 'var(--color-primary)' : 'var(--c-text)',
                             fontSize: '14px',
                             fontWeight: 600,
                             textAlign: 'right'
@@ -896,8 +898,8 @@ function MonthTargetRow({ monthName, daysInMonth, defaultWeekly, hasCustom, cust
                         onClick={onReset}
                         title="Auf Standard-Wochenstunden zurücksetzen"
                         style={{
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            background: 'rgb(var(--rgb-danger) / 0.1)',
+                            border: '1px solid rgb(var(--rgb-danger) / 0.2)',
                             color: 'var(--color-danger)',
                             borderRadius: '8px',
                             padding: '6px 8px',
@@ -954,7 +956,7 @@ function BonusSettingsManager({ defaultBonusAmount = 75, shifts = [], onUpdateDe
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div className="card-premium" style={{ borderLeft: '4px solid #10b981' }}>
+            <div className="card-premium" style={{ borderLeft: '4px solid var(--c-success-strong)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                     <span style={{ fontSize: '20px' }}>💰</span>
                     <div>
@@ -974,7 +976,7 @@ function BonusSettingsManager({ defaultBonusAmount = 75, shifts = [], onUpdateDe
                             step="1"
                             min="0"
                             className="input-premium"
-                            style={{ marginBottom: 0, paddingRight: '40px', fontSize: '16px', fontWeight: 700, color: '#34d399' }}
+                            style={{ marginBottom: 0, paddingRight: '40px', fontSize: '16px', fontWeight: 700, color: 'var(--c-success)' }}
                             value={amountInput}
                             onChange={(e) => setAmountInput(e.target.value)}
                         />
@@ -983,7 +985,7 @@ function BonusSettingsManager({ defaultBonusAmount = 75, shifts = [], onUpdateDe
                             right: '14px',
                             top: '50%',
                             transform: 'translateY(-50%)',
-                            color: '#34d399',
+                            color: 'var(--c-success)',
                             fontSize: '15px',
                             fontWeight: 700,
                             pointerEvents: 'none'
@@ -1000,7 +1002,7 @@ function BonusSettingsManager({ defaultBonusAmount = 75, shifts = [], onUpdateDe
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            background: savedFeedback ? 'var(--color-success)' : '#10b981'
+                            background: savedFeedback ? 'var(--color-success)' : 'var(--c-success-strong)'
                         }}
                     >
                         {savedFeedback ? <><Check size={18} /> Gespeichert</> : 'Speichern'}
@@ -1021,9 +1023,9 @@ function BonusSettingsManager({ defaultBonusAmount = 75, shifts = [], onUpdateDe
                                     borderRadius: '8px',
                                     fontSize: '12px',
                                     fontWeight: active ? 700 : 500,
-                                    background: active ? '#10b981' : '#0f172a',
-                                    color: active ? '#0f172a' : '#cbd5e1',
-                                    border: active ? '1px solid #10b981' : '1px solid #334155',
+                                    background: active ? 'var(--c-success-strong)' : 'var(--c-bg)',
+                                    color: active ? 'var(--c-bg)' : 'var(--c-text-soft)',
+                                    border: active ? '1px solid var(--c-success-strong)' : '1px solid var(--c-surface-3)',
                                     cursor: 'pointer'
                                 }}
                             >
@@ -1050,9 +1052,9 @@ function BonusSettingsManager({ defaultBonusAmount = 75, shifts = [], onUpdateDe
                             width: '100%',
                             padding: '10px 14px',
                             borderRadius: '10px',
-                            border: '1px solid rgba(16, 185, 129, 0.35)',
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            color: '#34d399',
+                            border: '1px solid rgb(var(--rgb-success) / 0.35)',
+                            background: 'rgb(var(--rgb-success) / 0.1)',
+                            color: 'var(--c-success)',
                             fontWeight: 600,
                             fontSize: '13px',
                             cursor: 'pointer'
@@ -1061,7 +1063,7 @@ function BonusSettingsManager({ defaultBonusAmount = 75, shifts = [], onUpdateDe
                         Alle {bonusShiftsCount} Bonus-Schichten auf {amountInput || defaultBonusAmount} € setzen
                     </button>
                     {bulkUpdatedCount !== null && (
-                        <div style={{ marginTop: '10px', fontSize: '12.5px', color: '#34d399', fontWeight: 600, textAlign: 'center' }}>
+                        <div style={{ marginTop: '10px', fontSize: '12.5px', color: 'var(--c-success)', fontWeight: 600, textAlign: 'center' }}>
                             ✓ {bulkUpdatedCount} Bonus-Schichten erfolgreich aktualisiert!
                         </div>
                     )}

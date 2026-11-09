@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Moon, Sun } from 'lucide-react';
+import { APP_VERSION } from '../version';
 import Navigation from './Navigation';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
@@ -50,6 +51,17 @@ export default function Layout() {
     const { currentUser } = useAuth();
     const { store, addShifts, deleteShifts, ensureCodesAndTypes } = useStore();
     const [autoImportToast, setAutoImportToast] = useState(null);
+    const [theme, setTheme] = useState(() =>
+        (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark') ? 'dark' : 'light'
+    );
+
+    // Darstellung (Hell = Johanniter-CI, Dunkel = Nachtdienst) – rein optisch
+    useEffect(() => {
+        document.documentElement.dataset.theme = theme;
+        try { localStorage.setItem('schichttagebuch_theme', theme); } catch { /* ignore */ }
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', theme === 'dark' ? '#0F1114' : '#FFFFFF');
+    }, [theme]);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -256,27 +268,49 @@ export default function Layout() {
             {autoImportToast && (
                 <div style={{
                     position: 'fixed',
-                    top: '18px',
+                    top: 'calc(14px + env(safe-area-inset-top))',
                     left: '50%',
                     transform: 'translateX(-50%)',
                     zIndex: 5000,
-                    background: 'linear-gradient(135deg, #059669, #10b981)',
+                    background: 'linear-gradient(135deg, var(--c-success-deep), var(--c-success-strong))',
                     color: 'white',
                     padding: '12px 18px',
-                    borderRadius: '16px',
+                    borderRadius: '999px',
                     fontSize: '13px',
                     fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                     maxWidth: '92vw',
-                    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
-                    border: '1px solid rgba(255, 255, 255, 0.25)'
+                    boxShadow: 'var(--shadow-float)',
+                    animation: 'riseIn 0.35s var(--ease-out)',
+                    border: '1px solid rgb(var(--rgb-overlay) / 0.25)'
                 }}>
                     <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
                     <span>{autoImportToast}</span>
                 </div>
             )}
+            <header className="app-topbar">
+                <div className="app-topbar-inner">
+                    <div className="app-brand">
+                        <img src="/logo.svg" alt="" className="app-brand-logo" />
+                        <div className="app-brand-text">
+                            <span className="app-brand-title">Schichttagebuch</span>
+                            <span className="app-brand-sub">Rettungsdienst · Dienstplan</span>
+                        </div>
+                    </div>
+                    <span className="app-version-chip">v{APP_VERSION}</span>
+                    <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))}
+                        aria-label={theme === 'dark' ? 'Helle Darstellung' : 'Dunkle Darstellung'}
+                        title={theme === 'dark' ? 'Helle Darstellung' : 'Dunkle Darstellung (Nachtdienst)'}
+                    >
+                        {theme === 'dark' ? <Sun /> : <Moon />}
+                    </button>
+                </div>
+            </header>
             <main style={{ flex: 1, width: '100%', maxWidth: '600px', margin: '0 auto' }}>
                 <Outlet />
             </main>

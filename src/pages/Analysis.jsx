@@ -1017,7 +1017,7 @@ export default function Analysis() {
                 </div>
             </div>
 
-            {/* Kalender / Schicht-Rhythmus direkt über den statistischen Werten */}
+            {/* Kalender / Schicht-Rhythmus */}
             <div className="card-premium">
                 <ShiftRhythmCalendar
                     baseDate={baseDate}
@@ -1028,88 +1028,34 @@ export default function Analysis() {
                 />
             </div>
 
-            {/* KPI Cards Grid (Row 1: Geleistet | Schichten | Bonus, Row 2: Saldo | Dienstplan PDF) */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-                <div className="stat-card" style={{ padding: '14px 12px' }}>
-                    <span className="text-label">Geleistet</span>
-                    <span className="text-value" style={{ fontSize: '22px' }}>{stats.actual.toFixed(1)} h</span>
-                </div>
-                <div className="stat-card" style={{ padding: '14px 12px' }}>
-                    <span className="text-label">Schichten</span>
-                    <span className="text-value" style={{ fontSize: '22px' }}>{stats.count}</span>
-                </div>
-                <div
-                    className="stat-card"
-                    onClick={() => setShowBonusModal(true)}
-                    style={{
-                        padding: '14px 12px',
-                        cursor: 'pointer',
-                        border: stats.bonusCount > 0 || onlyBonus ? '1px solid rgb(var(--rgb-warning) / 0.45)' : undefined,
-                        background: onlyBonus ? 'rgb(var(--rgb-warning) / 0.12)' : undefined,
-                        position: 'relative',
-                        transition: 'all 0.15s ease'
-                    }}
-                    title="Klicken für detaillierte Bonus-Auswertung"
-                >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                        <span className="text-label" style={{ color: stats.bonusCount > 0 ? 'var(--c-warning)' : undefined, marginBottom: '4px' }}>
-                            💰 Bonus ({stats.bonusCount}x)
-                        </span>
-                        <span style={{
-                            fontSize: '10px',
-                            color: 'var(--c-warning)',
-                            background: 'rgb(var(--rgb-warning) / 0.14)',
-                            padding: '1px 5px',
-                            borderRadius: '4px',
-                            fontWeight: 700
-                        }}>
-                            Details ↗
-                        </span>
-                    </div>
-                    <span className="text-value" style={{ fontSize: '22px', color: stats.bonusCount > 0 ? 'var(--c-warning)' : 'var(--c-text-subtle)' }}>
-                        {stats.bonusTotalAmount.toFixed(0)} €
-                    </span>
-                </div>
-
-                {/* Row 2 Left (span 2): Saldo */}
-                <div className="stat-card" style={{ gridColumn: 'span 2', borderLeft: `4px solid ${colorClass}`, padding: '14px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <span className="text-label">Saldo (Soll: {target.toFixed(1)}h{filterMode === 'month' ? ` • ${weeklyRate}h/Woche` : ''})</span>
-                        <div className="text-value" style={{ fontSize: '22px', color: colorClass }}>
-                            {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
-                        </div>
-                    </div>
-                    <div style={{ fontSize: '22px' }}>{isPositive ? "📈" : "📉"}</div>
-                </div>
-
-                {/* Row 2 Right (span 1): Dienstplan PDF Button Card */}
-                <button
-                    type="button"
-                    onClick={handleExportPDF}
-                    className="stat-card"
-                    style={{
-                        gridColumn: 'span 1',
-                        padding: '12px 10px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        background: 'rgb(var(--rgb-info) / 0.1)',
-                        border: '1px solid rgb(var(--rgb-info) / 0.35)',
-                        color: 'var(--c-info)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        textAlign: 'center'
-                    }}
-                    title="Monatsdienstplan als PDF exportieren"
-                >
-                    <span style={{ fontSize: '22px', lineHeight: 1 }}>📄</span>
-                    <span style={{ fontSize: '12.5px', fontWeight: 700, lineHeight: 1.2 }}>
-                        Dienstplan PDF
-                    </span>
-                </button>
-            </div>
+            {/* Dienstplan PDF – bleibt oben */}
+            <button
+                type="button"
+                onClick={handleExportPDF}
+                className="stat-card"
+                style={{
+                    width: '100%',
+                    marginBottom: '16px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    background: 'rgb(var(--rgb-info) / 0.1)',
+                    border: '1px solid rgb(var(--rgb-info) / 0.35)',
+                    color: 'var(--c-info)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    textAlign: 'center'
+                }}
+                title="Monatsdienstplan als PDF exportieren"
+            >
+                <span style={{ fontSize: '20px', lineHeight: 1 }}>📄</span>
+                <span style={{ fontSize: '15px', fontWeight: 700, lineHeight: 1.2 }}>
+                    Dienstplan PDF
+                </span>
+            </button>
 
             {/* PopUp Modal 1: Schichtfilter */}
             {showFilterModal && (
@@ -1639,202 +1585,259 @@ export default function Analysis() {
                 </div>
             )}
 
-            {/* Charts & Verteilung */}
+            {/* Dienste im Detail */}
             {stats.count === 0 ? (
                 <div className="card-premium center" style={{ padding: '40px', color: 'var(--c-text-subtle)' }}>
                     <div style={{ fontSize: '40px', marginBottom: '10px' }}>📊</div>
                     Keine weiteren Daten für diesen Zeitraum vorhanden.
                 </div>
             ) : (
-                <>
-                    <div className="card-premium">
-                        <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>🍰 Verteilung</h3>
+                <div className="card-premium">
+                    <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>📋 Schichten im Detail ({filteredData.length})</h3>
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))',
+                        gap: '10px',
+                        alignItems: 'stretch'
+                    }}>
+                        {[...filteredData].sort((a, b) => a.date.localeCompare(b.date)).map((s, index) => {
+                            const resolvedShift = resolveShiftDetails(s, store.settings);
+                            const d = new Date(s.date);
+                            const dateFormatted = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                            const bAmt = getShiftBonusAmount(s, store.settings);
+                            return (
+                                <div
+                                    key={s.id}
+                                    style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        padding: '10px 12px',
+                                        background: 'var(--c-surface)',
+                                        border: bAmt > 0 ? '1px solid rgb(var(--rgb-warning) / 0.4)' : `1px solid ${resolvedShift.colorInfo.border}44`,
+                                        borderLeft: `3px solid ${resolvedShift.colorInfo.color}`,
+                                        borderRadius: '10px',
+                                        fontSize: '12.5px',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    {/* Top Row: #Index, Date, Shift Code, Time + Bonus button */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
+                                            <span style={{ color: 'var(--c-text-subtle)', fontSize: '10.5px', fontWeight: 700 }}>#{index + 1}</span>
+                                            <span style={{ color: 'var(--color-primary)', fontWeight: 800, fontSize: '13px' }}>{dateFormatted}</span>
+                                            <span style={{
+                                                background: resolvedShift.colorInfo.bg,
+                                                color: resolvedShift.colorInfo.color,
+                                                border: `1px solid ${resolvedShift.colorInfo.border}`,
+                                                padding: '1px 6px',
+                                                borderRadius: '5px',
+                                                fontSize: '11px',
+                                                fontWeight: 800
+                                            }}>
+                                                {resolvedShift.code || resolvedShift.typeName}
+                                            </span>
+                                            <span style={{
+                                                color: 'var(--c-text-soft)',
+                                                fontSize: '11px',
+                                                background: 'var(--c-bg)',
+                                                padding: '1px 5px',
+                                                borderRadius: '4px',
+                                                fontWeight: 600,
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {s.startTime}–{s.endTime}
+                                            </span>
+                                        </div>
 
-                        {/* Wachen-Verteilung (Eigenständige Farbstruktur) */}
-                        {stationDistribution.length > 0 && (
-                            <div style={{ marginBottom: '16px' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
-                                    Einsätze nach Wachen:
-                                </span>
-                                {stationDistribution.map((st) => (
-                                    <div key={st.station} style={{ marginBottom: '8px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.theme.primaryHex }} />
-                                                <span style={{ fontWeight: 600 }}>{st.theme.name}</span>
-                                            </span>
-                                            <span style={{ fontSize: '12px', color: 'var(--c-text-muted)' }}>
-                                                <strong style={{ color: st.theme.primaryHex, fontSize: '13px', marginRight: '4px' }}>
-                                                    {st.count} {st.count === 1 ? 'Schicht' : 'Schichten'}
-                                                </strong>
-                                                ({st.hours.toFixed(1)} h)
-                                            </span>
-                                        </div>
-                                        <div style={{ height: '6px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
-                                            <div style={{
-                                                width: `${(st.count / stats.count) * 100}%`,
-                                                height: '100%',
-                                                background: st.theme.primaryHex,
-                                                borderRadius: '3px'
-                                            }} />
-                                        </div>
+                                        {/* Quick Bonus Checkbox Button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleShiftBonus(s)}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '3px',
+                                                padding: '3px 7px',
+                                                borderRadius: '5px',
+                                                fontSize: '10.5px',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                background: s.hasBonus ? 'rgb(var(--rgb-warning) / 0.18)' : 'rgb(var(--rgb-bg) / 0.6)',
+                                                color: s.hasBonus ? 'var(--c-warning)' : 'var(--c-text-subtle)',
+                                                border: s.hasBonus ? '1px solid rgb(var(--rgb-warning) / 0.5)' : '1px solid var(--c-surface-3)',
+                                                transition: 'all 0.15s ease',
+                                                flexShrink: 0
+                                            }}
+                                            title={s.hasBonus ? `Bonus (${bAmt} €) deaktivieren` : `Bonus (${store.settings?.defaultBonusAmount ?? 75} €) aktivieren`}
+                                        >
+                                            <span>{s.hasBonus ? '☑' : '☐'}</span>
+                                            <span>{bAmt > 0 ? `+${bAmt}€` : 'Bonus'}</span>
+                                        </button>
                                     </div>
-                                ))}
-                            </div>
-                        )}
 
-                        {/* Schichtarten-Verteilung */}
-                        <div>
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
-                                Schichtarten:
-                            </span>
-                            {stats.distributionData.map((d, i) => {
-                                const shiftCol = getShiftColor(d.name, '');
-                                return (
-                                    <div key={i} style={{ marginBottom: '10px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: shiftCol.color }} />
-                                                <span>{d.name}</span>
+                                    {/* Bottom Row: Station, Vehicle, Partner */}
+                                    <div style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '4px',
+                                        paddingTop: '6px',
+                                        borderTop: '1px solid rgb(var(--rgb-surface-3) / 0.45)'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                            <span style={{
+                                                background: resolvedShift.colorInfo.stationBg,
+                                                color: resolvedShift.colorInfo.stationColor,
+                                                border: `1px solid ${resolvedShift.colorInfo.stationBorder}`,
+                                                padding: '1px 6px',
+                                                borderRadius: '4px',
+                                                fontSize: '10.5px',
+                                                fontWeight: 700
+                                            }}>
+                                                📍 {resolvedShift.station}
                                             </span>
-                                            <strong style={{ color: shiftCol.color }}>{d.value}</strong>
-                                        </div>
-                                        <div style={{ height: '6px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
-                                            <div style={{
-                                                width: `${(d.value / stats.count) * 100}%`,
-                                                height: '100%',
-                                                background: shiftCol.color,
-                                                borderRadius: '3px'
-                                            }} />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    <div className="card-premium">
-                        <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>📋 Schichten im Detail ({filteredData.length})</h3>
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))',
-                            gap: '10px',
-                            alignItems: 'stretch'
-                        }}>
-                            {[...filteredData].sort((a, b) => a.date.localeCompare(b.date)).map((s, index) => {
-                                const resolvedShift = resolveShiftDetails(s, store.settings);
-                                const d = new Date(s.date);
-                                const dateFormatted = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-                                const bAmt = getShiftBonusAmount(s, store.settings);
-                                return (
-                                    <div
-                                        key={s.id}
-                                        style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            justifyContent: 'space-between',
-                                            padding: '10px 12px',
-                                            background: 'var(--c-surface)',
-                                            border: bAmt > 0 ? '1px solid rgb(var(--rgb-warning) / 0.4)' : `1px solid ${resolvedShift.colorInfo.border}44`,
-                                            borderLeft: `3px solid ${resolvedShift.colorInfo.color}`,
-                                            borderRadius: '10px',
-                                            fontSize: '12.5px',
-                                            gap: '8px'
-                                        }}
-                                    >
-                                        {/* Top Row: #Index, Date, Shift Code, Time + Bonus button */}
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
-                                                <span style={{ color: 'var(--c-text-subtle)', fontSize: '10.5px', fontWeight: 700 }}>#{index + 1}</span>
-                                                <span style={{ color: 'var(--color-primary)', fontWeight: 800, fontSize: '13px' }}>{dateFormatted}</span>
-                                                <span style={{
-                                                    background: resolvedShift.colorInfo.bg,
-                                                    color: resolvedShift.colorInfo.color,
-                                                    border: `1px solid ${resolvedShift.colorInfo.border}`,
-                                                    padding: '1px 6px',
-                                                    borderRadius: '5px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 800
-                                                }}>
-                                                    {resolvedShift.code || resolvedShift.typeName}
+                                            {s.vehicle && (
+                                                <span style={{ color: 'var(--c-text-muted)', fontSize: '11.5px', fontWeight: 500 }}>
+                                                    🚑 {s.vehicle}
                                                 </span>
-                                                <span style={{
-                                                    color: 'var(--c-text-soft)',
-                                                    fontSize: '11px',
-                                                    background: 'var(--c-bg)',
-                                                    padding: '1px 5px',
-                                                    borderRadius: '4px',
-                                                    fontWeight: 600,
-                                                    whiteSpace: 'nowrap'
-                                                }}>
-                                                    {s.startTime}–{s.endTime}
-                                                </span>
-                                            </div>
-
-                                            {/* Quick Bonus Checkbox Button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleShiftBonus(s)}
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    padding: '3px 7px',
-                                                    borderRadius: '5px',
-                                                    fontSize: '10.5px',
-                                                    fontWeight: 700,
-                                                    cursor: 'pointer',
-                                                    background: s.hasBonus ? 'rgb(var(--rgb-warning) / 0.18)' : 'rgb(var(--rgb-bg) / 0.6)',
-                                                    color: s.hasBonus ? 'var(--c-warning)' : 'var(--c-text-subtle)',
-                                                    border: s.hasBonus ? '1px solid rgb(var(--rgb-warning) / 0.5)' : '1px solid var(--c-surface-3)',
-                                                    transition: 'all 0.15s ease',
-                                                    flexShrink: 0
-                                                }}
-                                                title={s.hasBonus ? `Bonus (${bAmt} €) deaktivieren` : `Bonus (${store.settings?.defaultBonusAmount ?? 75} €) aktivieren`}
-                                            >
-                                                <span>{s.hasBonus ? '☑' : '☐'}</span>
-                                                <span>{bAmt > 0 ? `+${bAmt}€` : 'Bonus'}</span>
-                                            </button>
-                                        </div>
-
-                                        {/* Bottom Row: Station, Vehicle, Partner */}
-                                        <div style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '4px',
-                                            paddingTop: '6px',
-                                            borderTop: '1px solid rgb(var(--rgb-surface-3) / 0.45)'
-                                        }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                                <span style={{
-                                                    background: resolvedShift.colorInfo.stationBg,
-                                                    color: resolvedShift.colorInfo.stationColor,
-                                                    border: `1px solid ${resolvedShift.colorInfo.stationBorder}`,
-                                                    padding: '1px 6px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '10.5px',
-                                                    fontWeight: 700
-                                                }}>
-                                                    📍 {resolvedShift.station}
-                                                </span>
-                                                {s.vehicle && (
-                                                    <span style={{ color: 'var(--c-text-muted)', fontSize: '11.5px', fontWeight: 500 }}>
-                                                        🚑 {s.vehicle}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {s.partner && (
-                                                <div style={{ color: 'var(--c-info)', fontSize: '12px', fontWeight: 600, lineHeight: 1.3 }}>
-                                                    👤 {s.partner.toLowerCase().startsWith('mit ') ? s.partner : `mit ${s.partner}`}
-                                                </div>
                                             )}
                                         </div>
+                                        {s.partner && (
+                                            <div style={{ color: 'var(--c-info)', fontSize: '12px', fontWeight: 600, lineHeight: 1.3 }}>
+                                                👤 {s.partner.toLowerCase().startsWith('mit ') ? s.partner : `mit ${s.partner}`}
+                                            </div>
+                                        )}
                                     </div>
-                                );
-                            })}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* KPI Cards Grid (Row 1: Geleistet | Schichten | Bonus, Row 2: Saldo) – unterhalb der Dienste */}
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+                <div className="stat-card" style={{ padding: '14px 12px' }}>
+                    <span className="text-label">Geleistet</span>
+                    <span className="text-value" style={{ fontSize: '22px' }}>{stats.actual.toFixed(1)} h</span>
+                </div>
+                <div className="stat-card" style={{ padding: '14px 12px' }}>
+                    <span className="text-label">Schichten</span>
+                    <span className="text-value" style={{ fontSize: '22px' }}>{stats.count}</span>
+                </div>
+                <div
+                    className="stat-card"
+                    onClick={() => setShowBonusModal(true)}
+                    style={{
+                        padding: '14px 12px',
+                        cursor: 'pointer',
+                        border: stats.bonusCount > 0 || onlyBonus ? '1px solid rgb(var(--rgb-warning) / 0.45)' : undefined,
+                        background: onlyBonus ? 'rgb(var(--rgb-warning) / 0.12)' : undefined,
+                        position: 'relative',
+                        transition: 'all 0.15s ease'
+                    }}
+                    title="Klicken für detaillierte Bonus-Auswertung"
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                        <span className="text-label" style={{ color: stats.bonusCount > 0 ? 'var(--c-warning)' : undefined, marginBottom: '4px' }}>
+                            💰 Bonus ({stats.bonusCount}x)
+                        </span>
+                        <span style={{
+                            fontSize: '10px',
+                            color: 'var(--c-warning)',
+                            background: 'rgb(var(--rgb-warning) / 0.14)',
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            fontWeight: 700
+                        }}>
+                            Details ↗
+                        </span>
+                    </div>
+                    <span className="text-value" style={{ fontSize: '22px', color: stats.bonusCount > 0 ? 'var(--c-warning)' : 'var(--c-text-subtle)' }}>
+                        {stats.bonusTotalAmount.toFixed(0)} €
+                    </span>
+                </div>
+
+                {/* Row 2 (volle Breite): Saldo */}
+                <div className="stat-card" style={{ gridColumn: 'span 3', borderLeft: `4px solid ${colorClass}`, padding: '14px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <span className="text-label">Saldo (Soll: {target.toFixed(1)}h{filterMode === 'month' ? ` • ${weeklyRate}h/Woche` : ''})</span>
+                        <div className="text-value" style={{ fontSize: '22px', color: colorClass }}>
+                            {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
                         </div>
                     </div>
-                </>
+                    <div style={{ fontSize: '22px' }}>{isPositive ? "📈" : "📉"}</div>
+                </div>
+
+            </div>
+
+            {/* Verteilung */}
+            {stats.count > 0 && (
+                <div className="card-premium">
+                    <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>🍰 Verteilung</h3>
+
+                    {/* Wachen-Verteilung (Eigenständige Farbstruktur) */}
+                    {stationDistribution.length > 0 && (
+                        <div style={{ marginBottom: '16px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                                Einsätze nach Wachen:
+                            </span>
+                            {stationDistribution.map((st) => (
+                                <div key={st.station} style={{ marginBottom: '8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.theme.primaryHex }} />
+                                            <span style={{ fontWeight: 600 }}>{st.theme.name}</span>
+                                        </span>
+                                        <span style={{ fontSize: '12px', color: 'var(--c-text-muted)' }}>
+                                            <strong style={{ color: st.theme.primaryHex, fontSize: '13px', marginRight: '4px' }}>
+                                                {st.count} {st.count === 1 ? 'Schicht' : 'Schichten'}
+                                            </strong>
+                                            ({st.hours.toFixed(1)} h)
+                                        </span>
+                                    </div>
+                                    <div style={{ height: '6px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                        <div style={{
+                                            width: `${(st.count / stats.count) * 100}%`,
+                                            height: '100%',
+                                            background: st.theme.primaryHex,
+                                            borderRadius: '3px'
+                                        }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Schichtarten-Verteilung */}
+                    <div>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                            Schichtarten:
+                        </span>
+                        {stats.distributionData.map((d, i) => {
+                            const shiftCol = getShiftColor(d.name, '');
+                            return (
+                                <div key={i} style={{ marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: shiftCol.color }} />
+                                            <span>{d.name}</span>
+                                        </span>
+                                        <strong style={{ color: shiftCol.color }}>{d.value}</strong>
+                                    </div>
+                                    <div style={{ height: '6px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                        <div style={{
+                                            width: `${(d.value / stats.count) * 100}%`,
+                                            height: '100%',
+                                            background: shiftCol.color,
+                                            borderRadius: '3px'
+                                        }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             )}
 
         </div>

@@ -672,7 +672,7 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, version: '2.2.50' }));
+    res.end(JSON.stringify({ ok: true, version: '3.0.1' }));
     return;
   }
 
@@ -771,6 +771,6 @@ async function publishBridgeState() {
 }
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ CareMan Auto-Pilot Daemon v2.2.50 listening on http://127.0.0.1:${PORT}`);
+  console.log(`⚡ CareMan Auto-Pilot Daemon v3.0.1 listening on http://127.0.0.1:${PORT}`);
   publishBridgeState();
 });

@@ -347,31 +347,6 @@ export default function Journal() {
                         <ExternalLink size={15} />
                         <span>⚡ Dienstpläne (3 Wachen) laden</span>
                     </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setIsImportModalOpen(true)}
-                        style={{
-                            background: 'rgba(14, 165, 233, 0.18)',
-                            color: '#38bdf8',
-                            border: '1px solid rgba(56, 189, 248, 0.45)',
-                            fontWeight: 700,
-                            padding: '8px 11px',
-                            borderRadius: '12px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            cursor: 'pointer',
-                            fontSize: '12.5px',
-                            whiteSpace: 'nowrap',
-                            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)',
-                            transition: 'all 0.15s ease'
-                        }}
-                        title="CareMan Auto-Pilot Zugangsdaten & Lesezeichen einrichten"
-                    >
-                        <Bookmark size={14} />
-                        <span>Auto-Pilot</span>
-                    </button>
                 </div>
             </div>
 

@@ -136,6 +136,7 @@ export default function TeamRoster() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStation, setSelectedStation] = useState('ALL'); // 'ALL' | 'Sendling' | 'Hohenbrunn' | 'Obersendling'
   const [selectedShiftGroup, setSelectedShiftGroup] = useState('ALL'); // 'ALL' | 'Frühdienst' | 'Tagschicht' | 'Spätdienst' | 'Nachtdienst' | 'Sonderdienste' | 'Fortbildung' | 'Urlaub / Abwesend'
+  const [viewMode, setViewMode] = useState('crews'); // 'crews' | 'list'
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showJumpModal, setShowJumpModal] = useState(false);
   const [uploadStationOverride, setUploadStationOverride] = useState('AUTO'); // 'AUTO' | 'Sendling' | 'Obersendling' | 'Hohenbrunn'
@@ -935,32 +936,6 @@ export default function TeamRoster() {
         </h1>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <button
-            type="button"
-            disabled={isProcessing || isSyncingPersonal}
-            onClick={handleOneClickCareManSync}
-            style={{
-              background: 'linear-gradient(135deg, #059669, #10b981)',
-              color: '#ffffff',
-              border: '1px solid rgba(52, 211, 153, 0.55)',
-              fontWeight: 800,
-              padding: '7px 12px',
-              borderRadius: '12px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              cursor: isProcessing || isSyncingPersonal ? 'default' : 'pointer',
-              fontSize: '12.5px',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 3px 10px rgba(16, 185, 129, 0.3)',
-              transition: 'all 0.15s ease'
-            }}
-            title="CareMan-Dienstplan mit 1 Klick vollautomatisch aus Zwischenablage / Cloud einlesen & eigene Dienste ins Journal übertragen"
-          >
-            <Sparkles size={15} />
-            <span>{isProcessing || isSyncingPersonal ? 'Übertrage...' : '⚡ 1-Klick CareMan'}</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setIsUploadOpen(true)}
@@ -1803,8 +1778,8 @@ export default function TeamRoster() {
         </div>
       )}
 
-      {/* 1-Click Personal Schedule + Automatic PartnerIn Sync & Calendar Export Bar */}
-      {(myRosterShifts.length > 0 || calendarExportShifts.length > 0) && (() => {
+      {/* Calendar Export Bar */}
+      {calendarExportShifts.length > 0 && (() => {
         const count = myRosterShifts.length || calendarExportShifts.length;
         const countText = `${count} ${count === 1 ? 'Dienst' : 'Dienste'}`;
         return (
@@ -1812,11 +1787,13 @@ export default function TeamRoster() {
             background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(15, 23, 42, 0.85))',
             border: '1px solid rgba(56, 189, 248, 0.35)',
             borderRadius: '14px',
-            padding: '12px 14px',
+            padding: '10px 14px',
             marginBottom: '12px',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            flexWrap: 'wrap'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={16} style={{ color: '#38bdf8', flexShrink: 0 }} />
@@ -1824,70 +1801,101 @@ export default function TeamRoster() {
                 Dein Dienstplan ({countText}, {roster.monthLabel})
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              {calendarExportShifts.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setIsCalendarExportModalOpen(true)}
-                  style={{
-                    flex: 1,
-                    minWidth: '150px',
-                    justifyContent: 'center',
-                    background: 'rgba(234, 179, 8, 0.14)',
-                    color: '#facc15',
-                    border: '1px solid rgba(234, 179, 8, 0.38)',
-                    borderRadius: '9px',
-                    padding: '8px 12px',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title="Persönliche Dienste dieses Monats als .ics-Datei in den Kalender übertragen"
-                >
-                  <Calendar size={14} />
-                  <span>In Kalender übertragen</span>
-                </button>
-              )}
-              {myRosterShifts.length > 0 && (
-                <button
-                  type="button"
-                  disabled={isSyncingPersonal}
-                  onClick={handleTransferPersonalScheduleToJournal}
-                  style={{
-                    flex: 1,
-                    minWidth: '150px',
-                    justifyContent: 'center',
-                    background: '#0284c7',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '9px',
-                    padding: '8px 12px',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: isSyncingPersonal ? 'default' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
-                  }}
-                  title="Persönliche Schichten inklusive PartnerIn ins Journal eintragen"
-                >
-                  <Check size={14} />
-                  <span>{isSyncingPersonal ? 'Wird übertragen...' : 'Ins Journal übernehmen'}</span>
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsCalendarExportModalOpen(true)}
+              style={{
+                justifyContent: 'center',
+                background: 'rgba(234, 179, 8, 0.14)',
+                color: '#facc15',
+                border: '1px solid rgba(234, 179, 8, 0.38)',
+                borderRadius: '9px',
+                padding: '7px 14px',
+                fontSize: '12.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap'
+              }}
+              title="Persönliche Dienste dieses Monats als .ics-Datei in den Kalender übertragen"
+            >
+              <Calendar size={14} />
+              <span>In Kalender übertragen</span>
+            </button>
           </div>
         );
       })()}
 
       {/* Shifts List: Grouped & Sorted */}
       <div>
+        {/* Quick Station Filter Bar */}
+        {stationCounts.ALL > 0 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            overflowX: 'auto',
+            paddingBottom: '8px',
+            marginBottom: '6px',
+            scrollbarWidth: 'none'
+          }}>
+            <button
+              type="button"
+              onClick={() => setSelectedStation('ALL')}
+              style={{
+                padding: '6px 11px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: selectedStation === 'ALL' ? 800 : 600,
+                background: selectedStation === 'ALL' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(30, 41, 59, 0.75)',
+                border: selectedStation === 'ALL' ? '1px solid #38bdf8' : '1px solid rgba(148, 163, 184, 0.2)',
+                color: selectedStation === 'ALL' ? '#38bdf8' : '#cbd5e1',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Alle Wachen ({stationCounts.ALL})
+            </button>
+            {[
+              { id: 'Sendling', label: 'München', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.18)' },
+              { id: 'Hohenbrunn', label: 'Hohenbrunn', color: '#34d399', bg: 'rgba(16, 185, 129, 0.18)' },
+              { id: 'Obersendling', label: 'Obersendling', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.18)' }
+            ].map(st => {
+              const active = selectedStation === st.id;
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setSelectedStation(active ? 'ALL' : st.id)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 11px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    fontWeight: active ? 800 : 600,
+                    background: active ? st.bg : 'rgba(30, 41, 59, 0.75)',
+                    border: active ? `1px solid ${st.color}` : '1px solid rgba(148, 163, 184, 0.2)',
+                    color: active ? st.color : '#cbd5e1',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: st.color }} />
+                  <span>{st.label} ({stationCounts[st.id] || 0})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {currentDayShifts.length === 0 ? (
           <div style={{
             textAlign: 'center',
@@ -1903,31 +1911,9 @@ export default function TeamRoster() {
                   Noch kein Dienstplan für {roster.monthLabel || yearMonth} geladen
                 </p>
                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-                  Mit 1 Klick aus CareMan (Zwischenablage / Lesezeichen) direkt einlesen & ins Journal übernehmen:
+                  Lade die 3 Wachen über den Reiter Journal („⚡ Dienstpläne (3 Wachen) laden“) oder manuell:
                 </p>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    disabled={isProcessing || isSyncingPersonal}
-                    onClick={handleOneClickCareManSync}
-                    style={{
-                      background: 'linear-gradient(135deg, #059669, #10b981)',
-                      color: '#ffffff',
-                      border: '1px solid rgba(52, 211, 153, 0.5)',
-                      fontSize: '13px',
-                      fontWeight: 800,
-                      padding: '9px 18px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)'
-                    }}
-                  >
-                    <Sparkles size={16} />
-                    <span>{isProcessing || isSyncingPersonal ? 'Wird übertragen...' : '⚡ 1-Klick CareMan-Übernahme'}</span>
-                  </button>
                   <button
                     type="button"
                     onClick={() => setIsUploadOpen(true)}
@@ -1935,7 +1921,7 @@ export default function TeamRoster() {
                     style={{ fontSize: '13px', padding: '9px 16px', borderRadius: '10px' }}
                   >
                     <UploadCloud size={16} />
-                    <span>Manuell laden</span>
+                    <span>Plan laden</span>
                   </button>
                 </div>
               </div>
@@ -1968,104 +1954,408 @@ export default function TeamRoster() {
           </div>
         ) : (
           <div>
+            {/* Toolbar: Count + View Switcher (Besatzungs-Kacheln vs. Kompaktliste) */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '0 4px 6px 4px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: 'var(--color-text-muted)'
+              padding: '2px 4px 10px 4px',
+              gap: '8px'
             }}>
-              <span>
+              <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-text-muted)' }}>
                 {currentDayShifts.length} {currentDayShifts.length === 1 ? 'Kollege' : 'Kollegen'} im Dienst
               </span>
+
+              <div style={{
+                display: 'inline-flex',
+                background: 'rgba(15, 23, 42, 0.75)',
+                border: '1px solid rgba(148, 163, 184, 0.2)',
+                borderRadius: '9px',
+                padding: '2px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('crews')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: viewMode === 'crews' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                    color: viewMode === 'crews' ? '#38bdf8' : '#94a3b8'
+                  }}
+                >
+                  Besatzungen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: viewMode === 'list' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                    color: viewMode === 'list' ? '#38bdf8' : '#94a3b8'
+                  }}
+                >
+                  Liste
+                </button>
+              </div>
             </div>
-            <div className="team-roster-card">
-            {currentDayShifts.map((shift, idx) => {
-              const group = getShiftGroupName(shift.code);
-              const prevGroup = idx > 0 ? getShiftGroupName(currentDayShifts[idx - 1].code) : null;
-              const isNewGroup = group !== prevGroup;
-              const colorInfo = getShiftColor('', shift.code);
-              const isJohannes = shift.name.toLowerCase().includes('backhaus');
-              const johannesPartnerStr = isJohannes ? getPartnersForShiftFromRoster(selectedDate, shift.code, roster) : '';
+
+            {viewMode === 'crews' ? (() => {
+              // Group currentDayShifts by Shift Group -> then by Base Shift Code (so crews are shown together in a card)
+              const groupMap = new Map();
+              currentDayShifts.forEach(shift => {
+                const grpName = getShiftGroupName(shift.code);
+                if (!groupMap.has(grpName)) groupMap.set(grpName, new Map());
+                const codeMap = groupMap.get(grpName);
+                const baseCode = (shift.code || '').trim().replace(/\*+$/, '').toUpperCase();
+                if (!codeMap.has(baseCode)) {
+                  codeMap.set(baseCode, {
+                    baseCode,
+                    station: detectStation({ code: shift.code, station: shift.station }),
+                    members: []
+                  });
+                }
+                codeMap.get(baseCode).members.push(shift);
+              });
+
+              const groupMeta = {
+                'Frühdienst': { icon: '☀️', accent: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' },
+                'Tagschicht': { icon: '🌤️', accent: '#60a5fa', bg: 'rgba(96, 165, 250, 0.1)' },
+                'Spätdienst': { icon: '🌆', accent: '#fb923c', bg: 'rgba(251, 146, 60, 0.1)' },
+                'Nachtdienst': { icon: '🌙', accent: '#c084fc', bg: 'rgba(192, 132, 252, 0.1)' },
+                'Sonderdienste': { icon: '✨', accent: '#34d399', bg: 'rgba(52, 211, 153, 0.1)' },
+                'Fortbildung': { icon: '🎓', accent: '#facc15', bg: 'rgba(250, 204, 21, 0.1)' },
+                'Urlaub / Abwesend': { icon: '🏖️', accent: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)' }
+              };
+
+              const stationLabels = {
+                Sendling: { label: 'München', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' },
+                Hohenbrunn: { label: 'Hohenbrunn', color: '#34d399', bg: 'rgba(16, 185, 129, 0.15)' },
+                Obersendling: { label: 'Obersendling', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.15)' }
+              };
 
               return (
-                <React.Fragment key={`${shift.name}-${idx}`}>
-                  {isNewGroup && (
-                    <div className="team-roster-group-header">
-                      {group}
-                    </div>
-                  )}
-                  <div className={`team-roster-row ${isJohannes ? 'is-user' : ''}`}>
-                    {/* Colleague Name */}
-                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingRight: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                        <span style={{
-                          fontSize: '14px',
-                          fontWeight: isJohannes ? 700 : 500,
-                          color: isJohannes ? '#38bdf8' : 'var(--color-text-main)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {shift.name}
-                        </span>
-                        {isJohannes && (
-                          <span style={{
-                            fontSize: '10px',
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            background: '#0284c7',
-                            color: 'white',
-                            fontWeight: 800,
-                            flexShrink: 0
-                          }}>
-                            Du
-                          </span>
-                        )}
-                      </div>
-                      {isJohannes && johannesPartnerStr && (
-                        <span style={{
-                          fontSize: '11.5px',
-                          color: '#7dd3fc',
-                          fontWeight: 600,
-                          marginTop: '2px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          👤 {johannesPartnerStr}
-                        </span>
-                      )}
-                    </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {Array.from(groupMap.entries()).map(([grpName, codeMap]) => {
+                    const meta = groupMeta[grpName] || { icon: '📋', accent: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' };
+                    const crews = Array.from(codeMap.values());
+                    const totalPeopleInGroup = crews.reduce((sum, c) => sum + c.members.length, 0);
 
-                    {/* Shift Code Badge with Station Color and Understaffed Indicator */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                      {!shift.code.includes('*') && staffingAnalysis.understaffedCodes.has((shift.code || '').trim().toUpperCase()) && (
-                        <span
-                          className="team-roster-staffing-tag"
-                          title="In dieser Schicht fehlt ein Kollege bzw. eine Kollegin (nur 1x besetzt)"
-                        >
-                          ⚠️ 1x
-                        </span>
-                      )}
-                      <span
-                        className="team-roster-badge"
+                    return (
+                      <div
+                        key={grpName}
                         style={{
-                          background: colorInfo.bg,
-                          color: colorInfo.color,
-                          borderColor: colorInfo.border
+                          background: 'rgba(15, 23, 42, 0.55)',
+                          border: '1px solid rgba(148, 163, 184, 0.16)',
+                          borderRadius: '16px',
+                          padding: '12px'
                         }}
                       >
-                        {shift.code}
-                      </span>
-                    </div>
-                  </div>
-                </React.Fragment>
+                        {/* Section Header */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '10px',
+                          padding: '6px 10px',
+                          borderRadius: '10px',
+                          background: meta.bg,
+                          borderLeft: `3px solid ${meta.accent}`
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                            <span style={{ fontSize: '14px' }}>{meta.icon}</span>
+                            <span style={{
+                              fontSize: '12.5px',
+                              fontWeight: 800,
+                              letterSpacing: '0.6px',
+                              textTransform: 'uppercase',
+                              color: meta.accent
+                            }}>
+                              {grpName}
+                            </span>
+                          </div>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#cbd5e1',
+                            background: 'rgba(15, 23, 42, 0.6)',
+                            padding: '2px 8px',
+                            borderRadius: '999px'
+                          }}>
+                            {crews.length} {crews.length === 1 ? 'Schicht' : 'Schichten'} · {totalPeopleInGroup} Pers.
+                          </span>
+                        </div>
+
+                        {/* Responsive 2-Column Grid of Crew Cards */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))',
+                          gap: '10px'
+                        }}>
+                          {crews.map(crew => {
+                            const colorInfo = getShiftColor('', crew.baseCode);
+                            const preset = getPresetForCode(crew.baseCode);
+                            const stInfo = stationLabels[crew.station] || stationLabels.Sendling;
+                            const isUnderstaffed = staffingAnalysis.understaffedCodes.has(crew.baseCode);
+                            const hasJohannes = crew.members.some(m => m.name.toLowerCase().includes('backhaus'));
+
+                            return (
+                              <div
+                                key={crew.baseCode}
+                                style={{
+                                  background: hasJohannes
+                                    ? 'linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(30, 41, 59, 0.92))'
+                                    : 'rgba(30, 41, 59, 0.82)',
+                                  border: hasJohannes
+                                    ? '1.5px solid #38bdf8'
+                                    : isUnderstaffed
+                                      ? '1px solid rgba(245, 158, 11, 0.5)'
+                                      : '1px solid rgba(148, 163, 184, 0.18)',
+                                  borderRadius: '13px',
+                                  padding: '10px 12px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '8px',
+                                  boxShadow: hasJohannes ? '0 4px 16px rgba(14, 165, 233, 0.22)' : '0 2px 6px rgba(0,0,0,0.2)'
+                                }}
+                              >
+                                {/* Card Top Header: Shift Code Badge + Station + Time + Status */}
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '6px',
+                                  paddingBottom: '6px',
+                                  borderBottom: '1px solid rgba(148, 163, 184, 0.12)'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                    <span
+                                      className="team-roster-badge"
+                                      style={{
+                                        background: colorInfo.bg,
+                                        color: colorInfo.color,
+                                        borderColor: colorInfo.border,
+                                        fontSize: '12.5px',
+                                        fontWeight: 800,
+                                        padding: '2px 9px'
+                                      }}
+                                    >
+                                      {crew.baseCode}
+                                    </span>
+                                    <span style={{
+                                      fontSize: '10.5px',
+                                      fontWeight: 700,
+                                      color: stInfo.color,
+                                      background: stInfo.bg,
+                                      padding: '2px 6px',
+                                      borderRadius: '5px'
+                                    }}>
+                                      {stInfo.label}
+                                    </span>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                    {preset?.startTime && preset?.endTime && (
+                                      <span style={{
+                                        fontSize: '10.5px',
+                                        color: '#94a3b8',
+                                        fontWeight: 600
+                                      }}>
+                                        {preset.startTime}–{preset.endTime}
+                                      </span>
+                                    )}
+                                    {isUnderstaffed && (
+                                      <span
+                                        className="team-roster-staffing-tag"
+                                        title="In dieser Schicht fehlt eine 2. Person (nur 1x regulär besetzt)"
+                                      >
+                                        ⚠️ 1x
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Crew Members List */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                  {crew.members.map((member, mIdx) => {
+                                    const isMe = member.name.toLowerCase().includes('backhaus');
+                                    const isStar = (member.code || '').includes('*');
+                                    return (
+                                      <div
+                                        key={`${member.name}-${mIdx}`}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          gap: '6px',
+                                          padding: '4px 6px',
+                                          borderRadius: '7px',
+                                          background: isMe ? 'rgba(14, 165, 233, 0.18)' : 'rgba(15, 23, 42, 0.45)'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                                          <span style={{
+                                            width: '18px',
+                                            height: '18px',
+                                            borderRadius: '50%',
+                                            background: isStar ? 'rgba(245, 158, 11, 0.2)' : 'rgba(148, 163, 184, 0.16)',
+                                            color: isStar ? '#fbbf24' : '#cbd5e1',
+                                            fontSize: '10px',
+                                            fontWeight: 800,
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0
+                                          }}>
+                                            {isStar ? '+' : mIdx + 1}
+                                          </span>
+                                          <span style={{
+                                            fontSize: '13.5px',
+                                            fontWeight: isMe ? 800 : 600,
+                                            color: isMe ? '#38bdf8' : '#f1f5f9',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                          }}>
+                                            {member.name}
+                                          </span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                          {isStar && (
+                                            <span style={{
+                                              fontSize: '10px',
+                                              fontWeight: 700,
+                                              color: '#fbbf24',
+                                              background: 'rgba(245, 158, 11, 0.16)',
+                                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                                              padding: '1px 5px',
+                                              borderRadius: '4px'
+                                            }}>
+                                              {member.code}
+                                            </span>
+                                          )}
+                                          {isMe && (
+                                            <span style={{
+                                              fontSize: '10px',
+                                              padding: '1px 6px',
+                                              borderRadius: '4px',
+                                              background: '#0284c7',
+                                              color: 'white',
+                                              fontWeight: 800
+                                            }}>
+                                              Du
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               );
-            })}
-            </div>
+            })() : (
+              <div className="team-roster-card">
+                {currentDayShifts.map((shift, idx) => {
+                  const group = getShiftGroupName(shift.code);
+                  const prevGroup = idx > 0 ? getShiftGroupName(currentDayShifts[idx - 1].code) : null;
+                  const isNewGroup = group !== prevGroup;
+                  const colorInfo = getShiftColor('', shift.code);
+                  const isJohannes = shift.name.toLowerCase().includes('backhaus');
+                  const johannesPartnerStr = isJohannes ? getPartnersForShiftFromRoster(selectedDate, shift.code, roster) : '';
+
+                  return (
+                    <React.Fragment key={`${shift.name}-${idx}`}>
+                      {isNewGroup && (
+                        <div className="team-roster-group-header">
+                          {group}
+                        </div>
+                      )}
+                      <div className={`team-roster-row ${isJohannes ? 'is-user' : ''}`}>
+                        {/* Colleague Name */}
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingRight: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            <span style={{
+                              fontSize: '14px',
+                              fontWeight: isJohannes ? 700 : 500,
+                              color: isJohannes ? '#38bdf8' : 'var(--color-text-main)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {shift.name}
+                            </span>
+                            {isJohannes && (
+                              <span style={{
+                                fontSize: '10px',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: '#0284c7',
+                                color: 'white',
+                                fontWeight: 800,
+                                flexShrink: 0
+                              }}>
+                                Du
+                              </span>
+                            )}
+                          </div>
+                          {isJohannes && johannesPartnerStr && (
+                            <span style={{
+                              fontSize: '11.5px',
+                              color: '#7dd3fc',
+                              fontWeight: 600,
+                              marginTop: '2px',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              👤 {johannesPartnerStr}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Shift Code Badge with Station Color and Understaffed Indicator */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          {!shift.code.includes('*') && staffingAnalysis.understaffedCodes.has((shift.code || '').trim().toUpperCase()) && (
+                            <span
+                              className="team-roster-staffing-tag"
+                              title="In dieser Schicht fehlt ein Kollege bzw. eine Kollegin (nur 1x besetzt)"
+                            >
+                              ⚠️ 1x
+                            </span>
+                          )}
+                          <span
+                            className="team-roster-badge"
+                            style={{
+                              background: colorInfo.bg,
+                              color: colorInfo.color,
+                              borderColor: colorInfo.border
+                            }}
+                          >
+                            {shift.code}
+                          </span>
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

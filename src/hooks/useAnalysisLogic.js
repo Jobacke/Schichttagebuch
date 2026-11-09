@@ -40,7 +40,7 @@ function calculateDuration(start, end) {
 }
 
 export function resolveShiftTypeName(s, storeSettings) {
-    if (!s) return 'Tagdienst';
+    if (!s) return 'Tagschicht';
 
     // 1. Direct match with shiftTypes in settings by id
     const typeObj = (storeSettings?.shiftTypes || []).find(t => t.id === s.typeId);
@@ -108,7 +108,7 @@ export function resolveShiftTypeName(s, storeSettings) {
         }
     }
 
-    return storeSettings?.shiftTypes?.[0]?.name || 'Tagdienst';
+    return storeSettings?.shiftTypes?.[0]?.name || 'Tagschicht';
 }
 
 export const getMonthlyWeeklyHours = (year, monthIndex0, settings) => {

@@ -204,6 +204,16 @@ export const SHIFT_PRESETS = {
     vehicle: 'RTW Akkon Sendling 71/2',
     callSign: 'Akkon Sendling 71/2'
   },
+  'KS3M': {
+    code: 'KS3M',
+    shiftTypeName: 'Spätschicht',
+    startTime: '15:54',
+    endTime: '22:36',
+    hours: 6.7,
+    station: 'Wache Sendling',
+    vehicle: 'KTW Akkon Sendling 72/3',
+    callSign: 'Akkon Sendling 72/3'
+  },
   'DDM': {
     code: 'DDM',
     shiftTypeName: 'Tagschicht',
@@ -356,7 +366,7 @@ export function getPresetForCode(rawCode) {
     callSign = 'Akkon Sendling 71/2';
   }
 
-  let shiftTypeName = 'Tagdienst';
+  let shiftTypeName = 'Tagschicht';
   let startTime = '08:54';
   let endTime = '19:06';
   let hours = 8.2;
@@ -398,11 +408,11 @@ export function buildShiftFromPreset({ dateStr, code, partner = '', storeSetting
   const codeId = foundCode ? foundCode.id : (preset ? `preset_${cleanCode}` : '');
 
   // Match typeId
-  const typeName = preset?.shiftTypeName || 'Tagdienst';
+  const typeName = preset?.shiftTypeName || 'Tagschicht';
   const foundType = (storeSettings.shiftTypes || []).find(
     t => t.name.toLowerCase() === typeName.toLowerCase()
   );
-  const typeId = foundType ? foundType.id : (storeSettings.shiftTypes?.[0]?.id || 't1');
+  const typeId = foundType ? foundType.id : (storeSettings.shiftTypes?.[0]?.id || 'type_tag');
 
   return {
     id: crypto.randomUUID(),

@@ -267,7 +267,7 @@ export function getShiftTypeForCode(code = '') {
     if (clean.includes('1') || clean.includes('3') || clean === 'RTH') return 'Tagschicht';
     return 'Spätschicht';
   }
-  return 'Tagdienst';
+  return 'Tagschicht';
 }
 
 /**

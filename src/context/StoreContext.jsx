@@ -10,28 +10,211 @@ import {
   getPartnersForShiftFromRoster,
   isValidPersonalShiftCode
 } from '../utils/teamRosterParser';
-import { getPresetForCode, buildShiftFromPreset, CAREMAN_NOVEMBER_2026_BACKHAUS } from '../utils/shiftPresets';
+import { SHIFT_PRESETS, getPresetForCode, buildShiftFromPreset, CAREMAN_NOVEMBER_2026_BACKHAUS } from '../utils/shiftPresets';
 
 const StoreContext = createContext();
 
+const REAL_SHIFT_TYPES = [
+  { id: 'type_frueh', name: 'Frühschicht' },
+  { id: 'type_tag', name: 'Tagschicht' },
+  { id: 'type_spaat', name: 'Spätschicht' },
+  { id: 'type_nacht', name: 'Nachtschicht' },
+  { id: 'type_fobi', name: 'Fortbildung' },
+  { id: 'type_sonder', name: 'Sonderdienst' }
+];
+
+const REAL_STATIONS = [
+  'Wache Sendling',
+  'Wache Obersendling',
+  'Wache Hohenbrunn'
+];
+
+const REAL_VEHICLES = [
+  'RTW Akkon Sendling 71/1',
+  'RTW Akkon Sendling 71/2',
+  'RTW Akkon Obersendling 71/1',
+  'RTW Akkon Hohenbrunn 71/1',
+  'RTW Akkon HBN 71/1',
+  'RTW Akkon HBN 71/2',
+  'KTW Akkon Sendling 72/1',
+  'KTW Akkon Sendling 72/2',
+  'KTW Akkon Sendling 72/3'
+];
+
+const REAL_CALL_SIGNS = [
+  'Akkon Sendling 71/1',
+  'Akkon Sendling 71/2',
+  'Akkon Obersendling 71/1',
+  'Akkon Hohenbrunn 71/1',
+  'Akkon HBN 71/1',
+  'Akkon HBN 71/2',
+  'Akkon Sendling 72/1',
+  'Akkon Sendling 72/2',
+  'Akkon Sendling 72/3'
+];
+
+const REAL_SHIFT_CODES = Object.values(SHIFT_PRESETS).map(p => ({
+  id: `preset_${p.code}`,
+  code: p.code,
+  hours: p.hours,
+  startTime: p.startTime,
+  endTime: p.endTime,
+  shiftTypeName: p.shiftTypeName,
+  station: p.station,
+  vehicle: p.vehicle,
+  callSign: p.callSign
+}));
+
 const INITIAL_SETTINGS = {
-  shiftTypes: [
-    { id: 't1', name: 'Tagdienst' },
-    { id: 't2', name: 'Nachtdienst' },
-    { id: 't3', name: 'Zwischendienst' }
-  ],
-  shiftCodes: [
-    { id: 'c1', code: 'T', hours: 12 },
-    { id: 'c2', code: 'N', hours: 12 },
-    { id: 'c3', code: 'K', hours: 8 }
-  ],
-  vehicles: ['R-RTW-1', 'R-NEF-1', 'R-KdoW-1'],
-  callSigns: ['Florian 1/83/1', 'Florian 1/76/1', 'Florian 1/10/1'],
-  stations: ['Hauptwache', 'Nordwache', 'Südwache'],
+  shiftTypes: REAL_SHIFT_TYPES,
+  shiftCodes: REAL_SHIFT_CODES,
+  vehicles: REAL_VEHICLES,
+  callSigns: REAL_CALL_SIGNS,
+  stations: REAL_STATIONS,
   defaultWeeklyHours: 20,
   monthlyWeeklyHours: {},
   defaultBonusAmount: 75
 };
+
+const FANTASY_STATIONS = new Set(['Hauptwache', 'Nordwache', 'Südwache']);
+const FANTASY_VEHICLES = new Set(['R-RTW-1', 'R-NEF-1', 'R-KdoW-1']);
+const FANTASY_CALL_SIGNS = new Set(['Florian 1/83/1', 'Florian 1/76/1', 'Florian 1/10/1']);
+const FANTASY_SHIFT_TYPES = new Set(['tagdienst', 'nachtdienst', 'zwischendienst']);
+const FANTASY_SHIFT_CODES = new Set(['T', 'N', 'K']);
+
+function sanitizeAndMigrateSettings(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  let changed = false;
+
+  // 1. Stations
+  const rawStations = Array.isArray(src.stations) ? src.stations : [];
+  const filteredStations = rawStations.filter(st => st && !FANTASY_STATIONS.has(st));
+  if (filteredStations.length !== rawStations.length) changed = true;
+  const stationSet = new Set(filteredStations);
+  REAL_STATIONS.forEach(st => {
+    if (!stationSet.has(st)) {
+      filteredStations.push(st);
+      stationSet.add(st);
+      changed = true;
+    }
+  });
+
+  // 2. Vehicles
+  const rawVehicles = Array.isArray(src.vehicles) ? src.vehicles : [];
+  const filteredVehicles = rawVehicles.filter(v => v && !FANTASY_VEHICLES.has(v));
+  if (filteredVehicles.length !== rawVehicles.length) changed = true;
+  const vehicleSet = new Set(filteredVehicles);
+  REAL_VEHICLES.forEach(v => {
+    if (!vehicleSet.has(v)) {
+      filteredVehicles.push(v);
+      vehicleSet.add(v);
+      changed = true;
+    }
+  });
+
+  // 3. CallSigns
+  const rawCallSigns = Array.isArray(src.callSigns) ? src.callSigns : [];
+  const filteredCallSigns = rawCallSigns.filter(cs => cs && !FANTASY_CALL_SIGNS.has(cs));
+  if (filteredCallSigns.length !== rawCallSigns.length) changed = true;
+  const callSignSet = new Set(filteredCallSigns);
+  REAL_CALL_SIGNS.forEach(cs => {
+    if (!callSignSet.has(cs)) {
+      filteredCallSigns.push(cs);
+      callSignSet.add(cs);
+      changed = true;
+    }
+  });
+
+  // 4. ShiftTypes
+  const rawTypes = Array.isArray(src.shiftTypes) ? src.shiftTypes : [];
+  const seenTypeNames = new Set();
+  const filteredTypes = [];
+  rawTypes.forEach(t => {
+    const nameStr = String(t?.name || '').trim();
+    const lower = nameStr.toLowerCase();
+    if (!nameStr || FANTASY_SHIFT_TYPES.has(lower) || seenTypeNames.has(lower)) {
+      changed = true;
+      return;
+    }
+    seenTypeNames.add(lower);
+    filteredTypes.push({ id: t.id || `type_${lower}`, name: nameStr });
+  });
+  REAL_SHIFT_TYPES.forEach(rt => {
+    const lower = rt.name.toLowerCase();
+    if (!seenTypeNames.has(lower)) {
+      seenTypeNames.add(lower);
+      filteredTypes.push(rt);
+      changed = true;
+    }
+  });
+
+  // 5. ShiftCodes
+  const rawCodes = Array.isArray(src.shiftCodes) ? src.shiftCodes : [];
+  const seenCodes = new Set();
+  const filteredCodes = [];
+  rawCodes.forEach(c => {
+    const codeStr = String(c?.code || '').trim().toUpperCase();
+    if (!codeStr || FANTASY_SHIFT_CODES.has(codeStr) || !isValidPersonalShiftCode(codeStr) || seenCodes.has(codeStr)) {
+      changed = true;
+      return;
+    }
+    seenCodes.add(codeStr);
+    const preset = SHIFT_PRESETS[codeStr] || getPresetForCode(codeStr) || {};
+    const enriched = {
+      ...c,
+      id: c.id || `preset_${codeStr}`,
+      code: codeStr,
+      hours: c.hours ?? preset.hours ?? 8.2,
+      startTime: c.startTime || preset.startTime || '06:54',
+      endTime: c.endTime || preset.endTime || '15:06',
+      shiftTypeName: (!c.shiftTypeName || FANTASY_SHIFT_TYPES.has(String(c.shiftTypeName).toLowerCase()))
+        ? (preset.shiftTypeName || 'Frühschicht')
+        : c.shiftTypeName,
+      station: (!c.station || FANTASY_STATIONS.has(c.station))
+        ? (preset.station || 'Wache Sendling')
+        : c.station,
+      vehicle: (!c.vehicle || FANTASY_VEHICLES.has(c.vehicle))
+        ? (preset.vehicle || 'RTW Akkon Sendling 71/1')
+        : c.vehicle,
+      callSign: (!c.callSign || FANTASY_CALL_SIGNS.has(c.callSign))
+        ? (preset.callSign || 'Akkon Sendling 71/1')
+        : c.callSign
+    };
+    if (
+      enriched.startTime !== c.startTime ||
+      enriched.endTime !== c.endTime ||
+      enriched.station !== c.station ||
+      enriched.vehicle !== c.vehicle ||
+      enriched.callSign !== c.callSign ||
+      enriched.shiftTypeName !== c.shiftTypeName
+    ) {
+      changed = true;
+    }
+    filteredCodes.push(enriched);
+  });
+  REAL_SHIFT_CODES.forEach(rc => {
+    if (!seenCodes.has(rc.code)) {
+      seenCodes.add(rc.code);
+      filteredCodes.push(rc);
+      changed = true;
+    }
+  });
+
+  const cleaned = {
+    ...INITIAL_SETTINGS,
+    ...src,
+    stations: filteredStations,
+    vehicles: filteredVehicles,
+    callSigns: filteredCallSigns,
+    shiftTypes: filteredTypes,
+    shiftCodes: filteredCodes,
+    defaultWeeklyHours: src.defaultWeeklyHours !== undefined ? Number(src.defaultWeeklyHours) : INITIAL_SETTINGS.defaultWeeklyHours,
+    monthlyWeeklyHours: src.monthlyWeeklyHours || src.monthlyTargets || INITIAL_SETTINGS.monthlyWeeklyHours,
+    defaultBonusAmount: src.defaultBonusAmount !== undefined ? Number(src.defaultBonusAmount) : INITIAL_SETTINGS.defaultBonusAmount
+  };
+
+  return { cleaned, changed };
+}
 
 function resolveShiftCode(s, cfg) {
   if (s?.code && String(s.code).trim()) {
@@ -178,17 +361,24 @@ export function StoreProvider({ children }) {
 
       dedupedData.forEach(s => {
         const code = resolveShiftCode(s, settingsRef.current);
-        if (code && !isValidPersonalShiftCode(code) && !/^[TN]$/i.test(code)) {
+        if (code && !isValidPersonalShiftCode(code)) {
           ghostIdsSet.add(s.id);
           duplicateIdsToDelete.push(s.id);
           const ym = (s.date || '').slice(0, 7);
           if (/^\d{4}-\d{2}$/.test(ym)) monthsWithGarbage.add(ym);
           return;
         }
-        // Automatically repair any valid shift that previously got fallback "Hauptwache" / "R-RTW-1" because its preset was missing
-        if (code && (s.station === 'Hauptwache' || s.vehicle === 'R-RTW-1' || !s.station)) {
+        // Automatically repair any valid shift that previously got fantasy fallback values ("Hauptwache" / "R-RTW-1" / "Florian..." / "Tagdienst")
+        if (
+          code &&
+          (!s.station ||
+            FANTASY_STATIONS.has(s.station) ||
+            FANTASY_VEHICLES.has(s.vehicle) ||
+            FANTASY_CALL_SIGNS.has(s.callSign) ||
+            FANTASY_SHIFT_TYPES.has(String(s.shiftTypeName || '').toLowerCase()))
+        ) {
           const preset = getPresetForCode(code);
-          if (preset && preset.station && preset.station !== 'Hauptwache') {
+          if (preset && preset.station && !FANTASY_STATIONS.has(preset.station)) {
             s.station = preset.station;
             s.vehicle = preset.vehicle || s.vehicle;
             s.callSign = preset.callSign || s.callSign;
@@ -386,8 +576,9 @@ export function StoreProvider({ children }) {
       if (rawSettingsCache) {
         const parsedSettings = JSON.parse(rawSettingsCache);
         if (parsedSettings && typeof parsedSettings === 'object') {
-          settingsRef.current = parsedSettings;
-          setSettings(parsedSettings);
+          const { cleaned } = sanitizeAndMigrateSettings(parsedSettings);
+          settingsRef.current = cleaned;
+          setSettings(cleaned);
           setSettingsLoaded(true);
           hydratedSettingsFromCache = true;
         }
@@ -403,21 +594,15 @@ export function StoreProvider({ children }) {
     const settingsRefDoc = doc(db, `users/${currentUser.uid}/data`, 'settings');
     const unsubscribe = onSnapshot(settingsRefDoc, (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (Array.isArray(data.shiftCodes)) {
-          const cleanedCodes = data.shiftCodes.filter(c => {
-            const codeStr = String(c?.code || '').trim().toUpperCase();
-            return codeStr && (isValidPersonalShiftCode(codeStr) || /^[TNK]$/i.test(codeStr));
-          });
-          if (cleanedCodes.length !== data.shiftCodes.length) {
-            data.shiftCodes = cleanedCodes;
-            setDoc(settingsRefDoc, data).catch(() => {});
-          }
+        const rawData = docSnap.data();
+        const { cleaned, changed } = sanitizeAndMigrateSettings(rawData);
+        if (changed) {
+          setDoc(settingsRefDoc, cleaned).catch(() => {});
         }
-        settingsRef.current = data;
-        setSettings(data);
+        settingsRef.current = cleaned;
+        setSettings(cleaned);
         try {
-          localStorage.setItem(settingsCacheKey, JSON.stringify(data));
+          localStorage.setItem(settingsCacheKey, JSON.stringify(cleaned));
         } catch {
           /* ignore */
         }
@@ -675,29 +860,38 @@ export function StoreProvider({ children }) {
 
   const ensureCodesAndTypes = async (requiredCodes = [], requiredTypes = []) => {
     if (!currentUser) return settingsRef.current || settings;
-    const baseSettings = settingsRef.current || settings || INITIAL_SETTINGS;
+    const { cleaned: baseSettings } = sanitizeAndMigrateSettings(settingsRef.current || settings || INITIAL_SETTINGS);
     let settingsUpdated = false;
     let currentCodes = [...(baseSettings?.shiftCodes || [])];
     let currentTypes = [...(baseSettings?.shiftTypes || [])];
 
     requiredCodes.forEach(rc => {
-      const codeStr = typeof rc === 'string' ? rc : rc.code;
-      const hoursNum = typeof rc === 'object' && rc.hours ? rc.hours : 8.2;
-      if (codeStr && !currentCodes.some(c => c.code.toLowerCase() === codeStr.toLowerCase())) {
+      const codeStr = (typeof rc === 'string' ? rc : rc.code || '').trim().toUpperCase();
+      if (!codeStr || FANTASY_SHIFT_CODES.has(codeStr) || !isValidPersonalShiftCode(codeStr)) return;
+      const preset = SHIFT_PRESETS[codeStr] || getPresetForCode(codeStr) || {};
+      const hoursNum = typeof rc === 'object' && rc.hours ? rc.hours : (preset.hours ?? 8.2);
+      if (!currentCodes.some(c => c.code.toLowerCase() === codeStr.toLowerCase())) {
         currentCodes.push({
-          id: crypto.randomUUID(),
-          code: codeStr.toUpperCase(),
-          hours: hoursNum
+          id: `preset_${codeStr}`,
+          code: codeStr,
+          hours: hoursNum,
+          startTime: preset.startTime || '06:54',
+          endTime: preset.endTime || '15:06',
+          shiftTypeName: preset.shiftTypeName || 'Frühschicht',
+          station: preset.station || 'Wache Sendling',
+          vehicle: preset.vehicle || 'RTW Akkon Sendling 71/1',
+          callSign: preset.callSign || 'Akkon Sendling 71/1'
         });
         settingsUpdated = true;
       }
     });
 
     requiredTypes.forEach(rt => {
-      const nameStr = typeof rt === 'string' ? rt : rt.name;
-      if (nameStr && !currentTypes.some(t => t.name.toLowerCase() === nameStr.toLowerCase())) {
+      const nameStr = (typeof rt === 'string' ? rt : rt.name || '').trim();
+      if (!nameStr || FANTASY_SHIFT_TYPES.has(nameStr.toLowerCase())) return;
+      if (!currentTypes.some(t => t.name.toLowerCase() === nameStr.toLowerCase())) {
         currentTypes.push({
-          id: crypto.randomUUID(),
+          id: `type_${nameStr.toLowerCase()}`,
           name: nameStr
         });
         settingsUpdated = true;

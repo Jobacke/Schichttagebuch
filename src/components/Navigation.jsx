@@ -6,7 +6,7 @@ import { LayoutDashboard, PlusCircle, Settings, PieChart, Users } from 'lucide-r
 export default function Navigation() {
     return (
         <nav className="nav-bar" aria-label="Hauptnavigation">
-            <NavItem to="/analysis" icon={PieChart} label="Daten" />
+            <NavItem to="/analysis" icon={PieChart} label="mein Plan" />
             <NavItem to="/journal" icon={LayoutDashboard} label="Journal" />
             <NavItem to="/team" icon={Users} label="Team" />
             <NavItem to="/add" icon={PlusCircle} label="Eintrag" />

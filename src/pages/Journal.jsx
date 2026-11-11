@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore, getShiftBonusAmount } from '../context/StoreContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getDaysInMonth, startOfMonth, getDay, isSameDay, parseISO } from 'date-fns';
+import { isSameDay, parseISO } from 'date-fns';
 import {
-    ChevronLeft, ChevronRight, PenSquare, MapPin, Sparkles,
-    CheckCircle2, Trash2, CheckSquare, Square, X, AlertTriangle, Check,
-    Calendar as CalendarIcon, Bookmark, ExternalLink
+    ChevronLeft, ChevronRight, PenSquare, MapPin,
+    CheckCircle2, Trash2, X, AlertTriangle, ExternalLink, ArrowLeft
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
@@ -13,6 +12,9 @@ import { getShiftColor } from '../utils/shiftColors';
 import { getPartnersForShiftFromRoster, getIncomingNightShiftForDate } from '../utils/teamRosterParser';
 import { useAuth } from '../context/AuthContext';
 import { runOneClickCareManSync, openCareManLiveWindow } from '../utils/oneClickCareManSync';
+import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
+import ShiftRhythmCalendar from '../components/ShiftRhythmCalendar';
+import PeriodStats from '../components/PeriodStats';
 
 const JOURNAL_MONTH_STORAGE_KEY = 'schichttagebuch_journal_month';
 
@@ -49,17 +51,9 @@ export default function Journal() {
     const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') === '1');
     const [toastMessage, setToastMessage] = useState(null);
 
-    // Multi-Selection & Bulk Delete State
-    const [isSelectMode, setIsSelectMode] = useState(false);
-    const [selectedShiftIds, setSelectedShiftIds] = useState(new Set());
+    // Delete State
     const [confirmDeleteModal, setConfirmDeleteModal] = useState(null); // { type: 'month' | 'selected', count: number, ids: string[], label: string }
     const [isDeleting, setIsDeleting] = useState(false);
-
-    // --- Calendar Logic ---
-    const daysInMonth = getDaysInMonth(currentDate);
-    const firstDayOfMonth = startOfMonth(currentDate);
-    // 0 = Sunday, 1 = Monday. We want Monday start. 
-    const startDay = (getDay(firstDayOfMonth) + 6) % 7;
 
     const monthShifts = store.shifts.filter(s => {
         const d = parseISO(s.date);
@@ -70,7 +64,7 @@ export default function Journal() {
         ? monthShifts.filter(s => isSameDay(parseISO(s.date), selectedDate))
         : [];
 
-    const visibleShifts = selectedDate ? shiftsOnSelectedDate : monthShifts;
+    const visibleShifts = shiftsOnSelectedDate;
 
     const selectedDateStr = selectedDate
         ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
@@ -83,8 +77,6 @@ export default function Journal() {
         newDate.setMonth(newDate.getMonth() + delta);
         setCurrentDate(newDate);
         setSelectedDate(null);
-        setSelectedShiftIds(new Set());
-        setIsSelectMode(false);
     };
 
     const handleImportSuccess = (yearMonth, count) => {
@@ -100,6 +92,23 @@ export default function Journal() {
     const currentMonthLabel = currentDate.toLocaleString('de-DE', { month: 'long', year: 'numeric' });
     const nowDate = new Date();
     const isCurrentMonth = currentDate.getFullYear() === nowDate.getFullYear() && currentDate.getMonth() === nowDate.getMonth();
+
+    // Monatsauswertung (Geleistet | Schichten | Bonus | Saldo | Verteilung) für den gewählten Monat
+    const monthStartDate = useMemo(() => {
+        const [y, m] = currentYearMonthStr.split('-').map(Number);
+        return new Date(y, m - 1, 1);
+    }, [currentYearMonthStr]);
+    const monthLogic = useAnalysisLogic({ baseDate: monthStartDate });
+
+    const handleSelectCalendarDay = (dateStr) => {
+        if (!dateStr) {
+            setSelectedDate(null);
+            return;
+        }
+        const [y, m, d] = dateStr.split('-').map(Number);
+        setSelectedDate(new Date(y, m - 1, d));
+        try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { /* ignore */ }
+    };
 
     // Listen for global 1-click CareMan sync events
     useEffect(() => {
@@ -204,36 +213,7 @@ export default function Journal() {
         }
     }, [currentYearMonthStr, monthShifts.length, store.rosterVersion, store?.loading]);
 
-    // --- Multi-Select & Delete Actions ---
-    const toggleSelectShift = (id) => {
-        setSelectedShiftIds(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
-    const allVisibleSelected = visibleShifts.length > 0 && visibleShifts.every(s => selectedShiftIds.has(s.id));
-
-    const toggleSelectAll = () => {
-        if (allVisibleSelected) {
-            setSelectedShiftIds(new Set());
-        } else {
-            setSelectedShiftIds(new Set(visibleShifts.map(s => s.id)));
-        }
-    };
-
-    const requestDeleteSelected = () => {
-        if (selectedShiftIds.size === 0) return;
-        setConfirmDeleteModal({
-            type: 'selected',
-            count: selectedShiftIds.size,
-            ids: Array.from(selectedShiftIds),
-            label: `${selectedShiftIds.size} ausgewählte ${selectedShiftIds.size === 1 ? 'Dienst' : 'Dienste'}`
-        });
-    };
-
+    // --- Delete Actions ---
     const requestDeleteMonth = () => {
         if (monthShifts.length === 0) return;
         setConfirmDeleteModal({
@@ -251,8 +231,6 @@ export default function Journal() {
             const { ids, label } = confirmDeleteModal;
             const success = await deleteShifts(ids);
             if (success) {
-                setSelectedShiftIds(new Set());
-                setIsSelectMode(false);
                 setConfirmDeleteModal(null);
                 setToastMessage(`${label} erfolgreich gelöscht.`);
                 setTimeout(() => setToastMessage(null), 5000);
@@ -261,6 +239,192 @@ export default function Journal() {
             setIsDeleting(false);
         }
     };
+
+    const renderShiftCard = (shift) => {
+        const code = store.settings.shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
+        const displayCode = code ? code.code : (shift.code || 'Schicht');
+        const autoPartner = getPartnersForShiftFromRoster(shift.date, displayCode);
+        const partnerDisplay = (autoPartner && (!shift.partner || shift.partner.startsWith('mit ')))
+            ? autoPartner
+            : (shift.partner || autoPartner);
+        const dayName = new Date(shift.date).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
+        const dayNum = new Date(shift.date).getDate();
+        const shiftCol = getShiftColor(shift.shiftTypeName || '', displayCode, shift.station, shift.vehicle);
+
+        return (
+            <div
+                key={shift.id}
+                className="card-premium"
+                onClick={() => navigate(`/add?id=${shift.id}&month=${currentYearMonthStr}`)}
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    padding: '11px 12px',
+                    marginBottom: 0,
+                    border: 'var(--glass-border)',
+                    background: 'var(--color-surface)',
+                    transition: 'all 0.15s ease'
+                }}
+            >
+                {/* Top Row: Date Badge + Shift Code & Time + Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
+                        {/* Compact Date Box in station colors */}
+                        <div style={{
+                            background: shiftCol.stationBg,
+                            color: shiftCol.stationColor,
+                            border: `1px solid ${shiftCol.stationBorder}`,
+                            borderRadius: '10px',
+                            minWidth: '40px',
+                            height: '40px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            <span style={{ fontSize: '9px', fontWeight: 800, lineHeight: 1.1 }}>{dayName}</span>
+                            <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1.05 }}>{dayNum}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '15px', fontWeight: 800, color: shiftCol.color }}>
+                                    {displayCode}
+                                </span>
+                                <span style={{
+                                    fontSize: '11px',
+                                    background: 'var(--c-surface-3)',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    color: 'var(--c-text-soft)',
+                                    fontWeight: 600,
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    {shift.startTime}–{shift.endTime}
+                                </span>
+                            </div>
+                            {shift.hasBonus && (
+                                <span style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    background: 'rgb(var(--rgb-success) / 0.18)',
+                                    color: 'var(--c-success)',
+                                    border: '1px solid rgb(var(--rgb-success) / 0.4)',
+                                    padding: '0px 5px',
+                                    borderRadius: '4px',
+                                    width: 'fit-content'
+                                }}>
+                                    +{getShiftBonusAmount(shift, store.settings)} € Bonus
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Bonus Checkmark Toggle + Delete & Edit Icons */}
+                    {(
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleShiftBonus(shift);
+                                }}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: '4px 7px',
+                                    borderRadius: '7px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    border: shift.hasBonus
+                                        ? '1px solid var(--c-success-strong)'
+                                        : '1px solid rgb(var(--rgb-muted) / 0.25)',
+                                    background: shift.hasBonus
+                                        ? 'rgb(var(--rgb-success) / 0.18)'
+                                        : 'rgb(var(--rgb-bg) / 0.5)',
+                                    color: shift.hasBonus ? 'var(--c-success)' : 'var(--c-text-muted)',
+                                    transition: 'all 0.15s ease'
+                                }}
+                                title={shift.hasBonus ? `Bonus aktiv (${getShiftBonusAmount(shift, store.settings)} €) – Klicken zum Entfernen` : `Bonus-Haken setzen (+${store.settings?.defaultBonusAmount ?? 75} €)`}
+                            >
+                                <span>{shift.hasBonus ? '✓' : '☐'}</span>
+                                <span>Bonus</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteModal({
+                                        type: 'selected',
+                                        count: 1,
+                                        ids: [shift.id],
+                                        label: `den Dienst am ${new Date(shift.date).toLocaleDateString('de-DE')} (${displayCode})`
+                                    });
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--color-text-muted)',
+                                    cursor: 'pointer',
+                                    padding: '4px'
+                                }}
+                                title="Diesen Dienst löschen"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                            <PenSquare size={14} style={{ opacity: 0.5 }} />
+                        </div>
+                    )}
+                </div>
+
+                {/* Bottom Details: Station, Vehicle & Partner */}
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '3px',
+                    paddingTop: '6px',
+                    borderTop: '1px solid rgb(var(--rgb-muted) / 0.1)'
+                }}>
+                    {(shift.station || shift.vehicle) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--c-text-muted)', flexWrap: 'wrap' }}>
+                            {shift.station && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: shiftCol.stationColor, fontWeight: 600 }}>
+                                    <MapPin size={11} color={shiftCol.stationColor} />
+                                    {shift.station}
+                                </span>
+                            )}
+                            {shift.station && shift.vehicle && <span>•</span>}
+                            {shift.vehicle && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shift.vehicle}</span>}
+                        </div>
+                    )}
+                    {partnerDisplay && (
+                        <div style={{ fontSize: '12px', color: 'var(--c-info)', fontWeight: 600, lineHeight: 1.35 }}>
+                            👤 {partnerDisplay}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    const dayHeader = (() => {
+        if (!selectedDate) return '';
+        const todaySuffix = isSameDay(selectedDate, new Date()) ? ' (Heute)' : '';
+        const dateLabel = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+        if (visibleShifts.length === 0 && incomingNightShift) {
+            const isIncSpät = (incomingNightShift.shiftTypeName || '').toLowerCase().includes('spät') || (incomingNightShift.code || '').startsWith('RT');
+            return `${isIncSpät ? 'Spätschicht-Ende' : 'Nachtschicht-Ende'} am ${dateLabel}${todaySuffix}`;
+        }
+        if (visibleShifts.length === 0) return `${dateLabel}${todaySuffix}`;
+        return `${visibleShifts.length > 1 ? 'Dienste' : 'Dienst'} am ${dateLabel}${todaySuffix}`;
+    })();
 
     return (
         <div className="page-content">
@@ -334,516 +498,56 @@ export default function Journal() {
                         title={`Neueste Dienstpläne für "Rettungswache München", "Rettungswache Obersendling" & "Rettungswache Hohenbrunn" (${currentMonthLabel}) laden`}
                     >
                         <ExternalLink size={15} />
-                        <span>⚡ Dienstpläne (3 Wachen) laden</span>
+                        <span>⚡ DP mit neuestem Stand laden</span>
                     </button>
                 </div>
             </div>
 
-            {/* Month Switcher Bar with Month Clear Option */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: 'var(--color-surface)',
-                borderRadius: '12px',
-                padding: '8px 12px',
-                marginBottom: '16px',
-                border: 'var(--glass-border)'
-            }}>
-                <button className="btn-icon" onClick={() => changeMonth(-1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
-                    <ChevronLeft size={20} />
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'center' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '15px' }}>
-                        {currentMonthLabel}
-                    </span>
-                    {!isCurrentMonth && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const today = new Date();
-                                setCurrentDate(today);
-                                setSelectedDate(null);
-                                if (searchParams.get('month')) {
-                                    setSearchParams({});
-                                }
-                            }}
-                            style={{
-                                background: 'rgb(var(--rgb-primary) / 0.14)',
-                                border: '1px solid rgb(var(--rgb-primary) / 0.35)',
-                                color: 'var(--color-primary)',
-                                borderRadius: '6px',
-                                padding: '2px 8px',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                whiteSpace: 'nowrap',
-                                cursor: 'pointer'
-                            }}
-                            title="Zum aktuellen Monat springen"
-                        >
-                            Aktueller Monat
-                        </button>
-                    )}
-                </div>
-                <button className="btn-icon" onClick={() => changeMonth(1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
-                    <ChevronRight size={20} />
-                </button>
-            </div>
-
-            {/* Calendar Grid */}
-            <div className="calendar-wrapper">
-                <div className="calendar-grid">
-                    {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(day => (
-                        <div key={day} className="day-cell header">{day}</div>
-                    ))}
-
-                    {/* Empty Padding Cells */}
-                    {Array.from({ length: startDay }).map((_, i) => (
-                        <div key={`empty-${i}`} className="day-cell empty" />
-                    ))}
-
-                    {/* Actual Days */}
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-                        const dayNum = i + 1;
-                        const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNum);
-                        const dayShifts = monthShifts.filter(s => isSameDay(parseISO(s.date), date));
-                        const hasShift = dayShifts.length > 0;
-                        const hasBonusShift = dayShifts.some(s => s.hasBonus);
-                        const isSelected = selectedDate && isSameDay(date, selectedDate);
-                        const isCurrentDay = isSameDay(date, new Date());
-                        const dayDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                        const dayIncomingNight = getIncomingNightShiftForDate(dayDateStr, store.shifts);
-                        const isDayIncSpät = dayIncomingNight && ((dayIncomingNight.shiftTypeName || '').toLowerCase().includes('spät') || (dayIncomingNight.code || '').startsWith('RT'));
-                        const dayIncTitle = isDayIncSpät ? 'Spätschicht-Ende' : 'Nachtschicht-Ende';
-
-                        return (
-                            <div
-                                key={dayNum}
-                                className={`day-cell ${hasShift ? 'has-shift' : ''} ${isSelected ? 'selected' : ''} ${isCurrentDay ? 'today' : ''}`}
-                                onClick={() => setSelectedDate(date)}
-                                style={{ position: 'relative' }}
-                                title={isCurrentDay
-                                    ? `Tag ${dayNum} (Heute)`
-                                    : (dayIncomingNight ? `Tag ${dayNum}: ${dayIncTitle} bis ${dayIncomingNight.endTime} Uhr` : undefined)}
-                            >
-                                {dayNum}
-                                {hasBonusShift && (
-                                    <span
-                                        title="Bonus-Schicht"
-                                        style={{
-                                            position: 'absolute',
-                                            top: '2px',
-                                            right: '3px',
-                                            fontSize: '8px',
-                                            lineHeight: 1
-                                        }}
-                                    >
-                                        💰
-                                    </span>
-                                )}
-                                {!hasShift && dayIncomingNight && (
-                                    <span
-                                        title={`${dayIncTitle} bis ${dayIncomingNight.endTime} Uhr`}
-                                        style={{
-                                            position: 'absolute',
-                                            bottom: '2px',
-                                            right: '2px',
-                                            fontSize: '8px',
-                                            lineHeight: 1
-                                        }}
-                                    >
-                                        🌙
-                                    </span>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Shift List Header & Actions Bar */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginTop: '24px',
-                marginBottom: '12px',
-                flexWrap: 'wrap',
-                gap: '8px'
-            }}>
-                <div>
-                    <h2 style={{ margin: 0 }}>
-                        {selectedDate
-                            ? (() => {
-                                const isIncSpät = (incomingNightShift?.shiftTypeName || '').toLowerCase().includes('spät') || (incomingNightShift?.code || '').startsWith('RT');
-                                const incHeaderTitle = isIncSpät ? 'Spätschicht-Ende' : 'Nachtschicht-Ende';
-                                return visibleShifts.length === 0 && incomingNightShift
-                                    ? `${incHeaderTitle} am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`
-                                    : `${visibleShifts.length > 1 ? 'Dienste' : 'Dienst'} am ${selectedDate.toLocaleDateString('de-DE')}${isSameDay(selectedDate, new Date()) ? ' (Heute)' : ''}`;
-                            })()
-                            : 'Alle Dienste im Monat'
-                        }
-                    </h2>
-                </div>
-
-                {/* Bulk Actions Controls */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {selectedDate && (
-                        <button
-                            onClick={() => setSelectedDate(null)}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--color-primary)',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                fontWeight: 500,
-                                marginRight: '8px'
-                            }}
-                        >
-                            Alle anzeigen
-                        </button>
-                    )}
-
-                    {monthShifts.length > 0 && !isSelectMode && (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => setIsSelectMode(true)}
-                                className="filter-chip"
-                                style={{
-                                    fontSize: '12px',
-                                    padding: '6px 10px',
-                                    borderRadius: '8px',
-                                    gap: '4px'
-                                }}
-                            >
-                                <CheckSquare size={14} />
-                                Auswählen
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={requestDeleteMonth}
-                                className="filter-chip"
-                                style={{
-                                    fontSize: '12px',
-                                    padding: '6px 10px',
-                                    borderRadius: '8px',
-                                    gap: '4px',
-                                    color: 'var(--color-danger)',
-                                    borderColor: 'rgb(var(--rgb-danger) / 0.3)'
-                                }}
-                                title="Alle Dienste dieses Monats auf einmal löschen"
-                            >
-                                <Trash2 size={14} />
-                                Monat leeren
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {/* Selection Toolbar when isSelectMode is active */}
-            {isSelectMode && (
-                <div style={{
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-primary)',
-                    borderRadius: '12px',
-                    padding: '10px 14px',
-                    marginBottom: '14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '10px',
-                    animation: 'fadeIn 0.2s ease-out'
-                }}>
+            {selectedDate ? (
+                /* ===== Tagesansicht: nur der Kalendereintrag des angeklickten Tages ===== */
+                <div style={{ animation: 'fadeIn 0.18s ease-out' }}>
                     <button
                         type="button"
-                        onClick={toggleSelectAll}
+                        onClick={() => setSelectedDate(null)}
+                        className="btn-secondary"
                         style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--color-text-main)',
-                            display: 'flex',
+                            display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            cursor: 'pointer',
+                            padding: '8px 14px',
                             fontSize: '13px',
-                            fontWeight: 600
+                            borderRadius: '10px',
+                            marginBottom: '14px',
+                            width: 'auto'
                         }}
                     >
-                        {allVisibleSelected ? <CheckSquare size={16} color="var(--color-primary)" /> : <Square size={16} />}
-                        <span>{allVisibleSelected ? 'Keine auswählen' : 'Alle auswählen'}</span>
+                        <ArrowLeft size={16} />
+                        Zurück zur Monatsansicht
                     </button>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                            <strong style={{ color: 'var(--color-primary)' }}>{selectedShiftIds.size}</strong> ausgewählt
-                        </span>
+                    <h2 style={{ margin: '0 0 12px 0' }}>{dayHeader}</h2>
 
-                        <button
-                            type="button"
-                            onClick={requestDeleteSelected}
-                            disabled={selectedShiftIds.size === 0}
-                            style={{
-                                background: selectedShiftIds.size > 0 ? 'var(--color-danger)' : 'rgb(var(--rgb-danger) / 0.2)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '6px 12px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: selectedShiftIds.size > 0 ? 'pointer' : 'not-allowed',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                opacity: selectedShiftIds.size > 0 ? 1 : 0.6
-                            }}
-                        >
-                            <Trash2 size={14} />
-                            Ausgewählte löschen ({selectedShiftIds.size})
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsSelectMode(false);
-                                setSelectedShiftIds(new Set());
-                            }}
-                            className="btn-secondary"
-                            style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
-                        >
-                            Fertig
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Shift List Cards (Responsive Multi-Column Tile Grid) */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: visibleShifts.length > 0 ? 'repeat(auto-fill, minmax(240px, 1fr))' : '1fr',
-                gap: '10px'
-            }}>
-                {visibleShifts
-                    .slice()
-                    .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || '').localeCompare(b.startTime || ''))
-                    .map(shift => {
-                        const code = store.settings.shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
-                        const displayCode = code ? code.code : (shift.code || 'Schicht');
-                        const autoPartner = getPartnersForShiftFromRoster(shift.date, displayCode);
-                        const partnerDisplay = (autoPartner && (!shift.partner || shift.partner.startsWith('mit ')))
-                            ? autoPartner
-                            : (shift.partner || autoPartner);
-                        const dayName = new Date(shift.date).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
-                        const dayNum = new Date(shift.date).getDate();
-                        const isSelected = selectedShiftIds.has(shift.id);
-                        const shiftCol = getShiftColor(shift.shiftTypeName || '', displayCode, shift.station, shift.vehicle);
-
-                        return (
-                            <div
-                                key={shift.id}
-                                className="card-premium"
-                                onClick={() => {
-                                    if (isSelectMode) {
-                                        toggleSelectShift(shift.id);
-                                    } else {
-                                        navigate(`/add?id=${shift.id}&month=${currentYearMonthStr}`);
-                                    }
-                                }}
-                                style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'space-between',
-                                    gap: '8px',
-                                    cursor: 'pointer',
-                                    padding: '11px 12px',
-                                    marginBottom: 0,
-                                    border: isSelected ? '1px solid var(--color-primary)' : 'var(--glass-border)',
-                                    background: isSelected ? 'rgb(var(--rgb-primary) / 0.08)' : 'var(--color-surface)',
-                                    transition: 'all 0.15s ease'
-                                }}
-                            >
-                                {/* Top Row: Date Badge + Shift Code & Time + Actions */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
-                                        {isSelectMode && (
-                                            <div
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleSelectShift(shift.id);
-                                                }}
-                                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => toggleSelectShift(shift.id)}
-                                                    style={{
-                                                        width: '17px',
-                                                        height: '17px',
-                                                        accentColor: 'var(--color-primary)',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Compact Date Box in station colors */}
-                                        <div style={{
-                                            background: shiftCol.stationBg,
-                                            color: shiftCol.stationColor,
-                                            border: `1px solid ${shiftCol.stationBorder}`,
-                                            borderRadius: '10px',
-                                            minWidth: '40px',
-                                            height: '40px',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            flexShrink: 0
-                                        }}>
-                                            <span style={{ fontSize: '9px', fontWeight: 800, lineHeight: 1.1 }}>{dayName}</span>
-                                            <span style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1.05 }}>{dayNum}</span>
-                                        </div>
-
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                                <span style={{ fontSize: '15px', fontWeight: 800, color: shiftCol.color }}>
-                                                    {displayCode}
-                                                </span>
-                                                <span style={{
-                                                    fontSize: '11px',
-                                                    background: 'var(--c-surface-3)',
-                                                    padding: '1px 6px',
-                                                    borderRadius: '4px',
-                                                    color: 'var(--c-text-soft)',
-                                                    fontWeight: 600,
-                                                    whiteSpace: 'nowrap'
-                                                }}>
-                                                    {shift.startTime}–{shift.endTime}
-                                                </span>
-                                            </div>
-                                            {shift.hasBonus && (
-                                                <span style={{
-                                                    fontSize: '10px',
-                                                    fontWeight: 700,
-                                                    background: 'rgb(var(--rgb-success) / 0.18)',
-                                                    color: 'var(--c-success)',
-                                                    border: '1px solid rgb(var(--rgb-success) / 0.4)',
-                                                    padding: '0px 5px',
-                                                    borderRadius: '4px',
-                                                    width: 'fit-content'
-                                                }}>
-                                                    +{getShiftBonusAmount(shift, store.settings)} € Bonus
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Bonus Checkmark Toggle + Delete & Edit Icons */}
-                                    {!isSelectMode && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleShiftBonus(shift);
-                                                }}
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    padding: '4px 7px',
-                                                    borderRadius: '7px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 700,
-                                                    cursor: 'pointer',
-                                                    border: shift.hasBonus
-                                                        ? '1px solid var(--c-success-strong)'
-                                                        : '1px solid rgb(var(--rgb-muted) / 0.25)',
-                                                    background: shift.hasBonus
-                                                        ? 'rgb(var(--rgb-success) / 0.18)'
-                                                        : 'rgb(var(--rgb-bg) / 0.5)',
-                                                    color: shift.hasBonus ? 'var(--c-success)' : 'var(--c-text-muted)',
-                                                    transition: 'all 0.15s ease'
-                                                }}
-                                                title={shift.hasBonus ? `Bonus aktiv (${getShiftBonusAmount(shift, store.settings)} €) – Klicken zum Entfernen` : `Bonus-Haken setzen (+${store.settings?.defaultBonusAmount ?? 75} €)`}
-                                            >
-                                                <span>{shift.hasBonus ? '✓' : '☐'}</span>
-                                                <span>Bonus</span>
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setConfirmDeleteModal({
-                                                        type: 'selected',
-                                                        count: 1,
-                                                        ids: [shift.id],
-                                                        label: `den Dienst am ${new Date(shift.date).toLocaleDateString('de-DE')} (${displayCode})`
-                                                    });
-                                                }}
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    color: 'var(--color-text-muted)',
-                                                    cursor: 'pointer',
-                                                    padding: '4px'
-                                                }}
-                                                title="Diesen Dienst löschen"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                            <PenSquare size={14} style={{ opacity: 0.5 }} />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Bottom Details: Station, Vehicle & Partner */}
-                                <div style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '3px',
-                                    paddingTop: '6px',
-                                    borderTop: '1px solid rgb(var(--rgb-muted) / 0.1)'
-                                }}>
-                                    {(shift.station || shift.vehicle) && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: 'var(--c-text-muted)', flexWrap: 'wrap' }}>
-                                            {shift.station && (
-                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: shiftCol.stationColor, fontWeight: 600 }}>
-                                                    <MapPin size={11} color={shiftCol.stationColor} />
-                                                    {shift.station}
-                                                </span>
-                                            )}
-                                            {shift.station && shift.vehicle && <span>•</span>}
-                                            {shift.vehicle && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shift.vehicle}</span>}
-                                        </div>
-                                    )}
-                                    {partnerDisplay && (
-                                        <div style={{ fontSize: '12px', color: 'var(--c-info)', fontWeight: 600, lineHeight: 1.35 }}>
-                                            👤 {partnerDisplay}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                {visibleShifts.length === 0 && (
-                    <div style={{
-                        padding: '30px 20px',
-                        textAlign: 'center',
-                        color: 'var(--color-text-muted)',
-                        background: 'var(--color-surface)',
-                        borderRadius: '16px',
-                        border: 'var(--glass-border)'
-                    }}>
-                        {selectedDate ? (
-                            incomingNightShift ? (() => {
+                    {visibleShifts.length > 0 ? (
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                            gap: '10px'
+                        }}>
+                            {visibleShifts
+                                .slice()
+                                .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
+                                .map(renderShiftCard)}
+                        </div>
+                    ) : (
+                        <div style={{
+                            padding: '30px 20px',
+                            textAlign: 'center',
+                            color: 'var(--color-text-muted)',
+                            background: 'var(--color-surface)',
+                            borderRadius: '16px',
+                            border: 'var(--glass-border)'
+                        }}>
+                            {incomingNightShift ? (() => {
                                 const isIncSpät = (incomingNightShift.shiftTypeName || '').toLowerCase().includes('spät') || (incomingNightShift.code || '').startsWith('RT');
                                 const incTitle = isIncSpät ? 'SPÄTSCHICHT-ENDE' : 'NACHTSCHICHT-ENDE';
                                 const shiftWord = isIncSpät ? 'Spätschicht' : 'Nachtschicht';
@@ -864,15 +568,119 @@ export default function Journal() {
                                 <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--c-text)', letterSpacing: '1.5px' }}>
                                     FREI
                                 </div>
-                            )
-                        ) : (
-                            <div style={{ fontSize: '14px' }}>
-                                Keine Einträge für diesen Monat vorhanden.
-                            </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                /* ===== Monatsansicht ===== */
+                <>
+                {/* Month Switcher Bar */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: 'var(--color-surface)',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    marginBottom: '16px',
+                    border: 'var(--glass-border)'
+                }}>
+                    <button className="btn-icon" onClick={() => changeMonth(-1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
+                        <ChevronLeft size={20} />
+                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'center' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                            {currentMonthLabel}
+                        </span>
+                        {!isCurrentMonth && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const today = new Date();
+                                    setCurrentDate(today);
+                                    setSelectedDate(null);
+                                    if (searchParams.get('month')) {
+                                        setSearchParams({});
+                                    }
+                                }}
+                                style={{
+                                    background: 'rgb(var(--rgb-primary) / 0.14)',
+                                    border: '1px solid rgb(var(--rgb-primary) / 0.35)',
+                                    color: 'var(--color-primary)',
+                                    borderRadius: '6px',
+                                    padding: '2px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    whiteSpace: 'nowrap',
+                                    cursor: 'pointer'
+                                }}
+                                title="Zum aktuellen Monat springen"
+                            >
+                                Aktueller Monat
+                            </button>
                         )}
                     </div>
-                )}
-            </div>
+                    <button className="btn-icon" onClick={() => changeMonth(1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
+                        <ChevronRight size={20} />
+                    </button>
+                </div>
+
+                    {/* Monatskalender (gleiche Übersicht wie im Reiter „mein Plan“) */}
+                    <div className="card-premium">
+                        <ShiftRhythmCalendar
+                            baseDate={monthStartDate}
+                            filterMode="month"
+                            filteredData={monthShifts}
+                            allShifts={store.shifts}
+                            storeSettings={store.settings}
+                            selectedDateStr={selectedDateStr}
+                            onSelectDate={handleSelectCalendarDay}
+                            showInspector={false}
+                        />
+                    </div>
+
+                    {monthShifts.length > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-6px', marginBottom: '16px' }}>
+                            <button
+                                type="button"
+                                onClick={requestDeleteMonth}
+                                className="filter-chip"
+                                style={{
+                                    fontSize: '12px',
+                                    padding: '6px 10px',
+                                    borderRadius: '8px',
+                                    gap: '4px',
+                                    color: 'var(--color-danger)',
+                                    borderColor: 'rgb(var(--rgb-danger) / 0.3)'
+                                }}
+                                title="Alle Dienste dieses Monats auf einmal löschen"
+                            >
+                                <Trash2 size={14} />
+                                Monat leeren
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Auswertung: Geleistet | Schichten | Bonus | Saldo + Verteilung */}
+                    <PeriodStats
+                        stats={monthLogic.stats}
+                        target={monthLogic.target}
+                        delta={monthLogic.delta}
+                        weeklyRate={monthLogic.weeklyRate}
+                        filterMode="month"
+                        label={monthLogic.label}
+                        baseDate={monthStartDate}
+                        bonusOverview={monthLogic.bonusOverview}
+                        filteredData={monthLogic.filteredData}
+                        storeSettings={store.settings}
+                        onSelectMonth={(monthIndex) => {
+                            setCurrentDate(new Date(monthStartDate.getFullYear(), monthIndex, 1));
+                            setSelectedDate(null);
+                        }}
+                    />
+                </>
+            )}
 
             {/* Confirm Delete Modal */}
             {confirmDeleteModal && (

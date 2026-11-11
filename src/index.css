@@ -511,6 +511,10 @@ h2 {
   transition: transform 0.25s var(--ease-out);
 }
 
+.nav-item span {
+  white-space: nowrap;
+}
+
 .nav-item:hover {
   color: var(--c-text);
 }

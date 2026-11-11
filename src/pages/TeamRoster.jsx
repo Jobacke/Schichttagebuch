@@ -1911,7 +1911,7 @@ export default function TeamRoster() {
                   Noch kein Dienstplan für {roster.monthLabel || yearMonth} geladen
                 </p>
                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-                  Lade die 3 Wachen über den Reiter Journal („⚡ Dienstpläne (3 Wachen) laden“) oder manuell:
+                  Lade die 3 Wachen über den Reiter Journal oder „mein Plan“ („⚡ DP mit neuestem Stand laden“) oder manuell:
                 </p>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <button

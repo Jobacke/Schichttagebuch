@@ -126,12 +126,14 @@ export const getMonthlyTarget = (year, monthIndex0, settings) => {
     return (daysInMonth / 7) * weeklyHours;
 };
 
-export function useAnalysisLogic() {
+export function useAnalysisLogic(options = {}) {
     const { store, loading } = useStore();
 
     // Default Filter State
     const [filterMode, setFilterMode] = useState('month'); // 'month', 'year', 'custom'
-    const [baseDate, setBaseDate] = useState(new Date());
+    const [internalBaseDate, setBaseDate] = useState(new Date());
+    // Optional: Basisdatum von außen vorgeben (z. B. Monatsauswahl im Journal)
+    const baseDate = options.baseDate instanceof Date ? options.baseDate : internalBaseDate;
 
     // Custom Range Inputs
     const [customStart, setCustomStart] = useState('');

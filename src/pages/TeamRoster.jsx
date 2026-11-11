@@ -1740,62 +1740,53 @@ export default function TeamRoster() {
         {stationCounts.ALL > 0 && (
           <div style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
             gap: '6px',
-            overflowX: 'auto',
             paddingBottom: '8px',
             marginBottom: '6px',
-            scrollbarWidth: 'none'
+            width: '100%'
           }}>
-            <button
-              type="button"
-              onClick={() => setSelectedStation('ALL')}
-              style={{
-                padding: '6px 11px',
-                borderRadius: '10px',
-                fontSize: '12px',
-                fontWeight: selectedStation === 'ALL' ? 800 : 600,
-                background: selectedStation === 'ALL' ? 'rgb(var(--rgb-info) / 0.2)' : 'rgb(var(--rgb-surface) / 0.75)',
-                border: selectedStation === 'ALL' ? '1px solid var(--c-info)' : '1px solid rgb(var(--rgb-muted) / 0.2)',
-                color: selectedStation === 'ALL' ? 'var(--c-info)' : 'var(--c-text-soft)',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                transition: 'all 0.15s ease'
-              }}
-            >
-              Alle Wachen ({stationCounts.ALL})
-            </button>
             {[
               { id: 'Sendling', label: 'München', color: 'var(--c-info)', bg: 'rgb(var(--rgb-info) / 0.18)' },
               { id: 'Hohenbrunn', label: 'Hohenbrunn', color: 'var(--c-success)', bg: 'rgb(var(--rgb-success) / 0.18)' },
               { id: 'Obersendling', label: 'Obersendling', color: 'var(--c-warning)', bg: 'rgb(var(--rgb-warning) / 0.18)' }
             ].map(st => {
               const active = selectedStation === st.id;
+              const dimmed = selectedStation !== 'ALL' && !active;
               return (
                 <button
                   key={st.id}
                   type="button"
                   onClick={() => setSelectedStation(active ? 'ALL' : st.id)}
+                  title={active ? 'Filter aufheben – wieder alle Wachen anzeigen' : `Nur Wache ${st.label} anzeigen`}
+                  aria-pressed={active}
                   style={{
+                    flex: '1 1 0',
+                    minWidth: 0,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 11px',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    padding: '7px 6px',
                     borderRadius: '10px',
                     fontSize: '12px',
                     fontWeight: active ? 800 : 600,
                     background: active ? st.bg : 'rgb(var(--rgb-surface) / 0.75)',
                     border: active ? `1px solid ${st.color}` : '1px solid rgb(var(--rgb-muted) / 0.2)',
                     color: active ? st.color : 'var(--c-text-soft)',
+                    opacity: dimmed ? 0.6 : 1,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
-                    flexShrink: 0,
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: st.color }} />
-                  <span>{st.label} ({stationCounts[st.id] || 0})</span>
+                  {active ? (
+                    <X size={13} strokeWidth={3} style={{ flexShrink: 0 }} />
+                  ) : (
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: st.color, flexShrink: 0 }} />
+                  )}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{st.label}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, opacity: 0.75, flexShrink: 0 }}>{stationCounts[st.id] || 0}</span>
                 </button>
               );
             })}

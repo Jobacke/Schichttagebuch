@@ -135,7 +135,15 @@ export default function TeamRoster() {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStation, setSelectedStation] = useState('ALL'); // 'ALL' | 'Sendling' | 'Hohenbrunn' | 'Obersendling'
+  const [selectedStations, setSelectedStations] = useState([]); // [] = alle Wachen; sonst 1–2 aus 'Sendling' | 'Hohenbrunn' | 'Obersendling'
+  const ALL_STATION_IDS = ['Sendling', 'Hohenbrunn', 'Obersendling'];
+  // Wache an-/abwählen: erneutes Tippen entfernt sie; alle drei gewählt = kein Filter
+  const toggleStation = (id) => {
+    setSelectedStations(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      return next.length >= ALL_STATION_IDS.length ? [] : next;
+    });
+  };
   const [selectedShiftGroup, setSelectedShiftGroup] = useState('ALL'); // 'ALL' | 'Frühdienst' | 'Tagschicht' | 'Spätdienst' | 'Nachtdienst' | 'Sonderdienste' | 'Fortbildung' | 'Urlaub / Abwesend'
   const [viewMode, setViewMode] = useState('crews'); // 'crews' | 'list'
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -412,9 +420,9 @@ export default function TeamRoster() {
     const raw = roster.shiftsByDate?.[selectedDate] || [];
     const filtered = raw.filter(shift => {
       // 1. Station filter
-      if (selectedStation !== 'ALL') {
+      if (selectedStations.length > 0) {
         const st = detectStation({ code: shift.code, station: shift.station });
-        if (st !== selectedStation) return false;
+        if (!selectedStations.includes(st)) return false;
       }
 
       // 2. Shift group filter
@@ -449,14 +457,14 @@ export default function TeamRoster() {
       // 4. Kollegenname alphabetisch (bei identischem Schichtkürzel)
       return a.name.localeCompare(b.name, 'de');
     });
-  }, [roster, selectedDate, searchQuery, selectedStation, selectedShiftGroup]);
+  }, [roster, selectedDate, searchQuery, selectedStations, selectedShiftGroup]);
 
   // Staffing Analysis: Jedes reguläre Schichtkürzel ohne '*' muss mindestens 2x vorkommen
   const staffingAnalysis = useMemo(() => {
     const raw = roster.shiftsByDate?.[selectedDate] || [];
-    const shiftsToCheck = selectedStation === 'ALL'
+    const shiftsToCheck = selectedStations.length === 0
       ? raw
-      : raw.filter(s => detectStation({ code: s.code, station: s.station }) === selectedStation);
+      : raw.filter(s => selectedStations.includes(detectStation({ code: s.code, station: s.station })));
 
     const regularCounts = {}; // baseCode -> Anzahl regulär besetzt (ohne '*')
     const starCounts = {};    // baseCode -> Anzahl mit '*' (Zusatzkraft/3. Person)
@@ -531,7 +539,7 @@ export default function TeamRoster() {
       understaffedCodes,
       hasUnderstaffed: understaffed.length > 0
     };
-  }, [roster, selectedDate, selectedStation]);
+  }, [roster, selectedDate, selectedStations]);
 
   // All displayable months (combining saved plans with currently viewed month)
   const allDisplayMonths = useMemo(() => {
@@ -1026,8 +1034,8 @@ export default function TeamRoster() {
       {/* Single-Row Date Stepper (Click on Date = Jump Modal, Filter Button integrated) */}
       {(() => {
         const hasSearch = Boolean(searchQuery.trim());
-        const hasTeamFilter = selectedStation !== 'ALL' || selectedShiftGroup !== 'ALL' || hasSearch;
-        const activeCount = (selectedStation !== 'ALL' ? 1 : 0) + (selectedShiftGroup !== 'ALL' ? 1 : 0) + (hasSearch ? 1 : 0);
+        const hasTeamFilter = selectedStations.length > 0 || selectedShiftGroup !== 'ALL' || hasSearch;
+        const activeCount = (selectedStations.length > 0 ? 1 : 0) + (selectedShiftGroup !== 'ALL' ? 1 : 0) + (hasSearch ? 1 : 0);
 
         return (
           <div className="team-roster-stepper">
@@ -1108,7 +1116,7 @@ export default function TeamRoster() {
                   type="button"
                   onClick={() => {
                     setSearchQuery('');
-                    setSelectedStation('ALL');
+                    setSelectedStations([]);
                     setSelectedShiftGroup('ALL');
                   }}
                   style={{
@@ -1341,7 +1349,7 @@ export default function TeamRoster() {
 
       {/* PopUp Modal 2: Team-Filter (Kollege/Kürzel, Wachen & Schichtgruppen) */}
       {showFilterModal && (() => {
-        const hasTeamFilter = selectedStation !== 'ALL' || selectedShiftGroup !== 'ALL' || Boolean(searchQuery.trim());
+        const hasTeamFilter = selectedStations.length > 0 || selectedShiftGroup !== 'ALL' || Boolean(searchQuery.trim());
         const shiftGroups = ['Frühdienst', 'Tagschicht', 'Spätdienst', 'Nachtdienst', 'Sonderdienste', 'Fortbildung', 'Urlaub / Abwesend'];
 
         return (
@@ -1466,29 +1474,29 @@ export default function TeamRoster() {
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    onClick={() => setSelectedStation('ALL')}
+                    onClick={() => setSelectedStations([])}
                     style={{
                       padding: '7px 12px',
                       borderRadius: '20px',
                       fontSize: '12.5px',
-                      fontWeight: selectedStation === 'ALL' ? 700 : 500,
-                      background: selectedStation === 'ALL' ? 'rgb(var(--rgb-info) / 0.2)' : 'var(--c-surface)',
-                      border: selectedStation === 'ALL' ? '1px solid var(--c-info)' : '1px solid var(--c-surface-3)',
-                      color: selectedStation === 'ALL' ? 'var(--c-info)' : 'var(--c-text-soft)',
+                      fontWeight: selectedStations.length === 0 ? 700 : 500,
+                      background: selectedStations.length === 0 ? 'rgb(var(--rgb-info) / 0.2)' : 'var(--c-surface)',
+                      border: selectedStations.length === 0 ? '1px solid var(--c-info)' : '1px solid var(--c-surface-3)',
+                      color: selectedStations.length === 0 ? 'var(--c-info)' : 'var(--c-text-soft)',
                       cursor: 'pointer'
                     }}
                   >
-                    Alle Wachen ({stationCounts.ALL}) {selectedStation === 'ALL' && '✓'}
+                    Alle Wachen ({stationCounts.ALL}) {selectedStations.length === 0 && '✓'}
                   </button>
 
                   {['Sendling', 'Hohenbrunn', 'Obersendling'].map(stName => {
                     const theme = STATION_THEMES[stName] || STATION_THEMES.Sendling;
-                    const active = selectedStation === stName;
+                    const active = selectedStations.includes(stName);
                     return (
                       <button
                         key={stName}
                         type="button"
-                        onClick={() => setSelectedStation(active ? 'ALL' : stName)}
+                        onClick={() => toggleStation(stName)}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -1567,7 +1575,7 @@ export default function TeamRoster() {
                     type="button"
                     onClick={() => {
                       setSearchQuery('');
-                      setSelectedStation('ALL');
+                      setSelectedStations([]);
                       setSelectedShiftGroup('ALL');
                     }}
                     style={{
@@ -1657,7 +1665,7 @@ export default function TeamRoster() {
                         (+{item.stars}*)
                       </span>
                     )}
-                    {selectedStation === 'ALL' && (
+                    {selectedStations.length !== 1 && (
                       <span style={{
                         fontSize: '10px',
                         padding: '1px 5px',
@@ -1751,14 +1759,14 @@ export default function TeamRoster() {
               { id: 'Hohenbrunn', label: 'Hohenbrunn', color: 'var(--c-success)', bg: 'rgb(var(--rgb-success) / 0.18)' },
               { id: 'Obersendling', label: 'Obersendling', color: 'var(--c-warning)', bg: 'rgb(var(--rgb-warning) / 0.18)' }
             ].map(st => {
-              const active = selectedStation === st.id;
-              const dimmed = selectedStation !== 'ALL' && !active;
+              const active = selectedStations.includes(st.id);
+              const dimmed = selectedStations.length > 0 && !active;
               return (
                 <button
                   key={st.id}
                   type="button"
-                  onClick={() => setSelectedStation(active ? 'ALL' : st.id)}
-                  title={active ? 'Filter aufheben – wieder alle Wachen anzeigen' : `Nur Wache ${st.label} anzeigen`}
+                  onClick={() => toggleStation(st.id)}
+                  title={active ? `Wache ${st.label} aus dem Filter entfernen` : `Wache ${st.label} zum Filter hinzufügen`}
                   aria-pressed={active}
                   style={{
                     flex: '1 1 0',

@@ -6,6 +6,7 @@ import {
   Calendar, Trash2, FolderOpen, Check, Cloud, RefreshCw, SlidersHorizontal
 } from 'lucide-react';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
+import ShiftRhythmCalendar from '../components/ShiftRhythmCalendar';
 import {
   getActiveTeamRoster,
   saveStationTeamRoster,
@@ -139,6 +140,7 @@ export default function TeamRoster() {
   const [viewMode, setViewMode] = useState('crews'); // 'crews' | 'list'
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showJumpModal, setShowJumpModal] = useState(false);
+  const [jumpMonth, setJumpMonth] = useState(null); // 'YYYY-MM' – im Tag-Filter frei blätterbarer Monat
   const [uploadStationOverride, setUploadStationOverride] = useState('AUTO'); // 'AUTO' | 'Sendling' | 'Obersendling' | 'Hohenbrunn'
   const [copiedScript, setCopiedScript] = useState(false);
   const [copiedBookmarklet, setCopiedBookmarklet] = useState(false);
@@ -267,6 +269,30 @@ export default function TeamRoster() {
     } else {
       setSelectedDate(todayStr);
     }
+  };
+
+  // --- Tag-Filter (Kalender in mein-Plan-/Journal-Optik) ---
+  const openJumpModal = () => {
+    setJumpMonth((selectedDate || '').slice(0, 7) || yearMonth);
+    setShowJumpModal(true);
+  };
+
+  const shiftJumpMonth = (delta) => {
+    const base = jumpMonth || yearMonth;
+    const [y, m] = base.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setJumpMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const jumpToDate = (dateStr) => {
+    if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+    const targetYM = dateStr.slice(0, 7);
+    if (targetYM !== yearMonth) {
+      switchMonth(targetYM, dateStr);
+    } else {
+      setSelectedDate(dateStr);
+    }
+    setShowJumpModal(false);
   };
 
   function getShiftRank(code = '') {
@@ -1014,21 +1040,27 @@ export default function TeamRoster() {
               <ChevronLeft size={20} />
             </button>
 
-            <div
-              onClick={() => setShowJumpModal(true)}
+            <button
+              type="button"
+              onClick={openJumpModal}
+              className="team-roster-date-pill"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
                 minWidth: 0,
                 cursor: 'pointer',
-                padding: '4px 6px',
-                borderRadius: '8px',
+                borderRadius: '10px',
+                background: 'rgb(var(--rgb-primary) / 0.08)',
+                border: '1px solid rgb(var(--rgb-primary) / 0.3)',
+                color: 'var(--color-text-main)',
+                fontFamily: 'inherit',
                 transition: 'background 0.15s ease'
               }}
-              title="Klicken, um direkt zu einem Datum zu springen"
+              title="Tag wählen – Kalender öffnen (auch andere Monate)"
             >
-              <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
+              <Calendar size={15} style={{ color: 'var(--c-primary-text)', flexShrink: 0 }} />
+              <span className="team-roster-date-label" style={{ fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
                 {formattedSelectedDate}
               </span>
               {selectedDate === currentTodayStr && (
@@ -1045,7 +1077,7 @@ export default function TeamRoster() {
                   Heute
                 </span>
               )}
-            </div>
+            </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
               <button
@@ -1068,7 +1100,7 @@ export default function TeamRoster() {
                 title="Nach Kollege, Kürzel, Wache oder Schichtgruppe filtern"
               >
                 <SlidersHorizontal size={13} />
-                <span>Filter{hasTeamFilter ? ` (${activeCount})` : ''}</span>
+                <span className="team-roster-filter-label">Filter</span>{hasTeamFilter && <span>({activeCount})</span>}
               </button>
 
               {hasTeamFilter && (
@@ -1119,39 +1151,25 @@ export default function TeamRoster() {
         );
       })()}
 
-      {/* PopUp Modal 1: "Springe zu" Datum-Auswahl */}
+      {/* PopUp Modal 1: Tag-Filter – Kalender in gleicher Optik wie „mein Plan“ und „Journal“ */}
       {showJumpModal && (() => {
-        const [y, m] = yearMonth.split('-').map(Number);
-        const totalDays = new Date(y, m, 0).getDate();
-        const firstWeekday = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Mo=0 ... So=6
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const myShiftsMap = {};
-        myRosterShifts.forEach(s => {
-          myShiftsMap[s.date] = myShiftsMap[s.date] ? `${myShiftsMap[s.date]}, ${s.code}` : s.code;
-        });
-
-        const calendarCells = [];
-        for (let i = 0; i < firstWeekday; i++) {
-          calendarCells.push({ empty: true, key: `e-${i}` });
-        }
-        for (let d = 1; d <= totalDays; d++) {
-          const dStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
-          const dayRosterShifts = roster.shiftsByDate?.[dStr] || [];
-          const myCode = myShiftsMap[dStr] || null;
-          const isWeekend = ((firstWeekday + d - 1) % 7) >= 5;
-          calendarCells.push({
-            empty: false,
-            dayNum: d,
-            dateStr: dStr,
-            shiftCount: dayRosterShifts.length,
-            myCode,
-            isWeekend,
-            isSelected: selectedDate === dStr,
-            isToday: todayStr === dStr,
-            key: dStr
-          });
-        }
+        const pickerYM = jumpMonth || yearMonth;
+        const [py, pm] = pickerYM.split('-').map(Number);
+        const pickerBaseDate = new Date(py, pm - 1, 1);
+        const pickerLabel = pickerBaseDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+        const pickerShifts = (store?.shifts || []).filter(s => s.date && s.date.startsWith(pickerYM));
+        const pickerHasRoster = (savedRosters || []).some(r => r.yearMonth === pickerYM);
+        const isPickerTodayMonth = currentTodayStr.startsWith(pickerYM);
+        const navBtnStyle = {
+          background: 'var(--c-surface)',
+          border: '1px solid var(--c-surface-3)',
+          color: 'var(--c-text-soft)',
+          borderRadius: '8px',
+          padding: '6px 9px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center'
+        };
 
         return (
           <div
@@ -1174,11 +1192,13 @@ export default function TeamRoster() {
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: '420px',
+                maxWidth: '480px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
                 background: 'var(--c-bg)',
                 border: '1px solid var(--c-surface-3)',
                 borderRadius: '18px',
-                padding: '18px',
+                padding: '16px',
                 boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)'
               }}
             >
@@ -1187,246 +1207,132 @@ export default function TeamRoster() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Calendar size={17} style={{ color: 'var(--c-primary-text)' }} />
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--c-text)' }}>
-                    Springe zu Datum
+                    Tag wählen
                   </h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowJumpModal(false)}
-                  style={{
-                    background: 'var(--c-surface)',
-                    border: '1px solid var(--c-surface-3)',
-                    color: 'var(--c-text-muted)',
-                    borderRadius: '8px',
-                    padding: '4px 8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
+                  style={{ ...navBtnStyle, padding: '4px 8px', color: 'var(--c-text-muted)' }}
                 >
                   <X size={16} />
                 </button>
               </div>
 
-              {/* Month Bar inside Modal */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={handlePrevMonth}
-                    style={{
-                      background: 'var(--c-surface)',
-                      border: '1px solid var(--c-surface-3)',
-                      color: 'var(--c-text-soft)',
-                      borderRadius: '8px',
-                      padding: '5px 8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-text)', minWidth: '120px', textAlign: 'center' }}>
-                    {roster.monthLabel || yearMonth}
+              {/* Monatsnavigation (frei blätterbar, auch über den aktuellen Monat hinaus) */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <button type="button" onClick={() => shiftJumpMonth(-1)} style={navBtnStyle} title="Vorheriger Monat">
+                  <ChevronLeft size={16} />
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-text)', whiteSpace: 'nowrap' }}>
+                    {pickerLabel}
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleNextMonth}
-                    style={{
-                      background: 'var(--c-surface)',
-                      border: '1px solid var(--c-surface-3)',
-                      color: 'var(--c-text-soft)',
-                      borderRadius: '8px',
-                      padding: '5px 8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
+                  {!isPickerTodayMonth && (
+                    <button
+                      type="button"
+                      onClick={() => setJumpMonth(currentTodayStr.slice(0, 7))}
+                      style={{
+                        background: 'rgb(var(--rgb-primary) / 0.12)',
+                        border: '1px solid rgb(var(--rgb-primary) / 0.3)',
+                        color: 'var(--c-primary)',
+                        borderRadius: '6px',
+                        padding: '2px 8px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer'
+                      }}
+                      title="Zum aktuellen Monat blättern"
+                    >
+                      Aktueller Monat
+                    </button>
+                  )}
                 </div>
+                <button type="button" onClick={() => shiftJumpMonth(1)} style={navBtnStyle} title="Nächster Monat">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
 
+              {!pickerHasRoster && (
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--c-warning)',
+                  background: 'rgb(var(--rgb-warning) / 0.1)',
+                  border: '1px solid rgb(var(--rgb-warning) / 0.3)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  marginBottom: '10px'
+                }}>
+                  Für {pickerLabel} ist noch kein Team-Dienstplan geladen.
+                </div>
+              )}
+
+              {/* Kalender – identische Optik wie in „mein Plan“ und „Journal“ */}
+              <ShiftRhythmCalendar
+                baseDate={pickerBaseDate}
+                filterMode="month"
+                filteredData={pickerShifts}
+                allShifts={store?.shifts || []}
+                storeSettings={store?.settings}
+                selectedDateStr={selectedDate && selectedDate.startsWith(pickerYM) ? selectedDate : null}
+                onSelectDate={(dateStr) => {
+                  // Klick auf den bereits gewählten Tag liefert null → einfach schließen
+                  if (!dateStr) {
+                    setShowJumpModal(false);
+                    return;
+                  }
+                  jumpToDate(dateStr);
+                }}
+                showInspector={false}
+              />
+
+              {/* Schnellzugriff + direktes Datum */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                flexWrap: 'wrap',
+                paddingTop: '12px',
+                marginTop: '12px',
+                borderTop: '1px solid var(--c-surface)'
+              }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    handleToday();
-                    setShowJumpModal(false);
-                  }}
+                  onClick={() => jumpToDate(currentTodayStr)}
                   style={{
                     background: 'rgb(var(--rgb-info) / 0.15)',
                     border: '1px solid rgb(var(--rgb-info) / 0.35)',
                     color: 'var(--c-info)',
                     borderRadius: '8px',
-                    padding: '5px 10px',
-                    fontSize: '12px',
+                    padding: '6px 12px',
+                    fontSize: '12.5px',
                     fontWeight: 700,
                     cursor: 'pointer'
                   }}
                 >
                   Heute
                 </button>
-              </div>
-
-              {/* Weekday Headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '6px' }}>
-                {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((wd, i) => (
-                  <div
-                    key={wd}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--c-text-muted)', fontWeight: 600 }}>
+                    Direktes Datum:
+                  </span>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => jumpToDate(e.target.value)}
                     style={{
-                      textAlign: 'center',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: i >= 5 ? 'var(--c-primary-text)' : 'var(--c-text-subtle)'
+                      background: 'var(--c-surface)',
+                      border: '1px solid var(--c-surface-3)',
+                      color: 'var(--c-text)',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      fontSize: '12.5px',
+                      fontFamily: 'inherit'
                     }}
-                  >
-                    {wd}
-                  </div>
-                ))}
-              </div>
-
-              {/* 1-Click Day Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px', marginBottom: '14px' }}>
-                {calendarCells.map(cell => {
-                  if (cell.empty) {
-                    return <div key={cell.key} style={{ minHeight: '44px' }} />;
-                  }
-                  const myShiftColor = cell.myCode ? getShiftColor('', cell.myCode) : null;
-                  return (
-                    <button
-                      key={cell.key}
-                      type="button"
-                      onClick={() => {
-                        setSelectedDate(cell.dateStr);
-                        setShowJumpModal(false);
-                      }}
-                      style={{
-                        minHeight: '44px',
-                        padding: '4px 2px',
-                        borderRadius: '9px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '2px',
-                        cursor: 'pointer',
-                        background: cell.isSelected
-                          ? 'rgb(var(--rgb-info) / 0.25)'
-                          : cell.myCode
-                            ? myShiftColor.bg
-                            : (cell.isWeekend ? 'rgb(var(--rgb-surface) / 0.6)' : 'var(--c-surface)'),
-                        border: cell.isSelected
-                          ? '2px solid var(--c-info)'
-                          : cell.isToday
-                            ? '2px solid var(--c-primary)'
-                            : cell.myCode
-                              ? `1px solid ${myShiftColor.border}`
-                              : '1px solid var(--c-surface-3)',
-                        boxShadow: cell.isSelected
-                          ? '0 0 10px rgb(var(--rgb-info) / 0.35)'
-                          : cell.isToday
-                            ? '0 0 10px rgb(var(--rgb-primary) / 0.45)'
-                            : 'none',
-                        color: 'var(--c-text)',
-                        transition: 'all 0.12s ease'
-                      }}
-                    >
-                      {cell.isToday ? (
-                        <span style={{
-                          background: 'var(--c-primary)',
-                          color: '#ffffff',
-                          borderRadius: '50%',
-                          width: '18px',
-                          height: '18px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '11px',
-                          fontWeight: 800,
-                          lineHeight: 1,
-                          boxShadow: '0 2px 5px rgb(var(--rgb-primary) / 0.6)'
-                        }}>
-                          {cell.dayNum}
-                        </span>
-                      ) : (
-                        <span style={{
-                          fontSize: '12.5px',
-                          fontWeight: cell.isSelected || cell.myCode ? 800 : 600,
-                          color: cell.isSelected ? 'var(--c-info)' : 'var(--c-text)',
-                          lineHeight: 1.1
-                        }}>
-                          {cell.dayNum}
-                        </span>
-                      )}
-                      {cell.myCode ? (
-                        <span style={{
-                          fontSize: '9px',
-                          fontWeight: 800,
-                          color: myShiftColor.color,
-                          lineHeight: 1
-                        }}>
-                          {cell.myCode}
-                        </span>
-                      ) : cell.isToday ? (
-                        <span style={{
-                          fontSize: '9px',
-                          fontWeight: 800,
-                          color: 'var(--c-primary)',
-                          lineHeight: 1
-                        }}>
-                          Heute
-                        </span>
-                      ) : cell.shiftCount > 0 ? (
-                        <span style={{
-                          fontSize: '9px',
-                          color: 'var(--c-text-subtle)',
-                          lineHeight: 1
-                        }}>
-                          {cell.shiftCount}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Direct Date Input Fallback */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '10px',
-                paddingTop: '10px',
-                borderTop: '1px solid var(--c-surface)'
-              }}>
-                <span style={{ fontSize: '12px', color: 'var(--c-text-muted)', fontWeight: 600 }}>
-                  Direktes Datum:
-                </span>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (!val) return;
-                    const targetYM = val.slice(0, 7);
-                    if (targetYM !== yearMonth) {
-                      switchMonth(targetYM, val);
-                    } else {
-                      setSelectedDate(val);
-                    }
-                    setShowJumpModal(false);
-                  }}
-                  style={{
-                    background: 'var(--c-surface)',
-                    border: '1px solid var(--c-surface-3)',
-                    color: 'var(--c-text)',
-                    borderRadius: '8px',
-                    padding: '6px 10px',
-                    fontSize: '12.5px',
-                    fontFamily: 'inherit'
-                  }}
-                />
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -2967,7 +2873,6 @@ export default function TeamRoster() {
                 onClick={() => {
                   setIsUploadOpen(false);
                   setUploadError(null);
-                  setIsPasteMode(false);
                 }}
                 className="btn-secondary"
                 style={{ fontSize: '13px', padding: '8px 16px', borderRadius: '10px' }}

@@ -85,13 +85,36 @@ export default function Analysis() {
     return (
         <div className="page-content">
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                    <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                        Mein Plan
-                    </h1>
-                </div>
+            {/* Kopfzeile: Titel links | DP laden Mitte | Dienstplan PDF rechts */}
+            <div className="plan-header">
+                <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    Mein Plan
+                </h1>
                 <DpLoadButton yearMonth={currentYearMonthStr} monthLabel={currentMonthLabel} />
+                <button
+                    type="button"
+                    onClick={handleExportPDF}
+                    style={{
+                        background: 'rgb(var(--rgb-info) / 0.12)',
+                        color: 'var(--c-info)',
+                        border: '1px solid rgb(var(--rgb-info) / 0.4)',
+                        fontWeight: 800,
+                        padding: '8px 13px',
+                        borderRadius: '12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        fontSize: '12.5px',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 3px 12px rgb(var(--rgb-info) / 0.15)',
+                        transition: 'all 0.15s ease'
+                    }}
+                    title="Dienstplan als PDF exportieren"
+                >
+                    <span style={{ fontSize: '15px', lineHeight: 1 }}>📄</span>
+                    <span>Dienstplan PDF</span>
+                </button>
             </div>
 
             {/* Compact Period & Filter Command Bar */}
@@ -378,35 +401,6 @@ export default function Analysis() {
                     storeSettings={store.settings}
                 />
             </div>
-
-            {/* Dienstplan PDF – bleibt oben */}
-            <button
-                type="button"
-                onClick={handleExportPDF}
-                className="stat-card"
-                style={{
-                    width: '100%',
-                    marginBottom: '16px',
-                    padding: '14px 16px',
-                    display: 'flex',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    background: 'rgb(var(--rgb-info) / 0.1)',
-                    border: '1px solid rgb(var(--rgb-info) / 0.35)',
-                    color: 'var(--c-info)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    textAlign: 'center'
-                }}
-                title="Monatsdienstplan als PDF exportieren"
-            >
-                <span style={{ fontSize: '20px', lineHeight: 1 }}>📄</span>
-                <span style={{ fontSize: '15px', fontWeight: 700, lineHeight: 1.2 }}>
-                    Dienstplan PDF
-                </span>
-            </button>
 
             {/* PopUp Modal 1: Schichtfilter */}
             {showFilterModal && (

@@ -1351,3 +1351,34 @@ h2 {
     --space-page-padding: 20px;
   }
 }
+
+/* Kopfzeile „mein Plan“: Titel links, DP laden mittig, Dienstplan PDF rechts */
+.plan-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.plan-header > :nth-child(1) { justify-self: start; }
+.plan-header > :nth-child(2) { justify-self: center; }
+.plan-header > :nth-child(3) { justify-self: end; }
+
+/* Schmale Displays: Titel oben, darunter beide Buttons nebeneinander */
+@media (max-width: 640px) {
+  .plan-header {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 10px;
+  }
+  .plan-header > :nth-child(1) { grid-column: 1 / -1; }
+  .plan-header > :nth-child(2),
+  .plan-header > :nth-child(3) {
+    justify-self: stretch;
+    justify-content: center;
+    min-width: 0;
+    white-space: normal !important;
+    text-align: center;
+    line-height: 1.2;
+  }
+}

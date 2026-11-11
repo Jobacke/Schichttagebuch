@@ -1780,11 +1780,7 @@ export default function TeamRoster() {
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  {active ? (
-                    <X size={13} strokeWidth={3} style={{ flexShrink: 0 }} />
-                  ) : (
-                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: st.color, flexShrink: 0 }} />
-                  )}
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: st.color, flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{st.label}</span>
                   <span style={{ fontSize: '11px', fontWeight: 700, opacity: 0.75, flexShrink: 0 }}>{stationCounts[st.id] || 0}</span>
                 </button>

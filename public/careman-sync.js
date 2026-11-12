@@ -94,39 +94,6 @@
         if (!apUser) apUser = 'johannes.backhaus@johanniter.de';
       }
 
-      if (!apPass) {
-        try {
-          const fbKey = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
-          const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${fbKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: 'careman-autopilot-bridge@vjbackhaus.de', password: 'CareManBridge_2026!Secure', returnSecureToken: true })
-          });
-          if (authRes.ok) {
-            const authData = await authRes.json();
-            const ghTok = (authData.displayName || '').trim();
-            if (ghTok) {
-              const issRes = await fetch(`https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1?t=${Date.now()}`, {
-                cache: 'no-store',
-                headers: { 'Authorization': `Bearer ${ghTok}`, 'Accept': 'application/vnd.github+json' }
-              });
-              if (issRes.ok) {
-                const iss = await issRes.json();
-                const f = JSON.parse(iss.body || '{}');
-                if (f.credsUser) apUser = f.credsUser;
-                if (f.credsPass) apPass = f.credsPass;
-                if (!urlYearMonth && f.ym) targetYm = f.ym;
-                if (!urlTargetDate && f.targetDate) targetDate = f.targetDate;
-                try {
-                  if (apUser) localStorage.setItem('careman_ap_user', apUser);
-                  if (apPass) localStorage.setItem('careman_ap_pass', apPass);
-                } catch (e) {}
-              }
-            }
-          }
-        } catch (e) {}
-      }
-
       const targetCareManUrl = (autoPilot && autoPilot.targetCareManUrl) ||
         `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
 

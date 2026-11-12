@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ./scripts/careman-cloud-runner.mjs && node -e \"import('./src/utils/oneClickCareManSync.js').then(m => import('fs').then(fs => fs.default.writeFileSync('./public/careman-sync.js', m.SIEDA_EXTRACTOR_SCRIPT)))\" && vite build && cp dist/index.html dist/404.html",
+    "build": "node -e \"import('./src/utils/oneClickCareManSync.js').then(m => import('fs').then(fs => fs.default.writeFileSync('./public/careman-sync.js', m.SIEDA_EXTRACTOR_SCRIPT)))\" && vite build && cp dist/index.html dist/404.html",
     "lint": "eslint .",
     "preview": "vite preview"
   },

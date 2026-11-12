@@ -8,10 +8,9 @@ import path from 'node:path';
 import { SIEDA_EXTRACTOR_SCRIPT } from '../src/utils/oneClickCareManSync.js';
 
 const DEBUG_PORT = 9229;
-const FB_API_KEY = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
-const FB_BRIDGE_EMAIL = 'careman-autopilot-bridge@vjbackhaus.de';
-const FB_BRIDGE_PASS = 'CareManBridge_2026!Secure';
-const FB_PROJECT_ID = 'schichttagebuch-da2c3';
+// All credentials come from GitHub Actions secrets (see .github/workflows/careman-cloud.yml):
+//   BRIDGE_GH_TOKEN  – fine-grained token for Jobacke/careman-autopilot-bridge (Issues + Contents read/write)
+//   CAREMAN_USER / CAREMAN_PASS – Johanniter Secure Portal login
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -273,15 +272,11 @@ async function main() {
     return;
   }
 
-  const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: FB_BRIDGE_EMAIL, password: FB_BRIDGE_PASS, returnSecureToken: true })
-  });
-  if (!authRes.ok) return;
-  const auth = await authRes.json();
-  const ghToken = (auth.displayName || '').trim();
-  if (!ghToken) return;
+  const ghToken = String(process.env.BRIDGE_GH_TOKEN || '').trim();
+  if (!ghToken) {
+    console.log('ℹ️ Secret BRIDGE_GH_TOKEN fehlt – Cloud-Auto-Pilot übersprungen.');
+    return;
+  }
 
   const issueUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1';
   const blobsUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/git/blobs';
@@ -307,6 +302,8 @@ async function main() {
 
   const patchBridge = async (partialObj) => {
     bridgeState = { ...bridgeState, ...partialObj };
+    delete bridgeState.credsPass; // never store credentials in the issue
+    delete bridgeState.credsUser;
     await fetch(issueUrl, {
       method: 'PATCH',
       headers: ghHeaders,
@@ -334,14 +331,13 @@ async function main() {
   const reqAt = Number(f.requestedAt || 0);
   const ym = f.ym || '2026-11';
   const targetDate = f.targetDate || '2026-11-7';
-  const credsUser = f.credsUser || 'johannes.backhaus@johanniter.de';
-  const credsPass = f.credsPass || '';
-  const myPlanToken = f.myPlanToken ||
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MTc4MDM3IiwiZXhwIjoiMTc5NDIwNjgzNyJ9.i3ONReX48RFmLhSbjHwd1_quZ4ua1npCj732aiJZiH4';
+  const credsUser = String(process.env.CAREMAN_USER || '').trim() || 'johannes.backhaus@johanniter.de';
+  const credsPass = String(process.env.CAREMAN_PASS || '');
+  const myPlanToken = f.myPlanToken || '';
 
   const seedMyPlanScript = `
     try {
-      if (location.hostname === 'dienstplan-bayern.secure.johanniter.de' && !localStorage.getItem('myPlanToken')) {
+      if (${JSON.stringify(Boolean(myPlanToken))} && location.hostname === 'dienstplan-bayern.secure.johanniter.de' && !localStorage.getItem('myPlanToken')) {
         localStorage.setItem('myPlanToken', ${JSON.stringify(myPlanToken)});
         localStorage.setItem('myPlanLogin', JSON.stringify({ userId: 5692, kennwortAenderungNotwendig: false, warningMessage: '' }));
         localStorage.setItem('myPlanTenant', '-');

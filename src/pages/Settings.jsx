@@ -3,8 +3,9 @@ import { useStore } from '../context/StoreContext';
 import {
     Plus, Clock, Tag, Truck, Hash, MapPin,
     Database, ChevronLeft, ChevronRight, Trash2, RotateCcw, Check, CalendarDays,
-    PenSquare, X, Coins
+    PenSquare, X, Coins, KeyRound
 } from 'lucide-react';
+import { getBridgeToken, saveBridgeToken } from '../utils/integrationSecrets';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { APP_VERSION } from '../version';
 
@@ -33,7 +34,8 @@ export default function Settings() {
                             activeScreen === 'codes' ? 'Schichtkürzel' :
                                 activeScreen === 'types' ? 'Schichtarten' :
                                     activeScreen === 'stations' ? 'Wachen' :
-                                        activeScreen === 'vehicles' ? 'Fahrzeuge' : 'Funkrufnamen'
+                                        activeScreen === 'vehicles' ? 'Fahrzeuge' :
+                                            activeScreen === 'cloudToken' ? 'CareMan Cloud-Autopilot' : 'Funkrufnamen'
                 }
                 onBack={goBack}
             >
@@ -71,6 +73,7 @@ export default function Settings() {
                         onRemove={(id) => removeSettingItem('shiftTypes', id)}
                     />
                 )}
+                {activeScreen === 'cloudToken' && <CloudTokenManager />}
                 {['stations', 'vehicles', 'callSigns'].includes(activeScreen) && (
                     <SimpleManager
                         data={store.settings[activeScreen]}
@@ -123,6 +126,14 @@ export default function Settings() {
                 />
             </div>
 
+            <h2 style={{ marginTop: '32px' }}>Verbindungen</h2>
+            <div className="settings-list">
+                <SettingsItem
+                    icon={KeyRound} color="var(--c-info)" label="CareMan Cloud-Autopilot (GitHub-Token)"
+                    value="" onClick={() => setActiveScreen('cloudToken')}
+                />
+            </div>
+
             <div style={{ textAlign: 'center', marginTop: '40px', opacity: 0.4 }}>
                 <Database size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
                 <small>Cloud Sync Aktiv • v{APP_VERSION}</small>
@@ -132,6 +143,68 @@ export default function Settings() {
 }
 
 // --- Sub-Components ---
+
+// GitHub token for the CareMan Cloud-Autopilot – stored only in the user's private Firestore area
+function CloudTokenManager() {
+    const [hasToken, setHasToken] = useState(null);
+    const [value, setValue] = useState('');
+    const [status, setStatus] = useState('');
+
+    useEffect(() => {
+        getBridgeToken().then(t => setHasToken(Boolean(t)));
+    }, []);
+
+    const save = async (token) => {
+        setStatus('');
+        try {
+            await saveBridgeToken(token);
+            setHasToken(Boolean(token));
+            setValue('');
+            setStatus(token ? 'Token gespeichert.' : 'Token entfernt.');
+        } catch (err) {
+            setStatus('Fehler: ' + (err?.message || err));
+        }
+    };
+
+    return (
+        <div className="card-premium" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: 'var(--color-text-muted)' }}>
+                Für den CareMan-Abruf ohne Mac (Cloud-Autopilot) braucht die App ein fein abgestuftes GitHub-Token.
+                Es wird nur in deinem privaten Bereich gespeichert und nie angezeigt.
+            </p>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: hasToken ? 'var(--c-success)' : 'var(--c-orange)' }}>
+                {hasToken === null ? 'Wird geprüft …' : hasToken ? '✓ Token ist hinterlegt' : 'Kein Token hinterlegt'}
+            </div>
+            <input
+                type="password"
+                autoComplete="off"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={hasToken ? 'Neues Token einfügen, um es zu ersetzen' : 'github_pat_…'}
+                style={{
+                    height: '40px',
+                    borderRadius: '10px',
+                    border: '1px solid rgb(var(--rgb-muted) / 0.25)',
+                    background: 'var(--c-bg)',
+                    color: 'var(--color-text-main)',
+                    padding: '0 12px',
+                    fontSize: '13px'
+                }}
+            />
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button type="button" className="btn-primary" disabled={!value.trim()} onClick={() => save(value)}>
+                    Speichern
+                </button>
+                {hasToken && (
+                    <button type="button" className="btn-secondary" onClick={() => save('')}>
+                        Token entfernen
+                    </button>
+                )}
+            </div>
+            {status && <div style={{ fontSize: '12.5px', color: 'var(--color-text-muted)' }}>{status}</div>}
+        </div>
+    );
+}
 
 function SettingsItem({ icon: Icon, color, label, value, onClick }) {
     return (

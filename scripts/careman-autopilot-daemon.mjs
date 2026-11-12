@@ -16,7 +16,7 @@ const CHROME_BIN = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function loadStoredCredentials() {
-  const defaultToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIjNTY5MiIsImlzcyI6Imh0dHBzOi8vd3d3LnNpZWRhLmNvbS9hdXRob3JpemUiLCJhdWQiOiJteXBsYW4iLCJpYXQiOiIxNzk0MTc4MDM3IiwiZXhwIjoiMTc5NDIwNjgzNyJ9.i3ONReX48RFmLhSbjHwd1_quZ4ua1npCj732aiJZiH4';
+  const defaultToken = '';
   try {
     if (fs.existsSync(CREDENTIALS_PATH)) {
       const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf8');
@@ -757,11 +757,12 @@ async function publishBridgeState() {
     }
     const nextState = {
       ...state,
-      credsUser: creds.username || 'johannes.backhaus@johanniter.de',
-      credsPass: creds.password || state.credsPass || '',
       myPlanToken: creds.myPlanToken || state.myPlanToken || '',
       updatedAt: Date.now()
     };
+    // Credentials never belong into the bridge issue (also removes values from older versions)
+    delete nextState.credsPass;
+    delete nextState.credsUser;
     await fetch(BRIDGE_ISSUE_URL, {
       method: 'PATCH',
       headers: ghHeaders,

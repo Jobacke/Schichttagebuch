@@ -596,9 +596,6 @@ export function openCareManLiveWindow(targetYearMonth) {
 
     let stopped = false;
     const reqId = `ip_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const fbKey = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
-    const fbEmail = 'careman-autopilot-bridge@vjbackhaus.de';
-    const fbPass = 'CareManBridge_2026!Secure';
     const bridgeIssueUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1';
     const bridgeBlobsUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/git/blobs';
 
@@ -648,15 +645,10 @@ export function openCareManLiveWindow(targetYearMonth) {
 
     (async () => {
       try {
-        const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${fbKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: fbEmail, password: fbPass, returnSecureToken: true })
-        });
-        if (!authRes.ok) throw new Error('Cloud-Bridge Auth fehlgeschlagen');
-        const authData = await authRes.json();
-        ghToken = (authData.displayName || '').trim();
-        if (!ghToken) throw new Error('Kein Cloud-Bridge Token hinterlegt');
+        // GitHub token comes from the user's private Firestore area (Settings), never from the source code
+        const { getBridgeToken } = await import('./integrationSecrets.js');
+        ghToken = await getBridgeToken();
+        if (!ghToken) throw new Error('Kein GitHub-Token für den Cloud-Autopilot hinterlegt (Einstellungen)');
 
         const ghHeaders = {
           'Authorization': `Bearer ${ghToken}`,
@@ -688,6 +680,9 @@ export function openCareManLiveWindow(targetYearMonth) {
           requestedAt: Date.now(),
           updatedAt: Date.now()
         };
+        // Credentials never belong into the bridge issue
+        delete nextState.credsPass;
+        delete nextState.credsUser;
 
         const patchRes = await fetch(bridgeIssueUrl, {
           method: 'PATCH',
@@ -701,7 +696,7 @@ export function openCareManLiveWindow(targetYearMonth) {
         }
 
         // Starte sofort den 24/7 GitHub Cloud-Auto-Pilot-Server (unabhängig vom Mac!)
-        fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/230396421/dispatches', {
+        fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/careman-cloud.yml/dispatches', {
           method: 'POST',
           headers: ghHeaders,
           body: JSON.stringify({ ref: 'main' })
@@ -1042,39 +1037,6 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         else apPass = localStorage.getItem('careman_ap_pass') || '';
       } catch (e) {
         if (!apUser) apUser = 'johannes.backhaus@johanniter.de';
-      }
-
-      if (!apPass) {
-        try {
-          const fbKey = 'AIzaSyBntKv5YUjvoDDXsuBxQmzPFRqX99KMbxo';
-          const authRes = await fetch(\`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=\${fbKey}\`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: 'careman-autopilot-bridge@vjbackhaus.de', password: 'CareManBridge_2026!Secure', returnSecureToken: true })
-          });
-          if (authRes.ok) {
-            const authData = await authRes.json();
-            const ghTok = (authData.displayName || '').trim();
-            if (ghTok) {
-              const issRes = await fetch(\`https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1?t=\${Date.now()}\`, {
-                cache: 'no-store',
-                headers: { 'Authorization': \`Bearer \${ghTok}\`, 'Accept': 'application/vnd.github+json' }
-              });
-              if (issRes.ok) {
-                const iss = await issRes.json();
-                const f = JSON.parse(iss.body || '{}');
-                if (f.credsUser) apUser = f.credsUser;
-                if (f.credsPass) apPass = f.credsPass;
-                if (!urlYearMonth && f.ym) targetYm = f.ym;
-                if (!urlTargetDate && f.targetDate) targetDate = f.targetDate;
-                try {
-                  if (apUser) localStorage.setItem('careman_ap_user', apUser);
-                  if (apPass) localStorage.setItem('careman_ap_pass', apPass);
-                } catch (e) {}
-              }
-            }
-          }
-        } catch (e) {}
       }
 
       const targetCareManUrl = (autoPilot && autoPilot.targetCareManUrl) ||

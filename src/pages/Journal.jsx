@@ -770,6 +770,7 @@ export default function Journal() {
                 yearMonth={currentYearMonthStr}
                 storeSettings={store.settings}
                 initialCleared={calendarJustCleared}
+                shiftsReady={Boolean(store?.shiftsSynced) && !store?.loading}
             />
         </div>
     );

@@ -249,6 +249,8 @@ export function StoreProvider({ children }) {
   const [shifts, setShifts] = useState([]);
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [shiftsLoaded, setShiftsLoaded] = useState(false);
+  // true once the shifts came from the server (not only from the local cache)
+  const [shiftsSynced, setShiftsSynced] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [rosterVersion, setRosterVersion] = useState(0);
 
@@ -271,6 +273,7 @@ export function StoreProvider({ children }) {
 
     const shiftsCacheKey = `schichttagebuch_cache_shifts_${currentUser.uid}`;
     let hydratedFromCache = false;
+    setShiftsSynced(false);
     try {
       const rawCache = localStorage.getItem(shiftsCacheKey);
       if (rawCache) {
@@ -296,6 +299,7 @@ export function StoreProvider({ children }) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.metadata?.fromCache) setShiftsSynced(true);
       const rawSnapshotDocs = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(d => !pendingOptimisticDeletesRef.current.has(d.id));
@@ -1094,6 +1098,7 @@ export function StoreProvider({ children }) {
   const safeStore = {
     shifts: shifts || [],
     loading,
+    shiftsSynced,
     settings: {
       ...INITIAL_SETTINGS,
       ...(settings || {}),

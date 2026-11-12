@@ -653,11 +653,15 @@ export function downloadIcsFile(shifts, options = {}) {
   } = options;
 
   const icsString = generateIcsCalendar(shifts, options);
-  const blob = new Blob([icsString], { type: 'text/calendar;charset=utf-8' });
-
   const suffix = overwriteMode === 'forceNew' ? '_Neu' : '';
   const fileName = `Dienstplan_${yearMonth || 'Export'}_${calendarName}${suffix}.ics`;
+  downloadIcsString(icsString, fileName);
+  return { icsString, fileName };
+}
 
+/** Opens/downloads an already generated .ics again (does not touch the export history). */
+export function downloadIcsString(icsString, fileName = 'Dienstplan.ics') {
+  const blob = new Blob([icsString], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -666,7 +670,6 @@ export function downloadIcsFile(shifts, options = {}) {
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(url), 60000);
-
   return true;
 }
 
@@ -677,7 +680,7 @@ export function downloadIcsFile(shifts, options = {}) {
 function buildReturnUrl(yearMonth, extraParams) {
   try {
     const urlObj = new URL(window.location.href);
-    ['cleared', 'clearFailed'].forEach(p => urlObj.searchParams.delete(p));
+    ['cleared', 'clearFailed', 'autoExport', 'fmt', 'alarm'].forEach(p => urlObj.searchParams.delete(p));
     urlObj.searchParams.set('month', yearMonth);
     urlObj.searchParams.set('openCalendarExport', '1');
     Object.entries(extraParams).forEach(([k, v]) => urlObj.searchParams.set(k, v));
@@ -693,7 +696,7 @@ function buildReturnUrl(yearMonth, extraParams) {
  * The export history is NOT reset here – only after the Shortcut reports success
  * (see confirmCalendarClear), so a failed/cancelled Shortcut can never cause duplicates.
  */
-export function runIosCalendarDeleteShortcut(yearMonth) {
+export function runIosCalendarDeleteShortcut(yearMonth, autoExport = null) {
   if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) return false;
   const [y, m] = yearMonth.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
@@ -705,7 +708,15 @@ export function runIosCalendarDeleteShortcut(yearMonth) {
   const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
   const inputPayload = `${startStr}\n${endStr}`;
-  const successUrl = buildReturnUrl(yearMonth, { cleared: token });
+  // autoExport: after a successful clean the app creates the new .ics right away (one single process)
+  const successUrl = buildReturnUrl(yearMonth, autoExport
+    ? {
+        cleared: token,
+        autoExport: '1',
+        fmt: autoExport.titleFormat || DEFAULT_TITLE_FORMAT,
+        alarm: String(autoExport.alarmOption ?? DEFAULT_ALARM_OPTION)
+      }
+    : { cleared: token });
   const failUrl = buildReturnUrl(yearMonth, { clearFailed: '1' });
 
   const shortcutUrl =
@@ -726,6 +737,7 @@ function parseClearTokenTime(token) {
 
 /**
  * Called after returning from the Shortcut via x-success (?cleared=<token>&month=YYYY-MM).
+ * isAwaitingExportAfterClear() tells whether nothing was exported since that clean.
  * Call syncMonthFromRemote(yearMonth) before, so the account state is known.
  * Returns 'confirmed' (history reset now), 'already' (token was already used – page reload)
  * or null (invalid/expired token -> nothing is reset).
@@ -743,6 +755,18 @@ export function confirmCalendarClear(token, yearMonth) {
 
   resetMonthExportHistory(yearMonth, { lastClearToken: tokenStr, lastClearAt: ts });
   return 'confirmed';
+}
+
+/** True if the month was cleaned with this token and nothing has been exported since. */
+export function isAwaitingExportAfterClear(token, yearMonth) {
+  if (!token || !yearMonth) return false;
+  const entry = getCalendarExportHistory(yearMonth);
+  return Boolean(
+    entry &&
+    entry.lastClearToken === String(token) &&
+    !entry.exportedAt &&
+    Object.keys(entry.items || {}).length === 0
+  );
 }
 
 /**

@@ -2894,6 +2894,7 @@ export default function TeamRoster() {
         yearMonth={yearMonth}
         storeSettings={store?.settings}
         initialCleared={calendarJustCleared}
+        shiftsReady={Boolean(store?.shiftsSynced) && !store?.loading}
       />
     </div>
   );

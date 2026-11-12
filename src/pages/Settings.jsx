@@ -35,7 +35,8 @@ export default function Settings() {
                                 activeScreen === 'types' ? 'Schichtarten' :
                                     activeScreen === 'stations' ? 'Wachen' :
                                         activeScreen === 'vehicles' ? 'Fahrzeuge' :
-                                            activeScreen === 'cloudToken' ? 'CareMan Cloud-Autopilot' : 'Funkrufnamen'
+                                            activeScreen === 'cloudToken' ? 'CareMan Cloud-Autopilot' :
+                                                activeScreen === 'caremanLogin' ? 'CareMan-Anmeldung (dieses Gerät)' : 'Funkrufnamen'
                 }
                 onBack={goBack}
             >
@@ -74,6 +75,7 @@ export default function Settings() {
                     />
                 )}
                 {activeScreen === 'cloudToken' && <CloudTokenManager />}
+                {activeScreen === 'caremanLogin' && <CareManLoginManager />}
                 {['stations', 'vehicles', 'callSigns'].includes(activeScreen) && (
                     <SimpleManager
                         data={store.settings[activeScreen]}
@@ -132,6 +134,10 @@ export default function Settings() {
                     icon={KeyRound} color="var(--c-info)" label="CareMan Cloud-Autopilot (GitHub-Token)"
                     value="" onClick={() => setActiveScreen('cloudToken')}
                 />
+                <SettingsItem
+                    icon={KeyRound} color="var(--c-warning-strong)" label="CareMan-Anmeldung (dieses Gerät)"
+                    value="" onClick={() => setActiveScreen('caremanLogin')}
+                />
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '40px', opacity: 0.4 }}>
@@ -143,6 +149,75 @@ export default function Settings() {
 }
 
 // --- Sub-Components ---
+
+// CareMan login used by the Mac Auto-Pilot on THIS device (localStorage only, never synced)
+function CareManLoginManager() {
+    const read = (k, d = '') => { try { return localStorage.getItem(k) || d; } catch { return d; } };
+    const [user, setUser] = useState(() => read('careman_login_user', 'johannes.backhaus@johanniter.de'));
+    const [pass, setPass] = useState('');
+    const [hasPass, setHasPass] = useState(() => Boolean(read('careman_login_pass')));
+    const [status, setStatus] = useState('');
+
+    const save = (newPass) => {
+        try {
+            localStorage.setItem('careman_login_user', user.trim() || 'johannes.backhaus@johanniter.de');
+            if (newPass) {
+                localStorage.setItem('careman_login_pass', newPass);
+                localStorage.setItem('careman_ap_pass', newPass);
+            } else {
+                localStorage.removeItem('careman_login_pass');
+                localStorage.removeItem('careman_ap_pass');
+            }
+            setHasPass(Boolean(newPass));
+            setPass('');
+            setStatus(newPass ? 'Neues Passwort gespeichert – wird beim nächsten CareMan-Abruf verwendet.' : 'Gespeichertes Passwort gelöscht.');
+        } catch (err) {
+            setStatus('Fehler: ' + (err?.message || err));
+        }
+    };
+
+    const inputStyle = {
+        height: '40px',
+        borderRadius: '10px',
+        border: '1px solid rgb(var(--rgb-muted) / 0.25)',
+        background: 'var(--c-bg)',
+        color: 'var(--color-text-main)',
+        padding: '0 12px',
+        fontSize: '13px'
+    };
+
+    return (
+        <div className="card-premium" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: 'var(--color-text-muted)' }}>
+                Benutzername und Passwort, die der CareMan-Abruf auf <strong>diesem Gerät</strong> automatisch einträgt
+                (z. B. über den Mac-Hintergrunddienst). Wird nur lokal gespeichert, nie im Konto oder bei GitHub.
+            </p>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: hasPass ? 'var(--c-success)' : 'var(--c-orange)' }}>
+                {hasPass ? '✓ Passwort ist auf diesem Gerät gespeichert' : 'Kein Passwort gespeichert'}
+            </div>
+            <input type="text" autoComplete="off" value={user} onChange={(e) => setUser(e.target.value)} style={inputStyle} />
+            <input
+                type="password"
+                autoComplete="new-password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                placeholder="Neues Johanniter-Passwort"
+                style={inputStyle}
+            />
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button type="button" className="btn-primary" disabled={!pass} onClick={() => save(pass)}>
+                    Speichern
+                </button>
+                {hasPass && (
+                    <button type="button" className="btn-secondary" onClick={() => save('')}>
+                        Passwort löschen
+                    </button>
+                )}
+            </div>
+            {status && <div style={{ fontSize: '12.5px', color: 'var(--color-text-muted)' }}>{status}</div>}
+        </div>
+    );
+}
 
 // GitHub token for the CareMan Cloud-Autopilot – stored only in the user's private Firestore area
 function CloudTokenManager() {

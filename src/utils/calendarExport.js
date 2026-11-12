@@ -364,6 +364,9 @@ export function resetMonthExportHistory(yearMonth, extraMeta = {}) {
 export function getLastExportOptions(yearMonth) {
   const history = yearMonth ? getCalendarExportHistory(yearMonth) : null;
   const prefs = readJson(EXPORT_PREFS_STORAGE_KEY, {}) || {};
+  if (prefs.titleFormat && Number(prefs.savedAt || 0) > entryStamp(history)) {
+    return { titleFormat: prefs.titleFormat, alarmOption: String(prefs.alarmOption ?? DEFAULT_ALARM_OPTION) };
+  }
   return {
     titleFormat: history?.titleFormat || prefs.titleFormat || DEFAULT_TITLE_FORMAT,
     alarmOption: String(history?.alarmOption || prefs.alarmOption || DEFAULT_ALARM_OPTION)
@@ -371,7 +374,12 @@ export function getLastExportOptions(yearMonth) {
 }
 
 function saveExportPrefs(titleFormat, alarmOption) {
-  writeJson(EXPORT_PREFS_STORAGE_KEY, { titleFormat, alarmOption: String(alarmOption) });
+  writeJson(EXPORT_PREFS_STORAGE_KEY, { titleFormat, alarmOption: String(alarmOption), savedAt: Date.now() });
+}
+
+/** Remembers title/alarm settings (used by the direct Google sync). */
+export function rememberExportOptions(titleFormat, alarmOption) {
+  saveExportPrefs(titleFormat || DEFAULT_TITLE_FORMAT, alarmOption ?? DEFAULT_ALARM_OPTION);
 }
 
 export function isIosShortcutMarkedInstalled() {
@@ -782,4 +790,75 @@ export function downloadIosDeleteShortcutFile() {
   link.click();
   document.body.removeChild(link);
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Event data for the direct Google Calendar sync (same content as the .ics export)
+// ---------------------------------------------------------------------------
+
+/** Reminder minutes for an alarm option ('1440_60' -> [1440, 60]). */
+export function alarmOptionToMinutes(alarmOption) {
+  switch (String(alarmOption)) {
+    case '1440':
+    case 'day_before':
+      return [1440];
+    case '1440_60':
+      return [1440, 60];
+    case '0':
+      return [];
+    default: {
+      const n = Number(alarmOption);
+      return n > 0 ? [n] : [];
+    }
+  }
+}
+
+/**
+ * Builds the calendar events of a month for the Google sync.
+ * Times are local wall times ("YYYY-MM-DD HH:mm") in Europe/Berlin.
+ * Returns [{ key, title, start, end, location, description, reminders, fp }]
+ */
+export function buildCalendarEvents(shifts = [], options = {}) {
+  const {
+    titleFormat = DEFAULT_TITLE_FORMAT,
+    alarmOption = DEFAULT_ALARM_OPTION,
+    storeSettings = {}
+  } = options;
+  const { byShift } = buildCalendarKeys(shifts);
+  const reminders = alarmOptionToMinutes(alarmOption);
+
+  return shifts
+    .filter(s => s && s.date)
+    .map(shift => {
+      const key = byShift.get(shift) || `${shift.date}#1`;
+      const { code, typeName } = resolveCodeAndType(shift, storeSettings);
+      const { startTime, endTime } = getShiftTimes(shift);
+
+      let title = `${code} (${typeName})`;
+      if (titleFormat === 'codeOnly') title = code;
+      else if (titleFormat === 'typeAndTimes') title = `${typeName} (${startTime} - ${endTime})`;
+
+      const endDate = endTime <= startTime ? addDaysToDateStr(shift.date, 1) : shift.date;
+      const description = [
+        `Dienst: ${code} - ${typeName}`,
+        `Zeiten: ${startTime} bis ${endTime} Uhr`,
+        shift.station ? `Wache: ${shift.station}` : null,
+        shift.vehicle ? `Fahrzeug: ${shift.vehicle}` : null,
+        shift.callSign ? `Funkrufname: ${shift.callSign}` : null,
+        shift.partner ? `PartnerIn: ${shift.partner}` : null
+      ].filter(Boolean).join('\n');
+
+      const event = {
+        key,
+        title,
+        start: `${shift.date} ${startTime}`,
+        end: `${endDate} ${endTime}`,
+        location: shift.station || '',
+        description,
+        reminders
+      };
+      event.fp = hashString(JSON.stringify(event));
+      return event;
+    })
+    .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
 }

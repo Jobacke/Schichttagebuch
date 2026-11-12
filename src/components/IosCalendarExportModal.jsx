@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Calendar, Check, Download, X,
   Smartphone, CheckCircle2, Trash2,
-  Users, MapPin, Truck, HelpCircle, ChevronDown, Sparkles, AlertTriangle
+  Users, MapPin, Truck, HelpCircle, ChevronDown, Sparkles, AlertTriangle, RefreshCw, Settings as SettingsIcon
 } from 'lucide-react';
 import {
   downloadIcsFile,
@@ -15,8 +15,16 @@ import {
   getLastExportOptions,
   confirmCalendarClear,
   setCalendarExportRemote,
-  syncMonthFromRemote
+  syncMonthFromRemote,
+  rememberExportOptions
 } from '../utils/calendarExport';
+import {
+  getCachedSyncConfig,
+  loadSyncConfig,
+  isSyncConfigured,
+  syncMonthToGoogle
+} from '../utils/googleCalendarSync';
+import GoogleCalendarSyncSetup from './GoogleCalendarSyncSetup';
 import { createFirestoreCalendarRemote } from '../utils/calendarExportRemote';
 import { getShiftColor } from '../utils/shiftColors';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +33,16 @@ import { useAuth } from '../context/AuthContext';
 export default function IosCalendarExportModal(props) {
   if (!props.isOpen) return null;
   return <IosCalendarExportDialog key={props.yearMonth} {...props} />;
+}
+
+const DELIVERY_MODE_KEY = 'schichttagebuch_calendar_delivery_mode_v1';
+
+function readDeliveryMode() {
+  try {
+    return localStorage.getItem(DELIVERY_MODE_KEY) || 'google';
+  } catch {
+    return 'google';
+  }
 }
 
 function readUrlParam(name) {
@@ -58,6 +76,29 @@ function IosCalendarExportDialog({
   // One single process: after the Shortcut cleaned the month, the new .ics is created automatically
   const [autoExport, setAutoExport] = useState(null); // null | { titleFormat, alarmOption, startedAt }
   const lastIcsRef = useRef(null); // { icsString, fileName } – to open the file again if iOS did not show it
+
+  // Direct Google Calendar sync (preferred): no Shortcut, no Safari, no .ics import
+  const [syncConfig, setSyncConfig] = useState(() => getCachedSyncConfig());
+  const [deliveryMode, setDeliveryModeState] = useState(() => {
+    // Returning from the iOS Shortcut always continues in the .ics mode
+    if (readUrlParam('cleared') || readUrlParam('clearFailed')) return 'ics';
+    return readDeliveryMode();
+  });
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const [googleSync, setGoogleSync] = useState({ status: 'idle' }); // idle | syncing | done | error
+  const googleMode = deliveryMode === 'google';
+  const googleReady = isSyncConfigured(syncConfig);
+
+  const setDeliveryMode = (mode) => {
+    setDeliveryModeState(mode);
+    try { localStorage.setItem(DELIVERY_MODE_KEY, mode); } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    let alive = true;
+    loadSyncConfig(uid).then(cfg => { if (alive) setSyncConfig(cfg); });
+    return () => { alive = false; };
+  }, [uid]);
 
   // Load the export state of this month from the account (shared by Safari, Home-Screen app and Mac),
   // then handle the return from the iOS Shortcut (?cleared=<token>)
@@ -267,6 +308,26 @@ function IosCalendarExportDialog({
     if (lastIcsRef.current) downloadIcsString(lastIcsRef.current.icsString, lastIcsRef.current.fileName);
   };
 
+  // One tap: make the Google Calendar match the shifts of this month (create / update / delete)
+  const handleGoogleSync = async () => {
+    if (!googleReady || googleSync.status === 'syncing' || !shiftsReady) return;
+    setGoogleSync({ status: 'syncing' });
+    try {
+      const result = await syncMonthToGoogle({
+        config: syncConfig,
+        yearMonth,
+        shifts,
+        storeSettings,
+        titleFormat,
+        alarmOption
+      });
+      rememberExportOptions(titleFormat, alarmOption);
+      setGoogleSync({ status: 'done', result });
+    } catch (err) {
+      setGoogleSync({ status: 'error', error: err?.message || String(err) });
+    }
+  };
+
   const handleInstallShortcut = () => {
     downloadIosDeleteShortcutFile();
     setDownloadSuccess('installShortcut');
@@ -376,7 +437,7 @@ function IosCalendarExportDialog({
               fontWeight: 700,
               whiteSpace: 'nowrap'
             }}>
-              {selectedShifts.length} {selectedShifts.length === 1 ? 'Dienst' : 'Dienste'}
+              {googleMode ? shifts.length : selectedShifts.length} {(googleMode ? shifts.length : selectedShifts.length) === 1 ? 'Dienst' : 'Dienste'}
             </div>
 
             <button
@@ -436,6 +497,159 @@ function IosCalendarExportDialog({
           flex: 1,
           minHeight: 0
         }}>
+          {/* Delivery mode: direct Google sync (recommended) or .ics file */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '4px',
+            background: 'var(--c-bg)',
+            border: '1px solid rgb(var(--rgb-muted) / 0.22)',
+            borderRadius: '11px',
+            padding: '3px',
+            flexShrink: 0
+          }}>
+            {[
+              { id: 'google', label: 'Google-Kalender direkt' },
+              { id: 'ics', label: 'iPhone-Datei (.ics)' }
+            ].map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setDeliveryMode(opt.id)}
+                style={{
+                  border: 'none',
+                  borderRadius: '8px',
+                  height: '32px',
+                  background: deliveryMode === opt.id ? 'var(--c-surface-3)' : 'transparent',
+                  color: deliveryMode === opt.id ? 'var(--c-text)' : 'var(--c-text-muted)',
+                  fontSize: '12.5px',
+                  fontWeight: deliveryMode === opt.id ? 700 : 500,
+                  cursor: 'pointer'
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {googleMode && !googleReady && (
+            <div style={{
+              background: 'rgb(var(--rgb-info) / 0.1)',
+              border: '1px solid rgb(var(--rgb-info) / 0.32)',
+              color: 'var(--c-text-soft)',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              fontSize: '12.5px',
+              lineHeight: 1.5,
+              flexShrink: 0
+            }}>
+              <strong style={{ color: 'var(--c-text)' }}>Direkt-Abgleich mit Google einrichten (einmalig, ca. 3 Min.)</strong><br />
+              Danach überträgt ein Tipp alle Dienste des Monats direkt in deinen Google-Kalender – neue werden ergänzt,
+              geänderte angepasst, gestrichene gelöscht. Ohne Kurzbefehl, ohne Safari, ohne Datei-Import.
+              <div style={{ marginTop: '9px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsSetupOpen(true)}
+                  style={{
+                    border: 'none',
+                    background: 'linear-gradient(135deg, var(--c-info) 0%, var(--c-info-strong) 100%)',
+                    color: '#ffffff',
+                    borderRadius: '10px',
+                    padding: '8px 14px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Jetzt einrichten
+                </button>
+              </div>
+            </div>
+          )}
+
+          {googleMode && googleReady && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              fontSize: '12.5px',
+              color: 'var(--c-text-muted)',
+              flexShrink: 0
+            }}>
+              <span>
+                Verbunden mit Google-Kalender <strong style={{ color: 'var(--c-text)' }}>„{syncConfig.calendarName || 'Kalender'}“</strong> – der Monat wird exakt abgeglichen.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsSetupOpen(true)}
+                title="Verbindung bearbeiten"
+                style={{
+                  background: 'rgb(var(--rgb-muted) / 0.1)',
+                  border: '1px solid rgb(var(--rgb-muted) / 0.2)',
+                  color: 'var(--c-text-soft)',
+                  borderRadius: '9px',
+                  padding: '5px 8px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center'
+                }}
+              >
+                <SettingsIcon size={14} />
+              </button>
+            </div>
+          )}
+
+          {googleMode && googleSync.status === 'done' && (
+            <div style={{
+              background: 'rgb(var(--rgb-success) / 0.14)',
+              border: '1px solid rgb(var(--rgb-success) / 0.4)',
+              color: 'var(--c-success)',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '12.5px',
+              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flexShrink: 0
+            }}>
+              <CheckCircle2 size={17} style={{ flexShrink: 0 }} />
+              <div>
+                <strong>Kalender „{syncConfig?.calendarName || 'Kalender'}“ ist aktuell.</strong>{' '}
+                {(() => {
+                  const r = googleSync.result || {};
+                  const parts = [
+                    r.created ? `${r.created} neu` : null,
+                    r.updated ? `${r.updated} geändert` : null,
+                    r.deleted ? `${r.deleted} gelöscht` : null,
+                    r.legacyRemoved ? `${r.legacyRemoved} alte Import-Termine ersetzt` : null
+                  ].filter(Boolean);
+                  return parts.length ? parts.join(', ') + '.' : 'Es gab nichts zu ändern.';
+                })()}
+              </div>
+            </div>
+          )}
+
+          {googleMode && googleSync.status === 'error' && (
+            <div style={{
+              background: 'rgb(var(--rgb-danger) / 0.12)',
+              border: '1px solid rgb(var(--rgb-danger) / 0.4)',
+              color: 'var(--c-danger)',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '12.5px',
+              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={17} style={{ flexShrink: 0 }} />
+              <div><strong>Abgleich fehlgeschlagen:</strong> {googleSync.error} Im Kalender wurde dabei nichts doppelt angelegt – einfach erneut versuchen.</div>
+            </div>
+          )}
+
           {/* Feedback Banners */}
           {downloadSuccess === 'export' && (
             <div style={{
@@ -558,7 +772,7 @@ function IosCalendarExportDialog({
             </div>
           )}
 
-          {syncStatus === 'localOnly' && (
+          {!googleMode && syncStatus === 'localOnly' && (
             <div style={{
               background: 'rgb(var(--rgb-orange) / 0.12)',
               border: '1px solid rgb(var(--rgb-orange) / 0.38)',
@@ -579,7 +793,7 @@ function IosCalendarExportDialog({
             </div>
           )}
 
-          {!isSyncing && !['deleteShortcut', 'autoExporting', 'autoExported'].includes(downloadSuccess) && overwriteMode === 'update' && hasPreviousExport && (monthNeedsClean || calendarUpToDate) && (
+          {!googleMode && !isSyncing && !['deleteShortcut', 'autoExporting', 'autoExported'].includes(downloadSuccess) && overwriteMode === 'update' && hasPreviousExport && (monthNeedsClean || calendarUpToDate) && (
             <div style={{
               background: calendarUpToDate ? 'rgb(var(--rgb-success) / 0.1)' : 'rgb(var(--rgb-orange) / 0.12)',
               border: calendarUpToDate ? '1px solid rgb(var(--rgb-success) / 0.32)' : '1px solid rgb(var(--rgb-orange) / 0.38)',
@@ -731,6 +945,7 @@ function IosCalendarExportDialog({
               </div>
             </div>
 
+            {!googleMode && (<>
             {/* Cell 3 (Bottom-Left): Overwrite Mode Segmented Switch */}
             <div>
               <label style={labelStyle}>Bestehende Termine</label>
@@ -844,6 +1059,7 @@ function IosCalendarExportDialog({
                 </button>
               </div>
             </div>
+            </>)}
           </div>
 
           {/* Shifts Selection List */}
@@ -869,10 +1085,14 @@ function IosCalendarExportDialog({
                 letterSpacing: '0.04em',
                 color: 'var(--c-text-muted)'
               }}>
-                Zu übertragende Dienste <span style={{ color: 'var(--c-text)' }}>({selectedShifts.length} von {shifts.length})</span>
+                {googleMode ? (
+                  <>Dienste im Monat <span style={{ color: 'var(--c-text)' }}>({shifts.length})</span></>
+                ) : (
+                  <>Zu übertragende Dienste <span style={{ color: 'var(--c-text)' }}>({selectedShifts.length} von {shifts.length})</span></>
+                )}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: googleMode ? 'none' : 'flex', alignItems: 'center', gap: '8px' }}>
                 {changedOrNewIds.length > 0 && changedOrNewIds.length < shifts.length && (
                   <button
                     type="button"
@@ -932,7 +1152,7 @@ function IosCalendarExportDialog({
                 paddingRight: '4px'
               }}>
                 {sortedShifts.map(shift => {
-                  const isChecked = selectedIds.has(shift.id);
+                  const isChecked = googleMode || selectedIds.has(shift.id);
                   const shiftCodeObj = (storeSettings.shiftCodes || []).find(
                     c => c.id === shift.codeId || c.code === shift.code
                   );
@@ -945,7 +1165,7 @@ function IosCalendarExportDialog({
                   const weekday = dateObj.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
                   const rawDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }).replace(/\.$/, '');
                   const formattedDate = `${rawDate}.`;
-                  const status = hasPreviousExport ? shiftStatuses[shift.id] : null;
+                  const status = !googleMode && hasPreviousExport ? shiftStatuses[shift.id] : null;
                   const cleanPartner = shift.partner
                     ? (shift.partner.trim().startsWith('mit ') ? shift.partner.trim() : `mit ${shift.partner.trim()}`)
                     : '';
@@ -953,7 +1173,7 @@ function IosCalendarExportDialog({
                   return (
                     <div
                       key={shift.id}
-                      onClick={() => toggleShift(shift.id)}
+                      onClick={() => { if (!googleMode) toggleShift(shift.id); }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1170,6 +1390,47 @@ function IosCalendarExportDialog({
             Schließen
           </button>
 
+          {googleMode ? (
+          <button
+            type="button"
+            onClick={googleReady ? handleGoogleSync : () => setIsSetupOpen(true)}
+            disabled={googleSync.status === 'syncing' || (googleReady && !shiftsReady)}
+            style={{
+              flex: 2.5,
+              background: 'linear-gradient(135deg, var(--c-warning) 0%, var(--c-warning-strong) 100%)',
+              color: 'var(--c-bg)',
+              border: 'none',
+              padding: '11px 18px',
+              borderRadius: '12px',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: googleSync.status === 'syncing' ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 8px 20px -4px rgb(var(--rgb-warning) / 0.4)',
+              opacity: googleSync.status === 'syncing' || (googleReady && !shiftsReady) ? 0.7 : 1,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {googleSync.status === 'syncing' ? (
+              <>
+                <RefreshCw size={18} strokeWidth={2.5} className="spin-animation" style={{ flexShrink: 0 }} />
+                <span>Kalender wird abgeglichen …</span>
+              </>
+            ) : !googleReady ? (
+              <span>Direkt-Abgleich einrichten</span>
+            ) : !shiftsReady ? (
+              <span>Dienste werden geladen …</span>
+            ) : (
+              <>
+                <RefreshCw size={18} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                <span>In Kalender „{syncConfig.calendarName || 'Kalender'}“ übertragen ({shifts.length} {shifts.length === 1 ? 'Dienst' : 'Dienste'})</span>
+              </>
+            )}
+          </button>
+          ) : (
           <button
             type="button"
             onClick={handleExport}
@@ -1220,7 +1481,22 @@ function IosCalendarExportDialog({
               </>
             )}
           </button>
+          )}
         </div>
+
+        {isSetupOpen && (
+          <GoogleCalendarSyncSetup
+            uid={uid}
+            config={syncConfig}
+            onClose={() => setIsSetupOpen(false)}
+            onSaved={(cfg) => {
+              setSyncConfig(cfg);
+              setIsSetupOpen(false);
+              setDeliveryMode('google');
+              setGoogleSync({ status: 'idle' });
+            }}
+          />
+        )}
 
         {/* Tip Pop-up Overlay (Opens only on click) */}
         {isTipPopupOpen && (
@@ -1295,6 +1571,11 @@ function IosCalendarExportDialog({
               </div>
 
               <div style={{ fontSize: '13px', color: 'var(--c-text-soft)', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <strong style={{ color: 'var(--c-text)' }}>Empfohlen – Google-Kalender direkt:</strong><br />
+                  Die App gleicht den Monat direkt mit deinem Google-Kalender ab: neue Dienste werden eingetragen, geänderte angepasst, gestrichene gelöscht. Das iPhone übernimmt das automatisch über dein Google-Konto – kein Kurzbefehl, kein Safari, kein Datei-Import.
+                </div>
+                <div style={{ fontWeight: 700, color: 'var(--c-text)', marginTop: '4px' }}>Alternativ – iPhone-Datei (.ics):</div>
                 <div>
                   <strong style={{ color: 'var(--c-text)' }}>1. Aktualisieren (ein Tipp, ohne Duplikate):</strong><br />
                   Die App merkt sich für jeden Tag, was zuletzt übertragen wurde. Kommen nur <strong>neue Dienste</strong> hinzu, werden nur diese eingetragen. Wurde ein Dienst <strong>geändert, gestrichen oder verschoben</strong>, löscht der Kurzbefehl automatisch die alten Termine des Monats, springt zurück und die App trägt sofort alle aktuellen Dienste neu ein – so bleiben <strong>keine Dopplungen oder Altlasten</strong> stehen.

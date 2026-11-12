@@ -15,7 +15,7 @@ import { db } from '../firebase';
 import { buildCalendarEvents } from './calendarExport';
 
 const CONFIG_CACHE_KEY = 'schichttagebuch_calendar_sync_config_v1';
-export const APPS_SCRIPT_VERSION = 1;
+export const APPS_SCRIPT_VERSION = 2;
 
 function configRef(uid) {
   return doc(db, `users/${uid}/data`, 'calendarSync');
@@ -143,14 +143,18 @@ export async function syncMonthToGoogle({ config, yearMonth, shifts, storeSettin
   });
 }
 
-/** Google Apps Script code (Code.gs) – the secret is inserted for the user. */
-export function getAppsScriptCode(secret) {
+/**
+ * Google Apps Script code (Code.gs). It contains NO key: on the first "ping" the script
+ * stores the app's key in its script properties (pairing) and accepts only that key afterwards.
+ */
+// eslint-disable-next-line no-unused-vars
+export function getAppsScriptCode(_unused) {
   return `/**
  * Schichttagebuch – Google-Kalender-Sync (Version ${APPS_SCRIPT_VERSION})
  * Bereitstellen als Web-App:  Ausführen als „Ich“,  Zugriff „Jeder“.
- * Der Schlüssel unten verbindet nur DEINE App mit diesem Skript – nicht weitergeben.
+ * Beim ersten „Verbindung testen“ koppelt sich das Skript mit deiner App (Schlüssel wird
+ * in den Skripteigenschaften als APP_SECRET gespeichert). Neu koppeln: APP_SECRET löschen.
  */
-const SECRET = '${secret}';
 const TZ = 'Europe/Berlin';
 const KEY_TAG = 'stb_key';
 const FP_TAG = 'stb_fp';
@@ -166,7 +170,17 @@ function doPost(e) {
   } catch (err) {
     return out_({ ok: false, error: 'Ungültige Anfrage' });
   }
-  if (!req || req.secret !== SECRET) return out_({ ok: false, error: 'Schlüssel passt nicht zur App – in der App „Code kopieren“, im Skript ersetzen, speichern und als neue Version bereitstellen' });
+  if (!req || !req.secret || String(req.secret).length < 24) return out_({ ok: false, error: 'Ungültiger App-Schlüssel' });
+
+  var props = PropertiesService.getScriptProperties();
+  var stored = props.getProperty('APP_SECRET');
+  if (!stored && req.action === 'ping') {
+    props.setProperty('APP_SECRET', String(req.secret)); // first contact: pair with this app
+    stored = String(req.secret);
+  }
+  if (req.secret !== stored) {
+    return out_({ ok: false, error: 'Dieses Skript ist mit einem anderen App-Schlüssel gekoppelt. Im Skript-Editor: Projekteinstellungen → Skripteigenschaften → APP_SECRET löschen, dann erneut „Verbindung testen“.' });
+  }
 
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) return out_({ ok: false, error: 'Es läuft bereits ein Abgleich – bitte gleich noch einmal' });

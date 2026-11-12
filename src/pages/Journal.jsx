@@ -48,7 +48,7 @@ export default function Journal() {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isOneClickSyncing, setIsOneClickSyncing] = useState(false);
     const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(() => searchParams.get('openCalendarExport') === '1');
-    const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') === '1');
+    const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') || false);
     const [toastMessage, setToastMessage] = useState(null);
 
     // Delete State
@@ -183,8 +183,8 @@ export default function Journal() {
         }
         if (searchParams.get('openCalendarExport') === '1') {
             setIsCalendarExportModalOpen(true);
-            if (searchParams.get('cleared') === '1') {
-                setCalendarJustCleared(true);
+            if (searchParams.get('cleared')) {
+                setCalendarJustCleared(searchParams.get('cleared'));
             }
         }
     }, [searchParams]);
@@ -761,7 +761,7 @@ export default function Journal() {
                 onClose={() => {
                     setIsCalendarExportModalOpen(false);
                     setCalendarJustCleared(false);
-                    if (searchParams.get('openCalendarExport') || searchParams.get('cleared')) {
+                    if (searchParams.get('openCalendarExport') || searchParams.get('cleared') || searchParams.get('clearFailed')) {
                         setSearchParams({ month: currentYearMonthStr });
                     }
                 }}

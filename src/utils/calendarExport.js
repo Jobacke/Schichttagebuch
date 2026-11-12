@@ -2,21 +2,36 @@
  * iCalendar (.ics) generator & iOS Shortcut bridge for Apple Calendar on iPhone/Mac.
  *
  * Why iOS Safari (.ics) needs special handling:
- * - iOS Safari's native .ics previewer (EKICSPreviewController) is an "Add-Only" importer:
- *   1. Any VEVENT whose UID already exists in the iPhone Calendar is silently skipped ("importedEvents").
- *   2. METHOD:CANCEL / STATUS:CANCELLED inside a .ics file is ignored by iOS Safari and never deletes events.
+ * - iOS Safari's .ics importer is "add-only": it can neither update nor delete existing events
+ *   (METHOD:CANCEL / STATUS:CANCELLED are ignored).
  *
- * Solution implemented here:
- * 1. Content-Hash UIDs in 'update' mode (`<shiftId>-<contentHash>-v<resetVersion>@schichttagebuch`):
- *    - Unchanged shifts keep their exact UID -> iOS Safari automatically skips them (0 duplicates).
- *    - Modified shifts (or changed Title/Reminder settings) get a new contentHash UID -> iOS Safari imports them!
- * 2. Native iOS Shortcut bridge (`Schichttagebuch-Kalender`) for deleting old entries on iPhone:
- *    - Deletes all `Dienst:` events of the selected month in 1 second via Apple Shortcuts (EventKit)
- *      and increments `resetVersion` so the subsequent .ics export starts fresh.
+ * Robust update strategy implemented here (v3.1.6):
+ * 1. Every shift gets a STABLE calendar key per day (`YYYY-MM-DD#n`) – independent of the
+ *    Firestore document id (which changes whenever a month is re-imported from CareMan).
+ * 2. The export history (localStorage) remembers per key what was exported (fingerprint).
+ *    Comparing it with the current month yields: new / modified / unchanged and REMOVED
+ *    (shift deleted or moved to another day but still in the iPhone calendar).
+ * 3. Only brand-new shifts are ever added without cleaning. As soon as a shift was modified
+ *    or removed, the month is first cleaned via the native iOS Shortcut
+ *    (`Schichttagebuch-Kalender`, deletes all `Dienst:` events of the month) and then
+ *    exported completely with fresh UIDs.
+ * 4. The export history is reset ONLY after the Shortcut confirmed success via x-success
+ *    (one-time token). If the Shortcut fails or is cancelled nothing is reset, so no
+ *    duplicates can be produced.
  */
 
 const EXPORT_HISTORY_STORAGE_KEY = 'schichttagebuch_ics_export_history_v1';
 const SHORTCUT_INSTALLED_STORAGE_KEY = 'schichttagebuch_ios_shortcut_installed_v1';
+const EXPORT_PREFS_STORAGE_KEY = 'schichttagebuch_ics_export_prefs_v1';
+const PENDING_CLEAR_STORAGE_KEY = 'schichttagebuch_ics_pending_clear_v1';
+const HISTORY_SCHEMA = 2;
+
+export const DEFAULT_TITLE_FORMAT = 'codeAndType';
+export const DEFAULT_ALARM_OPTION = '1440';
+
+// ---------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------
 
 // Fast deterministic 32-bit FNV-1a hash -> 8-char hex string
 function hashString(str) {
@@ -29,10 +44,47 @@ function hashString(str) {
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
-// Format ISO date (YYYYMMDD) and time (HHMMSS)
+function readJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/** Normalizes "7:00", "07:00", "0700", "07:00:00" -> "07:00". Returns fallback if invalid. */
+export function normalizeTime(timeStr, fallback = '07:00') {
+  const raw = String(timeStr || '').trim();
+  let h;
+  let m;
+  const colon = raw.match(/^(\d{1,2})[:.](\d{2})/);
+  if (colon) {
+    h = Number(colon[1]);
+    m = Number(colon[2]);
+  } else if (/^\d{3,4}$/.test(raw)) {
+    const padded = raw.padStart(4, '0');
+    h = Number(padded.slice(0, 2));
+    m = Number(padded.slice(2));
+  } else {
+    return fallback;
+  }
+  if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return fallback;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// YYYY-MM-DD + HH:MM -> YYYYMMDDTHHMMSS
 function formatIcsDateTime(dateStr, timeStr) {
-  const cleanDate = dateStr.replace(/[^0-9]/g, ''); // YYYYMMDD
-  const cleanTime = (timeStr || '00:00').replace(/[^0-9]/g, '').padEnd(4, '0') + '00'; // HHMMSS
+  const cleanDate = String(dateStr).replace(/[^0-9]/g, '').slice(0, 8);
+  const cleanTime = timeStr.replace(':', '') + '00';
   return `${cleanDate}T${cleanTime}`;
 }
 
@@ -47,47 +99,143 @@ function addDaysToDateStr(dateStr, days) {
   return `${nextY}-${nextM}-${nextD}`;
 }
 
-// Escape special characters in iCalendar text
+// Escape special characters in iCalendar text (RFC 5545 3.3.11)
 function escapeIcsText(str) {
   if (!str) return '';
   return String(str)
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
-    .replace(/\n/g, '\\n');
+    .replace(/\r\n|\r|\n/g, '\\n');
+}
+
+// Fold content lines longer than 75 octets (RFC 5545 3.1), UTF-8 safe
+const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+function byteLength(str) {
+  return textEncoder ? textEncoder.encode(str).length : unescape(encodeURIComponent(str)).length;
+}
+function foldLine(line) {
+  if (byteLength(line) <= 75) return line;
+  const parts = [];
+  let current = '';
+  let currentBytes = 0;
+  for (const ch of line) {
+    const b = byteLength(ch);
+    if (currentBytes + b > 75) {
+      parts.push(current);
+      current = ' ' + ch;
+      currentBytes = 1 + b;
+    } else {
+      current += ch;
+      currentBytes += b;
+    }
+  }
+  if (current) parts.push(current);
+  return parts.join('\r\n');
+}
+
+function resolveCodeAndType(shift, storeSettings = {}) {
+  const shiftCodeObj = (storeSettings?.shiftCodes || []).find(
+    c => c.id === shift.codeId || c.code === shift.code
+  );
+  const code = shift.code || shiftCodeObj?.code || 'Schicht';
+  const shiftTypeObj = (storeSettings?.shiftTypes || []).find(t => t.id === shift.typeId);
+  const typeName = shift.shiftTypeName || shiftTypeObj?.name || 'Dienst';
+  return { code, typeName };
+}
+
+function getShiftTimes(shift) {
+  return {
+    startTime: normalizeTime(shift.startTime, '07:00'),
+    endTime: normalizeTime(shift.endTime, '19:00')
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Stable calendar keys (independent of Firestore ids)
+// ---------------------------------------------------------------------------
+
+/**
+ * Assigns a stable key per shift: `YYYY-MM-DD#1`, `YYYY-MM-DD#2` (several shifts on one day,
+ * ordered by start time). Returns Map(shiftRef -> key) plus Map(id -> key).
+ */
+export function buildCalendarKeys(shifts = []) {
+  const byDate = {};
+  shifts.forEach(s => {
+    if (!s || !s.date) return;
+    (byDate[s.date] = byDate[s.date] || []).push(s);
+  });
+  const byShift = new Map();
+  const byId = {};
+  Object.keys(byDate).forEach(date => {
+    byDate[date]
+      .slice()
+      .sort((a, b) => {
+        const ta = normalizeTime(a.startTime, '07:00');
+        const tb = normalizeTime(b.startTime, '07:00');
+        if (ta !== tb) return ta < tb ? -1 : 1;
+        return String(a.code || a.id || '').localeCompare(String(b.code || b.id || ''));
+      })
+      .forEach((s, idx) => {
+        const key = `${date}#${idx + 1}`;
+        byShift.set(s, key);
+        if (s.id) byId[s.id] = key;
+      });
+  });
+  return { byShift, byId };
+}
+
+function keyToUidPart(key) {
+  return String(key).replace(/[^0-9A-Za-z-]/g, '-');
+}
+
+// ---------------------------------------------------------------------------
+// Export history
+// ---------------------------------------------------------------------------
+
+// Converts a history entry of the old schema (items keyed by Firestore id) to stable keys
+function migrateMonthHistory(entry) {
+  if (!entry || entry.schema === HISTORY_SCHEMA) return entry;
+  const items = Object.values(entry.items || {}).filter(it => it && it.date);
+  const byDate = {};
+  items.forEach(it => {
+    (byDate[it.date] = byDate[it.date] || []).push(it);
+  });
+  const nextItems = {};
+  Object.keys(byDate).forEach(date => {
+    byDate[date]
+      .slice()
+      .sort((a, b) => String(a.dtStart || '').localeCompare(String(b.dtStart || '')))
+      .forEach((it, idx) => {
+        nextItems[`${date}#${idx + 1}`] = it;
+      });
+  });
+  return { ...entry, schema: HISTORY_SCHEMA, items: nextItems };
 }
 
 /**
  * Load export history from localStorage
- * Structure: { [yearMonth]: { exportedAt, resetVersion, titleFormat, alarmOption, items: { [shiftId]: { uid, id, date, fingerprint, ... } } } }
+ * Structure: { [yearMonth]: { schema, exportedAt, resetVersion, titleFormat, alarmOption, items: { [calendarKey]: { uid, date, fingerprint, ... } } } }
  */
 export function getCalendarExportHistory(yearMonth) {
-  try {
-    const raw = localStorage.getItem(EXPORT_HISTORY_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return yearMonth ? (parsed[yearMonth] || null) : parsed;
-  } catch {
-    return null;
-  }
+  const all = readJson(EXPORT_HISTORY_STORAGE_KEY, null);
+  if (!all) return null;
+  if (yearMonth) return migrateMonthHistory(all[yearMonth] || null);
+  return all;
 }
 
 function saveCalendarExportHistory(yearMonth, itemsMap, meta = {}) {
-  try {
-    const raw = localStorage.getItem(EXPORT_HISTORY_STORAGE_KEY);
-    const all = raw ? JSON.parse(raw) : {};
-    const prev = all[yearMonth] || {};
-    all[yearMonth] = {
-      ...prev,
-      ...meta,
-      resetVersion: meta.resetVersion || prev.resetVersion || 1,
-      exportedAt: Date.now(),
-      items: itemsMap
-    };
-    localStorage.setItem(EXPORT_HISTORY_STORAGE_KEY, JSON.stringify(all));
-  } catch {
-    // ignore storage errors
-  }
+  const all = readJson(EXPORT_HISTORY_STORAGE_KEY, {}) || {};
+  const prev = migrateMonthHistory(all[yearMonth]) || {};
+  all[yearMonth] = {
+    ...prev,
+    ...meta,
+    schema: HISTORY_SCHEMA,
+    resetVersion: meta.resetVersion || prev.resetVersion || 1,
+    exportedAt: Date.now(),
+    items: itemsMap
+  };
+  writeJson(EXPORT_HISTORY_STORAGE_KEY, all);
 }
 
 /**
@@ -96,21 +244,33 @@ function saveCalendarExportHistory(yearMonth, itemsMap, meta = {}) {
  */
 export function resetMonthExportHistory(yearMonth) {
   if (!yearMonth) return 1;
-  try {
-    const raw = localStorage.getItem(EXPORT_HISTORY_STORAGE_KEY);
-    const all = raw ? JSON.parse(raw) : {};
-    const prev = all[yearMonth] || {};
-    const nextVersion = (prev.resetVersion || 1) + 1;
-    all[yearMonth] = {
-      exportedAt: null,
-      resetVersion: nextVersion,
-      items: {}
-    };
-    localStorage.setItem(EXPORT_HISTORY_STORAGE_KEY, JSON.stringify(all));
-    return nextVersion;
-  } catch {
-    return 2;
-  }
+  const all = readJson(EXPORT_HISTORY_STORAGE_KEY, {}) || {};
+  const prev = all[yearMonth] || {};
+  const nextVersion = (prev.resetVersion || 1) + 1;
+  all[yearMonth] = {
+    schema: HISTORY_SCHEMA,
+    exportedAt: null,
+    resetVersion: nextVersion,
+    titleFormat: prev.titleFormat,
+    alarmOption: prev.alarmOption,
+    items: {}
+  };
+  writeJson(EXPORT_HISTORY_STORAGE_KEY, all);
+  return nextVersion;
+}
+
+/** Last used title/alarm settings (per month history first, then global preference). */
+export function getLastExportOptions(yearMonth) {
+  const history = yearMonth ? getCalendarExportHistory(yearMonth) : null;
+  const prefs = readJson(EXPORT_PREFS_STORAGE_KEY, {}) || {};
+  return {
+    titleFormat: history?.titleFormat || prefs.titleFormat || DEFAULT_TITLE_FORMAT,
+    alarmOption: String(history?.alarmOption || prefs.alarmOption || DEFAULT_ALARM_OPTION)
+  };
+}
+
+function saveExportPrefs(titleFormat, alarmOption) {
+  writeJson(EXPORT_PREFS_STORAGE_KEY, { titleFormat, alarmOption: String(alarmOption) });
 }
 
 export function isIosShortcutMarkedInstalled() {
@@ -129,25 +289,22 @@ export function markIosShortcutInstalled() {
   }
 }
 
-export function buildShiftFingerprint(shift, storeSettings = {}, exportOptions = {}) {
-  const shiftCodeObj = (storeSettings.shiftCodes || []).find(
-    c => c.id === shift.codeId || c.code === shift.code
-  );
-  const code = shift.code || shiftCodeObj?.code || 'Schicht';
-  const shiftTypeObj = (storeSettings.shiftTypes || []).find(
-    t => t.id === shift.typeId
-  );
-  const typeName = shift.shiftTypeName || shiftTypeObj?.name || 'Dienst';
+// ---------------------------------------------------------------------------
+// Change detection
+// ---------------------------------------------------------------------------
 
-  const titleFormat = exportOptions.titleFormat || 'codeAndType';
-  const alarmOption = String(exportOptions.alarmOption ?? '1440');
+export function buildShiftFingerprint(shift, storeSettings = {}, exportOptions = {}) {
+  const { code, typeName } = resolveCodeAndType(shift, storeSettings);
+  const { startTime, endTime } = getShiftTimes(shift);
+  const titleFormat = exportOptions.titleFormat || DEFAULT_TITLE_FORMAT;
+  const alarmOption = String(exportOptions.alarmOption ?? DEFAULT_ALARM_OPTION);
 
   return [
     shift.date || '',
     code,
     typeName,
-    shift.startTime || '',
-    shift.endTime || '',
+    startTime,
+    endTime,
     shift.station || '',
     shift.vehicle || '',
     shift.callSign || '',
@@ -158,22 +315,50 @@ export function buildShiftFingerprint(shift, storeSettings = {}, exportOptions =
 }
 
 /**
- * Determine export status of a shift compared to last export of this month:
- * 'new' | 'modified' | 'unchanged'
+ * Compares the current shifts of a month with the last export.
+ * Returns { hasPreviousExport, statusById: {id: 'new'|'modified'|'unchanged'}, keyById, removedItems }
+ * removedItems = exported calendar entries that no longer exist in the app (deleted/moved shifts).
  */
-export function getShiftExportStatus(shift, yearMonth, storeSettings = {}, exportOptions = {}) {
+export function analyzeMonthExport(shifts = [], yearMonth, storeSettings = {}, exportOptions = {}) {
   const history = getCalendarExportHistory(yearMonth);
-  if (!history || !history.items || Object.keys(history.items).length === 0) return 'new';
+  const items = history?.items || {};
+  const hasPreviousExport = Object.keys(items).length > 0;
+  const { byShift, byId } = buildCalendarKeys(shifts);
 
-  const prevById = history.items[shift.id];
-  const prevByDate = Object.values(history.items).find(item => item.date === shift.date);
-  const prev = prevById || prevByDate;
+  const statusById = {};
+  const currentKeys = new Set();
+  shifts.forEach(s => {
+    const key = byShift.get(s);
+    if (!key) return;
+    currentKeys.add(key);
+    const prev = items[key];
+    let status = 'new';
+    if (prev) {
+      status = prev.fingerprint === buildShiftFingerprint(s, storeSettings, exportOptions)
+        ? 'unchanged'
+        : 'modified';
+    }
+    statusById[s.id ?? key] = status;
+  });
 
-  if (!prev) return 'new';
-  const currentFp = buildShiftFingerprint(shift, storeSettings, exportOptions);
-  if (prev.fingerprint !== currentFp) return 'modified';
-  return 'unchanged';
+  const removedItems = Object.entries(items)
+    .filter(([key]) => !currentKeys.has(key))
+    .map(([key, item]) => ({ key, ...item }));
+
+  return { hasPreviousExport, statusById, keyById: byId, removedItems };
 }
+
+/** Backwards compatible single-shift status helper. */
+export function getShiftExportStatus(shift, yearMonth, storeSettings = {}, exportOptions = {}, allShifts = null) {
+  const list = allShifts || [shift];
+  const { hasPreviousExport, statusById } = analyzeMonthExport(list, yearMonth, storeSettings, exportOptions);
+  if (!hasPreviousExport) return 'new';
+  return statusById[shift.id] || 'new';
+}
+
+// ---------------------------------------------------------------------------
+// ICS generation
+// ---------------------------------------------------------------------------
 
 function getTimezoneLines() {
   return [
@@ -199,31 +384,74 @@ function getTimezoneLines() {
   ];
 }
 
+function buildAlarmLines(alarmOption, code, startTimeStr, endTimeStr) {
+  const c = escapeIcsText(code);
+  const alarm = (trigger, text) => [
+    'BEGIN:VALARM',
+    `TRIGGER:${trigger}`,
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${text}`,
+    'END:VALARM'
+  ];
+  const dayBefore = `Erinnerung: Morgen Dienst ${c} (${startTimeStr} - ${endTimeStr} Uhr)`;
+
+  switch (String(alarmOption)) {
+    case '1440':
+    case 'day_before':
+      return alarm('-P1D', dayBefore);
+    case '1440_60':
+      return [
+        ...alarm('-P1D', dayBefore),
+        ...alarm('-PT1H', `Erinnerung: In 1 Std. Dienst ${c} (${startTimeStr} - ${endTimeStr} Uhr)`)
+      ];
+    case '2880':
+      return alarm('-P2D', `Erinnerung: In 2 Tagen Dienst ${c}`);
+    case '720':
+      return alarm('-PT12H', `Erinnerung: In 12 Std. Dienst ${c}`);
+    case '120':
+      return alarm('-PT2H', `Erinnerung: In 2 Std. Dienst ${c}`);
+    case '60':
+      return alarm('-PT1H', `Erinnerung: In 1 Std. Dienst ${c}`);
+    case '30':
+      return alarm('-PT30M', `Erinnerung: In 30 Min. Dienst ${c}`);
+    default: {
+      const n = Number(alarmOption);
+      return n > 0 ? alarm(`-PT${n}M`, `Erinnerung an Dienst ${c}`) : [];
+    }
+  }
+}
+
 /**
  * Generates an .ics file string from a list of shifts
- * @param {Array} shifts - Array of shift objects
- * @param {Object} options - Export options (calendarName, alarmMinutes, titleFormat, overwriteMode, etc.)
+ * @param {Array} shifts - shifts to export (selection)
+ * @param {Object} options - { calendarName, alarmOption, titleFormat, overwriteMode, yearMonth, storeSettings,
+ *                             allShifts (all shifts of the month – needed for stable keys) }
  */
 export function generateIcsCalendar(shifts, options = {}) {
   const {
     calendarName = 'Dienstplan',
-    alarmMinutes = 1440,
-    alarmOption = '1440',
-    titleFormat = 'codeAndType', // 'codeAndType', 'codeOnly', 'typeAndTimes'
-    overwriteMode = 'update',    // 'update' (content-hash UID) | 'forceNew' (fresh revision UID)
+    alarmMinutes,
+    titleFormat = DEFAULT_TITLE_FORMAT, // 'codeAndType', 'codeOnly', 'typeAndTimes'
+    overwriteMode = 'update',           // 'update' (stable UID) | 'forceNew' (fresh revision UID)
     yearMonth = '',
-    storeSettings = {}
+    storeSettings = {},
+    allShifts = null
   } = options;
+  const alarmOption = String(options.alarmOption ?? alarmMinutes ?? DEFAULT_ALARM_OPTION);
 
   const nowIso = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const sequenceNum = Math.max(1, Math.floor((Date.now() - 1767225600000) / 1000));
+  const revision = Date.now().toString(36);
 
   const prevHistory = yearMonth ? getCalendarExportHistory(yearMonth) : null;
   const prevItems = prevHistory?.items || {};
   const resetVersion = prevHistory?.resetVersion || 1;
   const nextHistoryItems = { ...prevItems };
 
-  let icsContent = [
+  // Keys are computed over the whole month so that the index of a day stays stable
+  const { byShift, byId } = buildCalendarKeys(allShifts && allShifts.length ? allShifts : shifts);
+  const fallbackKeys = buildCalendarKeys(shifts).byShift;
+
+  const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Schichttagebuch//DE',
@@ -234,40 +462,26 @@ export function generateIcsCalendar(shifts, options = {}) {
   ];
 
   shifts.forEach(shift => {
-    const shiftCodeObj = (storeSettings.shiftCodes || []).find(
-      c => c.id === shift.codeId || c.code === shift.code
-    );
-    const code = shift.code || shiftCodeObj?.code || 'Schicht';
+    if (!shift || !shift.date) return;
+    const key = byShift.get(shift) || (shift.id && byId[shift.id]) || fallbackKeys.get(shift) || `${shift.date}#1`;
+    const { code, typeName } = resolveCodeAndType(shift, storeSettings);
+    const { startTime: startTimeStr, endTime: endTimeStr } = getShiftTimes(shift);
 
-    const shiftTypeObj = (storeSettings.shiftTypes || []).find(
-      t => t.id === shift.typeId
-    );
-    const typeName = shift.shiftTypeName || shiftTypeObj?.name || 'Dienst';
-
-    // Summary formatting
     let summary = `${code} (${typeName})`;
     if (titleFormat === 'codeOnly') {
       summary = code;
     } else if (titleFormat === 'typeAndTimes') {
-      summary = `${typeName} (${shift.startTime || '07:00'} - ${shift.endTime || '19:00'})`;
+      summary = `${typeName} (${startTimeStr} - ${endTimeStr})`;
     }
 
-    // Determine start and end date (accounting for midnight crossing)
+    // End on the next day if the shift crosses midnight; equal start/end = 24h shift
+    const isOvernight = endTimeStr <= startTimeStr;
     const startDateStr = shift.date;
-    const startTimeStr = shift.startTime || '07:00';
-    const endTimeStr = shift.endTime || '19:00';
-
-    const [startH, startM] = startTimeStr.split(':').map(Number);
-    const [endH, endM] = endTimeStr.split(':').map(Number);
-
-    // If end time is earlier than start time, it crosses midnight into the next day
-    const isOvernight = endH < startH || (endH === startH && endM < startM);
     const endDateStr = isOvernight ? addDaysToDateStr(startDateStr, 1) : startDateStr;
-
     const dtStart = formatIcsDateTime(startDateStr, startTimeStr);
     const dtEnd = formatIcsDateTime(endDateStr, endTimeStr);
 
-    // Build description (starts with "Dienst:" so the iOS Shortcut can always identify Schichttagebuch entries)
+    // Description starts with "Dienst:" so the iOS Shortcut can always identify Schichttagebuch entries
     const descParts = [
       `Dienst: ${code} - ${typeName}`,
       `Zeiten: ${startTimeStr} bis ${endTimeStr} Uhr`,
@@ -277,122 +491,54 @@ export function generateIcsCalendar(shifts, options = {}) {
       shift.partner ? `PartnerIn: ${shift.partner}` : null
     ].filter(Boolean);
 
-    const description = escapeIcsText(descParts.join('\n'));
-    const location = escapeIcsText(shift.station || '');
-
     const fingerprint = buildShiftFingerprint(shift, storeSettings, { titleFormat, alarmOption });
     const contentHash = hashString(fingerprint);
+    const uidBase = `st-${keyToUidPart(key)}`;
+    const uid = overwriteMode === 'forceNew'
+      ? `${uidBase}-r${revision}@schichttagebuch`
+      : `${uidBase}-v${resetVersion}@schichttagebuch`;
 
-    // Determine UID:
-    // - In 'update' mode: stable UID per shift and resetVersion (`<id>-v<resetVersion>@schichttagebuch`).
-    //   resetVersion only increments when the calendar month is cleared via the iOS Shortcut.
-    // - In 'forceNew' mode: fresh revision UID so iOS Safari imports every selected shift unconditionally.
-    let uid;
-    if (overwriteMode === 'forceNew') {
-      uid = `${shift.id || shift.date}-rev${sequenceNum}@schichttagebuch`;
-    } else {
-      uid = `${shift.id || shift.date}-v${resetVersion}@schichttagebuch`;
-    }
-
-    // Save into history for future change detection
-    nextHistoryItems[shift.id || shift.date] = {
+    nextHistoryItems[key] = {
       uid,
-      id: shift.id,
+      id: shift.id || null,
       date: shift.date,
       summary,
       dtStart,
       dtEnd,
       location: shift.station || '',
-      sequence: sequenceNum,
       fingerprint,
       contentHash,
       exportedAt: Date.now()
     };
 
-    icsContent.push('BEGIN:VEVENT');
-    icsContent.push(`UID:${uid}`);
-    icsContent.push(`SEQUENCE:${sequenceNum}`);
-    icsContent.push(`DTSTAMP:${nowIso}`);
-    icsContent.push(`LAST-MODIFIED:${nowIso}`);
-    icsContent.push(`DTSTART;TZID=Europe/Berlin:${dtStart}`);
-    icsContent.push(`DTEND;TZID=Europe/Berlin:${dtEnd}`);
-    icsContent.push(`SUMMARY:${escapeIcsText(summary)}`);
-    if (location) icsContent.push(`LOCATION:${location}`);
-    icsContent.push(`DESCRIPTION:${description}`);
-    icsContent.push('STATUS:CONFIRMED');
-    icsContent.push('TRANSP:OPAQUE');
-
-    // Optional Alarm / Reminder
-    const effectiveAlarm = String(alarmOption || alarmMinutes || '1440');
-
-    if (effectiveAlarm === '1440' || effectiveAlarm === 'day_before') {
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push('TRIGGER:-P1D');
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung: Morgen Dienst ${escapeIcsText(code)} (${startTimeStr} - ${endTimeStr} Uhr)`);
-      icsContent.push('END:VALARM');
-    } else if (effectiveAlarm === '1440_60') {
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push('TRIGGER:-P1D');
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung: Morgen Dienst ${escapeIcsText(code)} (${startTimeStr} - ${endTimeStr} Uhr)`);
-      icsContent.push('END:VALARM');
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push('TRIGGER:-PT1H');
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung: In 1 Std. Dienst ${escapeIcsText(code)} (${startTimeStr} - ${endTimeStr} Uhr)`);
-      icsContent.push('END:VALARM');
-    } else if (effectiveAlarm === '2880') {
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push('TRIGGER:-P2D');
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung: In 2 Tagen Dienst ${escapeIcsText(code)}`);
-      icsContent.push('END:VALARM');
-    } else if (effectiveAlarm === '720') {
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push('TRIGGER:-PT12H');
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung: In 12 Std. Dienst ${escapeIcsText(code)}`);
-      icsContent.push('END:VALARM');
-    } else if (effectiveAlarm === '120') {
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push('TRIGGER:-PT2H');
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung: In 2 Std. Dienst ${escapeIcsText(code)}`);
-      icsContent.push('END:VALARM');
-    } else if (effectiveAlarm === '60') {
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push('TRIGGER:-PT1H');
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung: In 1 Std. Dienst ${escapeIcsText(code)}`);
-      icsContent.push('END:VALARM');
-    } else if (effectiveAlarm === '30') {
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push('TRIGGER:-PT30M');
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung: In 30 Min. Dienst ${escapeIcsText(code)}`);
-      icsContent.push('END:VALARM');
-    } else if (Number(effectiveAlarm) > 0) {
-      icsContent.push('BEGIN:VALARM');
-      icsContent.push(`TRIGGER:-PT${Number(effectiveAlarm)}M`);
-      icsContent.push('ACTION:DISPLAY');
-      icsContent.push(`DESCRIPTION:Erinnerung an Dienst ${escapeIcsText(code)}`);
-      icsContent.push('END:VALARM');
-    }
-
-    icsContent.push('END:VEVENT');
+    lines.push('BEGIN:VEVENT');
+    lines.push(`UID:${uid}`);
+    lines.push('SEQUENCE:0');
+    lines.push(`DTSTAMP:${nowIso}`);
+    lines.push(`LAST-MODIFIED:${nowIso}`);
+    lines.push(`DTSTART;TZID=Europe/Berlin:${dtStart}`);
+    lines.push(`DTEND;TZID=Europe/Berlin:${dtEnd}`);
+    lines.push(`SUMMARY:${escapeIcsText(summary)}`);
+    if (shift.station) lines.push(`LOCATION:${escapeIcsText(shift.station)}`);
+    lines.push(`DESCRIPTION:${escapeIcsText(descParts.join('\n'))}`);
+    lines.push('STATUS:CONFIRMED');
+    lines.push('TRANSP:OPAQUE');
+    lines.push(...buildAlarmLines(alarmOption, code, startTimeStr, endTimeStr));
+    lines.push('END:VEVENT');
   });
+
+  lines.push('END:VCALENDAR');
 
   if (yearMonth) {
     saveCalendarExportHistory(yearMonth, nextHistoryItems, {
       resetVersion,
       titleFormat,
-      alarmOption: String(alarmOption)
+      alarmOption
     });
   }
+  saveExportPrefs(titleFormat, alarmOption);
 
-  icsContent.push('END:VCALENDAR');
-  return icsContent.join('\r\n');
+  return lines.map(foldLine).join('\r\n') + '\r\n';
 }
 
 /**
@@ -401,7 +547,7 @@ export function generateIcsCalendar(shifts, options = {}) {
 export function downloadIcsFile(shifts, options = {}) {
   const {
     calendarName = 'Dienstplan',
-    yearMonth = '2026-11',
+    yearMonth = '',
     overwriteMode = 'update'
   } = options;
 
@@ -409,48 +555,84 @@ export function downloadIcsFile(shifts, options = {}) {
   const blob = new Blob([icsString], { type: 'text/calendar;charset=utf-8' });
 
   const suffix = overwriteMode === 'forceNew' ? '_Neu' : '';
-  const fileName = `Dienstplan_${yearMonth}_${calendarName}${suffix}.ics`;
+  const fileName = `Dienstplan_${yearMonth || 'Export'}_${calendarName}${suffix}.ics`;
 
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
+  link.href = url;
   link.setAttribute('download', fileName);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// iOS Shortcut bridge (delete old entries of a month)
+// ---------------------------------------------------------------------------
+
+function buildReturnUrl(yearMonth, extraParams) {
+  try {
+    const urlObj = new URL(window.location.href);
+    ['cleared', 'clearFailed'].forEach(p => urlObj.searchParams.delete(p));
+    urlObj.searchParams.set('month', yearMonth);
+    urlObj.searchParams.set('openCalendarExport', '1');
+    Object.entries(extraParams).forEach(([k, v]) => urlObj.searchParams.set(k, v));
+    return urlObj.toString();
+  } catch {
+    return window.location.href;
+  }
+}
+
 /**
  * Triggers the native iOS Shortcut ("Schichttagebuch-Kalender") to delete all
- * exported Schichttagebuch shifts ("Dienst:") of the given month from the iPhone Calendar,
- * and resets the export history version so the next .ics export imports cleanly.
+ * exported Schichttagebuch shifts ("Dienst:") of the given month from the iPhone Calendar.
+ * The export history is NOT reset here – only after the Shortcut reports success
+ * (see confirmCalendarClear), so a failed/cancelled Shortcut can never cause duplicates.
  */
-export function runIosCalendarDeleteShortcut(yearMonth = '2026-11') {
+export function runIosCalendarDeleteShortcut(yearMonth) {
+  if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) return false;
   const [y, m] = yearMonth.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
   const startStr = `${yearMonth}-01T00:00:00`;
   const endStr = `${yearMonth}-${String(lastDay).padStart(2, '0')}T23:59:59`;
 
-  // Reset export history & increment resetVersion so subsequent exports have fresh UIDs
-  resetMonthExportHistory(yearMonth);
+  const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  writeJson(PENDING_CLEAR_STORAGE_KEY, { yearMonth, token, startedAt: Date.now() });
 
   const inputPayload = `${startStr}\n${endStr}`;
-  let returnUrl = window.location.href;
-  try {
-    const urlObj = new URL(window.location.href);
-    urlObj.searchParams.set('month', yearMonth);
-    urlObj.searchParams.set('openCalendarExport', '1');
-    urlObj.searchParams.set('cleared', '1');
-    returnUrl = urlObj.toString();
-  } catch {
-    // fallback to window.location.href
-  }
+  const successUrl = buildReturnUrl(yearMonth, { cleared: token });
+  const failUrl = buildReturnUrl(yearMonth, { clearFailed: '1' });
 
-  const shortcutUrl = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent('Schichttagebuch-Kalender')}&input=text&text=${encodeURIComponent(inputPayload)}&x-success=${encodeURIComponent(returnUrl)}`;
+  const shortcutUrl =
+    `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent('Schichttagebuch-Kalender')}` +
+    `&input=text&text=${encodeURIComponent(inputPayload)}` +
+    `&x-success=${encodeURIComponent(successUrl)}` +
+    `&x-cancel=${encodeURIComponent(failUrl)}` +
+    `&x-error=${encodeURIComponent(failUrl)}`;
 
   window.location.href = shortcutUrl;
   return true;
+}
+
+/**
+ * Called after returning from the Shortcut via x-success (?cleared=<token>).
+ * Resets the month history exactly once for a valid token. Idempotent on page reloads.
+ * Returns the cleared yearMonth or null.
+ */
+export function confirmCalendarClear(token) {
+  if (!token || token === true) return null;
+  const pending = readJson(PENDING_CLEAR_STORAGE_KEY, null);
+  if (pending && !pending.consumed && pending.token === String(token)) {
+    resetMonthExportHistory(pending.yearMonth);
+    writeJson(PENDING_CLEAR_STORAGE_KEY, { ...pending, confirmedAt: Date.now(), consumed: true });
+    return pending.yearMonth;
+  }
+  // Page reload with an already-consumed token: report success again, but do not reset twice
+  if (pending && pending.consumed && pending.token === String(token)) return pending.yearMonth;
+  return null;
 }
 
 /**
@@ -460,7 +642,7 @@ export function runIosCalendarDeleteShortcut(yearMonth = '2026-11') {
 export function downloadIosDeleteShortcutFile() {
   markIosShortcutInstalled();
   const link = document.createElement('a');
-  link.href = '/Schichttagebuch-Kalender.shortcut';
+  link.href = `${import.meta.env?.BASE_URL || '/'}Schichttagebuch-Kalender.shortcut`;
   link.setAttribute('download', 'Schichttagebuch-Kalender.shortcut');
   document.body.appendChild(link);
   link.click();

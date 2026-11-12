@@ -2,33 +2,56 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calendar, Check, Download, X,
   Smartphone, CheckCircle2, Trash2,
-  Users, MapPin, Truck, HelpCircle, ChevronDown, Sparkles
+  Users, MapPin, Truck, HelpCircle, ChevronDown, Sparkles, AlertTriangle
 } from 'lucide-react';
 import {
   downloadIcsFile,
   runIosCalendarDeleteShortcut,
   downloadIosDeleteShortcutFile,
-  getShiftExportStatus,
-  getCalendarExportHistory
+  analyzeMonthExport,
+  getCalendarExportHistory,
+  getLastExportOptions,
+  confirmCalendarClear
 } from '../utils/calendarExport';
 import { getShiftColor } from '../utils/shiftColors';
 
-export default function IosCalendarExportModal({
-  isOpen,
+// Wrapper: hooks of the dialog only run while it is open (no hooks after an early return)
+export default function IosCalendarExportModal(props) {
+  if (!props.isOpen) return null;
+  return <IosCalendarExportDialog key={props.yearMonth} {...props} />;
+}
+
+function readClearFailedFromUrl() {
+  try {
+    return new URLSearchParams(window.location.search).get('clearFailed') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function IosCalendarExportDialog({
   onClose,
   shifts = [],
-  currentMonthLabel = 'November 2026',
-  yearMonth = '2026-11',
+  currentMonthLabel = '',
+  yearMonth = '',
   storeSettings = {},
   initialCleared = false
 }) {
-  if (!isOpen) return null;
+  // Return from the iOS Shortcut: reset the month history only if the Shortcut confirmed success
+  const [initialBanner] = useState(() => {
+    if (initialCleared) {
+      const token = typeof initialCleared === 'string' ? initialCleared : null;
+      if (confirmCalendarClear(token)) return 'deleteShortcut';
+    }
+    if (readClearFailedFromUrl()) return 'clearFailed';
+    return null;
+  });
 
-  const [titleFormat, setTitleFormat] = useState('codeAndType'); // 'codeAndType', 'codeOnly', 'typeAndTimes'
-  const [alarmOption, setAlarmOption] = useState('1440'); // Default: 1 Tag vorher!
+  const [titleFormat, setTitleFormat] = useState(() => getLastExportOptions(yearMonth).titleFormat); // 'codeAndType', 'codeOnly', 'typeAndTimes'
+  const [alarmOption, setAlarmOption] = useState(() => getLastExportOptions(yearMonth).alarmOption);
   const [overwriteMode, setOverwriteMode] = useState('update'); // 'update' | 'forceNew'
   const [selectedIds, setSelectedIds] = useState(() => new Set(shifts.map(s => s.id)));
-  const [downloadSuccess, setDownloadSuccess] = useState(initialCleared ? 'deleteShortcut' : null); // null | 'export' | 'deleteShortcut' | 'installShortcut'
+  const [downloadSuccess, setDownloadSuccess] = useState(initialBanner); // null | 'export' | 'deleteShortcut' | 'installShortcut' | 'clearFailed'
   const [exportVersionTick, setExportVersionTick] = useState(0);
   const [isTipPopupOpen, setIsTipPopupOpen] = useState(false);
 
@@ -36,30 +59,22 @@ export default function IosCalendarExportModal({
     return getCalendarExportHistory(yearMonth);
   }, [yearMonth, exportVersionTick]);
 
-  const hasPreviousExport = useMemo(() => {
-    return Boolean(exportHistory?.items && Object.keys(exportHistory.items).length > 0);
-  }, [exportHistory]);
+  const analysis = useMemo(() => {
+    return analyzeMonthExport(shifts, yearMonth, storeSettings, { titleFormat, alarmOption });
+  }, [shifts, yearMonth, storeSettings, titleFormat, alarmOption, exportVersionTick, exportHistory]);
 
-  const shiftStatuses = useMemo(() => {
-    const map = {};
-    shifts.forEach(s => {
-      map[s.id] = getShiftExportStatus(s, yearMonth, storeSettings, { titleFormat, alarmOption });
-    });
-    return map;
-  }, [shifts, yearMonth, storeSettings, titleFormat, alarmOption, exportVersionTick]);
+  const hasPreviousExport = analysis.hasPreviousExport;
+  const shiftStatuses = analysis.statusById;
+  const removedItems = analysis.removedItems;
 
   const newOnlyIds = useMemo(() => {
     if (!hasPreviousExport) return [];
-    return shifts
-      .filter(s => shiftStatuses[s.id] === 'new')
-      .map(s => s.id);
+    return shifts.filter(s => shiftStatuses[s.id] === 'new').map(s => s.id);
   }, [shifts, shiftStatuses, hasPreviousExport]);
 
   const modifiedIds = useMemo(() => {
     if (!hasPreviousExport) return [];
-    return shifts
-      .filter(s => shiftStatuses[s.id] === 'modified')
-      .map(s => s.id);
+    return shifts.filter(s => shiftStatuses[s.id] === 'modified').map(s => s.id);
   }, [shifts, shiftStatuses, hasPreviousExport]);
 
   const changedOrNewIds = useMemo(() => {
@@ -69,31 +84,51 @@ export default function IosCalendarExportModal({
       .map(s => s.id);
   }, [shifts, shiftStatuses, hasPreviousExport]);
 
-  // In 'update' mode:
-  // - If only brand-new days were added (no existing shifts modified), select ONLY the brand-new days so existing shifts are never re-exported.
-  // - Otherwise select all shifts (and require Shortcut clean before re-exporting already-exported shifts).
+  // Old calendar entries must be removed first if a shift was changed, deleted or moved
+  const monthNeedsClean = hasPreviousExport && (modifiedIds.length > 0 || removedItems.length > 0);
+  const calendarUpToDate = hasPreviousExport && !monthNeedsClean && newOnlyIds.length === 0;
+
+  // Stable signature so a re-render of the parent (new array reference, Firestore snapshot)
+  // does not reset the user's manual selection
+  const selectionSignature = useMemo(() => {
+    return [
+      overwriteMode,
+      hasPreviousExport ? '1' : '0',
+      removedItems.length,
+      shifts.map(s => `${s.id}:${shiftStatuses[s.id] || ''}`).join(',')
+    ].join('|');
+  }, [overwriteMode, hasPreviousExport, removedItems.length, shifts, shiftStatuses]);
+
+  // Default selection:
+  // - forceNew / first export: all shifts
+  // - update + changed/removed shifts: all shifts (month is cleaned first, then re-exported completely)
+  // - update + only new shifts: only the new ones
+  // - update + nothing changed: nothing (calendar is up to date)
   useEffect(() => {
     if (overwriteMode === 'update' && hasPreviousExport) {
-      if (newOnlyIds.length > 0 && modifiedIds.length === 0) {
-        setSelectedIds(new Set(newOnlyIds));
-      } else {
+      if (monthNeedsClean) {
         setSelectedIds(new Set(shifts.map(s => s.id)));
+      } else {
+        setSelectedIds(new Set(newOnlyIds));
       }
     } else {
       setSelectedIds(new Set(shifts.map(s => s.id)));
     }
-  }, [overwriteMode, hasPreviousExport, newOnlyIds.length, modifiedIds.length, shifts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionSignature]);
 
   const selectedShifts = useMemo(() => {
     return shifts.filter(s => selectedIds.has(s.id));
   }, [shifts, selectedIds]);
 
-  // In 'update' mode, if any selected shift has ALREADY been exported to the calendar ('unchanged' or 'modified'),
-  // iOS Safari would duplicate it unless the old calendar entries of this month are deleted first via the iOS Shortcut!
+  // In 'update' mode iOS cannot overwrite or delete events from an .ics file.
+  // If a selected shift is already in the calendar, or an exported shift no longer exists,
+  // the month must be cleaned via the iOS Shortcut first – otherwise duplicates/leftovers remain.
   const needsShortcutCleanBeforeExport = useMemo(() => {
     if (overwriteMode !== 'update' || !hasPreviousExport) return false;
+    if (removedItems.length > 0) return true;
     return selectedShifts.some(s => shiftStatuses[s.id] !== 'new');
-  }, [overwriteMode, hasPreviousExport, selectedShifts, shiftStatuses]);
+  }, [overwriteMode, hasPreviousExport, removedItems.length, selectedShifts, shiftStatuses]);
 
   const toggleSelectAll = () => {
     if (selectedIds.size === shifts.length) {
@@ -121,8 +156,7 @@ export default function IosCalendarExportModal({
   const handleExport = () => {
     if (selectedShifts.length === 0) return;
 
-    // If 'update' mode is active and selected shifts are already in the iPhone calendar,
-    // Step 1 deletes the old entries via the iOS Shortcut first so 0 duplicates can occur!
+    // Step 1: delete the old entries of this month via the iOS Shortcut first (0 duplicates)
     if (needsShortcutCleanBeforeExport) {
       handleRunDeleteShortcut();
       return;
@@ -132,10 +166,10 @@ export default function IosCalendarExportModal({
       calendarName: 'Dienstplan',
       titleFormat,
       alarmOption,
-      alarmMinutes: alarmOption === '1440' ? 1440 : (Number(alarmOption) || 1440),
       overwriteMode,
       yearMonth,
-      storeSettings
+      storeSettings,
+      allShifts: shifts
     });
 
     setExportVersionTick(t => t + 1);
@@ -144,11 +178,8 @@ export default function IosCalendarExportModal({
   };
 
   const handleRunDeleteShortcut = () => {
+    // History is reset only after the Shortcut reports success (x-success -> ?cleared=<token>)
     runIosCalendarDeleteShortcut(yearMonth);
-    setExportVersionTick(t => t + 1);
-    setSelectedIds(new Set(shifts.map(s => s.id)));
-    setDownloadSuccess('deleteShortcut');
-    setTimeout(() => setDownloadSuccess(null), 12000);
   };
 
   const handleInstallShortcut = () => {
@@ -337,7 +368,7 @@ export default function IosCalendarExportModal({
             }}>
               <CheckCircle2 size={17} style={{ flexShrink: 0 }} />
               <div>
-                <strong>Kalenderdatei (.ics) erstellt!</strong> Wähle beim Hinzufügen deinen Ziel-Kalender aus. Unveränderte Termine werden automatisch übersprungen, geänderte/neue Dienste frisch eingetragen.
+                <strong>Kalenderdatei (.ics) erstellt!</strong> Tippe auf „Alle hinzufügen“ und wähle deinen Ziel-Kalender. Die App merkt sich, was übertragen wurde – beim nächsten Mal werden nur Änderungen abgeglichen.
               </div>
             </div>
           )}
@@ -359,6 +390,60 @@ export default function IosCalendarExportModal({
               <CheckCircle2 size={17} style={{ flexShrink: 0 }} />
               <div>
                 <strong>Schritt 1 erledigt: Alte Termine für {currentMonthLabel} im Kalender gelöscht!</strong> Tippe jetzt unten auf den gelben Button (Schritt 2), um die aktuellen Dienste frisch und ohne Duplikate einzutragen.
+              </div>
+            </div>
+          )}
+
+          {downloadSuccess === 'clearFailed' && (
+            <div style={{
+              background: 'rgb(var(--rgb-danger) / 0.12)',
+              border: '1px solid rgb(var(--rgb-danger) / 0.4)',
+              color: 'var(--c-danger)',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '12.5px',
+              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={17} style={{ flexShrink: 0 }} />
+              <div>
+                <strong>Kurzbefehl wurde nicht ausgeführt.</strong> Im Kalender wurde nichts gelöscht und der Abgleich bleibt unverändert – es entstehen keine Duplikate. Ist der Kurzbefehl „Schichttagebuch-Kalender“ installiert? Sonst zuerst „Kurzbefehl (1×)“ tippen.
+              </div>
+            </div>
+          )}
+
+          {downloadSuccess !== 'deleteShortcut' && overwriteMode === 'update' && hasPreviousExport && (monthNeedsClean || calendarUpToDate) && (
+            <div style={{
+              background: calendarUpToDate ? 'rgb(var(--rgb-success) / 0.1)' : 'rgb(var(--rgb-orange) / 0.12)',
+              border: calendarUpToDate ? '1px solid rgb(var(--rgb-success) / 0.32)' : '1px solid rgb(var(--rgb-orange) / 0.38)',
+              color: calendarUpToDate ? 'var(--c-success)' : 'var(--c-orange)',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '12.5px',
+              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flexShrink: 0
+            }}>
+              {calendarUpToDate ? <CheckCircle2 size={17} style={{ flexShrink: 0 }} /> : <AlertTriangle size={17} style={{ flexShrink: 0 }} />}
+              <div>
+                {calendarUpToDate ? (
+                  <><strong>Kalender ist aktuell.</strong> Seit der letzten Übertragung hat sich in {currentMonthLabel} nichts geändert.</>
+                ) : (
+                  <>
+                    <strong>
+                      {[
+                        modifiedIds.length > 0 ? `${modifiedIds.length} ${modifiedIds.length === 1 ? 'Dienst geändert' : 'Dienste geändert'}` : null,
+                        removedItems.length > 0 ? `${removedItems.length} ${removedItems.length === 1 ? 'Dienst entfallen/verschoben' : 'Dienste entfallen/verschoben'}` : null
+                      ].filter(Boolean).join(', ')}.
+                    </strong>{' '}
+                    Der Kalender wird in 2 Schritten abgeglichen: erst die alten Termine des Monats löschen, dann alle aktuellen Dienste neu eintragen.
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -509,7 +594,7 @@ export default function IosCalendarExportModal({
                     transition: 'all 0.15s ease',
                     whiteSpace: 'nowrap'
                   }}
-                  title="Überträgt gezielt geänderte/neue Dienste mit aktualisierter Kennung und überspringt unveränderte Einträge"
+                  title="Gleicht den Kalender ab: neue Dienste werden ergänzt, bei Änderungen wird der Monat erst bereinigt und dann neu eingetragen"
                 >
                   Aktualisieren
                 </button>
@@ -527,7 +612,7 @@ export default function IosCalendarExportModal({
                     transition: 'all 0.15s ease',
                     whiteSpace: 'nowrap'
                   }}
-                  title="Vergibt für alle ausgewählten Dienste eine komplett neue Kalender-ID"
+                  title="Trägt alle ausgewählten Dienste ohne Abgleich neu ein (kann Dopplungen erzeugen)"
                 >
                   Neu erzwingen
                 </button>
@@ -1046,7 +1131,7 @@ export default function IosCalendarExportModal({
               <div style={{ fontSize: '13px', color: 'var(--c-text-soft)', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
                   <strong style={{ color: 'var(--c-text)' }}>1. Aktualisieren (Intelligent ohne Duplikate):</strong><br />
-                  Berechnet für jeden Dienst einen <strong>Inhalts-Fingerabdruck</strong>. Unveränderte Dienste behalten ihre ID (iOS überspringt sie automatisch – <strong>keine Dopplungen</strong>), während geänderte oder neue Dienste automatisch eine neue ID erhalten und sofort übernommen werden.
+                  Die App merkt sich für jeden Tag, was zuletzt übertragen wurde. Kommen nur <strong>neue Dienste</strong> hinzu, werden nur diese eingetragen. Wurde ein Dienst <strong>geändert, gestrichen oder verschoben</strong>, löscht Schritt 1 per Kurzbefehl die alten Termine des Monats und Schritt 2 trägt alle aktuellen Dienste neu ein – so bleiben <strong>keine Dopplungen oder Altlasten</strong> stehen.
                 </div>
                 <div>
                   <strong style={{ color: 'var(--c-text)' }}>2. Termine löschen (per iOS-Kurzbefehl):</strong><br />
@@ -1054,7 +1139,7 @@ export default function IosCalendarExportModal({
                 </div>
                 <div>
                   <strong style={{ color: 'var(--c-text)' }}>3. Neu erzwingen:</strong><br />
-                  Vergibt für alle ausgewählten Dienste eine komplett neue ID, um alle Termine unabhängig vom bisherigen Status neu einzutragen.
+                  Trägt alle ausgewählten Dienste ohne Abgleich neu ein (z.B. wenn Termine manuell gelöscht wurden). Achtung: Sind die alten Termine noch im Kalender, entstehen Dopplungen – dann vorher „Termine löschen“ nutzen.
                 </div>
               </div>
 

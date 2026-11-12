@@ -48,7 +48,7 @@ export default function TeamRoster() {
   const [cloudSyncing, setCloudSyncing] = useState(false);
   const [isSyncingPersonal, setIsSyncingPersonal] = useState(false);
   const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(() => searchParams.get('openCalendarExport') === '1');
-  const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') === '1');
+  const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') || false);
 
   // Stored rosters list
   const [savedRosters, setSavedRosters] = useState(() => getSavedRosterSummaries());
@@ -595,8 +595,8 @@ export default function TeamRoster() {
     }
     if (searchParams.get('openCalendarExport') === '1') {
       setIsCalendarExportModalOpen(true);
-      if (searchParams.get('cleared') === '1') {
-        setCalendarJustCleared(true);
+      if (searchParams.get('cleared')) {
+        setCalendarJustCleared(searchParams.get('cleared'));
       }
     }
   }, [searchParams]);
@@ -2885,7 +2885,7 @@ export default function TeamRoster() {
         onClose={() => {
           setIsCalendarExportModalOpen(false);
           setCalendarJustCleared(false);
-          if (searchParams.get('openCalendarExport') || searchParams.get('cleared')) {
+          if (searchParams.get('openCalendarExport') || searchParams.get('cleared') || searchParams.get('clearFailed')) {
             setSearchParams({ month: yearMonth });
           }
         }}

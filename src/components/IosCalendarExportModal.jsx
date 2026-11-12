@@ -11,9 +11,13 @@ import {
   analyzeMonthExport,
   getCalendarExportHistory,
   getLastExportOptions,
-  confirmCalendarClear
+  confirmCalendarClear,
+  setCalendarExportRemote,
+  syncMonthFromRemote
 } from '../utils/calendarExport';
+import { createFirestoreCalendarRemote } from '../utils/calendarExportRemote';
 import { getShiftColor } from '../utils/shiftColors';
+import { useAuth } from '../context/AuthContext';
 
 // Wrapper: hooks of the dialog only run while it is open (no hooks after an early return)
 export default function IosCalendarExportModal(props) {
@@ -21,11 +25,11 @@ export default function IosCalendarExportModal(props) {
   return <IosCalendarExportDialog key={props.yearMonth} {...props} />;
 }
 
-function readClearFailedFromUrl() {
+function readUrlParam(name) {
   try {
-    return new URLSearchParams(window.location.search).get('clearFailed') === '1';
+    return new URLSearchParams(window.location.search).get(name);
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -37,23 +41,44 @@ function IosCalendarExportDialog({
   storeSettings = {},
   initialCleared = false
 }) {
-  // Return from the iOS Shortcut: reset the month history only if the Shortcut confirmed success
-  const [initialBanner] = useState(() => {
-    if (initialCleared) {
-      const token = typeof initialCleared === 'string' ? initialCleared : null;
-      if (confirmCalendarClear(token)) return 'deleteShortcut';
-    }
-    if (readClearFailedFromUrl()) return 'clearFailed';
-    return null;
-  });
+  const { currentUser } = useAuth() || {};
+  const uid = currentUser?.uid || null;
 
   const [titleFormat, setTitleFormat] = useState(() => getLastExportOptions(yearMonth).titleFormat); // 'codeAndType', 'codeOnly', 'typeAndTimes'
   const [alarmOption, setAlarmOption] = useState(() => getLastExportOptions(yearMonth).alarmOption);
   const [overwriteMode, setOverwriteMode] = useState('update'); // 'update' | 'forceNew'
   const [selectedIds, setSelectedIds] = useState(() => new Set(shifts.map(s => s.id)));
-  const [downloadSuccess, setDownloadSuccess] = useState(initialBanner); // null | 'export' | 'deleteShortcut' | 'installShortcut' | 'clearFailed'
+  const [downloadSuccess, setDownloadSuccess] = useState(() => (readUrlParam('clearFailed') === '1' ? 'clearFailed' : null)); // null | 'export' | 'deleteShortcut' | 'installShortcut' | 'clearFailed'
   const [exportVersionTick, setExportVersionTick] = useState(0);
   const [isTipPopupOpen, setIsTipPopupOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('loading'); // 'loading' | 'ready' | 'localOnly'
+
+  // Load the export state of this month from the account (shared by Safari, Home-Screen app and Mac),
+  // then handle the return from the iOS Shortcut (?cleared=<token>)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setCalendarExportRemote(uid ? createFirestoreCalendarRemote(uid) : null);
+      const res = await syncMonthFromRemote(yearMonth);
+
+      const token = typeof initialCleared === 'string' ? initialCleared : readUrlParam('cleared');
+      if (token) {
+        const clearedMonth = readUrlParam('month') || yearMonth;
+        if (clearedMonth !== yearMonth) await syncMonthFromRemote(clearedMonth);
+        const result = confirmCalendarClear(token, clearedMonth);
+        if (alive && result && clearedMonth === yearMonth) setDownloadSuccess('deleteShortcut');
+      }
+
+      if (!alive) return;
+      const opts = getLastExportOptions(yearMonth);
+      setTitleFormat(opts.titleFormat);
+      setAlarmOption(opts.alarmOption);
+      setSyncStatus(uid && res.ok ? 'ready' : 'localOnly');
+      setExportVersionTick(t => t + 1);
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const exportHistory = useMemo(() => {
     return getCalendarExportHistory(yearMonth);
@@ -153,8 +178,10 @@ function IosCalendarExportDialog({
     });
   };
 
+  const isSyncing = syncStatus === 'loading';
+
   const handleExport = () => {
-    if (selectedShifts.length === 0) return;
+    if (selectedShifts.length === 0 || isSyncing) return;
 
     // Step 1: delete the old entries of this month via the iOS Shortcut first (0 duplicates)
     if (needsShortcutCleanBeforeExport) {
@@ -415,7 +442,28 @@ function IosCalendarExportDialog({
             </div>
           )}
 
-          {downloadSuccess !== 'deleteShortcut' && overwriteMode === 'update' && hasPreviousExport && (monthNeedsClean || calendarUpToDate) && (
+          {syncStatus === 'localOnly' && (
+            <div style={{
+              background: 'rgb(var(--rgb-orange) / 0.12)',
+              border: '1px solid rgb(var(--rgb-orange) / 0.38)',
+              color: 'var(--c-orange)',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '12.5px',
+              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={17} style={{ flexShrink: 0 }} />
+              <div>
+                <strong>Abgleichsstand konnte nicht aus dem Konto geladen werden</strong> (offline?). Es wird der Stand dieses Geräts verwendet. Im Zweifel „Termine löschen“ und danach alle Dienste neu übertragen.
+              </div>
+            </div>
+          )}
+
+          {!isSyncing && downloadSuccess !== 'deleteShortcut' && overwriteMode === 'update' && hasPreviousExport && (monthNeedsClean || calendarUpToDate) && (
             <div style={{
               background: calendarUpToDate ? 'rgb(var(--rgb-success) / 0.1)' : 'rgb(var(--rgb-orange) / 0.12)',
               border: calendarUpToDate ? '1px solid rgb(var(--rgb-success) / 0.32)' : '1px solid rgb(var(--rgb-orange) / 0.38)',
@@ -1009,7 +1057,7 @@ function IosCalendarExportDialog({
           <button
             type="button"
             onClick={handleExport}
-            disabled={selectedShifts.length === 0}
+            disabled={selectedShifts.length === 0 || isSyncing}
             style={{
               flex: 2.5,
               background: selectedShifts.length > 0
@@ -1037,7 +1085,9 @@ function IosCalendarExportDialog({
               transition: 'all 0.15s ease'
             }}
           >
-            {needsShortcutCleanBeforeExport ? (
+            {isSyncing ? (
+              <span>Abgleich mit dem Kalender wird geladen …</span>
+            ) : needsShortcutCleanBeforeExport ? (
               <>
                 <Trash2 size={18} strokeWidth={2.5} style={{ flexShrink: 0 }} />
                 <span>

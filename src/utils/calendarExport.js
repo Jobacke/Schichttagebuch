@@ -18,12 +18,15 @@
  * 4. The export history is reset ONLY after the Shortcut confirmed success via x-success
  *    (one-time token). If the Shortcut fails or is cancelled nothing is reset, so no
  *    duplicates can be produced.
+ * 5. The history is stored in the user's account (Firestore, see calendarExportRemote.js)
+ *    with localStorage only as cache: on the iPhone the Home-Screen web app and Safari
+ *    (where the Shortcut returns to) have separate localStorage.
  */
 
 const EXPORT_HISTORY_STORAGE_KEY = 'schichttagebuch_ics_export_history_v1';
 const SHORTCUT_INSTALLED_STORAGE_KEY = 'schichttagebuch_ios_shortcut_installed_v1';
 const EXPORT_PREFS_STORAGE_KEY = 'schichttagebuch_ics_export_prefs_v1';
-const PENDING_CLEAR_STORAGE_KEY = 'schichttagebuch_ics_pending_clear_v1';
+const CLEAR_TOKEN_MAX_AGE_MS = 30 * 60 * 1000;
 const HISTORY_SCHEMA = 2;
 
 export const DEFAULT_TITLE_FORMAT = 'codeAndType';
@@ -58,6 +61,95 @@ function writeJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // ignore storage errors
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Remote (account-wide) storage of the export history
+// ---------------------------------------------------------------------------
+
+let remoteStore = null; // { loadMonth(ym), saveMonth(ym, entry) }
+let lastRemoteError = null;
+const pendingRemoteWrites = new Set();
+
+/** Connects the export history to the user's account (Firestore adapter) or null for local only. */
+export function setCalendarExportRemote(adapter) {
+  remoteStore = adapter || null;
+}
+
+export function getCalendarExportRemoteError() {
+  return lastRemoteError;
+}
+
+function entryStamp(entry) {
+  return Number(entry?.updatedAt || entry?.exportedAt || 0);
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Zeitüberschreitung')), ms))
+  ]);
+}
+
+function pushMonthToRemote(yearMonth, entry) {
+  if (!remoteStore || !yearMonth || !entry) return Promise.resolve(false);
+  const p = Promise.resolve()
+    .then(() => remoteStore.saveMonth(yearMonth, entry))
+    .then(() => {
+      lastRemoteError = null;
+      return true;
+    })
+    .catch(err => {
+      lastRemoteError = err;
+      console.warn('[Kalender] Abgleichsstand konnte nicht im Konto gespeichert werden:', err);
+      return false;
+    })
+    .finally(() => pendingRemoteWrites.delete(p));
+  pendingRemoteWrites.add(p);
+  return p;
+}
+
+/** Waits until all pending account writes are done (or failed). */
+export async function flushCalendarExportWrites(timeoutMs = 6000) {
+  if (pendingRemoteWrites.size === 0) return true;
+  try {
+    await withTimeout(Promise.all([...pendingRemoteWrites]), timeoutMs);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Loads the month state from the account and merges it with the local cache (newer wins).
+ * Returns { ok, source: 'remote'|'local'|'none', error }.
+ */
+export async function syncMonthFromRemote(yearMonth, timeoutMs = 6000) {
+  if (!remoteStore || !yearMonth) return { ok: false, source: 'local', error: null };
+  await flushCalendarExportWrites(timeoutMs);
+  try {
+    const remoteEntry = await withTimeout(remoteStore.loadMonth(yearMonth), timeoutMs);
+    const all = readJson(EXPORT_HISTORY_STORAGE_KEY, {}) || {};
+    const localEntry = all[yearMonth] ? migrateMonthHistory(all[yearMonth]) : null;
+
+    if (remoteEntry && entryStamp(remoteEntry) >= entryStamp(localEntry)) {
+      all[yearMonth] = migrateMonthHistory(remoteEntry);
+      writeJson(EXPORT_HISTORY_STORAGE_KEY, all);
+      lastRemoteError = null;
+      return { ok: true, source: 'remote', error: null };
+    }
+    if (localEntry) {
+      // Local state is newer (e.g. written offline or before this update) -> upload it
+      const pushed = await pushMonthToRemote(yearMonth, { ...localEntry, updatedAt: entryStamp(localEntry) || Date.now() });
+      return { ok: pushed, source: 'local', error: pushed ? null : lastRemoteError };
+    }
+    lastRemoteError = null;
+    return { ok: true, source: 'none', error: null };
+  } catch (err) {
+    lastRemoteError = err;
+    console.warn('[Kalender] Abgleichsstand konnte nicht aus dem Konto geladen werden:', err);
+    return { ok: false, source: 'local', error: err };
   }
 }
 
@@ -227,35 +319,44 @@ export function getCalendarExportHistory(yearMonth) {
 function saveCalendarExportHistory(yearMonth, itemsMap, meta = {}) {
   const all = readJson(EXPORT_HISTORY_STORAGE_KEY, {}) || {};
   const prev = migrateMonthHistory(all[yearMonth]) || {};
+  const now = Date.now();
   all[yearMonth] = {
     ...prev,
     ...meta,
     schema: HISTORY_SCHEMA,
     resetVersion: meta.resetVersion || prev.resetVersion || 1,
-    exportedAt: Date.now(),
+    exportedAt: now,
+    updatedAt: Math.max(now, entryStamp(prev) + 1),
     items: itemsMap
   };
   writeJson(EXPORT_HISTORY_STORAGE_KEY, all);
+  pushMonthToRemote(yearMonth, all[yearMonth]);
 }
 
 /**
  * Increments resetVersion and clears exported items for a month
  * so that after deleting events from the calendar, all shifts can be exported fresh.
  */
-export function resetMonthExportHistory(yearMonth) {
+export function resetMonthExportHistory(yearMonth, extraMeta = {}) {
   if (!yearMonth) return 1;
   const all = readJson(EXPORT_HISTORY_STORAGE_KEY, {}) || {};
   const prev = all[yearMonth] || {};
   const nextVersion = (prev.resetVersion || 1) + 1;
+  const now = Date.now();
   all[yearMonth] = {
     schema: HISTORY_SCHEMA,
     exportedAt: null,
+    updatedAt: Math.max(now, entryStamp(prev) + 1),
     resetVersion: nextVersion,
-    titleFormat: prev.titleFormat,
-    alarmOption: prev.alarmOption,
+    titleFormat: prev.titleFormat || null,
+    alarmOption: prev.alarmOption || null,
+    lastClearToken: prev.lastClearToken || null,
+    lastClearAt: prev.lastClearAt || null,
+    ...extraMeta,
     items: {}
   };
   writeJson(EXPORT_HISTORY_STORAGE_KEY, all);
+  pushMonthToRemote(yearMonth, all[yearMonth]);
   return nextVersion;
 }
 
@@ -599,8 +700,9 @@ export function runIosCalendarDeleteShortcut(yearMonth) {
   const startStr = `${yearMonth}-01T00:00:00`;
   const endStr = `${yearMonth}-${String(lastDay).padStart(2, '0')}T23:59:59`;
 
-  const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  writeJson(PENDING_CLEAR_STORAGE_KEY, { yearMonth, token, startedAt: Date.now() });
+  // One-time token: <timestamp base36>-<random>. Validated against the account state on return,
+  // so it also works when the Shortcut returns to Safari instead of the Home-Screen web app.
+  const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
   const inputPayload = `${startStr}\n${endStr}`;
   const successUrl = buildReturnUrl(yearMonth, { cleared: token });
@@ -617,22 +719,30 @@ export function runIosCalendarDeleteShortcut(yearMonth) {
   return true;
 }
 
+function parseClearTokenTime(token) {
+  const ts = parseInt(String(token).split('-')[0], 36);
+  return Number.isFinite(ts) ? ts : 0;
+}
+
 /**
- * Called after returning from the Shortcut via x-success (?cleared=<token>).
- * Resets the month history exactly once for a valid token. Idempotent on page reloads.
- * Returns the cleared yearMonth or null.
+ * Called after returning from the Shortcut via x-success (?cleared=<token>&month=YYYY-MM).
+ * Call syncMonthFromRemote(yearMonth) before, so the account state is known.
+ * Returns 'confirmed' (history reset now), 'already' (token was already used – page reload)
+ * or null (invalid/expired token -> nothing is reset).
  */
-export function confirmCalendarClear(token) {
-  if (!token || token === true) return null;
-  const pending = readJson(PENDING_CLEAR_STORAGE_KEY, null);
-  if (pending && !pending.consumed && pending.token === String(token)) {
-    resetMonthExportHistory(pending.yearMonth);
-    writeJson(PENDING_CLEAR_STORAGE_KEY, { ...pending, confirmedAt: Date.now(), consumed: true });
-    return pending.yearMonth;
-  }
-  // Page reload with an already-consumed token: report success again, but do not reset twice
-  if (pending && pending.consumed && pending.token === String(token)) return pending.yearMonth;
-  return null;
+export function confirmCalendarClear(token, yearMonth) {
+  if (!token || token === true || !yearMonth) return null;
+  const tokenStr = String(token);
+  const entry = getCalendarExportHistory(yearMonth) || {};
+  if (entry.lastClearToken === tokenStr) return 'already';
+
+  const ts = parseClearTokenTime(tokenStr);
+  const age = Date.now() - ts;
+  if (!ts || age < -5 * 60 * 1000 || age > CLEAR_TOKEN_MAX_AGE_MS) return null;
+  if (entry.lastClearAt && ts <= Number(entry.lastClearAt)) return null;
+
+  resetMonthExportHistory(yearMonth, { lastClearToken: tokenStr, lastClearAt: ts });
+  return 'confirmed';
 }
 
 /**

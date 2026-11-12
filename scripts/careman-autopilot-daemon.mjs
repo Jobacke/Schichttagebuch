@@ -251,6 +251,8 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
   let lastExtractorInjectAt = 0;
   let lastPasswordSubmitAt = 0;
   let last2faSelectAt = 0;
+  let waitingForCareManLogin = false;
+  let seedRedirects = 0; // a stored session is tried at most twice – then the user signs in manually
 
   const seedMyPlanScript = `
     try {
@@ -261,7 +263,7 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
       }
     } catch (e) {}
     try {
-      if (location.hostname === 'dienstplan-bayern.secure.johanniter.de' && !localStorage.getItem('myPlanToken')) {
+      if (${JSON.stringify(Boolean(creds.myPlanToken))} && location.hostname === 'dienstplan-bayern.secure.johanniter.de' && !localStorage.getItem('myPlanToken')) {
         localStorage.setItem('myPlanToken', ${JSON.stringify(creds.myPlanToken)});
         localStorage.setItem('myPlanLogin', JSON.stringify({ userId: 5692, kennwortAenderungNotwendig: false, warningMessage: '' }));
         localStorage.setItem('myPlanTenant', '-');
@@ -502,11 +504,28 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
       // 3. Handle dienstplan-bayern.secure.johanniter.de (CareMan Bayern)
       if (/dienstplan-bayern\.secure\.johanniter\.de/i.test(pageState.host)) {
         if (!pageState.freshMyPlanToken || pageState.href.includes('/identity/')) {
+          if (!creds.myPlanToken || seedRedirects >= 2) {
+            // No stored CareMan session yet: wait until the user signs in once in this window
+            // (with "Angemeldet bleiben"); the new session token is then saved automatically.
+            waitingForCareManLogin = true;
+            currentJob.stepMessage = '🔐 Bitte einmalig im CareMan-Fenster mit Anmeldename und Passwort anmelden („Angemeldet bleiben“ angehakt lassen) – danach läuft alles automatisch weiter.';
+            await sleep(1500);
+            continue;
+          }
+          seedRedirects++;
           await cdp.evalInPage(`(() => {
             ${seedMyPlanScript}
             window.location.href = ${JSON.stringify(targetCareManUrl)};
           })()`).catch(() => {});
           await sleep(800);
+          continue;
+        }
+
+        if (waitingForCareManLogin) {
+          // First page after the manual login: jump to the requested month once
+          waitingForCareManLogin = false;
+          await cdp.evalInPage(`window.location.href = ${JSON.stringify(targetCareManUrl)};`).catch(() => {});
+          await sleep(1500);
           continue;
         }
 

@@ -46,9 +46,16 @@ export async function loadSyncConfig(uid) {
   if (!uid) return readCache();
   try {
     const snap = await getDoc(configRef(uid));
-    const cfg = snap.exists() ? snap.data() : null;
-    writeCache(cfg);
-    return cfg;
+    const remote = snap.exists() ? snap.data() : null;
+    const cached = readCache();
+    // Never lose a locally created key: if the account has nothing (yet) or an older state,
+    // keep the local one and upload it
+    if (cached && (!remote || Number(cached.updatedAt || 0) > Number(remote.updatedAt || 0))) {
+      setDoc(configRef(uid), cached).catch(() => {});
+      return cached;
+    }
+    writeCache(remote);
+    return remote;
   } catch (err) {
     console.warn('[Kalender-Sync] Einstellungen konnten nicht geladen werden:', err);
     return readCache();
@@ -104,7 +111,9 @@ export async function callSyncScript(scriptUrl, payload, timeoutMs = 60000) {
     return data;
   } catch (err) {
     if (err?.name === 'AbortError') throw new Error('Zeitüberschreitung – Google hat nicht rechtzeitig geantwortet.');
-    if (err instanceof TypeError) throw new Error('Keine Verbindung zur Web-App (offline oder falsche Adresse).');
+    if (err instanceof TypeError) {
+      throw new Error('Keine Verbindung zur Web-App. Prüfe: Zugriff „Jeder“, Zugriff autorisiert und neue Version bereitgestellt (oder offline).');
+    }
     throw err;
   } finally {
     if (timer) clearTimeout(timer);
@@ -157,7 +166,7 @@ function doPost(e) {
   } catch (err) {
     return out_({ ok: false, error: 'Ungültige Anfrage' });
   }
-  if (!req || req.secret !== SECRET) return out_({ ok: false, error: 'Schlüssel passt nicht zur App' });
+  if (!req || req.secret !== SECRET) return out_({ ok: false, error: 'Schlüssel passt nicht zur App – in der App „Code kopieren“, im Skript ersetzen, speichern und als neue Version bereitstellen' });
 
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) return out_({ ok: false, error: 'Es läuft bereits ein Abgleich – bitte gleich noch einmal' });

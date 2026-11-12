@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Copy, Check, ExternalLink, Cloud, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 import {
   generateSecret,
+  getCachedSyncConfig,
   getAppsScriptCode,
   isValidScriptUrl,
   saveSyncConfig,
@@ -12,8 +13,8 @@ import {
  * One-time setup of the direct Google Calendar sync (overlay inside the export dialog).
  */
 export default function GoogleCalendarSyncSetup({ uid, config, onSaved, onClose }) {
-  const [secret, setSecret] = useState(config?.secret || '');
-  const [scriptUrl, setScriptUrl] = useState(config?.scriptUrl || '');
+  const [secret, setSecret] = useState(() => config?.secret || getCachedSyncConfig()?.secret || '');
+  const [scriptUrl, setScriptUrl] = useState(() => config?.scriptUrl || getCachedSyncConfig()?.scriptUrl || '');
   const [copied, setCopied] = useState(false);
   const [testState, setTestState] = useState('idle'); // idle | testing | ok | error
   const [testError, setTestError] = useState('');

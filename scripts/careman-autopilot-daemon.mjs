@@ -254,6 +254,13 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
 
   const seedMyPlanScript = `
     try {
+      // Keep the locally remembered CareMan password in sync with the one given by the app,
+      // so no outdated password can be auto-filled after a password change.
+      if (${JSON.stringify(Boolean(creds.password))} && /johanniter\.de$/.test(location.hostname)) {
+        localStorage.setItem('careman_ap_pass', ${JSON.stringify(creds.password || '')});
+      }
+    } catch (e) {}
+    try {
       if (location.hostname === 'dienstplan-bayern.secure.johanniter.de' && !localStorage.getItem('myPlanToken')) {
         localStorage.setItem('myPlanToken', ${JSON.stringify(creds.myPlanToken)});
         localStorage.setItem('myPlanLogin', JSON.stringify({ userId: 5692, kennwortAenderungNotwendig: false, warningMessage: '' }));
@@ -292,10 +299,9 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
         const bodyText = (document.body ? (document.body.innerText || document.body.textContent || '') : '').trim();
         const passEl = document.querySelector('input[type="password"]');
         const hasPassInput = Boolean(passEl);
-        let capturedPass = passEl?.value || '';
+        const capturedPass = passEl?.value || '';
         let freshMyPlanToken = '';
         try {
-          if (!capturedPass) capturedPass = localStorage.getItem('careman_ap_pass') || '';
           if (host === 'dienstplan-bayern.secure.johanniter.de') {
             freshMyPlanToken = localStorage.getItem('myPlanToken') || '';
           }
@@ -328,8 +334,10 @@ async function runAutoPilotJob({ ym, targetDate, user, pass, returnOrigin, headl
         break;
       }
 
-      // Persist password if user entered it once in the login window
-      if (pageState.capturedPass && pageState.capturedPass !== creds.password) {
+      // Persist the password only if none is known yet (user typed it once in the login window).
+      // A password given by the app (Settings → CareMan-Anmeldung) always wins – an old value
+      // remembered by the browser must never overwrite it.
+      if (!creds.password && pageState.capturedPass) {
         creds.password = pageState.capturedPass;
         saveStoredCredentials(creds.username, creds.password);
       }

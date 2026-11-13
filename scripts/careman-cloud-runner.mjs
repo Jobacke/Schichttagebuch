@@ -527,6 +527,17 @@ async function main() {
   let connectedUrl = '';
   let lastExtractorInjectAt = 0;
   let lastPasswordSubmitAt = 0;
+  // Protection against account lockouts: each login form is submitted at most a few times
+  let johanniterSubmits = 0;
+  let siedaSubmits = 0;
+  let aborted = false;
+  const siedaConfigured = Boolean(String(process.env.CAREMAN_SIEDA_PASS || ''));
+  const abortRun = async (msg) => {
+    console.error('⛔ ' + msg);
+    await patchBridge({ status: 'error', noRetry: true, stepMessage: msg, updatedAt: Date.now() });
+    process.exitCode = 1;
+    aborted = true;
+  };
   let last2faSelectAt = 0;
   let lastStepMsg = '';
   let seedAttempts = 0;
@@ -661,9 +672,15 @@ async function main() {
           continue;
         }
 
-        if (pageState.hasPassInput && credsPass && Date.now() - lastPasswordSubmitAt > 3000) {
+        if (pageState.hasPassInput && johanniterSubmits >= 2 && Date.now() - lastPasswordSubmitAt > 20000) {
+          await abortRun('⛔ Johanniter-Anmeldung wurde abgelehnt. Bitte das Passwort im GitHub-Secret CAREMAN_PASS prüfen – zum Schutz vor einer Kontosperre wird nicht weiter probiert.');
+          break;
+        }
+
+        if (pageState.hasPassInput && credsPass && johanniterSubmits < 2 && Date.now() - lastPasswordSubmitAt > 8000) {
           await updateStep(`🔐 Trage Benutzername & Passwort in der Cloud ein und klicke auf Anmelden...`);
           lastPasswordSubmitAt = Date.now();
+          johanniterSubmits++;
           await cdp.evalInPage(`(async () => {
             const sleep = ms => new Promise(r => setTimeout(r, ms));
             const fillField = (el, val) => {
@@ -709,8 +726,15 @@ async function main() {
             })()`).catch(() => {});
             await sleep(800);
             continue;
-          } else if (pageState.hasPassInput && siedaPass && Date.now() - lastPasswordSubmitAt > 3000) {
+          } else if (pageState.hasPassInput && !siedaConfigured) {
+            await abortRun('⛔ CareMan verlangt eine eigene Anmeldung (opta data), aber die Secrets CAREMAN_SIEDA_USER / CAREMAN_SIEDA_PASS fehlen. Bitte bei GitHub hinterlegen.');
+            break;
+          } else if (pageState.hasPassInput && siedaSubmits >= 1 && Date.now() - lastPasswordSubmitAt > 20000) {
+            await abortRun('⛔ CareMan-Anmeldung (opta data) wurde abgelehnt. Bitte CAREMAN_SIEDA_USER / CAREMAN_SIEDA_PASS prüfen – zum Schutz vor einer Kontosperre wird nicht weiter probiert.');
+            break;
+          } else if (pageState.hasPassInput && siedaPass && siedaSubmits < 1) {
             lastPasswordSubmitAt = Date.now();
+            siedaSubmits++;
             await updateStep('🔐 CareMan-Anmeldung (opta data) – trage Anmeldename & Passwort ein …');
             await cdp.evalInPage(`(async () => {
               const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -781,7 +805,7 @@ async function main() {
 
       await sleep(300);
     }
-    if (!finished) {
+    if (!finished && !aborted) {
       console.error('❌ Zeitüberschreitung – Dienstplan wurde nicht ausgelesen. Letzter Schritt: ' + lastStepMsg);
       await patchBridge({
         status: 'error',

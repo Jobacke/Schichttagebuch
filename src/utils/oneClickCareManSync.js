@@ -717,6 +717,7 @@ export function openCareManLiveWindow(targetYearMonth) {
             resultBlobSha: '',
             resultJson: '',
             error: '',
+            noRetry: false,
             requestedAt: Date.now(),
             updatedAt: Date.now()
           };
@@ -805,6 +806,11 @@ export function openCareManLiveWindow(targetYearMonth) {
             }
 
             if (curStatus === 'error') {
+              if (f.noRetry) {
+                // Login was rejected – retrying could lock the account
+                finalFailure(stepMsg || '⛔ Anmeldung abgelehnt.');
+                return 'fatal';
+              }
               showMsg((stepMsg || '⚠️ Fehler beim Cloud-Abruf.') + label, 'warn');
               return 'retry';
             }

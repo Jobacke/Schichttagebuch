@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { SIEDA_EXTRACTOR_SCRIPT } from '../src/utils/oneClickCareManSync.js';
 
-const DEBUG_PORT = 9229;
+let debugPort = 0; // set by launchCloudChrome (read from DevToolsActivePort)
 // All credentials come from GitHub Actions secrets (see .github/workflows/careman-cloud.yml):
 //   BRIDGE_GH_TOKEN  – fine-grained token for Jobacke/careman-autopilot-bridge (Issues + Contents read/write)
 //   CAREMAN_USER / CAREMAN_PASS – Johanniter Secure Portal login
@@ -239,7 +239,8 @@ class CdpSession {
 }
 
 async function getActivePageTarget() {
-  const res = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`);
+  if (!debugPort) return null;
+  const res = await fetch(`http://127.0.0.1:${debugPort}/json/list`);
   if (!res.ok) return null;
   const targets = await res.json();
   return targets.find(t =>
@@ -251,6 +252,7 @@ async function getActivePageTarget() {
 
 function findChromeBinary() {
   const candidates = [
+    process.env.CHROME_PATH,
     '/usr/bin/google-chrome',
     '/usr/bin/google-chrome-stable',
     '/usr/bin/chromium-browser',
@@ -258,7 +260,7 @@ function findChromeBinary() {
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
   ];
   for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
+    if (c && fs.existsSync(c)) return c;
   }
   try {
     return execSync('which google-chrome || which chromium-browser || which chromium', { encoding: 'utf8' }).trim();
@@ -267,8 +269,148 @@ function findChromeBinary() {
   }
 }
 
+function listChromeBinaries() {
+  const list = [
+    process.env.CHROME_PATH,
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  ].filter(b => b && fs.existsSync(b));
+  if (list.length === 0) list.push(findChromeBinary());
+  return [...new Set(list)];
+}
+
+/**
+ * Starts a headless Chrome robustly: several binaries / headless modes, free DevTools port
+ * (read from DevToolsActivePort), up to 40 s per attempt, stderr is logged on failure.
+ * Returns { proc, pageTarget, bin } or throws with the collected reasons.
+ */
+async function launchCloudChrome(startUrl) {
+  const binaries = listChromeBinaries();
+  const modes = ['--headless=new', '--headless'];
+  const reasons = [];
+  let attempt = 0;
+
+  for (const bin of binaries) {
+    for (const mode of modes) {
+      if (attempt >= 4) break;
+      attempt++;
+      const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'careman-cloud-profile-'));
+      const stderrLines = [];
+      let exitInfo = null;
+      console.log(`🧭 Chrome-Start Versuch ${attempt}: ${bin} ${mode}`);
+      let proc;
+      try {
+        proc = spawn(bin, [
+          '--remote-debugging-port=0',
+          '--remote-debugging-address=127.0.0.1',
+          `--user-data-dir=${profileDir}`,
+          mode,
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--disable-extensions',
+          '--disable-background-networking',
+          '--lang=de-DE',
+          '--accept-lang=de-DE,de',
+          '--window-size=1440,900',
+          startUrl
+        ], {
+          stdio: ['ignore', 'ignore', 'pipe'],
+          env: { ...process.env, LANG: 'de_DE.UTF-8', LC_ALL: 'de_DE.UTF-8', TZ: 'Europe/Berlin' }
+        });
+      } catch (err) {
+        reasons.push(`Versuch ${attempt}: Start nicht möglich (${err.message})`);
+        continue;
+      }
+      proc.on('error', err => { exitInfo = `Startfehler ${err.message}`; });
+      proc.on('exit', (code, signal) => { if (exitInfo === null) exitInfo = `beendet (Code ${code}, Signal ${signal})`; });
+      proc.stderr.on('data', d => {
+        String(d).split('\n').filter(Boolean).forEach(line => {
+          stderrLines.push(line);
+          if (stderrLines.length > 25) stderrLines.shift();
+        });
+      });
+
+      let pageTarget = null;
+      for (let i = 0; i < 160 && exitInfo === null; i++) {
+        await sleep(250);
+        try {
+          if (!debugPort) {
+            const portFile = path.join(profileDir, 'DevToolsActivePort');
+            if (fs.existsSync(portFile)) {
+              const port = parseInt(fs.readFileSync(portFile, 'utf8').split('\n')[0], 10);
+              if (port > 0) debugPort = port;
+            }
+          }
+          pageTarget = await getActivePageTarget();
+          if (pageTarget) break;
+        } catch {}
+      }
+
+      if (pageTarget) {
+        console.log(`✅ Chrome läuft (Port ${debugPort}, Versuch ${attempt}).`);
+        return { proc, pageTarget, bin };
+      }
+
+      const why = exitInfo || 'keine DevTools-Verbindung nach 40 s';
+      reasons.push(`Versuch ${attempt} (${path.basename(bin)} ${mode}): ${why}`);
+      console.log(`⚠️ Chrome-Start Versuch ${attempt} fehlgeschlagen: ${why}`);
+      if (stderrLines.length) console.log('   Chrome-Ausgabe:\n   ' + stderrLines.slice(-12).join('\n   '));
+      try { proc.kill('SIGKILL'); } catch {}
+      debugPort = 0;
+      await sleep(500);
+    }
+  }
+  throw new Error('Cloud-Browser konnte nicht gestartet werden – ' + reasons.join(' | '));
+}
+
+/**
+ * Self-test (workflow input "selftest" or daily schedule): starts Chrome, opens the
+ * Johanniter login and checks that the page renders. Exit code 1 on failure so the
+ * GitHub run turns red and GitHub sends a notification e-mail.
+ */
+async function runSelfTest() {
+  const url = 'https://dienstplan-bayern.secure.johanniter.de/';
+  console.log('🩺 Selbsttest Cloud-Autopilot: starte Chrome und öffne ' + url);
+  let launched = null;
+  try {
+    launched = await launchCloudChrome(url);
+    try {
+      console.log('   Chrome-Version: ' + execSync(`"${launched.bin}" --version`, { encoding: 'utf8' }).trim());
+    } catch {}
+    const cdp = new CdpSession(launched.pageTarget.webSocketDebuggerUrl);
+    await cdp.connect();
+    await cdp.send('Runtime.enable').catch(() => {});
+    let info = null;
+    for (let i = 0; i < 60; i++) {
+      await sleep(1000);
+      info = await cdp.evalInPage(`(() => ({ href: location.href, title: document.title, ready: document.readyState,
+        hasPassword: Boolean(document.querySelector('input[type="password"]')),
+        text: (document.body ? document.body.innerText : '').slice(0, 200) }))()`).catch(() => null);
+      if (info && info.ready === 'complete' && /johanniter/i.test(info.href) && (info.hasPassword || info.text.length > 20)) break;
+    }
+    cdp.close();
+    console.log('   Seite: ' + JSON.stringify(info));
+    if (!info || !/johanniter/i.test(info.href || '')) throw new Error('Johanniter-Seite wurde nicht geladen');
+    console.log('✅ Selbsttest erfolgreich – Cloud-Browser und Johanniter-Anmeldung erreichbar.');
+  } finally {
+    if (launched) try { launched.proc.kill('SIGKILL'); } catch {}
+  }
+}
+
 async function main() {
   if (process.env.GITHUB_ACTIONS !== 'true' && process.env.FORCE_CLOUD_RUNNER !== '1') {
+    return;
+  }
+
+  if (process.env.CLOUD_SELFTEST === 'true' || process.env.CLOUD_SELFTEST === '1') {
+    await runSelfTest();
     return;
   }
 
@@ -347,7 +489,8 @@ async function main() {
     } catch (e) {}
   `;
 
-  if (reqStatus !== 'requested' || !reqId || (Date.now() - reqAt > 180000)) {
+  // GitHub can queue a job for a few minutes – accept requests up to 10 minutes old
+  if (reqStatus !== 'requested' || !reqId || (Date.now() - reqAt > 600000)) {
     console.log('ℹ️ No pending CareMan Cloud Auto-Pilot job – skipping cloud browser run.');
     return;
   }
@@ -360,50 +503,20 @@ async function main() {
   });
 
   const targetCareManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
-  const profileDir = path.join(os.tmpdir(), `careman-cloud-profile-${Date.now()}`);
-  fs.mkdirSync(profileDir, { recursive: true });
 
-  const chromeBin = findChromeBinary();
-  const proc = spawn(chromeBin, [
-    `--remote-debugging-port=${DEBUG_PORT}`,
-    `--user-data-dir=${profileDir}`,
-    '--headless=new',
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-gpu',
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--lang=de-DE',
-    '--accept-lang=de-DE,de',
-    '--window-size=1440,900',
-    targetCareManUrl
-  ], {
-    stdio: 'ignore',
-    env: {
-      ...process.env,
-      LANG: 'de_DE.UTF-8',
-      LC_ALL: 'de_DE.UTF-8',
-      TZ: 'Europe/Berlin'
-    }
-  });
-
-  let pageTarget = null;
-  for (let i = 0; i < 40; i++) {
-    await sleep(250);
-    try {
-      pageTarget = await getActivePageTarget();
-      if (pageTarget) break;
-    } catch {}
-  }
-
-  if (!pageTarget) {
+  let proc;
+  try {
+    const launched = await launchCloudChrome(targetCareManUrl);
+    proc = launched.proc;
+  } catch (err) {
+    console.error('❌ ' + err.message);
     await patchBridge({
       status: 'error',
-      stepMessage: '⚠️ Cloud-Browser konnte nicht gestartet werden.',
+      stepMessage: '⚠️ Cloud-Browser konnte nicht gestartet werden (Server-Problem bei GitHub). Bitte gleich noch einmal versuchen.',
+      error: String(err.message || err).slice(0, 900),
       updatedAt: Date.now()
     });
-    proc.kill('SIGTERM');
+    process.exitCode = 1;
     return;
   }
 
@@ -426,6 +539,7 @@ async function main() {
     });
   };
 
+  let finished = false;
   try {
     for (let tick = 0; tick < 550; tick++) {
       const latestTarget = await getActivePageTarget().catch(() => null);
@@ -437,7 +551,16 @@ async function main() {
       if (!cdp || latestTarget.webSocketDebuggerUrl !== connectedUrl) {
         if (cdp) cdp.close();
         cdp = new CdpSession(latestTarget.webSocketDebuggerUrl);
-        await cdp.connect();
+        try {
+          await cdp.connect();
+        } catch (err) {
+          // page is navigating – just try again on the next tick
+          console.log('   CDP-Verbindung wird neu aufgebaut: ' + (err.message || err));
+          cdp = null;
+          connectedUrl = '';
+          await sleep(500);
+          continue;
+        }
         await cdp.send('Page.enable').catch(() => {});
         await cdp.send('Runtime.enable').catch(() => {});
         await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: seedMyPlanScript }).catch(() => {});
@@ -470,7 +593,11 @@ async function main() {
       }
 
       if (pageState.daemonResult && pageState.daemonResult.length > 20) {
-        const blobSha = await createResultBlob(pageState.daemonResult);
+        let blobSha = '';
+        for (let tryNo = 0; tryNo < 3 && !blobSha; tryNo++) {
+          blobSha = await createResultBlob(pageState.daemonResult).catch(() => '');
+          if (!blobSha) await sleep(1500);
+        }
         await patchBridge({
           status: 'done',
           stepMessage: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...`,
@@ -479,6 +606,7 @@ async function main() {
           updatedAt: Date.now()
         });
         console.log('✅ Cloud Auto-Pilot finished successfully! blobSha=' + blobSha);
+        finished = true;
         break;
       }
 
@@ -649,6 +777,15 @@ async function main() {
 
       await sleep(300);
     }
+    if (!finished) {
+      console.error('❌ Zeitüberschreitung – Dienstplan wurde nicht ausgelesen. Letzter Schritt: ' + lastStepMsg);
+      await patchBridge({
+        status: 'error',
+        stepMessage: '⚠️ Zeitüberschreitung beim CareMan-Abruf (letzter Schritt: ' + (lastStepMsg || 'unbekannt') + '). Bitte erneut versuchen.',
+        updatedAt: Date.now()
+      });
+      process.exitCode = 1;
+    }
   } catch (err) {
     console.error('Cloud runner loop error:', err);
     await patchBridge({
@@ -656,6 +793,7 @@ async function main() {
       stepMessage: '⚠️ Cloud-Fehler: ' + (err.message || String(err)),
       updatedAt: Date.now()
     });
+    process.exitCode = 1;
   } finally {
     if (cdp) cdp.close();
     try { proc.kill('SIGTERM'); } catch {}
@@ -664,4 +802,5 @@ async function main() {
 
 main().catch(err => {
   console.error('Cloud runner error:', err);
+  process.exitCode = 1;
 });

@@ -743,6 +743,336 @@
       return stepped;
     };
 
+    // Ergebnis an das Schichttagebuch übergeben (gemeinsam für Schnellweg und Klick-Weg)
+    const deliverPayload = async (payload, rosters, yearMonth, monthLabel) => {
+      const json = JSON.stringify(payload);
+      try { window.name = 'CAREMAN_SYNC:' + json; } catch (e) {}
+      if (window.__CAREMAN_DAEMON_MODE) {
+        window.__CAREMAN_DAEMON_RESULT = json;
+        banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+        setStatus(`✅ ${Math.max(1, rosters.length)} ${rosters.length === 1 ? 'Wache' : 'Wachen'} (${monthLabel}) übertragen – kehre zum Schichttagebuch zurück...`);
+        return;
+      }
+      copySync(json);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try { await navigator.clipboard.writeText(json); } catch (e) {}
+      }
+
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload }, '*');
+        } catch (e) {}
+      }
+
+      // WICHTIG: #careman= IMMER an die Ziel-URL anhängen und direkt /journal?month=YYYY-MM öffnen
+      // (verhindert auf dem iPhone jeden Redirect-Verlust durch <Navigate to="/analysis" replace />)!
+      const encodedHash = encodeURIComponent(json);
+      const targetUrl = 'https://schicht.vjbackhaus.de/journal?month=' + encodeURIComponent(yearMonth) + '&sync=' + Date.now() + '#careman=' + encodedHash;
+
+      banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+      setStatus(`✅ ${Math.max(1, rosters.length)} ${rosters.length === 1 ? 'Wache' : 'Wachen'} (${monthLabel}) übertragen – öffne Schichttagebuch...`);
+
+      const navLink = document.createElement('a');
+      navLink.href = targetUrl;
+      navLink.target = '_top';
+      navLink.style.display = 'none';
+      document.body.appendChild(navLink);
+      navLink.click();
+      await sleep(150);
+      window.top.location.href = targetUrl;
+      window.location.href = targetUrl;
+    };
+
+    // ============================================================================
+    // SCHNELLWEG: Dienstpläne direkt über die CareMan-Schnittstelle laden (alle 3 Wachen gleichzeitig).
+    // Ergebnis identisch mit dem Auslesen über die Oberfläche. Bei jedem Problem -> klassischer Klick-Weg.
+    // ============================================================================
+    const tryFastApiExtract = async () => {
+      if (!/dienstplan-bayern\.secure\.johanniter\.de$/i.test(location.hostname)) return null;
+      let token = '';
+      try { token = localStorage.getItem('myPlanToken') || ''; } catch (e) {}
+      if (!token) return null;
+
+      // Zielmonat: Auftrag aus der App, sonst Monat aus der Adresse, sonst der sichtbar angezeigte Monat
+      let fastYm = (isFreshAutoPilot && autoPilot.targetYearMonth) || urlYearMonth || '';
+      if (!fastYm) {
+        const vis = getVisibleMonthHeaderInfo();
+        fastYm = (vis && vis.yearMonth) || '';
+      }
+      if (!/^20\d{2}-\d{2}$/.test(fastYm)) return null;
+      const fy = parseInt(fastYm.slice(0, 4), 10);
+      const fm = parseInt(fastYm.slice(5, 7), 10);
+      const fastLabel = monthNames[fm - 1] + ' ' + fy;
+      setStatus('⚡ Lade Dienstplan ' + fastLabel + ' direkt aus CareMan (3 Wachen gleichzeitig)...');
+
+      const apiBase = location.origin + '/api/-';
+      const callApi = async (method, path, body, timeoutMs) => {
+        const doCall = async () => {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), timeoutMs || 25000);
+          try {
+            return await fetch(apiBase + path, {
+              method,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'Authorization': 'Bearer ' + token
+              },
+              body: body === undefined ? undefined : JSON.stringify(body),
+              signal: ctrl.signal
+            });
+          } finally {
+            clearTimeout(timer);
+          }
+        };
+        let res = await doCall();
+        if (res.status === 401) {
+          // Sitzung auffrischen (wie die CareMan-App selbst) und einmal wiederholen
+          try {
+            const rr = await fetch(apiBase + '/auth/refreshToken', { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' } });
+            if (rr.ok) {
+              const rj = await rr.json();
+              if (rj && rj.isSuccess && rj.data) {
+                token = rj.data;
+                try { localStorage.setItem('myPlanToken', token); } catch (e) {}
+                res = await doCall();
+              }
+            }
+          } catch (e) {}
+        }
+        if (!res.ok) throw new Error('CareMan-API ' + path + ' HTTP ' + res.status);
+        return res.json();
+      };
+
+      // Mitarbeiter-ID (eigener Vertrag laut CareMan; gespeicherte Auswahl nur als Rückfall)
+      let employeeId = 0;
+      try {
+        const pre = await callApi('POST', '/app/initial-preload', undefined, 15000);
+        const ct = pre && pre.contracts && pre.contracts.data;
+        if (Array.isArray(ct) && ct[0] && ct[0].dbId) employeeId = ct[0].dbId;
+      } catch (e) {}
+      if (!employeeId) {
+        try {
+          Object.keys(localStorage).forEach(k => {
+            if (/selectedEmployeeId$/.test(k)) {
+              const v = parseInt(localStorage.getItem(k), 10);
+              if (v > 0) employeeId = v;
+            }
+          });
+        } catch (e) {}
+      }
+      if (!employeeId) return null;
+
+      // Datumsumrechnung (CareMan liefert UTC, Tage gelten in deutscher Zeit)
+      const berlinFmt = new Intl.DateTimeFormat('de-DE', {
+        timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      });
+      const berlinParts = (iso) => {
+        const parts = berlinFmt.formatToParts(new Date(iso));
+        const g = t => (parts.find(p => p.type === t) || {}).value || '';
+        return { y: parseInt(g('year'), 10), m: parseInt(g('month'), 10), d: parseInt(g('day'), 10), hm: g('hour') + ':' + g('minute') };
+      };
+      const berlinMidnightIso = (y, m, d) => {
+        for (const off of [1, 2]) {
+          const iso = new Date(Date.UTC(y, m - 1, d) - off * 3600000).toISOString();
+          const p = berlinParts(iso);
+          if (p.y === y && p.m === m && p.d === d && p.hm === '00:00') return iso;
+        }
+        return new Date(Date.UTC(y, m - 1, d) - 3600000).toISOString();
+      };
+      const lastDay = new Date(fy, fm, 0).getDate();
+      const fromIso = berlinMidnightIso(fy, fm, 1);
+      const toIso = berlinMidnightIso(fy, fm, lastDay);
+      const pad2 = n => String(n).padStart(2, '0');
+
+      const FAST_STATIONS = [
+        { id: 149, name: '61000 Rettungswache München', pattern: /61000.*Rettungswache\s+M[üu]nchen/i, station: 'Sendling' },
+        { id: 1669, name: '61010 Rettungswache Obersendling', pattern: /61010.*Obersendling/i, station: 'Obersendling' },
+        { id: 151, name: '61300 Rettungswache Hohenbrunn', pattern: /61300.*Hohenbrunn/i, station: 'Hohenbrunn' }
+      ];
+
+      // Dienst-Kürzel genauso aufbereiten wie beim Auslesen der Tabelle
+      const stdPatFast = '(?:RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MHO]|RH[MHO]|KS\\d?[MHO]|KF\\d?[MHO]|KT\\d?[MHO]|KN\\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
+      const preRx = new RegExp('^(RD|RDÜ|ÜB)(' + stdPatFast + ')(\\*?)$');
+      const postRx = new RegExp('^(' + stdPatFast + ')(RD|RDÜ|ÜB)(\\*?)$');
+      const normCodes = (rawText) => {
+        const raw = String(rawText || '').trim();
+        if (!raw) return [];
+        const cellHasAsterisk = raw.includes('*');
+        const parts = raw.toUpperCase().split(/[,/;\n\r\t]+/).map(p => p.trim()).filter(Boolean);
+        const out = [];
+        parts.forEach(part => {
+          const hasAsterisk = part.includes('*') || cellHasAsterisk;
+          let baseCode = part.replace(/[^A-ZÄÖÜ0-9\-]/g, '');
+          if (!baseCode || baseCode.length < 2 || baseCode.length > 10 || !/[A-ZÄÖÜ]/i.test(baseCode) || /^KW\d*$/i.test(baseCode) || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
+          const pm = baseCode.match(preRx);
+          if (pm) {
+            out.push(pm[1] === 'RD' ? 'RDÜ' : pm[1], pm[2] + (pm[3] || (hasAsterisk ? '*' : '')));
+            return;
+          }
+          const sm = baseCode.match(postRx);
+          if (sm) {
+            out.push(sm[1] + (hasAsterisk ? '*' : ''), sm[2] === 'RD' ? 'RDÜ' : sm[2]);
+            return;
+          }
+          if (baseCode.length > 6) return;
+          if (baseCode === 'RD') baseCode = 'RDÜ';
+          out.push(hasAsterisk ? (baseCode + '*') : baseCode);
+        });
+        return out;
+      };
+
+      const toColleagues = (resp) => {
+        const d = resp && resp.data;
+        if (!resp || resp.isSuccess === false || !d || !Array.isArray(d.data)) throw new Error('Unerwartete Antwort');
+        const colleagues = [];
+        d.data.forEach(row => {
+          const name = String((row.item1 && row.item1.name) || '').trim().replace(/\s+/g, ' ');
+          if (!name.includes(',') || /\d{2,}/.test(name)) return;
+          if (/^M-J/i.test(name) || /\b(KTW|RTW|NEF|Ak\.)\b/i.test(name)) return;
+          const byDay = {};
+          ((row.item2 && row.item2.data) || []).forEach(e => {
+            if (!e || !e.day || !e.day.date) return;
+            const p = berlinParts(e.day.date);
+            if (p.y !== fy || p.m !== fm) return;
+            (byDay[p.d] = byDay[p.d] || []).push(e.shortName || '');
+          });
+          const shifts = {};
+          Object.keys(byDay).map(Number).sort((a, b) => a - b).forEach(day => {
+            const codes = normCodes(byDay[day].join(','));
+            if (codes.length > 0) shifts[String(day)] = codes.join(',');
+          });
+          if (Object.keys(shifts).length > 0) colleagues.push({ name, shifts });
+        });
+        return colleagues;
+      };
+
+      const loadStation = async (st) => {
+        const resp = await callApi('POST', '/team-duty/roster/' + employeeId, {
+          teamDuty: { idPlanninggroup: st.id, namePlanninggroup: st.name, from: fromIso, to: toIso },
+          filterEmployee: 0
+        }, 30000);
+        return toColleagues(resp);
+      };
+
+      // Falls sich die Planungsgruppen-IDs bei CareMan ändern: einmal neu ermitteln
+      let groupsRefreshed = null;
+      const refreshGroups = async () => {
+        if (!groupsRefreshed) {
+          groupsRefreshed = callApi('POST', '/team-duty/preload', { employeeId, planningGroup: null, filterEmployee: 0, month: fromIso }, 30000)
+            .then(pre => {
+              const list = (pre && pre.teamDuties && pre.teamDuties.data && pre.teamDuties.data.data) || [];
+              FAST_STATIONS.forEach(st => {
+                const hit = list.find(t => st.pattern.test(t.namePlanninggroup || ''));
+                if (hit) { st.id = hit.idPlanninggroup; st.name = hit.namePlanninggroup; }
+              });
+            });
+        }
+        return groupsRefreshed;
+      };
+      const loadStationRobust = async (st) => {
+        try {
+          return await loadStation(st);
+        } catch (e) {
+          await refreshGroups();
+          return loadStation(st);
+        }
+      };
+
+      const lastDayIso = fy + '-' + pad2(fm) + '-' + pad2(lastDay) + 'T00:00:00.000Z';
+      const personalPromise = callApi('POST', '/rosters/preload', [
+        { employeeId, begin: fy + '-' + pad2(fm) + '-01T00:00:00.000Z', end: lastDayIso, rosterViewMode: 4 }
+      ], 30000).catch(() => null);
+
+      const t0 = Date.now();
+      const stationResults = await Promise.all(FAST_STATIONS.map(st => loadStationRobust(st)));
+      const personalResp = await personalPromise;
+
+      const rosters = FAST_STATIONS.map((st, idx) => ({
+        extractedAt: Date.now(),
+        yearMonth: fastYm,
+        monthLabel: fastLabel,
+        station: st.station,
+        detectedStation: st.station,
+        colleagues: stationResults[idx]
+      }));
+      if (!rosters.some(r => r.colleagues.length > 0)) return null;
+
+      // Eigene Dienstzeiten (wie im Istplan) und reine Istplan-Einträge (z.B. Lehrgänge)
+      const fastPersonalTimes = {};
+      const fastIstShifts = {};
+      let selfName = '';
+      try {
+        const monthEntry = Array.isArray(personalResp)
+          ? (personalResp.find(x => x && x.key && String(x.key.begin || '').startsWith(fastYm)) || personalResp[0])
+          : null;
+        const ru = monthEntry && monthEntry.rosterUrlaubEinsatzwunsch && monthEntry.rosterUrlaubEinsatzwunsch.data;
+        if (ru && Array.isArray(ru.data) && ru.data[0] && ru.data[0].item1) selfName = ru.data[0].item1.name || '';
+        const istValid = /^(RF[MHO]|RS\d?[MHO]|RN[MHO]|RT\d?[MHO]|RC[MHO]|RH[MHO]|KS\d?[MHO]|KF\d?[MHO]|KT\d?[MHO]|KN\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\d?|RZF|R-SAN)\*?$/i;
+        ((monthEntry && monthEntry.rosterDetails) || []).forEach(rdw => {
+          const rd = rdw && rdw.data && rdw.data.rosterDetails;
+          const key = rdw && rdw.data && rdw.data.key;
+          if (!rd || !key || !key.day) return;
+          const kp = berlinParts(key.day);
+          if (kp.y !== fy || kp.m !== fm) return;
+          const entries = (rd.entries || []).filter(en => en && en.shortName && !['-', '--', '/'].includes(en.shortName) && en.nameShiftType !== 'Fehlzeit Tag');
+          if (entries.length === 0) return;
+          const fp = berlinParts(entries[0].from);
+          const tp = berlinParts(entries[entries.length - 1].to);
+          const dStr = fastYm + '-' + pad2(kp.d);
+          if (!(fp.hm === '00:00' && tp.hm === '00:00')) {
+            fastPersonalTimes[dStr] = { startTime: fp.hm, endTime: tp.hm };
+          }
+          const codes = entries
+            .map(en => String(en.shortName).toUpperCase().replace(/[^A-ZÄÖÜ0-9\-*]/g, ''))
+            .filter(c => istValid.test(c))
+            .map(c => c.replace(/^RD(\*?)$/, 'RDÜ$1'));
+          if (codes.length > 0) fastIstShifts[String(kp.d)] = codes.join(',');
+        });
+      } catch (e) {}
+
+      // Reine Istplan-Einträge beim eigenen Namen ergänzen (gleiches Verhalten wie der Klick-Weg)
+      if (Object.keys(fastIstShifts).length > 0) {
+        const selfRx = selfName ? null : /backhaus/i;
+        const isSelf = c => c && c.name && (selfRx ? selfRx.test(c.name) : c.name === selfName);
+        let selfEntry = null;
+        for (const r of rosters) {
+          const found = r.colleagues.find(isSelf);
+          if (found) { selfEntry = found; break; }
+        }
+        if (!selfEntry) {
+          selfEntry = { name: selfName || 'Backhaus, Johannes', shifts: {} };
+          rosters[0].colleagues.unshift(selfEntry);
+        }
+        Object.keys(fastIstShifts).forEach(dayKey => {
+          const already = rosters.some(r => r.colleagues.some(c => isSelf(c) && c.shifts && c.shifts[dayKey]));
+          if (!already) selfEntry.shifts[dayKey] = fastIstShifts[dayKey];
+        });
+      }
+
+      const total = rosters.reduce((n, r) => n + r.colleagues.length, 0);
+      setStatus('⚡ ' + total + ' Einträge aus 3 Wachen in ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s geladen...');
+      return {
+        payload: { multiStation: true, extractedAt: Date.now(), yearMonth: fastYm, monthLabel: fastLabel, rosters, personalTimes: fastPersonalTimes },
+        rosters,
+        yearMonth: fastYm,
+        monthLabel: fastLabel
+      };
+    };
+
+    let fastResult = null;
+    try {
+      fastResult = await tryFastApiExtract();
+    } catch (e) {
+      fastResult = null;
+      setStatus('⚡ Direktabruf nicht möglich (' + (e && e.message ? e.message : e) + ') – lese über die Oberfläche...');
+    }
+    if (fastResult) {
+      await deliverPayload(fastResult.payload, fastResult.rosters, fastResult.yearMonth, fastResult.monthLabel);
+      return;
+    }
+
     // Falls CareMan direkt nach dem Login/Redirect noch lädt, warte kurz bis Kalender oder Planungsgruppe sichtbar sind
     for (let w = 0; w < 36; w++) {
       if (getVisibleMonthHeaderInfo() || findPlanungsgruppeTrigger() || document.querySelectorAll('table tr').length > 2) break;
@@ -1431,42 +1761,7 @@
       ? { multiStation: true, extractedAt: Date.now(), yearMonth, monthLabel, rosters, personalTimes }
       : { ...(rosters[0] || { yearMonth, monthLabel, station: 'Sendling', colleagues: [] }), personalTimes, extractedAt: Date.now() };
 
-    const json = JSON.stringify(payload);
-    try { window.name = 'CAREMAN_SYNC:' + json; } catch (e) {}
-    if (window.__CAREMAN_DAEMON_MODE) {
-      window.__CAREMAN_DAEMON_RESULT = json;
-      banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-      setStatus(`✅ ${Math.max(1, rosters.length)} ${rosters.length === 1 ? 'Wache' : 'Wachen'} (${monthLabel}) übertragen – kehre zum Schichttagebuch zurück...`);
-      return;
-    }
-    copySync(json);
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      try { await navigator.clipboard.writeText(json); } catch (e) {}
-    }
-
-    if (window.opener && !window.opener.closed) {
-      try {
-        window.opener.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload }, '*');
-      } catch (e) {}
-    }
-
-    // WICHTIG: #careman= IMMER an die Ziel-URL anhängen und direkt /journal?month=YYYY-MM öffnen
-    // (verhindert auf dem iPhone jeden Redirect-Verlust durch <Navigate to="/analysis" replace />)!
-    const encodedHash = encodeURIComponent(json);
-    const targetUrl = 'https://schicht.vjbackhaus.de/journal?month=' + encodeURIComponent(yearMonth) + '&sync=' + Date.now() + '#careman=' + encodedHash;
-
-    banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-    setStatus(`✅ ${Math.max(1, rosters.length)} ${rosters.length === 1 ? 'Wache' : 'Wachen'} (${monthLabel}) übertragen – öffne Schichttagebuch...`);
-
-    const navLink = document.createElement('a');
-    navLink.href = targetUrl;
-    navLink.target = '_top';
-    navLink.style.display = 'none';
-    document.body.appendChild(navLink);
-    navLink.click();
-    await sleep(150);
-    window.top.location.href = targetUrl;
-    window.location.href = targetUrl;
+    await deliverPayload(payload, rosters, yearMonth, monthLabel);
   } catch (err) {
     banner.style.background = '#dc2626';
     setStatus('⚠️ Fehler: ' + err.message);

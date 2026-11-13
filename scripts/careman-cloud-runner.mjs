@@ -915,6 +915,10 @@ async function main() {
 
         if (!pageState.extractorRunning && pageState.readyState === 'complete' && Date.now() - lastExtractorInjectAt > 4000) {
           const isCareManUiReady = await cdp.evalInPage(`(() => {
+            // Schnellweg: angemeldet bei Dienstplan Bayern reicht – das Skript liest direkt über die Schnittstelle
+            try {
+              if (/dienstplan-bayern\\.secure\\.johanniter\\.de$/i.test(location.hostname) && localStorage.getItem('myPlanToken')) return true;
+            } catch (e) {}
             const txt = (document.body?.innerText || '');
             return /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|April|May|June|July|August|September|October|November|December)\\s+20\\d{2}\\b/i.test(txt) ||
               /Planungsgruppe|Abteilungs|Istplan/i.test(txt) ||

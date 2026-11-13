@@ -37,8 +37,6 @@ jobs:
       CAREMAN_SIEDA_USER: ${{ secrets.CAREMAN_SIEDA_USER }}
       CAREMAN_SIEDA_PASS: ${{ secrets.CAREMAN_SIEDA_PASS }}
       CLOUD_SELFTEST: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.selftest || 'false' }}
-      # Vorübergehend: CareMan-API-Aufrufe mitschneiden (privat in der Bridge), um das Auslesen auf direkte API-Abfragen umzustellen
-      CAPTURE_API: 'true'
     steps:
       # Nur das Runner-Skript genau dieses Stands holen (statt Checkout + npm ci)
       - name: Runner laden

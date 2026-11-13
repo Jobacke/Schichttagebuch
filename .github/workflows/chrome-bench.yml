@@ -7,9 +7,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [cold, prewarm, realurl, direct]
+        mode: [base, parallel, prefetchfirst]
+        rep: [1, 2]
     steps:
       - name: Messen
         run: |
+          export T_STEP=$(date +%s%3N)
           curl -fsSL -o "$RUNNER_TEMP/b.mjs" "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/chrome-bench.mjs"
           node "$RUNNER_TEMP/b.mjs" ${{ matrix.mode }}

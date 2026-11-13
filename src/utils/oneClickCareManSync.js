@@ -494,6 +494,51 @@ export async function importCareManPayloadAndSync({
  * 3. Automatically opens Dienstplan Bayern for the selected month (`https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=YYYY-M-D`)
  * 4. Automatically extracts all 3 stations (Rettungswache München, Rettungswache Obersendling, Rettungswache Hohenbrunn) + personal shifts and transfers them into the App.
  */
+const PREWARM_KEY = 'careman_cloud_prewarm_at';
+const LAST_CLOUD_SYNC_KEY = 'careman_cloud_last_sync_at';
+let prewarmInFlight = false;
+
+function isMacDesktopBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isTouchDevice = Number(navigator.maxTouchPoints) > 1;
+  return /Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad|iPod|Mobile/i.test(ua) && !isTouchDevice;
+}
+
+/**
+ * Vorstart des Cloud-Autopilots (nur iPhone/Mobil, wo der Abruf über die Cloud läuft):
+ * startet den GitHub-Lauf schon beim Öffnen der Seite. Chrome lädt die Johanniter-Anmeldung vor und wartet
+ * bis zu 3 Minuten – angemeldet wird erst nach dem Tippen auf „Dienstplan abrufen“. Höchstens alle 2,5 Minuten,
+ * und nicht in den ersten 10 Minuten nach einem Abruf.
+ */
+export async function prewarmCareManCloud() {
+  try {
+    if (typeof window === 'undefined' || prewarmInFlight || isMacDesktopBrowser()) return;
+    const now = Date.now();
+    const lastWarm = Number(localStorage.getItem(PREWARM_KEY) || 0);
+    const lastSync = Number(localStorage.getItem(LAST_CLOUD_SYNC_KEY) || 0);
+    if (now - lastWarm < 150000 || now - lastSync < 600000) return;
+    prewarmInFlight = true;
+    const { getBridgeToken } = await import('./integrationSecrets.js');
+    const token = await getBridgeToken();
+    if (!token) return;
+    const r = await fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/careman-cloud.yml/dispatches', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { prewarm: 'true' } })
+    }).catch(() => null);
+    if (r && r.status === 204) localStorage.setItem(PREWARM_KEY, String(Date.now()));
+  } catch {
+    /* Vorstart ist nur eine Beschleunigung – Fehler sind egal */
+  } finally {
+    prewarmInFlight = false;
+  }
+}
+
 export function openCareManLiveWindow(targetYearMonth) {
   const now = new Date();
   const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -596,6 +641,7 @@ export function openCareManLiveWindow(targetYearMonth) {
 
     let stopped = false;
     const reqId = `ip_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    try { localStorage.setItem(LAST_CLOUD_SYNC_KEY, String(Date.now())); } catch { /* ignore */ }
     const bridgeIssueUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1';
     const bridgeBlobsUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/git/blobs';
 

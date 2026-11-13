@@ -15,6 +15,7 @@ import { runOneClickCareManSync, openCareManLiveWindow } from '../utils/oneClick
 import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
 import ShiftRhythmCalendar from '../components/ShiftRhythmCalendar';
 import PeriodStats from '../components/PeriodStats';
+import useCareManPrewarm from '../hooks/useCareManPrewarm';
 
 const JOURNAL_MONTH_STORAGE_KEY = 'schichttagebuch_journal_month';
 
@@ -26,6 +27,7 @@ function parseYearMonthToDate(ymStr) {
 }
 
 export default function Journal() {
+    useCareManPrewarm();
     const { currentUser } = useAuth();
     const { store, addShifts, ensureCodesAndTypes, deleteShifts, toggleShiftBonus } = useStore();
     const navigate = useNavigate();

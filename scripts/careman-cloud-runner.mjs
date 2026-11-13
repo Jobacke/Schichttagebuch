@@ -626,7 +626,54 @@ async function main() {
     return d.sha || '';
   };
 
-  const f = (await getBridgeState()) || {};
+  const isPendingJob = st => Boolean(st && st.status === 'requested' && st.requestId &&
+    (Date.now() - Number(st.requestedAt || 0) <= 600000));
+  let f = (await getBridgeState()) || {};
+
+  // Vorstart: Die App startet den Lauf schon beim Öffnen. Chrome lädt die Johanniter-Anmeldung vor,
+  // angemeldet wird aber erst, wenn wirklich ein Abruf angefordert wurde. Ohne Abruf endet der Lauf von selbst.
+  let prewarmed = null;
+  if (process.env.PREWARM === 'true' && !isPendingJob(f)) {
+    const waitMs = 180000;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: 'numeric', day: 'numeric' })
+      .formatToParts(new Date()).reduce((o, p) => { o[p.type] = p.value; return o; }, {});
+    const warmUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${today.year}-${today.month}-${today.day}`;
+    console.log(`🔥 Vorstart: Chrome hält die Anmeldung bereit und wartet bis zu ${waitMs / 1000} s auf einen Abruf …`);
+    prewarmed = await launchCloudChrome(warmUrl).catch(err => {
+      console.log('   Vorstart ohne Chrome: ' + (err.message || err));
+      return null;
+    });
+    const t0 = Date.now();
+    let lastFresh = Date.now();
+    while (Date.now() - t0 < waitMs) {
+      await sleep(1000);
+      const st = await getBridgeState().catch(() => null);
+      if (isPendingJob(st)) {
+        f = st;
+        console.log(`   Abruf eingegangen nach ${((Date.now() - t0) / 1000).toFixed(1)} s Wartezeit.`);
+        break;
+      }
+      // Anmeldeseite frisch halten, damit sie beim Abruf nicht abgelaufen ist
+      if (prewarmed && Date.now() - lastFresh > 75000) {
+        lastFresh = Date.now();
+        try {
+          const target = await getActivePageTarget();
+          if (target) {
+            const nav = new CdpSession(target.webSocketDebuggerUrl);
+            await nav.connect();
+            await nav.send('Page.navigate', { url: warmUrl });
+            nav.close();
+          }
+        } catch {}
+      }
+    }
+    if (!isPendingJob(f)) {
+      console.log('ℹ️ Vorstart beendet – kein Abruf angefordert.');
+      try { fs.unlinkSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'chrome_failed')); } catch {}
+      if (prewarmed) try { prewarmed.proc.kill('SIGKILL'); } catch {}
+      return;
+    }
+  }
   const reqStatus = f.status || '';
   const reqId = f.requestId || '';
   const reqAt = Number(f.requestedAt || 0);
@@ -676,7 +723,7 @@ async function main() {
 
   let proc;
   try {
-    const launched = await launchCloudChrome(targetCareManUrl);
+    const launched = prewarmed || await launchCloudChrome(targetCareManUrl);
     proc = launched.proc;
   } catch (err) {
     console.error('❌ ' + err.message);

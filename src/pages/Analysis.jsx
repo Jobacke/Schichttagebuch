@@ -7,6 +7,7 @@ import { resolveShiftDetails } from '../utils/shiftDisplay';
 import { openCareManLiveWindow } from '../utils/oneClickCareManSync';
 import ShiftRhythmCalendar from '../components/ShiftRhythmCalendar';
 import { ChevronLeft, ChevronRight, X, SlidersHorizontal, ExternalLink } from 'lucide-react';
+import useCareManPrewarm from '../hooks/useCareManPrewarm';
 
 // Helper for CSS Date controls
 const addMonths = (date, n) => {
@@ -17,6 +18,7 @@ const addMonths = (date, n) => {
 };
 
 export default function Analysis() {
+    useCareManPrewarm();
     const { store, toggleShiftBonus } = useStore();
     // Use the decoupled logic hook
     const logic = useAnalysisLogic();

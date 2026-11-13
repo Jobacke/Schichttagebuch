@@ -17,6 +17,10 @@ on:
         description: 'Nur Selbsttest (Chrome + Johanniter-Seite), kein Abruf'
         required: false
         default: 'false'
+      prewarm:
+        description: 'Vorstart: Chrome vorbereiten und bis zu 3 Minuten auf einen Abruf aus der App warten'
+        required: false
+        default: 'false'
   schedule:
     - cron: '17 4 * * *' # täglich ca. 05:17/06:17 Uhr deutscher Zeit
 
@@ -34,6 +38,7 @@ env:
   CAREMAN_SIEDA_USER: ${{ secrets.CAREMAN_SIEDA_USER }}
   CAREMAN_SIEDA_PASS: ${{ secrets.CAREMAN_SIEDA_PASS }}
   CLOUD_SELFTEST: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.selftest || 'false' }}
+  PREWARM: ${{ github.event.inputs.prewarm || 'false' }}
 
 jobs:
   run:

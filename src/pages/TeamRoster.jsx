@@ -40,8 +40,10 @@ import {
   BOOKMARKLET_CODE
 } from '../utils/oneClickCareManSync';
 import { APP_VERSION } from '../version';
+import useCareManPrewarm from '../hooks/useCareManPrewarm';
 
 export default function TeamRoster() {
+  useCareManPrewarm();
   const { currentUser } = useAuth();
   const { store, addShifts, deleteShifts, ensureCodesAndTypes } = useStore();
   const [searchParams, setSearchParams] = useSearchParams();

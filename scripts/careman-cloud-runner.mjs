@@ -387,7 +387,55 @@ function listChromeBinaries() {
  * (read from DevToolsActivePort), up to 25 s per attempt, stderr is logged on failure.
  * Returns { proc, pageTarget, bin } or throws with the collected reasons.
  */
+async function attachPrelaunchedChrome(startUrl) {
+  const profileDir = process.env.PRELAUNCH_CHROME_PROFILE || '';
+  const pid = parseInt(process.env.PRELAUNCH_CHROME_PID || '0', 10);
+  if (!profileDir || !pid) return null;
+  delete process.env.PRELAUNCH_CHROME_PROFILE; // only once
+  const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  const kill = (sig) => { try { process.kill(pid, sig || 'SIGTERM'); } catch {} };
+  const t0 = Date.now();
+  let pageTarget = null;
+  while (Date.now() - t0 < 30000 && alive()) {
+    try {
+      if (!debugPort) {
+        const portFile = path.join(profileDir, 'DevToolsActivePort');
+        if (fs.existsSync(portFile)) {
+          const port = parseInt(fs.readFileSync(portFile, 'utf8').split('\n')[0], 10);
+          if (port > 0) debugPort = port;
+        }
+      }
+      pageTarget = await getActivePageTarget();
+      if (pageTarget) break;
+    } catch {}
+    await sleep(100);
+  }
+  if (!pageTarget) {
+    console.log(`⚠️ Vorab gestartetes Chrome nicht erreichbar (${alive() ? 'keine DevTools-Verbindung' : 'beendet'}) – starte neu.`);
+    try {
+      const logFile = path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'cm-chrome.log');
+      const lines = fs.readFileSync(logFile, 'utf8').split('\n').filter(Boolean).slice(-12);
+      if (lines.length) console.log('   Chrome-Ausgabe:\n   ' + lines.join('\n   '));
+    } catch {}
+    kill('SIGKILL');
+    debugPort = 0;
+    return null;
+  }
+  console.log(`✅ Chrome läuft (vorab gestartet, Port ${debugPort}, ${Date.now() - t0} ms Wartezeit im Runner).`);
+  if (startUrl && (!pageTarget.url || /^about:blank/i.test(pageTarget.url))) {
+    try {
+      const nav = new CdpSession(pageTarget.webSocketDebuggerUrl);
+      await nav.connect();
+      await nav.send('Page.navigate', { url: startUrl });
+      nav.close();
+    } catch {}
+  }
+  return { proc: { kill }, pageTarget, bin: '/usr/bin/google-chrome' };
+}
+
 async function launchCloudChrome(startUrl) {
+  const pre = await attachPrelaunchedChrome(startUrl).catch(() => null);
+  if (pre) return pre;
   const binaries = listChromeBinaries();
   const modes = ['--headless=new', '--headless'];
   const reasons = [];
@@ -552,15 +600,16 @@ async function main() {
     }
   };
 
-  const patchBridge = async (partialObj) => {
+  // Updates run one after another in the background (keeps their order) – the login loop never waits for GitHub.
+  // "await patchBridge(...)" still waits until this and all earlier updates are written.
+  let patchChain = Promise.resolve();
+  const patchBridge = (partialObj) => {
     bridgeState = { ...bridgeState, ...partialObj };
     delete bridgeState.credsPass; // never store credentials in the issue
     delete bridgeState.credsUser;
-    await fetch(issueUrl, {
-      method: 'PATCH',
-      headers: ghHeaders,
-      body: JSON.stringify({ body: JSON.stringify(bridgeState, null, 2) })
-    }).catch(() => {});
+    const body = JSON.stringify({ body: JSON.stringify(bridgeState, null, 2) });
+    patchChain = patchChain.then(() => fetch(issueUrl, { method: 'PATCH', headers: ghHeaders, body })).catch(() => {});
+    return patchChain;
   };
 
   const createResultBlob = async (jsonStr) => {
@@ -609,7 +658,9 @@ async function main() {
   }
 
   console.log(`☁️ Starting CareMan Cloud Auto-Pilot for ${ym} (${targetDate}), requestId=${reqId}...`);
-  await patchBridge({
+  patchBridge({
+    resultJson: '',
+    resultBlobSha: '',
     status: 'running',
     stepMessage: `☁️ Cloud-Auto-Pilot verbunden – öffne Johanniter-Anmeldung für ${ym}...`,
     updatedAt: Date.now()
@@ -663,12 +714,13 @@ async function main() {
   let last2faSelectAt = 0;
   let lastStepMsg = '';
   let seedAttempts = 0;
+  let monthFixed = false;
 
   const updateStep = async (msg) => {
     if (!msg || msg === lastStepMsg) return;
     lastStepMsg = msg;
     console.log('[Cloud Auto-Pilot]', msg);
-    await patchBridge({
+    patchBridge({
       status: 'running',
       stepMessage: msg,
       updatedAt: Date.now()
@@ -745,20 +797,37 @@ async function main() {
             console.log('   API-Mitschnitt nicht möglich: ' + (err.message || err));
           }
         }
-        let blobSha = '';
-        for (let tryNo = 0; tryNo < 3 && !blobSha; tryNo++) {
-          blobSha = await createResultBlob(pageState.daemonResult).catch(() => '');
-          if (!blobSha) await sleep(1500);
-        }
-        await patchBridge({
+        const doneFields = {
           status: 'done',
           stepMessage: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...`,
-          resultBlobSha: blobSha,
           ...(captureBlobSha ? { captureBlobSha, captureAt: Date.now() } : {}),
           ...(pageState.freshMyPlanToken ? { myPlanToken: pageState.freshMyPlanToken } : {}),
           updatedAt: Date.now()
-        });
-        console.log('✅ Cloud Auto-Pilot finished successfully! blobSha=' + blobSha);
+        };
+        // Schnell: Ergebnis direkt in die (private) Bridge schreiben – die App braucht dann keinen zweiten Abruf.
+        let blobSha = '';
+        let inlineOk = false;
+        await patchChain; // laufende Statusmeldungen zuerst abschließen
+        const inlineState = { ...bridgeState, ...doneFields, resultJson: pageState.daemonResult, resultBlobSha: '' };
+        delete inlineState.credsPass;
+        delete inlineState.credsUser;
+        const inlineBody = JSON.stringify({ body: JSON.stringify(inlineState) });
+        if (inlineBody.length < 60000) {
+          for (let tryNo = 0; tryNo < 2 && !inlineOk; tryNo++) {
+            const r = await fetch(issueUrl, { method: 'PATCH', headers: ghHeaders, body: inlineBody }).catch(() => null);
+            inlineOk = Boolean(r && r.ok);
+            if (!inlineOk) await sleep(800);
+          }
+          if (inlineOk) bridgeState = inlineState;
+        }
+        if (!inlineOk) {
+          for (let tryNo = 0; tryNo < 3 && !blobSha; tryNo++) {
+            blobSha = await createResultBlob(pageState.daemonResult).catch(() => '');
+            if (!blobSha) await sleep(1500);
+          }
+          await patchBridge({ ...doneFields, resultJson: '', resultBlobSha: blobSha });
+        }
+        console.log('✅ Cloud Auto-Pilot finished successfully! ' + (inlineOk ? 'Ergebnis direkt in der Bridge' : 'blobSha=' + blobSha));
         finished = true;
         break;
       }
@@ -905,6 +974,19 @@ async function main() {
             await sleep(800);
             continue;
           }
+        }
+
+        // Chrome wurde vorab mit dem heutigen Datum geöffnet: steht ein anderer Monat an, einmal auf den Zielmonat wechseln
+        if (!monthFixed && !pageState.extractorRunning) {
+          const dm = String(pageState.href || '').match(/[?&]date=(20\d{2})-(\d{1,2})-\d{1,2}/);
+          const urlYm = dm ? `${dm[1]}-${String(parseInt(dm[2], 10)).padStart(2, '0')}` : '';
+          if (urlYm && urlYm !== ym) {
+            monthFixed = true;
+            await cdp.evalInPage(`window.location.href = ${JSON.stringify(targetCareManUrl)};`).catch(() => {});
+            await sleep(600);
+            continue;
+          }
+          if (urlYm) monthFixed = true;
         }
 
         if (pageState.bannerText) {

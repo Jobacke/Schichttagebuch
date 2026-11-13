@@ -759,7 +759,7 @@ export function openCareManLiveWindow(targetYearMonth) {
           const startedAt = Date.now();
           let redispatched = false;
           while (!stopped && Date.now() - startedAt < 9 * 60 * 1000) {
-            await new Promise(r => setTimeout(r, 1500));
+            await new Promise(r => setTimeout(r, 1000));
             if (stopped) break;
 
             let f;
@@ -1853,24 +1853,23 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         return res.json();
       };
 
-      // Mitarbeiter-ID (eigener Vertrag laut CareMan; gespeicherte Auswahl nur als Rückfall)
-      let employeeId = 0;
+      // Mitarbeiter-ID: eigener Vertrag laut CareMan. Eine gespeicherte Auswahl wird schon parallel genutzt
+      // und nur verworfen, wenn CareMan eine andere ID meldet.
+      let storedEmployeeId = 0;
       try {
-        const pre = await callApi('POST', '/app/initial-preload', undefined, 15000);
-        const ct = pre && pre.contracts && pre.contracts.data;
-        if (Array.isArray(ct) && ct[0] && ct[0].dbId) employeeId = ct[0].dbId;
+        Object.keys(localStorage).forEach(k => {
+          if (/selectedEmployeeId$/.test(k)) {
+            const v = parseInt(localStorage.getItem(k), 10);
+            if (v > 0) storedEmployeeId = v;
+          }
+        });
       } catch (e) {}
-      if (!employeeId) {
-        try {
-          Object.keys(localStorage).forEach(k => {
-            if (/selectedEmployeeId$/.test(k)) {
-              const v = parseInt(localStorage.getItem(k), 10);
-              if (v > 0) employeeId = v;
-            }
-          });
-        } catch (e) {}
-      }
-      if (!employeeId) return null;
+      const contractIdPromise = callApi('POST', '/app/initial-preload', undefined, 15000)
+        .then(pre => {
+          const ct = pre && pre.contracts && pre.contracts.data;
+          return (Array.isArray(ct) && ct[0] && ct[0].dbId) ? ct[0].dbId : 0;
+        })
+        .catch(() => 0);
 
       // Datumsumrechnung (CareMan liefert UTC, Tage gelten in deutscher Zeit)
       const berlinFmt = new Intl.DateTimeFormat('de-DE', {
@@ -1957,7 +1956,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         return colleagues;
       };
 
-      const loadStation = async (st) => {
+      const loadStation = async (st, employeeId) => {
         const resp = await callApi('POST', '/team-duty/roster/' + employeeId, {
           teamDuty: { idPlanninggroup: st.id, namePlanninggroup: st.name, from: fromIso, to: toIso },
           filterEmployee: 0
@@ -1967,7 +1966,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       // Falls sich die Planungsgruppen-IDs bei CareMan ändern: einmal neu ermitteln
       let groupsRefreshed = null;
-      const refreshGroups = async () => {
+      const refreshGroups = async (employeeId) => {
         if (!groupsRefreshed) {
           groupsRefreshed = callApi('POST', '/team-duty/preload', { employeeId, planningGroup: null, filterEmployee: 0, month: fromIso }, 30000)
             .then(pre => {
@@ -1976,27 +1975,45 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
                 const hit = list.find(t => st.pattern.test(t.namePlanninggroup || ''));
                 if (hit) { st.id = hit.idPlanninggroup; st.name = hit.namePlanninggroup; }
               });
-            });
+            })
+            .catch(e => { groupsRefreshed = null; throw e; });
         }
         return groupsRefreshed;
       };
-      const loadStationRobust = async (st) => {
+      const loadStationRobust = async (st, employeeId) => {
         try {
-          return await loadStation(st);
+          return await loadStation(st, employeeId);
         } catch (e) {
-          await refreshGroups();
-          return loadStation(st);
+          await refreshGroups(employeeId);
+          return loadStation(st, employeeId);
         }
       };
 
       const lastDayIso = fy + '-' + pad2(fm) + '-' + pad2(lastDay) + 'T00:00:00.000Z';
-      const personalPromise = callApi('POST', '/rosters/preload', [
-        { employeeId, begin: fy + '-' + pad2(fm) + '-01T00:00:00.000Z', end: lastDayIso, rosterViewMode: 4 }
-      ], 30000).catch(() => null);
+      const loadAll = async (employeeId) => {
+        const personalPromise = callApi('POST', '/rosters/preload', [
+          { employeeId, begin: fy + '-' + pad2(fm) + '-01T00:00:00.000Z', end: lastDayIso, rosterViewMode: 4 }
+        ], 30000).catch(() => null);
+        const stationResults = await Promise.all(FAST_STATIONS.map(st => loadStationRobust(st, employeeId)));
+        const personalResp = await personalPromise;
+        return { stationResults, personalResp };
+      };
 
       const t0 = Date.now();
-      const stationResults = await Promise.all(FAST_STATIONS.map(st => loadStationRobust(st)));
-      const personalResp = await personalPromise;
+      let loaded = null;
+      if (storedEmployeeId) {
+        let earlyErr = null;
+        loaded = await loadAll(storedEmployeeId).catch(e => { earlyErr = e; return null; });
+        const contractId = await contractIdPromise;
+        if (contractId && contractId !== storedEmployeeId) loaded = await loadAll(contractId);
+        else if (!loaded) throw earlyErr || new Error('Direktabruf fehlgeschlagen');
+      } else {
+        const contractId = await contractIdPromise;
+        if (!contractId) return null;
+        loaded = await loadAll(contractId);
+      }
+      const stationResults = loaded.stationResults;
+      const personalResp = loaded.personalResp;
 
       const rosters = FAST_STATIONS.map((st, idx) => ({
         extractedAt: Date.now(),

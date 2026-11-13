@@ -2,7 +2,8 @@ name: CareMan Cloud-Autopilot
 
 # Wird von der App gestartet (workflow_dispatch), wenn der Dienstplan ohne Mac aus CareMan geholt werden soll.
 # Auf Tempo optimiert: kein Auschecken des ganzen Repos, kein npm ci, vorinstalliertes Node und Chrome.
-# Nur wenn das Chrome des Servers defekt ist, wird ein eigenes Chrome installiert (Absicherung).
+# Chrome startet schon, während der Runner geladen wird (seine Dateien werden parallel vorgeladen).
+# Nur wenn das Chrome des Servers defekt ist, installiert ein zweiter Job ein eigenes Chrome (Absicherung).
 # Zusätzlich läuft täglich ein Selbsttest (Chrome startet, Johanniter-Seite lädt). Schlägt er fehl,
 # wird der Lauf rot und GitHub schickt eine E-Mail.
 # Zugangsdaten nur als verschlüsselte Repository-Secrets:
@@ -26,50 +27,73 @@ concurrency:
   group: careman-cloud-${{ github.event_name == 'schedule' && 'selftest' || github.event.inputs.selftest == 'true' && 'selftest' || 'run' }}
   cancel-in-progress: false
 
+env:
+  BRIDGE_GH_TOKEN: ${{ secrets.BRIDGE_GH_TOKEN }}
+  CAREMAN_USER: ${{ secrets.CAREMAN_USER }}
+  CAREMAN_PASS: ${{ secrets.CAREMAN_PASS }}
+  CAREMAN_SIEDA_USER: ${{ secrets.CAREMAN_SIEDA_USER }}
+  CAREMAN_SIEDA_PASS: ${{ secrets.CAREMAN_SIEDA_PASS }}
+  CLOUD_SELFTEST: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.selftest || 'false' }}
+
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 12
-    env:
-      BRIDGE_GH_TOKEN: ${{ secrets.BRIDGE_GH_TOKEN }}
-      CAREMAN_USER: ${{ secrets.CAREMAN_USER }}
-      CAREMAN_PASS: ${{ secrets.CAREMAN_PASS }}
-      CAREMAN_SIEDA_USER: ${{ secrets.CAREMAN_SIEDA_USER }}
-      CAREMAN_SIEDA_PASS: ${{ secrets.CAREMAN_SIEDA_PASS }}
-      CLOUD_SELFTEST: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.selftest || 'false' }}
+    outputs:
+      chrome_failed: ${{ steps.run1.outputs.chrome_failed }}
     steps:
-      # Nur das Runner-Skript genau dieses Stands holen (statt Checkout + npm ci)
-      - name: Runner laden
-        run: |
-          curl -fsSL --retry 3 --max-time 20 -o "$RUNNER_TEMP/careman-cloud-runner.mjs" \
-            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/careman-cloud-runner.mjs"
-
-      # Schneller Weg: vorinstalliertes Chrome des Servers
+      # Schneller Weg: vorinstalliertes Chrome des Servers, sofort im Hintergrund gestartet
       - name: CareMan Cloud-Autopilot
         id: run1
-        continue-on-error: true
         env:
           CHROME_FALLBACK_AVAILABLE: 'true'
-        run: node "$RUNNER_TEMP/careman-cloud-runner.mjs"
-
-      # Absicherung: nur wenn das Server-Chrome nicht startet -> eigenes Chrome installieren und erneut
-      - name: Chrome-Absicherung prüfen
-        id: fb
-        if: steps.run1.outcome == 'failure'
         run: |
-          if [ -f "$RUNNER_TEMP/chrome_failed" ]; then echo "needed=true" >> "$GITHUB_OUTPUT"; else echo "needed=false" >> "$GITHUB_OUTPUT"; exit 1; fi
+          P="$RUNNER_TEMP/cm-chrome-profile"; mkdir -p "$P"
+          D=$(TZ=Europe/Berlin date +%Y-%-m-%-d)
+          LANG=de_DE.UTF-8 LC_ALL=de_DE.UTF-8 TZ=Europe/Berlin /usr/bin/google-chrome \
+            --remote-debugging-port=0 --remote-debugging-address=127.0.0.1 --user-data-dir="$P" --headless=new \
+            --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run \
+            --no-default-browser-check --disable-extensions --disable-background-networking --password-store=basic \
+            --use-mock-keychain --disable-features=MediaRouter,OptimizationHints,Translate --lang=de-DE \
+            --accept-lang=de-DE,de --window-size=1440,900 \
+            "https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=$D" \
+            >/dev/null 2>"$RUNNER_TEMP/cm-chrome.log" &
+          export PRELAUNCH_CHROME_PID=$! PRELAUNCH_CHROME_PROFILE="$P"
+          # Chrome-Dateien parallel von der (anfangs langsamen) Server-Festplatte vorladen
+          ( cd /opt/google/chrome && S=$(stat -c %s chrome) && C=$(( (S + 15) / 16 )) && \
+            for i in $(seq 0 15); do dd if=chrome of=/dev/null bs=1M iflag=skip_bytes,count_bytes skip=$((i*C)) count=$C status=none & done; \
+            find . -type f ! -name chrome -print0 | xargs -0 -P 8 -n 8 cat >/dev/null; wait ) >/dev/null 2>&1 &
+          # Nur das Runner-Skript genau dieses Stands holen (statt Checkout + npm ci)
+          curl -fsSL --retry 3 --max-time 20 -o "$RUNNER_TEMP/careman-cloud-runner.mjs" \
+            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/careman-cloud-runner.mjs"
+          rc=0
+          node "$RUNNER_TEMP/careman-cloud-runner.mjs" || rc=$?
+          if [ -f "$RUNNER_TEMP/chrome_failed" ]; then
+            echo "chrome_failed=true" >> "$GITHUB_OUTPUT"
+            echo "Server-Chrome startet nicht – der Absicherungs-Job übernimmt mit eigenem Chrome."
+            exit 0
+          fi
+          exit $rc
 
+  # Absicherung: nur wenn das Server-Chrome nicht startet -> eigenes Chrome installieren und erneut
+  fallback:
+    needs: run
+    if: needs.run.outputs.chrome_failed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
       - name: Eigenes Chrome bereitstellen
         id: chrome
-        if: steps.fb.outputs.needed == 'true'
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
           install-dependencies: true
 
       - name: CareMan Cloud-Autopilot (mit eigenem Chrome)
-        if: steps.fb.outputs.needed == 'true'
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
           CHROME_FALLBACK_AVAILABLE: 'false'
-        run: node "$RUNNER_TEMP/careman-cloud-runner.mjs"
+        run: |
+          curl -fsSL --retry 3 --max-time 20 -o "$RUNNER_TEMP/careman-cloud-runner.mjs" \
+            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/careman-cloud-runner.mjs"
+          node "$RUNNER_TEMP/careman-cloud-runner.mjs"

@@ -5,7 +5,49 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { SIEDA_EXTRACTOR_SCRIPT } from '../src/utils/oneClickCareManSync.js';
+
+// The extractor script (SIEDA_EXTRACTOR_SCRIPT) is loaded at runtime instead of importing the app
+// sources – so the cloud run needs no `npm ci` (saves ~15 s). Order: live site (always matches the
+// deployed app) → file of this exact commit on GitHub → local repo file → app sources.
+let SIEDA_EXTRACTOR_SCRIPT = '';
+const looksLikeExtractor = (txt) => typeof txt === 'string' && txt.length > 10000 && txt.includes('CAREMAN_DAEMON_RESULT');
+
+async function loadExtractorScript() {
+  const sources = [
+    process.env.EXTRACTOR_URL || 'https://schicht.vjbackhaus.de/careman-sync.js',
+    process.env.GITHUB_SHA
+      ? `https://raw.githubusercontent.com/Jobacke/Schichttagebuch/${process.env.GITHUB_SHA}/public/careman-sync.js`
+      : null
+  ].filter(Boolean);
+  for (const url of sources) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      const r = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, { signal: controller.signal, cache: 'no-store' });
+      clearTimeout(timer);
+      if (r.ok) {
+        const txt = await r.text();
+        if (looksLikeExtractor(txt)) {
+          console.log(`   Auslese-Skript geladen: ${url.replace(/\?.*$/, '')} (${txt.length} Zeichen)`);
+          return txt;
+        }
+      }
+    } catch {}
+  }
+  try {
+    const local = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'public', 'careman-sync.js');
+    if (fs.existsSync(local)) {
+      const txt = fs.readFileSync(local, 'utf8');
+      if (looksLikeExtractor(txt)) {
+        console.log('   Auslese-Skript aus lokaler Datei geladen.');
+        return txt;
+      }
+    }
+  } catch {}
+  const mod = await import('../src/utils/oneClickCareManSync.js');
+  console.log('   Auslese-Skript aus App-Quellcode geladen.');
+  return mod.SIEDA_EXTRACTOR_SCRIPT;
+}
 
 let debugPort = 0; // set by launchCloudChrome (read from DevToolsActivePort)
 // All credentials come from GitHub Actions secrets (see .github/workflows/careman-cloud.yml):
@@ -398,7 +440,9 @@ async function runSelfTest() {
     cdp.close();
     console.log('   Seite: ' + JSON.stringify(info));
     if (!info || !/johanniter/i.test(info.href || '')) throw new Error('Johanniter-Seite wurde nicht geladen');
-    console.log('✅ Selbsttest erfolgreich – Cloud-Browser und Johanniter-Anmeldung erreichbar.');
+    const extractor = await loadExtractorScript();
+    if (!looksLikeExtractor(extractor)) throw new Error('Auslese-Skript nicht ladbar');
+    console.log('✅ Selbsttest erfolgreich – Cloud-Browser, Johanniter-Anmeldung und Auslese-Skript verfügbar.');
   } finally {
     if (launched) try { launched.proc.kill('SIGKILL'); } catch {}
   }
@@ -506,6 +550,12 @@ async function main() {
   });
 
   const targetCareManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
+
+  // Load the extractor in parallel to the Chrome start (needed only after the login)
+  const extractorPromise = loadExtractorScript().catch(err => {
+    console.error('⚠️ Auslese-Skript konnte nicht geladen werden: ' + (err.message || err));
+    return '';
+  });
 
   let proc;
   try {
@@ -798,6 +848,13 @@ async function main() {
               window.__CAREMAN_DAEMON_RESULT = null;
               window.name = 'CAREMAN_AUTOPILOT:' + ${JSON.stringify(apPayload)};
             `).catch(() => {});
+            if (!SIEDA_EXTRACTOR_SCRIPT) SIEDA_EXTRACTOR_SCRIPT = await extractorPromise;
+            if (!SIEDA_EXTRACTOR_SCRIPT) {
+              await patchBridge({ status: 'error', stepMessage: '⚠️ Auslese-Skript nicht verfügbar – neuer Versuch …', updatedAt: Date.now() });
+              process.exitCode = 1;
+              aborted = true;
+              break;
+            }
             cdp.evalInPage(SIEDA_EXTRACTOR_SCRIPT, false).catch(() => {});
           }
         }

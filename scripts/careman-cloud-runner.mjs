@@ -12,6 +12,64 @@ import path from 'node:path';
 let SIEDA_EXTRACTOR_SCRIPT = '';
 const looksLikeExtractor = (txt) => typeof txt === 'string' && txt.length > 10000 && txt.includes('CAREMAN_DAEMON_RESULT');
 
+// Optional API capture (CAPTURE_API=true): records the CareMan (SIEDA myPlan) XHR/fetch calls made by
+// the web app, so the extraction can later call the API directly instead of clicking through the UI.
+// Stored only as a blob in the PRIVATE bridge repository – never in the (public) job log.
+const CAPTURE_SCRIPT = `
+(() => {
+  try {
+    if (!/dienstplan-bayern\.secure\.johanniter\.de$/.test(location.hostname) || window.__CM_CAPTURE_INSTALLED) return;
+    window.__CM_CAPTURE_INSTALLED = true;
+    window.__CM_CAPTURE = window.__CM_CAPTURE || [];
+    const MAX_BODY = 250000;
+    const tokenInfo = (v) => {
+      try {
+        const t = localStorage.getItem('myPlanToken') || '';
+        const s = String(v || '');
+        if (t && s.includes(t)) return s.replace(t, '<myPlanToken>');
+        return s.length > 40 ? s.slice(0, 12) + '…(' + s.length + ')' : s;
+      } catch (e) { return '?'; }
+    };
+    const push = (e) => { try { if (window.__CM_CAPTURE.length < 400) window.__CM_CAPTURE.push(e); } catch (x) {} };
+    const XO = XMLHttpRequest.prototype.open, XS = XMLHttpRequest.prototype.send, XH = XMLHttpRequest.prototype.setRequestHeader;
+    XMLHttpRequest.prototype.open = function (m, u) { this.__cm = { kind: 'xhr', method: m, url: String(u), headers: {}, t0: Date.now() }; return XO.apply(this, arguments); };
+    XMLHttpRequest.prototype.setRequestHeader = function (k, v) { try { if (this.__cm) this.__cm.headers[k] = tokenInfo(v); } catch (e) {} return XH.apply(this, arguments); };
+    XMLHttpRequest.prototype.send = function (body) {
+      const rec = this.__cm;
+      if (rec) {
+        rec.body = typeof body === 'string' ? body.slice(0, 20000) : (body ? '[' + typeof body + ']' : null);
+        this.addEventListener('loadend', () => {
+          try {
+            rec.status = this.status;
+            rec.ms = Date.now() - rec.t0;
+            rec.contentType = this.getResponseHeader('content-type');
+            let txt = '';
+            try { txt = (this.responseType === '' || this.responseType === 'text') ? this.responseText : (this.responseType === 'json' ? JSON.stringify(this.response) : '[' + this.responseType + ']'); } catch (e) {}
+            rec.size = txt ? txt.length : 0;
+            rec.response = txt ? txt.slice(0, MAX_BODY) : '';
+            push(rec);
+          } catch (e) {}
+        });
+      }
+      return XS.apply(this, arguments);
+    };
+    const F = window.fetch;
+    if (F) window.fetch = async function (input, init) {
+      const t0 = Date.now();
+      const url = typeof input === 'string' ? input : (input && input.url) || String(input);
+      const headers = {};
+      try { const h = new Headers((init && init.headers) || (input && input.headers) || {}); h.forEach((v, k) => { headers[k] = tokenInfo(v); }); } catch (e) {}
+      const res = await F.apply(this, arguments);
+      try {
+        const clone = res.clone();
+        clone.text().then(txt => push({ kind: 'fetch', method: (init && init.method) || 'GET', url, headers, body: init && typeof init.body === 'string' ? init.body.slice(0, 20000) : null, status: res.status, ms: Date.now() - t0, contentType: res.headers.get('content-type'), size: txt.length, response: txt.slice(0, MAX_BODY) })).catch(() => {});
+      } catch (e) {}
+      return res;
+    };
+  } catch (e) {}
+})();
+`;
+
 async function loadExtractorScript() {
   const sources = [
     process.env.EXTRACTOR_URL || 'https://schicht.vjbackhaus.de/careman-sync.js',
@@ -642,6 +700,9 @@ async function main() {
         await cdp.send('Page.enable').catch(() => {});
         await cdp.send('Runtime.enable').catch(() => {});
         await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: seedMyPlanScript }).catch(() => {});
+        if (process.env.CAPTURE_API === 'true') {
+          await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: CAPTURE_SCRIPT }).catch(() => {});
+        }
         connectedUrl = latestTarget.webSocketDebuggerUrl;
       }
 
@@ -671,6 +732,19 @@ async function main() {
       }
 
       if (pageState.daemonResult && pageState.daemonResult.length > 20) {
+        let captureBlobSha = '';
+        if (process.env.CAPTURE_API === 'true') {
+          try {
+            const cap = await cdp.evalInPage(`JSON.stringify({ capturedAt: Date.now(), href: location.href, calls: window.__CM_CAPTURE || [] })`);
+            if (cap) {
+              captureBlobSha = await createResultBlob(cap).catch(() => '');
+              const n = (() => { try { return JSON.parse(cap).calls.length; } catch { return 0; } })();
+              console.log(`   API-Mitschnitt: ${n} Aufrufe gespeichert (privat in der Bridge).`);
+            }
+          } catch (err) {
+            console.log('   API-Mitschnitt nicht möglich: ' + (err.message || err));
+          }
+        }
         let blobSha = '';
         for (let tryNo = 0; tryNo < 3 && !blobSha; tryNo++) {
           blobSha = await createResultBlob(pageState.daemonResult).catch(() => '');
@@ -680,6 +754,7 @@ async function main() {
           status: 'done',
           stepMessage: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...`,
           resultBlobSha: blobSha,
+          ...(captureBlobSha ? { captureBlobSha, captureAt: Date.now() } : {}),
           ...(pageState.freshMyPlanToken ? { myPlanToken: pageState.freshMyPlanToken } : {}),
           updatedAt: Date.now()
         });

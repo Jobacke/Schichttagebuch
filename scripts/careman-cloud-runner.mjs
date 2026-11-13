@@ -476,6 +476,9 @@ async function main() {
   const credsUser = String(process.env.CAREMAN_USER || '').trim() || 'johannes.backhaus@johanniter.de';
   const credsPass = String(process.env.CAREMAN_PASS || '');
   const myPlanToken = f.myPlanToken || '';
+  // CareMan's own login (opta data / SIEDA) – separate secrets if it differs from the Johanniter login
+  const siedaUser = String(process.env.CAREMAN_SIEDA_USER || '').trim() || credsUser;
+  const siedaPass = String(process.env.CAREMAN_SIEDA_PASS || '') || credsPass;
 
   const seedMyPlanScript = `
     try {
@@ -706,8 +709,9 @@ async function main() {
             })()`).catch(() => {});
             await sleep(800);
             continue;
-          } else if (pageState.hasPassInput && credsPass && Date.now() - lastPasswordSubmitAt > 3000) {
+          } else if (pageState.hasPassInput && siedaPass && Date.now() - lastPasswordSubmitAt > 3000) {
             lastPasswordSubmitAt = Date.now();
+            await updateStep('🔐 CareMan-Anmeldung (opta data) – trage Anmeldename & Passwort ein …');
             await cdp.evalInPage(`(async () => {
               const sleep = ms => new Promise(r => setTimeout(r, ms));
               const fillField = (el, val) => {
@@ -726,9 +730,9 @@ async function main() {
               const passInput = document.querySelector('input[type="password"]');
               const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="password"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"])'));
               const userInput = allInputs[0];
-              if (userInput) fillField(userInput, ${JSON.stringify(credsUser)});
+              if (userInput) fillField(userInput, ${JSON.stringify(siedaUser)});
               await sleep(80);
-              if (passInput) fillField(passInput, ${JSON.stringify(credsPass)});
+              if (passInput) fillField(passInput, ${JSON.stringify(siedaPass)});
               await sleep(220);
               const loginBtn = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]')).find(b =>
                 /^(Anmelden|Login|Sign\\s*in|Weiter|Next|OK|Submit)$/i.test((b.innerText || b.value || b.textContent || '').trim())

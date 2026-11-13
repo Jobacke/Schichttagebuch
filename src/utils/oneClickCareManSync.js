@@ -644,11 +644,38 @@ export function openCareManLiveWindow(targetYearMonth) {
     }
 
     (async () => {
+      const MAX_ATTEMPTS = 3;
+      const showMsg = (text, tone = 'info') => {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        if (tone === 'error') {
+          msgEl.style.borderColor = '#ef4444';
+          msgEl.style.color = '#f87171';
+        } else if (tone === 'warn') {
+          msgEl.style.borderColor = '#f59e0b';
+          msgEl.style.color = '#fbbf24';
+        } else {
+          msgEl.style.borderColor = 'rgba(56,189,248,0.35)';
+          msgEl.style.color = '#e2e8f0';
+        }
+      };
+      const finalFailure = (text) => {
+        if (spinEl) spinEl.style.display = 'none';
+        showMsg(text, 'error');
+        if (fallbackBtn) {
+          fallbackBtn.textContent = 'Stattdessen direkt im Browser mit Lesezeichen abrufen';
+          fallbackBtn.style.fontSize = '13.5px';
+        }
+      };
+
       try {
         // GitHub token comes from the user's private Firestore area (Settings), never from the source code
         const { getBridgeToken } = await import('./integrationSecrets.js');
         ghToken = await getBridgeToken();
-        if (!ghToken) throw new Error('Kein GitHub-Token für den Cloud-Autopilot hinterlegt (Einstellungen)');
+        if (!ghToken) {
+          finalFailure('⚠️ Kein GitHub-Token für den Cloud-Autopilot hinterlegt (Einstellungen → Verbindungen).');
+          return;
+        }
 
         const ghHeaders = {
           'Authorization': `Bearer ${ghToken}`,
@@ -656,119 +683,150 @@ export function openCareManLiveWindow(targetYearMonth) {
           'Content-Type': 'application/json'
         };
 
-        let existingState = {};
-        try {
-          const curRes = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, {
-            cache: 'no-store',
-            headers: ghHeaders
-          });
-          if (curRes.ok) {
-            const curIssue = await curRes.json();
-            existingState = JSON.parse(curIssue.body || '{}');
+        const readBridge = async () => {
+          const r = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, { cache: 'no-store', headers: ghHeaders });
+          if (!r.ok) {
+            const err = new Error(`Bridge nicht lesbar (HTTP ${r.status})`);
+            err.httpStatus = r.status;
+            throw err;
           }
-        } catch {}
-
-        const nextState = {
-          ...existingState,
-          requestId: reqId,
-          status: 'requested',
-          stepMessage: `☁️ Starte 24/7 Cloud-Auto-Pilot für ${ym} (dauert ca. 10–15s)...`,
-          ym,
-          targetDate,
-          resultBlobSha: '',
-          error: '',
-          requestedAt: Date.now(),
-          updatedAt: Date.now()
+          const iss = await r.json();
+          try { return JSON.parse(iss.body || '{}'); } catch { return {}; }
         };
-        // Credentials never belong into the bridge issue
-        delete nextState.credsPass;
-        delete nextState.credsUser;
 
-        const patchRes = await fetch(bridgeIssueUrl, {
-          method: 'PATCH',
-          headers: ghHeaders,
-          body: JSON.stringify({ body: JSON.stringify(nextState, null, 2) })
-        });
-        if (!patchRes.ok) throw new Error('Cloud-Bridge Request fehlgeschlagen');
+        // Starts one cloud run; returns 'done' | 'retry' | 'fatal'
+        const runAttempt = async (attemptNo) => {
+          const attemptReqId = attemptNo === 1 ? reqId : `${reqId}_r${attemptNo}`;
+          const label = attemptNo > 1 ? ` (Versuch ${attemptNo}/${MAX_ATTEMPTS})` : '';
 
-        if (msgEl) {
-          msgEl.textContent = nextState.stepMessage;
-        }
-
-        // Starte sofort den 24/7 GitHub Cloud-Auto-Pilot-Server (unabhängig vom Mac!)
-        fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/careman-cloud.yml/dispatches', {
-          method: 'POST',
-          headers: ghHeaders,
-          body: JSON.stringify({ ref: 'main' })
-        }).catch(() => {});
-
-        for (let tick = 0; tick < 180 && !stopped; tick++) {
-          await new Promise(r => setTimeout(r, 1200));
-          if (stopped) break;
-
-          const pollRes = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, {
-            cache: 'no-store',
-            headers: ghHeaders
-          });
-          if (!pollRes.ok) continue;
-          const issueData = await pollRes.json();
-          let f = {};
-          try {
-            f = JSON.parse(issueData.body || '{}');
-          } catch {
-            continue;
+          let existingState = {};
+          try { existingState = await readBridge(); } catch (err) {
+            if (err.httpStatus === 401 || err.httpStatus === 403 || err.httpStatus === 404) {
+              finalFailure(`⚠️ GitHub-Token ungültig oder abgelaufen (HTTP ${err.httpStatus}). Bitte in den Einstellungen ein neues Token „CareMan-App“ hinterlegen.`);
+              return 'fatal';
+            }
           }
 
-          const curReqId = f.requestId || '';
-          const curStatus = f.status || '';
-          const stepMsg = f.stepMessage || '';
-          const resultBlobSha = f.resultBlobSha || '';
+          const nextState = {
+            ...existingState,
+            requestId: attemptReqId,
+            status: 'requested',
+            stepMessage: `☁️ Cloud-Autopilot wird gestartet${label} – das dauert meist 30–60 Sekunden …`,
+            ym,
+            targetDate,
+            resultBlobSha: '',
+            resultJson: '',
+            error: '',
+            requestedAt: Date.now(),
+            updatedAt: Date.now()
+          };
+          // Credentials never belong into the bridge issue
+          delete nextState.credsPass;
+          delete nextState.credsUser;
 
-          if (curReqId === reqId && stepMsg && msgEl) {
-            msgEl.textContent = stepMsg;
+          const patchRes = await fetch(bridgeIssueUrl, {
+            method: 'PATCH',
+            headers: ghHeaders,
+            body: JSON.stringify({ body: JSON.stringify(nextState, null, 2) })
+          }).catch(() => null);
+          if (!patchRes || !patchRes.ok) {
+            if (patchRes && (patchRes.status === 401 || patchRes.status === 403)) {
+              finalFailure('⚠️ GitHub-Token hat keine Schreibrechte für die Bridge. Bitte Token „CareMan-App“ prüfen (Issues: Lesen und Schreiben).');
+              return 'fatal';
+            }
+            showMsg(`⚠️ Verbindung zur Cloud gestört${label} – neuer Versuch …`, 'warn');
+            return 'retry';
+          }
+          showMsg(nextState.stepMessage);
+
+          // Start the GitHub Cloud-Autopilot (independent of the Mac)
+          const dispatch = async () => {
+            const r = await fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/careman-cloud.yml/dispatches', {
+              method: 'POST',
+              headers: ghHeaders,
+              body: JSON.stringify({ ref: 'main' })
+            }).catch(() => null);
+            return r ? r.status : 0;
+          };
+          const dispatchStatus = await dispatch();
+          if (dispatchStatus === 401 || dispatchStatus === 403 || dispatchStatus === 404) {
+            finalFailure(`⚠️ Cloud-Autopilot konnte nicht gestartet werden (HTTP ${dispatchStatus}). Token „CareMan-App“ braucht für Schichttagebuch das Recht „Actions: Lesen und Schreiben“.`);
+            return 'fatal';
           }
 
-          if (curReqId === reqId && curStatus === 'done' && (resultBlobSha || (f.resultJson && f.resultJson.length > 20))) {
-            let resJson = f.resultJson || '';
-            if (resultBlobSha && !resJson) {
-              const blobRes = await fetch(`${bridgeBlobsUrl}/${resultBlobSha}`, {
-                cache: 'no-store',
-                headers: ghHeaders
-              });
-              if (blobRes.ok) {
-                const blobData = await blobRes.json();
-                const b64 = (blobData.content || '').replace(/\s+/g, '');
-                const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-                resJson = new TextDecoder('utf-8').decode(bytes);
+          // Poll up to ~9 minutes (login + Airlock confirmation can take a while)
+          const startedAt = Date.now();
+          let redispatched = false;
+          while (!stopped && Date.now() - startedAt < 9 * 60 * 1000) {
+            await new Promise(r => setTimeout(r, 1500));
+            if (stopped) break;
+
+            let f;
+            try { f = await readBridge(); } catch { continue; }
+            if (f.requestId !== attemptReqId) continue;
+
+            const curStatus = f.status || '';
+            const stepMsg = f.stepMessage || '';
+            if (stepMsg && curStatus === 'running') showMsg(stepMsg + label);
+
+            // Nobody picked up the job after 3 minutes: start the workflow once more
+            if (curStatus === 'requested' && !redispatched && Date.now() - startedAt > 3 * 60 * 1000) {
+              redispatched = true;
+              showMsg(`⏳ GitHub startet den Cloud-Autopilot verzögert – ich stoße ihn erneut an${label} …`, 'warn');
+              await dispatch();
+            }
+
+            if (curStatus === 'done' && (f.resultBlobSha || (f.resultJson && f.resultJson.length > 20))) {
+              let resJson = f.resultJson || '';
+              if (f.resultBlobSha && !resJson) {
+                for (let i = 0; i < 3 && !resJson; i++) {
+                  const blobRes = await fetch(`${bridgeBlobsUrl}/${f.resultBlobSha}`, { cache: 'no-store', headers: ghHeaders }).catch(() => null);
+                  if (blobRes && blobRes.ok) {
+                    const blobData = await blobRes.json();
+                    const b64 = (blobData.content || '').replace(/\s+/g, '');
+                    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                    resJson = new TextDecoder('utf-8').decode(bytes);
+                  } else {
+                    await new Promise(r => setTimeout(r, 1500));
+                  }
+                }
+              }
+              if (resJson && resJson.length > 20) {
+                stopped = true;
+                if (msgEl) {
+                  msgEl.style.borderColor = '#10b981';
+                  msgEl.style.color = '#34d399';
+                  msgEl.textContent = `✅ Alle 3 Wachen (${ym}) geladen – trage Dienste & PartnerInnen ins Journal ein...`;
+                }
+                window.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload: resJson }, '*');
+                setTimeout(() => overlay.remove(), 900);
+                return 'done';
               }
             }
-            if (resJson && resJson.length > 20) {
-              stopped = true;
-              if (msgEl) {
-                msgEl.style.borderColor = '#10b981';
-                msgEl.style.color = '#34d399';
-                msgEl.textContent = `✅ Alle 3 Wachen (${ym}) geladen – trage Dienste & PartnerInnen ins Journal ein...`;
-              }
-              window.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload: resJson }, '*');
-              setTimeout(() => overlay.remove(), 900);
-              return;
+
+            if (curStatus === 'error') {
+              showMsg((stepMsg || '⚠️ Fehler beim Cloud-Abruf.') + label, 'warn');
+              return 'retry';
             }
           }
+          if (stopped) return 'fatal';
+          showMsg(`⚠️ Keine Rückmeldung vom Cloud-Autopilot${label}.`, 'warn');
+          return 'retry';
+        };
 
-          if (curReqId === reqId && curStatus === 'error') {
-            if (spinEl) spinEl.style.display = 'none';
-            if (msgEl) {
-              msgEl.style.borderColor = '#ef4444';
-              msgEl.style.color = '#f87171';
-              msgEl.textContent = stepMsg || '⚠️ Fehler beim Abruf.';
-            }
-            return;
+        for (let attemptNo = 1; attemptNo <= MAX_ATTEMPTS && !stopped; attemptNo++) {
+          const result = await runAttempt(attemptNo);
+          if (result === 'done' || result === 'fatal') return;
+          if (attemptNo < MAX_ATTEMPTS && !stopped) {
+            await new Promise(r => setTimeout(r, 4000));
           }
         }
-      } catch {
         if (!stopped) {
-          overlay.remove();
-          window.location.href = targetCareManUrl;
+          finalFailure(`⚠️ Der Cloud-Abruf hat nach ${MAX_ATTEMPTS} Versuchen nicht geklappt. Du kannst es gleich noch einmal versuchen oder den Plan direkt per Lesezeichen abrufen.`);
+        }
+      } catch (err) {
+        if (!stopped) {
+          finalFailure('⚠️ Unerwarteter Fehler beim Cloud-Abruf: ' + (err?.message || err));
         }
       }
     })();

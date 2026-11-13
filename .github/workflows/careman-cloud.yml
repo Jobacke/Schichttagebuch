@@ -7,6 +7,7 @@ name: CareMan Cloud-Autopilot
 #   BRIDGE_GH_TOKEN  – fein abgestuftes Token nur für Jobacke/careman-autopilot-bridge (Issues + Contents: Lesen/Schreiben)
 #   CAREMAN_USER     – Johanniter-Benutzername
 #   CAREMAN_PASS     – Johanniter-Passwort
+#   CAREMAN_SIEDA_USER / CAREMAN_SIEDA_PASS – optional, falls die CareMan-Anmeldung (opta data) andere Daten nutzt
 on:
   workflow_dispatch:
     inputs:
@@ -56,6 +57,8 @@ jobs:
           BRIDGE_GH_TOKEN: ${{ secrets.BRIDGE_GH_TOKEN }}
           CAREMAN_USER: ${{ secrets.CAREMAN_USER }}
           CAREMAN_PASS: ${{ secrets.CAREMAN_PASS }}
+          CAREMAN_SIEDA_USER: ${{ secrets.CAREMAN_SIEDA_USER }}
+          CAREMAN_SIEDA_PASS: ${{ secrets.CAREMAN_SIEDA_PASS }}
           CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
           CLOUD_SELFTEST: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.selftest || 'false' }}
         run: node ./scripts/careman-cloud-runner.mjs

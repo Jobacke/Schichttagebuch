@@ -326,7 +326,7 @@ function listChromeBinaries() {
 
 /**
  * Starts a headless Chrome robustly: several binaries / headless modes, free DevTools port
- * (read from DevToolsActivePort), up to 40 s per attempt, stderr is logged on failure.
+ * (read from DevToolsActivePort), up to 25 s per attempt, stderr is logged on failure.
  * Returns { proc, pageTarget, bin } or throws with the collected reasons.
  */
 async function launchCloudChrome(startUrl) {
@@ -358,6 +358,9 @@ async function launchCloudChrome(startUrl) {
           '--no-default-browser-check',
           '--disable-extensions',
           '--disable-background-networking',
+          '--password-store=basic',
+          '--use-mock-keychain',
+          '--disable-features=MediaRouter,OptimizationHints,Translate',
           '--lang=de-DE',
           '--accept-lang=de-DE,de',
           '--window-size=1440,900',
@@ -380,7 +383,7 @@ async function launchCloudChrome(startUrl) {
       });
 
       let pageTarget = null;
-      for (let i = 0; i < 160 && exitInfo === null; i++) {
+      for (let i = 0; i < 100 && exitInfo === null; i++) { // up to 25 s
         await sleep(250);
         try {
           if (!debugPort) {
@@ -400,7 +403,7 @@ async function launchCloudChrome(startUrl) {
         return { proc, pageTarget, bin };
       }
 
-      const why = exitInfo || 'keine DevTools-Verbindung nach 40 s';
+      const why = exitInfo || 'keine DevTools-Verbindung nach 25 s';
       reasons.push(`Versuch ${attempt} (${path.basename(bin)} ${mode}): ${why}`);
       console.log(`⚠️ Chrome-Start Versuch ${attempt} fehlgeschlagen: ${why}`);
       if (stderrLines.length) console.log('   Chrome-Ausgabe:\n   ' + stderrLines.slice(-12).join('\n   '));
@@ -409,7 +412,12 @@ async function launchCloudChrome(startUrl) {
       await sleep(500);
     }
   }
-  throw new Error('Cloud-Browser konnte nicht gestartet werden – ' + reasons.join(' | '));
+  const msg = 'Cloud-Browser konnte nicht gestartet werden – ' + reasons.join(' | ');
+  if (process.env.CHROME_FALLBACK_AVAILABLE === 'true') {
+    // tells the workflow to install its own Chrome and run again
+    try { fs.writeFileSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'chrome_failed'), msg); } catch {}
+  }
+  throw new Error(msg);
 }
 
 /**
@@ -563,6 +571,12 @@ async function main() {
     proc = launched.proc;
   } catch (err) {
     console.error('❌ ' + err.message);
+    if (process.env.CHROME_FALLBACK_AVAILABLE === 'true') {
+      // The workflow installs its own Chrome and starts the runner again – keep the job "requested"
+      await patchBridge({ status: 'requested', stepMessage: '🔧 Cloud-Browser wird neu eingerichtet – einen Moment …', updatedAt: Date.now() });
+      process.exitCode = 3;
+      return;
+    }
     await patchBridge({
       status: 'error',
       stepMessage: '⚠️ Cloud-Browser konnte nicht gestartet werden (Server-Problem bei GitHub). Bitte gleich noch einmal versuchen.',

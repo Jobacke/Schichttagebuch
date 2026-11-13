@@ -30,38 +30,46 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    env:
+      BRIDGE_GH_TOKEN: ${{ secrets.BRIDGE_GH_TOKEN }}
+      CAREMAN_USER: ${{ secrets.CAREMAN_USER }}
+      CAREMAN_PASS: ${{ secrets.CAREMAN_PASS }}
+      CAREMAN_SIEDA_USER: ${{ secrets.CAREMAN_SIEDA_USER }}
+      CAREMAN_SIEDA_PASS: ${{ secrets.CAREMAN_SIEDA_PASS }}
+      CLOUD_SELFTEST: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.selftest || 'false' }}
     steps:
       # Nur das Runner-Skript genau dieses Stands holen (statt Checkout + npm ci)
-      - name: Runner laden und Chrome prüfen
-        id: prep
+      - name: Runner laden
         run: |
           curl -fsSL --retry 3 --max-time 20 -o "$RUNNER_TEMP/careman-cloud-runner.mjs" \
             "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/careman-cloud-runner.mjs"
-          if timeout 20 google-chrome --headless=new --no-sandbox --disable-gpu --dump-dom about:blank >/dev/null 2>&1; then
-            echo "chrome_ok=true" >> "$GITHUB_OUTPUT"
-            echo "Vorinstalliertes Chrome funktioniert: $(google-chrome --version)"
-          else
-            echo "chrome_ok=false" >> "$GITHUB_OUTPUT"
-            echo "Vorinstalliertes Chrome defekt – installiere eigenes Chrome."
-          fi
 
-      # Absicherung: nur wenn das Server-Chrome nicht funktioniert
-      - name: Chrome bereitstellen (nur bei Bedarf)
-        id: chrome
-        if: steps.prep.outputs.chrome_ok != 'true'
+      # Schneller Weg: vorinstalliertes Chrome des Servers
+      - name: CareMan Cloud-Autopilot
+        id: run1
         continue-on-error: true
+        env:
+          CHROME_FALLBACK_AVAILABLE: 'true'
+        run: node "$RUNNER_TEMP/careman-cloud-runner.mjs"
+
+      # Absicherung: nur wenn das Server-Chrome nicht startet -> eigenes Chrome installieren und erneut
+      - name: Chrome-Absicherung prüfen
+        id: fb
+        if: steps.run1.outcome == 'failure'
+        run: |
+          if [ -f "$RUNNER_TEMP/chrome_failed" ]; then echo "needed=true" >> "$GITHUB_OUTPUT"; else echo "needed=false" >> "$GITHUB_OUTPUT"; exit 1; fi
+
+      - name: Eigenes Chrome bereitstellen
+        id: chrome
+        if: steps.fb.outputs.needed == 'true'
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
           install-dependencies: true
 
-      - name: CareMan Cloud-Autopilot
+      - name: CareMan Cloud-Autopilot (mit eigenem Chrome)
+        if: steps.fb.outputs.needed == 'true'
         env:
-          BRIDGE_GH_TOKEN: ${{ secrets.BRIDGE_GH_TOKEN }}
-          CAREMAN_USER: ${{ secrets.CAREMAN_USER }}
-          CAREMAN_PASS: ${{ secrets.CAREMAN_PASS }}
-          CAREMAN_SIEDA_USER: ${{ secrets.CAREMAN_SIEDA_USER }}
-          CAREMAN_SIEDA_PASS: ${{ secrets.CAREMAN_SIEDA_PASS }}
           CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
-          CLOUD_SELFTEST: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.selftest || 'false' }}
+          CHROME_FALLBACK_AVAILABLE: 'false'
         run: node "$RUNNER_TEMP/careman-cloud-runner.mjs"

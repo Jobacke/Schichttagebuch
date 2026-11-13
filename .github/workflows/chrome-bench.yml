@@ -1,0 +1,15 @@
+name: Chrome-Messlauf (temporär)
+on: workflow_dispatch
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [cold, prewarm, realurl, direct]
+    steps:
+      - name: Messen
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/b.mjs" "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/chrome-bench.mjs"
+          node "$RUNNER_TEMP/b.mjs" ${{ matrix.mode }}

@@ -616,9 +616,12 @@ export default function TeamRoster() {
         const codeObj = (store?.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
         const codeStr = s.code || codeObj?.code || '';
         const detectedPartner = codeStr ? getPartnersForShiftFromRoster(s.date, codeStr, roster) : '';
+        const current = (s.partner || '').trim();
+        // Automatically filled partners ("mit ...") always follow the current roster; typed-in ones stay
+        const isAuto = !current || current.startsWith('mit ');
         return {
           ...s,
-          partner: s.partner || detectedPartner || ''
+          partner: (isAuto && detectedPartner) ? detectedPartner : (s.partner || detectedPartner || '')
         };
       });
     }

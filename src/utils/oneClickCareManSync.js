@@ -494,6 +494,29 @@ export async function importCareManPayloadAndSync({
  * 3. Automatically opens Dienstplan Bayern for the selected month (`https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=YYYY-M-D`)
  * 4. Automatically extracts all 3 stations (Rettungswache München, Rettungswache Obersendling, Rettungswache Hohenbrunn) + personal shifts and transfers them into the App.
  */
+const SIRI_ABRUF_KEY = 'careman_siri_abruf';
+const SIRI_ABRUF_MAX_AGE = 10 * 60 * 1000;
+
+/** Liegt ein Abruf per Sprachbefehl (/?abruf=1) vor, der noch nicht gestartet wurde? */
+export function hasPendingSiriAbruf() {
+  if (typeof window === 'undefined') return false;
+  if (window.__CAREMAN_SIRI_ABRUF) return true;
+  try {
+    const at = Number(sessionStorage.getItem(SIRI_ABRUF_KEY) || 0);
+    return at > 0 && Date.now() - at < SIRI_ABRUF_MAX_AGE;
+  } catch {
+    return false;
+  }
+}
+
+/** Holt den Sprachbefehl-Auftrag ab (nur einmal) – true, wenn jetzt abgerufen werden soll. */
+export function consumeSiriAbruf() {
+  const pending = hasPendingSiriAbruf();
+  if (typeof window !== 'undefined') window.__CAREMAN_SIRI_ABRUF = false;
+  try { sessionStorage.removeItem(SIRI_ABRUF_KEY); } catch { /* ignore */ }
+  return pending;
+}
+
 const PREWARM_KEY = 'careman_cloud_prewarm_at';
 const LAST_CLOUD_SYNC_KEY = 'careman_cloud_last_sync_at';
 let prewarmInFlight = false;
@@ -515,7 +538,7 @@ export async function prewarmCareManCloud() {
   try {
     if (typeof window === 'undefined' || prewarmInFlight || isMacDesktopBrowser()) return;
     // Beim Start per Sprachbefehl folgt sofort der echte Abruf – kein zusätzlicher Vorstart nötig
-    if (window.__CAREMAN_SIRI_ABRUF) return;
+    if (hasPendingSiriAbruf()) return;
     const now = Date.now();
     const lastWarm = Number(localStorage.getItem(PREWARM_KEY) || 0);
     const lastSync = Number(localStorage.getItem(LAST_CLOUD_SYNC_KEY) || 0);

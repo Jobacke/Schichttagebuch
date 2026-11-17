@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
+import CalendarTransferButton from '../components/CalendarTransferButton';
 import { getShiftColor } from '../utils/shiftColors';
 import { getPartnersForShiftFromRoster, getIncomingNightShiftForDate } from '../utils/teamRosterParser';
 import { useAuth } from '../context/AuthContext';
@@ -477,7 +478,7 @@ export default function Journal() {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <div className="header-actions">
                     <button
                         type="button"
                         onClick={() => openCareManLiveWindow(currentYearMonthStr)}
@@ -502,6 +503,11 @@ export default function Journal() {
                         <ExternalLink size={15} />
                         <span>⚡ DP mit neuestem Stand laden</span>
                     </button>
+                    <CalendarTransferButton
+                        onClick={() => setIsCalendarExportModalOpen(true)}
+                        count={monthShifts.length}
+                        monthLabel={currentMonthLabel}
+                    />
                 </div>
             </div>
 

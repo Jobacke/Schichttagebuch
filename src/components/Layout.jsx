@@ -8,8 +8,26 @@ import { useStore } from '../context/StoreContext';
 import {
     runOneClickCareManSync,
     importCareManPayloadAndSync,
-    looksLikeCareManData
+    looksLikeCareManData,
+    openCareManLiveWindow
 } from '../utils/oneClickCareManSync';
+
+// Sprachbefehl / Kurzbefehl („Hey Siri, aktueller Plan“): https://schicht.vjbackhaus.de/?abruf=1
+// startet den Dienstplan-Abruf des aktuellen Monats sofort – früh erfassen, bevor eine Weiterleitung
+// (z. B. „/“ → „/analysis“ oder zur Anmeldung) den Parameter verwirft.
+if (typeof window !== 'undefined') {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('abruf')) {
+            window.__CAREMAN_SIRI_ABRUF = true;
+            params.delete('abruf');
+            const rest = params.toString();
+            window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash);
+        }
+    } catch {
+        /* ignore */
+    }
+}
 
 // Capture #careman=... hash or window.name payload early before any route redirects
 if (typeof window !== 'undefined') {
@@ -69,6 +87,18 @@ export default function Layout() {
     useEffect(() => {
         latestRef.current = { currentUser, store, addShifts, deleteShifts, ensureCodesAndTypes, location, navigate };
     });
+
+    // Abruf per Sprachbefehl: sobald angemeldet und Daten geladen, Journal des aktuellen Monats öffnen
+    // und denselben Abruf starten wie „⚡ DP mit neuestem Stand laden“ (nur noch Airlock bestätigen).
+    useEffect(() => {
+        if (!currentUser || store?.loading) return;
+        if (typeof window === 'undefined' || !window.__CAREMAN_SIRI_ABRUF) return;
+        window.__CAREMAN_SIRI_ABRUF = false;
+        const now = new Date();
+        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        latestRef.current.navigate(`/journal?month=${ym}`, { replace: true });
+        openCareManLiveWindow(ym);
+    }, [currentUser, store?.loading]);
 
     const isImportingRef = useRef(false);
     const hasLeftTabRef = useRef(false);

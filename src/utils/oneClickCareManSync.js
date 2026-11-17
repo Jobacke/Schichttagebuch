@@ -514,6 +514,8 @@ function isMacDesktopBrowser() {
 export async function prewarmCareManCloud() {
   try {
     if (typeof window === 'undefined' || prewarmInFlight || isMacDesktopBrowser()) return;
+    // Beim Start per Sprachbefehl folgt sofort der echte Abruf – kein zusätzlicher Vorstart nötig
+    if (window.__CAREMAN_SIRI_ABRUF) return;
     const now = Date.now();
     const lastWarm = Number(localStorage.getItem(PREWARM_KEY) || 0);
     const lastSync = Number(localStorage.getItem(LAST_CLOUD_SYNC_KEY) || 0);

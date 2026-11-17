@@ -23,13 +23,17 @@
     } catch (e) { document.documentElement.dataset.theme = 'light'; }
   </script>
   <script>
-    // Sprachbefehl „Hey Siri, aktueller Plan“ → /?abruf=1: sofort merken (überlebt Weiterleitung & Anmeldung)
+    // Sprachbefehl „Hey Siri, Plan aktuell“ → /?abruf=1: sofort merken (überlebt Weiterleitung & Anmeldung)
+    // ?appv=… stammt vom Update-Hinweis („Neu laden“) und wird nur aus der Adresse entfernt.
     try {
       var cmP = new URLSearchParams(location.search);
       if (cmP.has('abruf')) {
         try { sessionStorage.setItem('careman_siri_abruf', String(Date.now())); } catch (e) {}
         window.__CAREMAN_SIRI_ABRUF = true;
         cmP.delete('abruf');
+      }
+      if (cmP.has('appv') || location.search !== (cmP.toString() ? '?' + cmP.toString() : '')) {
+        cmP.delete('appv');
         var cmR = cmP.toString();
         history.replaceState(null, '', location.pathname + (cmR ? '?' + cmR : '') + location.hash);
       }

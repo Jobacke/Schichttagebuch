@@ -17,6 +17,7 @@ import '@fontsource/outfit/500.css';
 import '@fontsource/outfit/600.css';
 import '@fontsource/outfit/700.css';
 import ErrorBoundary from './components/ErrorBoundary';
+import UpdateBanner from './components/UpdateBanner';
 
 // Guard Component
 function RequireAuth({ children }) {
@@ -61,6 +62,7 @@ function App() {
           <BrowserRouter basename={import.meta.env.BASE_URL}>
             <AppRoutes />
           </BrowserRouter>
+          <UpdateBanner />
         </StoreProvider>
       </AuthProvider>
     </ErrorBoundary>

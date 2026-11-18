@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
+import { useAuth } from '../context/AuthContext';
 import {
     Plus, Clock, Tag, Truck, Hash, MapPin,
     Database, ChevronLeft, ChevronRight, Trash2, RotateCcw, Check, CalendarDays,
-    PenSquare, X, Coins, KeyRound
+    PenSquare, X, Coins, KeyRound, Lock
 } from 'lucide-react';
 import { getBridgeToken, saveBridgeToken } from '../utils/integrationSecrets';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
@@ -21,6 +22,7 @@ export default function Settings() {
         updateDefaultBonusAmount,
         updateAllBonusShiftsAmount
     } = useStore();
+    const { currentUser, requirePassword, setRequirePassword, logout } = useAuth();
     const [activeScreen, setActiveScreen] = useState(null);
 
     const goBack = () => setActiveScreen(null);
@@ -128,8 +130,22 @@ export default function Settings() {
                 />
             </div>
 
-            <h2 style={{ marginTop: '32px' }}>Verbindungen</h2>
+            <h2 style={{ marginTop: '32px' }}>Verbindungen &amp; Sicherheit</h2>
             <div className="settings-list">
+                <SettingsItem
+                    icon={Lock}
+                    color={requirePassword ? 'var(--c-danger)' : 'var(--c-success-strong)'}
+                    label="Passwortabfrage beim Start"
+                    value={requirePassword ? 'Aktiv' : 'Aus (Direktstart)'}
+                    onClick={() => setRequirePassword(!requirePassword)}
+                />
+                <SettingsItem
+                    icon={KeyRound}
+                    color="var(--c-primary)"
+                    label={currentUser?.isDefaultUser ? 'Cloud-Konto anmelden (Sync)' : `Konto (${currentUser?.email || 'Johannes'}) abmelden`}
+                    value={currentUser?.isDefaultUser ? 'Anmelden' : 'Sperren'}
+                    onClick={() => logout()}
+                />
                 <SettingsItem
                     icon={KeyRound} color="var(--c-info)" label="CareMan Cloud-Autopilot (GitHub-Token)"
                     value="" onClick={() => setActiveScreen('cloudToken')}

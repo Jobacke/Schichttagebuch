@@ -275,10 +275,14 @@ export function StoreProvider({ children }) {
     let hydratedFromCache = false;
     setShiftsSynced(false);
     try {
-      const rawCache = localStorage.getItem(shiftsCacheKey);
+      let rawCache = localStorage.getItem(shiftsCacheKey);
+      if (!rawCache && currentUser.isDefaultUser) {
+        const lastUid = localStorage.getItem('schichttagebuch_last_uid');
+        if (lastUid) rawCache = localStorage.getItem(`schichttagebuch_cache_shifts_${lastUid}`);
+      }
       if (rawCache) {
         const parsedCache = JSON.parse(rawCache);
-        if (Array.isArray(parsedCache)) {
+        if (Array.isArray(parsedCache) && parsedCache.length > 0) {
           shiftsRef.current = parsedCache;
           setShifts(parsedCache);
           setShiftsLoaded(true);
@@ -287,6 +291,35 @@ export function StoreProvider({ children }) {
       }
     } catch {
       /* ignore cache read error */
+    }
+    if (currentUser.isDefaultUser) {
+      if (!hydratedFromCache) {
+        const roster = getActiveTeamRoster('2026-11');
+        const seeded = CAREMAN_NOVEMBER_2026_BACKHAUS.map(item => {
+          const dateStr = `2026-11-${String(item.day).padStart(2, '0')}`;
+          const partnerStr = getPartnersForShiftFromRoster(dateStr, item.code, roster) || '';
+          const built = buildShiftFromPreset({
+            dateStr,
+            code: item.code,
+            partner: partnerStr,
+            storeSettings: settingsRef.current
+          });
+          return {
+            ...built,
+            id: `preset_2026-11_${item.day}_${item.code}`,
+            startTime: item.startTime || built.startTime,
+            endTime: item.endTime || built.endTime,
+            partner: partnerStr,
+            updatedAt: Date.now()
+          };
+        });
+        shiftsRef.current = seeded;
+        setShifts(seeded);
+        try { localStorage.setItem(shiftsCacheKey, JSON.stringify(seeded)); } catch {}
+      }
+      setShiftsLoaded(true);
+      setShiftsSynced(true);
+      return;
     }
     if (!hydratedFromCache) {
       setShiftsLoaded(false);
@@ -590,6 +623,10 @@ export function StoreProvider({ children }) {
     } catch {
       /* ignore cache read error */
     }
+    if (currentUser.isDefaultUser) {
+      setSettingsLoaded(true);
+      return;
+    }
     if (!hydratedSettingsFromCache) {
       setSettingsLoaded(false);
     }
@@ -625,7 +662,7 @@ export function StoreProvider({ children }) {
 
   // --- Listener: Cloud Team Rosters Real-Time Sync ---
   useEffect(() => {
-    if (!currentUser || !db) return;
+    if (!currentUser || currentUser.isDefaultUser || !db) return;
 
     let unsubscribe = () => {};
     // Defer heavy team_rosters collection snapshot slightly so shifts & settings finish loading first
@@ -674,6 +711,9 @@ export function StoreProvider({ children }) {
       } else {
         shiftsRef.current = [docData, ...currentShifts];
       }
+      setShifts(shiftsRef.current);
+      try { localStorage.setItem(`schichttagebuch_cache_shifts_${currentUser.uid}`, JSON.stringify(shiftsRef.current)); } catch {}
+      if (currentUser.isDefaultUser) return;
       await setDoc(doc(db, `users/${currentUser.uid}/shifts`, id), docData);
     } catch (e) {
       console.error("Add Shift Failed", e);
@@ -830,6 +870,7 @@ export function StoreProvider({ children }) {
       } catch {
         /* ignore */
       }
+      if (currentUser.isDefaultUser) return true;
 
       // Commit to Firestore asynchronously so the Journal UI renders in < 10ms without waiting on network latency
       batch.commit()
@@ -932,7 +973,9 @@ export function StoreProvider({ children }) {
       try {
         localStorage.setItem(`schichttagebuch_cache_shifts_${currentUser.uid}`, JSON.stringify(next));
       } catch {}
-      await deleteDoc(doc(db, `users/${currentUser.uid}/shifts`, id));
+      if (!currentUser.isDefaultUser) {
+        await deleteDoc(doc(db, `users/${currentUser.uid}/shifts`, id));
+      }
       try { sessionStorage.setItem('careman_allow_reimport_after_tab_switch', '1'); } catch {}
     } catch (e) {
       console.error("Delete Shift Failed", e);
@@ -954,6 +997,7 @@ export function StoreProvider({ children }) {
         localStorage.setItem(`schichttagebuch_cache_shifts_${currentUser.uid}`, JSON.stringify(next));
         sessionStorage.setItem('careman_allow_reimport_after_tab_switch', '1');
       } catch {}
+      if (currentUser.isDefaultUser) return true;
       const batch = writeBatch(db);
       shiftIds.forEach(id => {
         batch.delete(doc(db, `users/${currentUser.uid}/shifts`, id));
@@ -980,6 +1024,10 @@ export function StoreProvider({ children }) {
   // Helper helper to update settings Doc
   const _updateSettingsDoc = async (newSettings) => {
     if (!currentUser) return;
+    try {
+      localStorage.setItem(`schichttagebuch_cache_settings_${currentUser.uid}`, JSON.stringify(newSettings));
+    } catch {}
+    if (currentUser.isDefaultUser) return;
     try {
       await setDoc(doc(db, `users/${currentUser.uid}/data`, 'settings'), newSettings);
     } catch (e) {

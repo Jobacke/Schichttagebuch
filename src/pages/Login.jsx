@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Flame, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function Login() {
-    const { login, register, currentUser } = useAuth();
+    const { login, register, currentUser, skipLogin } = useAuth();
     const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
@@ -128,6 +128,23 @@ export default function Login() {
                     <button disabled={loading} className="btn-primary" style={{ height: '52px', width: '100%' }}>
                         {loading ? 'Lade...' : (isLogin ? 'Anmelden' : 'Registrieren')}
                         {!loading && <ArrowRight size={20} />}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { skipLogin(); navigate('/'); }}
+                        style={{
+                            marginTop: '10px',
+                            height: '46px',
+                            width: '100%',
+                            borderRadius: '14px',
+                            border: '1px solid var(--c-border)',
+                            background: 'var(--c-surface)',
+                            color: 'var(--c-text)',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Ohne Passwort direkt starten
                     </button>
                 </form>
 

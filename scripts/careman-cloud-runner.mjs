@@ -5,9 +5,109 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { SIEDA_EXTRACTOR_SCRIPT } from '../src/utils/oneClickCareManSync.js';
 
-const DEBUG_PORT = 9229;
+// The extractor script (SIEDA_EXTRACTOR_SCRIPT) is loaded at runtime instead of importing the app
+// sources – so the cloud run needs no `npm ci` (saves ~15 s). Order: live site (always matches the
+// deployed app) → file of this exact commit on GitHub → local repo file → app sources.
+let SIEDA_EXTRACTOR_SCRIPT = '';
+const looksLikeExtractor = (txt) => typeof txt === 'string' && txt.length > 10000 && txt.includes('CAREMAN_DAEMON_RESULT');
+
+// Optional API capture (CAPTURE_API=true): records the CareMan (SIEDA myPlan) XHR/fetch calls made by
+// the web app, so the extraction can later call the API directly instead of clicking through the UI.
+// Stored only as a blob in the PRIVATE bridge repository – never in the (public) job log.
+const CAPTURE_SCRIPT = `
+(() => {
+  try {
+    if (!/dienstplan-bayern\.secure\.johanniter\.de$/.test(location.hostname) || window.__CM_CAPTURE_INSTALLED) return;
+    window.__CM_CAPTURE_INSTALLED = true;
+    window.__CM_CAPTURE = window.__CM_CAPTURE || [];
+    const MAX_BODY = 250000;
+    const tokenInfo = (v) => {
+      try {
+        const t = localStorage.getItem('myPlanToken') || '';
+        const s = String(v || '');
+        if (t && s.includes(t)) return s.replace(t, '<myPlanToken>');
+        return s.length > 40 ? s.slice(0, 12) + '…(' + s.length + ')' : s;
+      } catch (e) { return '?'; }
+    };
+    const push = (e) => { try { if (window.__CM_CAPTURE.length < 400) window.__CM_CAPTURE.push(e); } catch (x) {} };
+    const XO = XMLHttpRequest.prototype.open, XS = XMLHttpRequest.prototype.send, XH = XMLHttpRequest.prototype.setRequestHeader;
+    XMLHttpRequest.prototype.open = function (m, u) { this.__cm = { kind: 'xhr', method: m, url: String(u), headers: {}, t0: Date.now() }; return XO.apply(this, arguments); };
+    XMLHttpRequest.prototype.setRequestHeader = function (k, v) { try { if (this.__cm) this.__cm.headers[k] = tokenInfo(v); } catch (e) {} return XH.apply(this, arguments); };
+    XMLHttpRequest.prototype.send = function (body) {
+      const rec = this.__cm;
+      if (rec) {
+        rec.body = typeof body === 'string' ? body.slice(0, 20000) : (body ? '[' + typeof body + ']' : null);
+        this.addEventListener('loadend', () => {
+          try {
+            rec.status = this.status;
+            rec.ms = Date.now() - rec.t0;
+            rec.contentType = this.getResponseHeader('content-type');
+            let txt = '';
+            try { txt = (this.responseType === '' || this.responseType === 'text') ? this.responseText : (this.responseType === 'json' ? JSON.stringify(this.response) : '[' + this.responseType + ']'); } catch (e) {}
+            rec.size = txt ? txt.length : 0;
+            rec.response = txt ? txt.slice(0, MAX_BODY) : '';
+            push(rec);
+          } catch (e) {}
+        });
+      }
+      return XS.apply(this, arguments);
+    };
+    const F = window.fetch;
+    if (F) window.fetch = async function (input, init) {
+      const t0 = Date.now();
+      const url = typeof input === 'string' ? input : (input && input.url) || String(input);
+      const headers = {};
+      try { const h = new Headers((init && init.headers) || (input && input.headers) || {}); h.forEach((v, k) => { headers[k] = tokenInfo(v); }); } catch (e) {}
+      const res = await F.apply(this, arguments);
+      try {
+        const clone = res.clone();
+        clone.text().then(txt => push({ kind: 'fetch', method: (init && init.method) || 'GET', url, headers, body: init && typeof init.body === 'string' ? init.body.slice(0, 20000) : null, status: res.status, ms: Date.now() - t0, contentType: res.headers.get('content-type'), size: txt.length, response: txt.slice(0, MAX_BODY) })).catch(() => {});
+      } catch (e) {}
+      return res;
+    };
+  } catch (e) {}
+})();
+`;
+
+async function loadExtractorScript() {
+  const sources = [
+    process.env.EXTRACTOR_URL || 'https://schicht.vjbackhaus.de/careman-sync.js',
+    process.env.GITHUB_SHA
+      ? `https://raw.githubusercontent.com/Jobacke/Schichttagebuch/${process.env.GITHUB_SHA}/public/careman-sync.js`
+      : null
+  ].filter(Boolean);
+  for (const url of sources) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      const r = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, { signal: controller.signal, cache: 'no-store' });
+      clearTimeout(timer);
+      if (r.ok) {
+        const txt = await r.text();
+        if (looksLikeExtractor(txt)) {
+          console.log(`   Auslese-Skript geladen: ${url.replace(/\?.*$/, '')} (${txt.length} Zeichen)`);
+          return txt;
+        }
+      }
+    } catch {}
+  }
+  try {
+    const local = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'public', 'careman-sync.js');
+    if (fs.existsSync(local)) {
+      const txt = fs.readFileSync(local, 'utf8');
+      if (looksLikeExtractor(txt)) {
+        console.log('   Auslese-Skript aus lokaler Datei geladen.');
+        return txt;
+      }
+    }
+  } catch {}
+  const mod = await import('../src/utils/oneClickCareManSync.js');
+  console.log('   Auslese-Skript aus App-Quellcode geladen.');
+  return mod.SIEDA_EXTRACTOR_SCRIPT;
+}
+
+let debugPort = 0; // set by launchCloudChrome (read from DevToolsActivePort)
 // All credentials come from GitHub Actions secrets (see .github/workflows/careman-cloud.yml):
 //   BRIDGE_GH_TOKEN  – fine-grained token for Jobacke/careman-autopilot-bridge (Issues + Contents read/write)
 //   CAREMAN_USER / CAREMAN_PASS – Johanniter Secure Portal login
@@ -239,7 +339,8 @@ class CdpSession {
 }
 
 async function getActivePageTarget() {
-  const res = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`);
+  if (!debugPort) return null;
+  const res = await fetch(`http://127.0.0.1:${debugPort}/json/list`);
   if (!res.ok) return null;
   const targets = await res.json();
   return targets.find(t =>
@@ -251,6 +352,7 @@ async function getActivePageTarget() {
 
 function findChromeBinary() {
   const candidates = [
+    process.env.CHROME_PATH,
     '/usr/bin/google-chrome',
     '/usr/bin/google-chrome-stable',
     '/usr/bin/chromium-browser',
@@ -258,7 +360,7 @@ function findChromeBinary() {
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
   ];
   for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
+    if (c && fs.existsSync(c)) return c;
   }
   try {
     return execSync('which google-chrome || which chromium-browser || which chromium', { encoding: 'utf8' }).trim();
@@ -267,8 +369,206 @@ function findChromeBinary() {
   }
 }
 
+function listChromeBinaries() {
+  const list = [
+    process.env.CHROME_PATH,
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  ].filter(b => b && fs.existsSync(b));
+  if (list.length === 0) list.push(findChromeBinary());
+  return [...new Set(list)];
+}
+
+/**
+ * Starts a headless Chrome robustly: several binaries / headless modes, free DevTools port
+ * (read from DevToolsActivePort), up to 25 s per attempt, stderr is logged on failure.
+ * Returns { proc, pageTarget, bin } or throws with the collected reasons.
+ */
+async function attachPrelaunchedChrome(startUrl) {
+  const profileDir = process.env.PRELAUNCH_CHROME_PROFILE || '';
+  const pid = parseInt(process.env.PRELAUNCH_CHROME_PID || '0', 10);
+  if (!profileDir || !pid) return null;
+  delete process.env.PRELAUNCH_CHROME_PROFILE; // only once
+  const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  const kill = (sig) => { try { process.kill(pid, sig || 'SIGTERM'); } catch {} };
+  const t0 = Date.now();
+  let pageTarget = null;
+  while (Date.now() - t0 < 30000 && alive()) {
+    try {
+      if (!debugPort) {
+        const portFile = path.join(profileDir, 'DevToolsActivePort');
+        if (fs.existsSync(portFile)) {
+          const port = parseInt(fs.readFileSync(portFile, 'utf8').split('\n')[0], 10);
+          if (port > 0) debugPort = port;
+        }
+      }
+      pageTarget = await getActivePageTarget();
+      if (pageTarget) break;
+    } catch {}
+    await sleep(100);
+  }
+  if (!pageTarget) {
+    console.log(`⚠️ Vorab gestartetes Chrome nicht erreichbar (${alive() ? 'keine DevTools-Verbindung' : 'beendet'}) – starte neu.`);
+    try {
+      const logFile = path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'cm-chrome.log');
+      const lines = fs.readFileSync(logFile, 'utf8').split('\n').filter(Boolean).slice(-12);
+      if (lines.length) console.log('   Chrome-Ausgabe:\n   ' + lines.join('\n   '));
+    } catch {}
+    kill('SIGKILL');
+    debugPort = 0;
+    return null;
+  }
+  console.log(`✅ Chrome läuft (vorab gestartet, Port ${debugPort}, ${Date.now() - t0} ms Wartezeit im Runner).`);
+  if (startUrl && (!pageTarget.url || /^about:blank/i.test(pageTarget.url))) {
+    try {
+      const nav = new CdpSession(pageTarget.webSocketDebuggerUrl);
+      await nav.connect();
+      await nav.send('Page.navigate', { url: startUrl });
+      nav.close();
+    } catch {}
+  }
+  return { proc: { kill }, pageTarget, bin: '/usr/bin/google-chrome' };
+}
+
+async function launchCloudChrome(startUrl) {
+  const pre = await attachPrelaunchedChrome(startUrl).catch(() => null);
+  if (pre) return pre;
+  const binaries = listChromeBinaries();
+  const modes = ['--headless=new', '--headless'];
+  const reasons = [];
+  let attempt = 0;
+
+  for (const bin of binaries) {
+    for (const mode of modes) {
+      if (attempt >= 4) break;
+      attempt++;
+      const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'careman-cloud-profile-'));
+      const stderrLines = [];
+      let exitInfo = null;
+      console.log(`🧭 Chrome-Start Versuch ${attempt}: ${bin} ${mode}`);
+      let proc;
+      try {
+        proc = spawn(bin, [
+          '--remote-debugging-port=0',
+          '--remote-debugging-address=127.0.0.1',
+          `--user-data-dir=${profileDir}`,
+          mode,
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--disable-extensions',
+          '--disable-background-networking',
+          '--password-store=basic',
+          '--use-mock-keychain',
+          '--disable-features=MediaRouter,OptimizationHints,Translate',
+          '--lang=de-DE',
+          '--accept-lang=de-DE,de',
+          '--window-size=1440,900',
+          startUrl
+        ], {
+          stdio: ['ignore', 'ignore', 'pipe'],
+          env: { ...process.env, LANG: 'de_DE.UTF-8', LC_ALL: 'de_DE.UTF-8', TZ: 'Europe/Berlin' }
+        });
+      } catch (err) {
+        reasons.push(`Versuch ${attempt}: Start nicht möglich (${err.message})`);
+        continue;
+      }
+      proc.on('error', err => { exitInfo = `Startfehler ${err.message}`; });
+      proc.on('exit', (code, signal) => { if (exitInfo === null) exitInfo = `beendet (Code ${code}, Signal ${signal})`; });
+      proc.stderr.on('data', d => {
+        String(d).split('\n').filter(Boolean).forEach(line => {
+          stderrLines.push(line);
+          if (stderrLines.length > 25) stderrLines.shift();
+        });
+      });
+
+      let pageTarget = null;
+      for (let i = 0; i < 100 && exitInfo === null; i++) { // up to 25 s
+        await sleep(250);
+        try {
+          if (!debugPort) {
+            const portFile = path.join(profileDir, 'DevToolsActivePort');
+            if (fs.existsSync(portFile)) {
+              const port = parseInt(fs.readFileSync(portFile, 'utf8').split('\n')[0], 10);
+              if (port > 0) debugPort = port;
+            }
+          }
+          pageTarget = await getActivePageTarget();
+          if (pageTarget) break;
+        } catch {}
+      }
+
+      if (pageTarget) {
+        console.log(`✅ Chrome läuft (Port ${debugPort}, Versuch ${attempt}).`);
+        return { proc, pageTarget, bin };
+      }
+
+      const why = exitInfo || 'keine DevTools-Verbindung nach 25 s';
+      reasons.push(`Versuch ${attempt} (${path.basename(bin)} ${mode}): ${why}`);
+      console.log(`⚠️ Chrome-Start Versuch ${attempt} fehlgeschlagen: ${why}`);
+      if (stderrLines.length) console.log('   Chrome-Ausgabe:\n   ' + stderrLines.slice(-12).join('\n   '));
+      try { proc.kill('SIGKILL'); } catch {}
+      debugPort = 0;
+      await sleep(500);
+    }
+  }
+  const msg = 'Cloud-Browser konnte nicht gestartet werden – ' + reasons.join(' | ');
+  if (process.env.CHROME_FALLBACK_AVAILABLE === 'true') {
+    // tells the workflow to install its own Chrome and run again
+    try { fs.writeFileSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'chrome_failed'), msg); } catch {}
+  }
+  throw new Error(msg);
+}
+
+/**
+ * Self-test (workflow input "selftest" or daily schedule): starts Chrome, opens the
+ * Johanniter login and checks that the page renders. Exit code 1 on failure so the
+ * GitHub run turns red and GitHub sends a notification e-mail.
+ */
+async function runSelfTest() {
+  const url = 'https://dienstplan-bayern.secure.johanniter.de/';
+  console.log('🩺 Selbsttest Cloud-Autopilot: starte Chrome und öffne ' + url);
+  let launched = null;
+  try {
+    launched = await launchCloudChrome(url);
+    try {
+      console.log('   Chrome-Version: ' + execSync(`"${launched.bin}" --version`, { encoding: 'utf8' }).trim());
+    } catch {}
+    const cdp = new CdpSession(launched.pageTarget.webSocketDebuggerUrl);
+    await cdp.connect();
+    await cdp.send('Runtime.enable').catch(() => {});
+    let info = null;
+    for (let i = 0; i < 60; i++) {
+      await sleep(1000);
+      info = await cdp.evalInPage(`(() => ({ href: location.href, title: document.title, ready: document.readyState,
+        hasPassword: Boolean(document.querySelector('input[type="password"]')),
+        text: (document.body ? document.body.innerText : '').slice(0, 200) }))()`).catch(() => null);
+      if (info && info.ready === 'complete' && /johanniter/i.test(info.href) && (info.hasPassword || info.text.length > 20)) break;
+    }
+    cdp.close();
+    console.log('   Seite: ' + JSON.stringify(info));
+    if (!info || !/johanniter/i.test(info.href || '')) throw new Error('Johanniter-Seite wurde nicht geladen');
+    const extractor = await loadExtractorScript();
+    if (!looksLikeExtractor(extractor)) throw new Error('Auslese-Skript nicht ladbar');
+    console.log('✅ Selbsttest erfolgreich – Cloud-Browser, Johanniter-Anmeldung und Auslese-Skript verfügbar.');
+  } finally {
+    if (launched) try { launched.proc.kill('SIGKILL'); } catch {}
+  }
+}
+
 async function main() {
   if (process.env.GITHUB_ACTIONS !== 'true' && process.env.FORCE_CLOUD_RUNNER !== '1') {
+    return;
+  }
+
+  if (process.env.CLOUD_SELFTEST === 'true' || process.env.CLOUD_SELFTEST === '1') {
+    await runSelfTest();
     return;
   }
 
@@ -300,15 +600,16 @@ async function main() {
     }
   };
 
-  const patchBridge = async (partialObj) => {
+  // Updates run one after another in the background (keeps their order) – the login loop never waits for GitHub.
+  // "await patchBridge(...)" still waits until this and all earlier updates are written.
+  let patchChain = Promise.resolve();
+  const patchBridge = (partialObj) => {
     bridgeState = { ...bridgeState, ...partialObj };
     delete bridgeState.credsPass; // never store credentials in the issue
     delete bridgeState.credsUser;
-    await fetch(issueUrl, {
-      method: 'PATCH',
-      headers: ghHeaders,
-      body: JSON.stringify({ body: JSON.stringify(bridgeState, null, 2) })
-    }).catch(() => {});
+    const body = JSON.stringify({ body: JSON.stringify(bridgeState, null, 2) });
+    patchChain = patchChain.then(() => fetch(issueUrl, { method: 'PATCH', headers: ghHeaders, body })).catch(() => {});
+    return patchChain;
   };
 
   const createResultBlob = async (jsonStr) => {
@@ -325,7 +626,54 @@ async function main() {
     return d.sha || '';
   };
 
-  const f = (await getBridgeState()) || {};
+  const isPendingJob = st => Boolean(st && st.status === 'requested' && st.requestId &&
+    (Date.now() - Number(st.requestedAt || 0) <= 600000));
+  let f = (await getBridgeState()) || {};
+
+  // Vorstart: Die App startet den Lauf schon beim Öffnen. Chrome lädt die Johanniter-Anmeldung vor,
+  // angemeldet wird aber erst, wenn wirklich ein Abruf angefordert wurde. Ohne Abruf endet der Lauf von selbst.
+  let prewarmed = null;
+  if (process.env.PREWARM === 'true' && !isPendingJob(f)) {
+    const waitMs = 180000;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: 'numeric', day: 'numeric' })
+      .formatToParts(new Date()).reduce((o, p) => { o[p.type] = p.value; return o; }, {});
+    const warmUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${today.year}-${today.month}-${today.day}`;
+    console.log(`🔥 Vorstart: Chrome hält die Anmeldung bereit und wartet bis zu ${waitMs / 1000} s auf einen Abruf …`);
+    prewarmed = await launchCloudChrome(warmUrl).catch(err => {
+      console.log('   Vorstart ohne Chrome: ' + (err.message || err));
+      return null;
+    });
+    const t0 = Date.now();
+    let lastFresh = Date.now();
+    while (Date.now() - t0 < waitMs) {
+      await sleep(1000);
+      const st = await getBridgeState().catch(() => null);
+      if (isPendingJob(st)) {
+        f = st;
+        console.log(`   Abruf eingegangen nach ${((Date.now() - t0) / 1000).toFixed(1)} s Wartezeit.`);
+        break;
+      }
+      // Anmeldeseite frisch halten, damit sie beim Abruf nicht abgelaufen ist
+      if (prewarmed && Date.now() - lastFresh > 75000) {
+        lastFresh = Date.now();
+        try {
+          const target = await getActivePageTarget();
+          if (target) {
+            const nav = new CdpSession(target.webSocketDebuggerUrl);
+            await nav.connect();
+            await nav.send('Page.navigate', { url: warmUrl });
+            nav.close();
+          }
+        } catch {}
+      }
+    }
+    if (!isPendingJob(f)) {
+      console.log('ℹ️ Vorstart beendet – kein Abruf angefordert.');
+      try { fs.unlinkSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'chrome_failed')); } catch {}
+      if (prewarmed) try { prewarmed.proc.kill('SIGKILL'); } catch {}
+      return;
+    }
+  }
   const reqStatus = f.status || '';
   const reqId = f.requestId || '';
   const reqAt = Number(f.requestedAt || 0);
@@ -334,6 +682,9 @@ async function main() {
   const credsUser = String(process.env.CAREMAN_USER || '').trim() || 'johannes.backhaus@johanniter.de';
   const credsPass = String(process.env.CAREMAN_PASS || '');
   const myPlanToken = f.myPlanToken || '';
+  // CareMan's own login (opta data / SIEDA) – separate secrets if it differs from the Johanniter login
+  const siedaUser = String(process.env.CAREMAN_SIEDA_USER || '').trim() || credsUser;
+  const siedaPass = String(process.env.CAREMAN_SIEDA_PASS || '') || credsPass;
 
   const seedMyPlanScript = `
     try {
@@ -347,63 +698,48 @@ async function main() {
     } catch (e) {}
   `;
 
-  if (reqStatus !== 'requested' || !reqId || (Date.now() - reqAt > 180000)) {
+  // GitHub can queue a job for a few minutes – accept requests up to 10 minutes old
+  if (reqStatus !== 'requested' || !reqId || (Date.now() - reqAt > 600000)) {
     console.log('ℹ️ No pending CareMan Cloud Auto-Pilot job – skipping cloud browser run.');
     return;
   }
 
   console.log(`☁️ Starting CareMan Cloud Auto-Pilot for ${ym} (${targetDate}), requestId=${reqId}...`);
-  await patchBridge({
+  patchBridge({
+    resultJson: '',
+    resultBlobSha: '',
     status: 'running',
     stepMessage: `☁️ Cloud-Auto-Pilot verbunden – öffne Johanniter-Anmeldung für ${ym}...`,
     updatedAt: Date.now()
   });
 
   const targetCareManUrl = `https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=${targetDate}`;
-  const profileDir = path.join(os.tmpdir(), `careman-cloud-profile-${Date.now()}`);
-  fs.mkdirSync(profileDir, { recursive: true });
 
-  const chromeBin = findChromeBinary();
-  const proc = spawn(chromeBin, [
-    `--remote-debugging-port=${DEBUG_PORT}`,
-    `--user-data-dir=${profileDir}`,
-    '--headless=new',
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-gpu',
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--lang=de-DE',
-    '--accept-lang=de-DE,de',
-    '--window-size=1440,900',
-    targetCareManUrl
-  ], {
-    stdio: 'ignore',
-    env: {
-      ...process.env,
-      LANG: 'de_DE.UTF-8',
-      LC_ALL: 'de_DE.UTF-8',
-      TZ: 'Europe/Berlin'
-    }
+  // Load the extractor in parallel to the Chrome start (needed only after the login)
+  const extractorPromise = loadExtractorScript().catch(err => {
+    console.error('⚠️ Auslese-Skript konnte nicht geladen werden: ' + (err.message || err));
+    return '';
   });
 
-  let pageTarget = null;
-  for (let i = 0; i < 40; i++) {
-    await sleep(250);
-    try {
-      pageTarget = await getActivePageTarget();
-      if (pageTarget) break;
-    } catch {}
-  }
-
-  if (!pageTarget) {
+  let proc;
+  try {
+    const launched = prewarmed || await launchCloudChrome(targetCareManUrl);
+    proc = launched.proc;
+  } catch (err) {
+    console.error('❌ ' + err.message);
+    if (process.env.CHROME_FALLBACK_AVAILABLE === 'true') {
+      // The workflow installs its own Chrome and starts the runner again – keep the job "requested"
+      await patchBridge({ status: 'requested', stepMessage: '🔧 Cloud-Browser wird neu eingerichtet – einen Moment …', updatedAt: Date.now() });
+      process.exitCode = 3;
+      return;
+    }
     await patchBridge({
       status: 'error',
-      stepMessage: '⚠️ Cloud-Browser konnte nicht gestartet werden.',
+      stepMessage: '⚠️ Cloud-Browser konnte nicht gestartet werden (Server-Problem bei GitHub). Bitte gleich noch einmal versuchen.',
+      error: String(err.message || err).slice(0, 900),
       updatedAt: Date.now()
     });
-    proc.kill('SIGTERM');
+    process.exitCode = 1;
     return;
   }
 
@@ -411,21 +747,34 @@ async function main() {
   let connectedUrl = '';
   let lastExtractorInjectAt = 0;
   let lastPasswordSubmitAt = 0;
+  // Protection against account lockouts: each login form is submitted at most a few times
+  let johanniterSubmits = 0;
+  let siedaSubmits = 0;
+  let aborted = false;
+  const siedaConfigured = Boolean(String(process.env.CAREMAN_SIEDA_PASS || ''));
+  const abortRun = async (msg) => {
+    console.error('⛔ ' + msg);
+    await patchBridge({ status: 'error', noRetry: true, stepMessage: msg, updatedAt: Date.now() });
+    process.exitCode = 1;
+    aborted = true;
+  };
   let last2faSelectAt = 0;
   let lastStepMsg = '';
   let seedAttempts = 0;
+  let monthFixed = false;
 
   const updateStep = async (msg) => {
     if (!msg || msg === lastStepMsg) return;
     lastStepMsg = msg;
     console.log('[Cloud Auto-Pilot]', msg);
-    await patchBridge({
+    patchBridge({
       status: 'running',
       stepMessage: msg,
       updatedAt: Date.now()
     });
   };
 
+  let finished = false;
   try {
     for (let tick = 0; tick < 550; tick++) {
       const latestTarget = await getActivePageTarget().catch(() => null);
@@ -437,10 +786,22 @@ async function main() {
       if (!cdp || latestTarget.webSocketDebuggerUrl !== connectedUrl) {
         if (cdp) cdp.close();
         cdp = new CdpSession(latestTarget.webSocketDebuggerUrl);
-        await cdp.connect();
+        try {
+          await cdp.connect();
+        } catch (err) {
+          // page is navigating – just try again on the next tick
+          console.log('   CDP-Verbindung wird neu aufgebaut: ' + (err.message || err));
+          cdp = null;
+          connectedUrl = '';
+          await sleep(500);
+          continue;
+        }
         await cdp.send('Page.enable').catch(() => {});
         await cdp.send('Runtime.enable').catch(() => {});
         await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: seedMyPlanScript }).catch(() => {});
+        if (process.env.CAPTURE_API === 'true') {
+          await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: CAPTURE_SCRIPT }).catch(() => {});
+        }
         connectedUrl = latestTarget.webSocketDebuggerUrl;
       }
 
@@ -470,15 +831,51 @@ async function main() {
       }
 
       if (pageState.daemonResult && pageState.daemonResult.length > 20) {
-        const blobSha = await createResultBlob(pageState.daemonResult);
-        await patchBridge({
+        let captureBlobSha = '';
+        if (process.env.CAPTURE_API === 'true') {
+          try {
+            const cap = await cdp.evalInPage(`JSON.stringify({ capturedAt: Date.now(), href: location.href, calls: window.__CM_CAPTURE || [] })`);
+            if (cap) {
+              captureBlobSha = await createResultBlob(cap).catch(() => '');
+              const n = (() => { try { return JSON.parse(cap).calls.length; } catch { return 0; } })();
+              console.log(`   API-Mitschnitt: ${n} Aufrufe gespeichert (privat in der Bridge).`);
+            }
+          } catch (err) {
+            console.log('   API-Mitschnitt nicht möglich: ' + (err.message || err));
+          }
+        }
+        const doneFields = {
           status: 'done',
           stepMessage: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...`,
-          resultBlobSha: blobSha,
+          ...(captureBlobSha ? { captureBlobSha, captureAt: Date.now() } : {}),
           ...(pageState.freshMyPlanToken ? { myPlanToken: pageState.freshMyPlanToken } : {}),
           updatedAt: Date.now()
-        });
-        console.log('✅ Cloud Auto-Pilot finished successfully! blobSha=' + blobSha);
+        };
+        // Schnell: Ergebnis direkt in die (private) Bridge schreiben – die App braucht dann keinen zweiten Abruf.
+        let blobSha = '';
+        let inlineOk = false;
+        await patchChain; // laufende Statusmeldungen zuerst abschließen
+        const inlineState = { ...bridgeState, ...doneFields, resultJson: pageState.daemonResult, resultBlobSha: '' };
+        delete inlineState.credsPass;
+        delete inlineState.credsUser;
+        const inlineBody = JSON.stringify({ body: JSON.stringify(inlineState) });
+        if (inlineBody.length < 60000) {
+          for (let tryNo = 0; tryNo < 2 && !inlineOk; tryNo++) {
+            const r = await fetch(issueUrl, { method: 'PATCH', headers: ghHeaders, body: inlineBody }).catch(() => null);
+            inlineOk = Boolean(r && r.ok);
+            if (!inlineOk) await sleep(800);
+          }
+          if (inlineOk) bridgeState = inlineState;
+        }
+        if (!inlineOk) {
+          for (let tryNo = 0; tryNo < 3 && !blobSha; tryNo++) {
+            blobSha = await createResultBlob(pageState.daemonResult).catch(() => '');
+            if (!blobSha) await sleep(1500);
+          }
+          await patchBridge({ ...doneFields, resultJson: '', resultBlobSha: blobSha });
+        }
+        console.log('✅ Cloud Auto-Pilot finished successfully! ' + (inlineOk ? 'Ergebnis direkt in der Bridge' : 'blobSha=' + blobSha));
+        finished = true;
         break;
       }
 
@@ -530,9 +927,15 @@ async function main() {
           continue;
         }
 
-        if (pageState.hasPassInput && credsPass && Date.now() - lastPasswordSubmitAt > 3000) {
+        if (pageState.hasPassInput && johanniterSubmits >= 2 && Date.now() - lastPasswordSubmitAt > 20000) {
+          await abortRun('⛔ Johanniter-Anmeldung wurde abgelehnt. Bitte das Passwort im GitHub-Secret CAREMAN_PASS prüfen – zum Schutz vor einer Kontosperre wird nicht weiter probiert.');
+          break;
+        }
+
+        if (pageState.hasPassInput && credsPass && johanniterSubmits < 2 && Date.now() - lastPasswordSubmitAt > 8000) {
           await updateStep(`🔐 Trage Benutzername & Passwort in der Cloud ein und klicke auf Anmelden...`);
           lastPasswordSubmitAt = Date.now();
+          johanniterSubmits++;
           await cdp.evalInPage(`(async () => {
             const sleep = ms => new Promise(r => setTimeout(r, ms));
             const fillField = (el, val) => {
@@ -578,8 +981,16 @@ async function main() {
             })()`).catch(() => {});
             await sleep(800);
             continue;
-          } else if (pageState.hasPassInput && credsPass && Date.now() - lastPasswordSubmitAt > 3000) {
+          } else if (pageState.hasPassInput && !siedaConfigured) {
+            await abortRun('⛔ CareMan verlangt eine eigene Anmeldung (opta data), aber die Secrets CAREMAN_SIEDA_USER / CAREMAN_SIEDA_PASS fehlen. Bitte bei GitHub hinterlegen.');
+            break;
+          } else if (pageState.hasPassInput && siedaSubmits >= 1 && Date.now() - lastPasswordSubmitAt > 20000) {
+            await abortRun('⛔ CareMan-Anmeldung (opta data) wurde abgelehnt. Bitte CAREMAN_SIEDA_USER / CAREMAN_SIEDA_PASS prüfen – zum Schutz vor einer Kontosperre wird nicht weiter probiert.');
+            break;
+          } else if (pageState.hasPassInput && siedaPass && siedaSubmits < 1) {
             lastPasswordSubmitAt = Date.now();
+            siedaSubmits++;
+            await updateStep('🔐 CareMan-Anmeldung (opta data) – trage Anmeldename & Passwort ein …');
             await cdp.evalInPage(`(async () => {
               const sleep = ms => new Promise(r => setTimeout(r, ms));
               const fillField = (el, val) => {
@@ -598,9 +1009,9 @@ async function main() {
               const passInput = document.querySelector('input[type="password"]');
               const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="password"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"])'));
               const userInput = allInputs[0];
-              if (userInput) fillField(userInput, ${JSON.stringify(credsUser)});
+              if (userInput) fillField(userInput, ${JSON.stringify(siedaUser)});
               await sleep(80);
-              if (passInput) fillField(passInput, ${JSON.stringify(credsPass)});
+              if (passInput) fillField(passInput, ${JSON.stringify(siedaPass)});
               await sleep(220);
               const loginBtn = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]')).find(b =>
                 /^(Anmelden|Login|Sign\\s*in|Weiter|Next|OK|Submit)$/i.test((b.innerText || b.value || b.textContent || '').trim())
@@ -612,6 +1023,19 @@ async function main() {
           }
         }
 
+        // Chrome wurde vorab mit dem heutigen Datum geöffnet: steht ein anderer Monat an, einmal auf den Zielmonat wechseln
+        if (!monthFixed && !pageState.extractorRunning) {
+          const dm = String(pageState.href || '').match(/[?&]date=(20\d{2})-(\d{1,2})-\d{1,2}/);
+          const urlYm = dm ? `${dm[1]}-${String(parseInt(dm[2], 10)).padStart(2, '0')}` : '';
+          if (urlYm && urlYm !== ym) {
+            monthFixed = true;
+            await cdp.evalInPage(`window.location.href = ${JSON.stringify(targetCareManUrl)};`).catch(() => {});
+            await sleep(600);
+            continue;
+          }
+          if (urlYm) monthFixed = true;
+        }
+
         if (pageState.bannerText) {
           await updateStep(pageState.bannerText);
         } else {
@@ -620,6 +1044,10 @@ async function main() {
 
         if (!pageState.extractorRunning && pageState.readyState === 'complete' && Date.now() - lastExtractorInjectAt > 4000) {
           const isCareManUiReady = await cdp.evalInPage(`(() => {
+            // Schnellweg: angemeldet bei Dienstplan Bayern reicht – das Skript liest direkt über die Schnittstelle
+            try {
+              if (/dienstplan-bayern\\.secure\\.johanniter\\.de$/i.test(location.hostname) && localStorage.getItem('myPlanToken')) return true;
+            } catch (e) {}
             const txt = (document.body?.innerText || '');
             return /\\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|April|May|June|July|August|September|October|November|December)\\s+20\\d{2}\\b/i.test(txt) ||
               /Planungsgruppe|Abteilungs|Istplan/i.test(txt) ||
@@ -642,12 +1070,28 @@ async function main() {
               window.__CAREMAN_DAEMON_RESULT = null;
               window.name = 'CAREMAN_AUTOPILOT:' + ${JSON.stringify(apPayload)};
             `).catch(() => {});
+            if (!SIEDA_EXTRACTOR_SCRIPT) SIEDA_EXTRACTOR_SCRIPT = await extractorPromise;
+            if (!SIEDA_EXTRACTOR_SCRIPT) {
+              await patchBridge({ status: 'error', stepMessage: '⚠️ Auslese-Skript nicht verfügbar – neuer Versuch …', updatedAt: Date.now() });
+              process.exitCode = 1;
+              aborted = true;
+              break;
+            }
             cdp.evalInPage(SIEDA_EXTRACTOR_SCRIPT, false).catch(() => {});
           }
         }
       }
 
       await sleep(300);
+    }
+    if (!finished && !aborted) {
+      console.error('❌ Zeitüberschreitung – Dienstplan wurde nicht ausgelesen. Letzter Schritt: ' + lastStepMsg);
+      await patchBridge({
+        status: 'error',
+        stepMessage: '⚠️ Zeitüberschreitung beim CareMan-Abruf (letzter Schritt: ' + (lastStepMsg || 'unbekannt') + '). Bitte erneut versuchen.',
+        updatedAt: Date.now()
+      });
+      process.exitCode = 1;
     }
   } catch (err) {
     console.error('Cloud runner loop error:', err);
@@ -656,6 +1100,7 @@ async function main() {
       stepMessage: '⚠️ Cloud-Fehler: ' + (err.message || String(err)),
       updatedAt: Date.now()
     });
+    process.exitCode = 1;
   } finally {
     if (cdp) cdp.close();
     try { proc.kill('SIGTERM'); } catch {}
@@ -664,4 +1109,5 @@ async function main() {
 
 main().catch(err => {
   console.error('Cloud runner error:', err);
+  process.exitCode = 1;
 });

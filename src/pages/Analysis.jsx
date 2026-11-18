@@ -6,7 +6,11 @@ import { getShiftColor, STATION_THEMES } from '../utils/shiftColors';
 import { resolveShiftDetails } from '../utils/shiftDisplay';
 import { openCareManLiveWindow } from '../utils/oneClickCareManSync';
 import ShiftRhythmCalendar from '../components/ShiftRhythmCalendar';
+import IosCalendarExportModal from '../components/IosCalendarExportModal';
+import CalendarTransferButton from '../components/CalendarTransferButton';
+import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, X, SlidersHorizontal, ExternalLink } from 'lucide-react';
+import useCareManPrewarm from '../hooks/useCareManPrewarm';
 
 // Helper for CSS Date controls
 const addMonths = (date, n) => {
@@ -17,6 +21,7 @@ const addMonths = (date, n) => {
 };
 
 export default function Analysis() {
+    useCareManPrewarm();
     const { store, toggleShiftBonus } = useStore();
     // Use the decoupled logic hook
     const logic = useAnalysisLogic();
@@ -63,6 +68,33 @@ export default function Analysis() {
     const currentYearMonthStr = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}`;
     const currentMonthLabel = baseDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
 
+    // „In Kalender übertragen“ – immer für den aktuell gewählten Monat
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(() => searchParams.get('openCalendarExport') === '1');
+    const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') || false);
+    const calendarMonthShifts = useMemo(
+        () => (store.shifts || []).filter(s => s.date && s.date.startsWith(currentYearMonthStr)),
+        [store.shifts, currentYearMonthStr]
+    );
+
+    // Rückkehr vom iOS-Kurzbefehl (?month=YYYY-MM&openCalendarExport=1&cleared=…): Monat setzen und Dialog öffnen
+    useEffect(() => {
+        const paramMonth = searchParams.get('month');
+        if (paramMonth && /^\d{4}-\d{2}$/.test(paramMonth)) {
+            const [y, m] = paramMonth.split('-').map(Number);
+            if (y && m >= 1 && m <= 12 && (baseDate.getFullYear() !== y || baseDate.getMonth() !== m - 1)) {
+                setBaseDate(new Date(y, m - 1, 1));
+                setFilterMode('month');
+            }
+        }
+        if (searchParams.get('openCalendarExport') === '1') {
+            setIsCalendarExportModalOpen(true);
+            if (searchParams.get('cleared')) {
+                setCalendarJustCleared(searchParams.get('cleared'));
+            }
+        }
+    }, [searchParams]);
+
     // Nach einem 1-Klick-CareMan-Import auf den importierten Monat springen
     useEffect(() => {
         const onSynced = (e) => {
@@ -85,12 +117,17 @@ export default function Analysis() {
     return (
         <div className="page-content">
             {/* Header */}
-            {/* Kopfzeile: Titel links | DP laden Mitte | Dienstplan PDF rechts */}
+            {/* Kopfzeile: Titel links | DP laden · In Kalender übertragen · Dienstplan PDF */}
             <div className="plan-header">
                 <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     Mein Plan
                 </h1>
                 <DpLoadButton yearMonth={currentYearMonthStr} monthLabel={currentMonthLabel} />
+                <CalendarTransferButton
+                    onClick={() => setIsCalendarExportModalOpen(true)}
+                    count={calendarMonthShifts.length}
+                    monthLabel={currentMonthLabel}
+                />
                 <button
                     type="button"
                     onClick={handleExportPDF}
@@ -801,6 +838,23 @@ export default function Analysis() {
                 </div>
             )}
 
+            {/* Kalender-Übertragung (Google-Kalender / iOS) für den gewählten Monat */}
+            <IosCalendarExportModal
+                isOpen={isCalendarExportModalOpen}
+                onClose={() => {
+                    setIsCalendarExportModalOpen(false);
+                    setCalendarJustCleared(false);
+                    if (searchParams.get('openCalendarExport') || searchParams.get('cleared') || searchParams.get('clearFailed')) {
+                        setSearchParams({});
+                    }
+                }}
+                shifts={calendarMonthShifts}
+                currentMonthLabel={currentMonthLabel}
+                yearMonth={currentYearMonthStr}
+                storeSettings={store.settings}
+                initialCleared={calendarJustCleared}
+                shiftsReady={Boolean(store?.shiftsSynced) && !store?.loading}
+            />
         </div>
     );
 }

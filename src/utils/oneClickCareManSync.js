@@ -494,6 +494,76 @@ export async function importCareManPayloadAndSync({
  * 3. Automatically opens Dienstplan Bayern for the selected month (`https://dienstplan-bayern.secure.johanniter.de/app/home/(calendar//panel:entries)?date=YYYY-M-D`)
  * 4. Automatically extracts all 3 stations (Rettungswache München, Rettungswache Obersendling, Rettungswache Hohenbrunn) + personal shifts and transfers them into the App.
  */
+const SIRI_ABRUF_KEY = 'careman_siri_abruf';
+const SIRI_ABRUF_MAX_AGE = 10 * 60 * 1000;
+
+/** Liegt ein Abruf per Sprachbefehl (/?abruf=1) vor, der noch nicht gestartet wurde? */
+export function hasPendingSiriAbruf() {
+  if (typeof window === 'undefined') return false;
+  if (window.__CAREMAN_SIRI_ABRUF) return true;
+  try {
+    const at = Number(sessionStorage.getItem(SIRI_ABRUF_KEY) || 0);
+    return at > 0 && Date.now() - at < SIRI_ABRUF_MAX_AGE;
+  } catch {
+    return false;
+  }
+}
+
+/** Holt den Sprachbefehl-Auftrag ab (nur einmal) – true, wenn jetzt abgerufen werden soll. */
+export function consumeSiriAbruf() {
+  const pending = hasPendingSiriAbruf();
+  if (typeof window !== 'undefined') window.__CAREMAN_SIRI_ABRUF = false;
+  try { sessionStorage.removeItem(SIRI_ABRUF_KEY); } catch { /* ignore */ }
+  return pending;
+}
+
+const PREWARM_KEY = 'careman_cloud_prewarm_at';
+const LAST_CLOUD_SYNC_KEY = 'careman_cloud_last_sync_at';
+let prewarmInFlight = false;
+
+function isMacDesktopBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isTouchDevice = Number(navigator.maxTouchPoints) > 1;
+  return /Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad|iPod|Mobile/i.test(ua) && !isTouchDevice;
+}
+
+/**
+ * Vorstart des Cloud-Autopilots (nur iPhone/Mobil, wo der Abruf über die Cloud läuft):
+ * startet den GitHub-Lauf schon beim Öffnen der Seite. Chrome lädt die Johanniter-Anmeldung vor und wartet
+ * bis zu 3 Minuten – angemeldet wird erst nach dem Tippen auf „Dienstplan abrufen“. Höchstens alle 2,5 Minuten,
+ * und nicht in den ersten 10 Minuten nach einem Abruf.
+ */
+export async function prewarmCareManCloud() {
+  try {
+    if (typeof window === 'undefined' || prewarmInFlight || isMacDesktopBrowser()) return;
+    // Beim Start per Sprachbefehl folgt sofort der echte Abruf – kein zusätzlicher Vorstart nötig
+    if (hasPendingSiriAbruf()) return;
+    const now = Date.now();
+    const lastWarm = Number(localStorage.getItem(PREWARM_KEY) || 0);
+    const lastSync = Number(localStorage.getItem(LAST_CLOUD_SYNC_KEY) || 0);
+    if (now - lastWarm < 150000 || now - lastSync < 600000) return;
+    prewarmInFlight = true;
+    const { getBridgeToken } = await import('./integrationSecrets.js');
+    const token = await getBridgeToken();
+    if (!token) return;
+    const r = await fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/careman-cloud.yml/dispatches', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { prewarm: 'true' } })
+    }).catch(() => null);
+    if (r && r.status === 204) localStorage.setItem(PREWARM_KEY, String(Date.now()));
+  } catch {
+    /* Vorstart ist nur eine Beschleunigung – Fehler sind egal */
+  } finally {
+    prewarmInFlight = false;
+  }
+}
+
 export function openCareManLiveWindow(targetYearMonth) {
   const now = new Date();
   const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -596,6 +666,7 @@ export function openCareManLiveWindow(targetYearMonth) {
 
     let stopped = false;
     const reqId = `ip_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    try { localStorage.setItem(LAST_CLOUD_SYNC_KEY, String(Date.now())); } catch { /* ignore */ }
     const bridgeIssueUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1';
     const bridgeBlobsUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/git/blobs';
 
@@ -644,11 +715,38 @@ export function openCareManLiveWindow(targetYearMonth) {
     }
 
     (async () => {
+      const MAX_ATTEMPTS = 3;
+      const showMsg = (text, tone = 'info') => {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        if (tone === 'error') {
+          msgEl.style.borderColor = '#ef4444';
+          msgEl.style.color = '#f87171';
+        } else if (tone === 'warn') {
+          msgEl.style.borderColor = '#f59e0b';
+          msgEl.style.color = '#fbbf24';
+        } else {
+          msgEl.style.borderColor = 'rgba(56,189,248,0.35)';
+          msgEl.style.color = '#e2e8f0';
+        }
+      };
+      const finalFailure = (text) => {
+        if (spinEl) spinEl.style.display = 'none';
+        showMsg(text, 'error');
+        if (fallbackBtn) {
+          fallbackBtn.textContent = 'Stattdessen direkt im Browser mit Lesezeichen abrufen';
+          fallbackBtn.style.fontSize = '13.5px';
+        }
+      };
+
       try {
         // GitHub token comes from the user's private Firestore area (Settings), never from the source code
         const { getBridgeToken } = await import('./integrationSecrets.js');
         ghToken = await getBridgeToken();
-        if (!ghToken) throw new Error('Kein GitHub-Token für den Cloud-Autopilot hinterlegt (Einstellungen)');
+        if (!ghToken) {
+          finalFailure('⚠️ Kein GitHub-Token für den Cloud-Autopilot hinterlegt (Einstellungen → Verbindungen).');
+          return;
+        }
 
         const ghHeaders = {
           'Authorization': `Bearer ${ghToken}`,
@@ -656,119 +754,156 @@ export function openCareManLiveWindow(targetYearMonth) {
           'Content-Type': 'application/json'
         };
 
-        let existingState = {};
-        try {
-          const curRes = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, {
-            cache: 'no-store',
-            headers: ghHeaders
-          });
-          if (curRes.ok) {
-            const curIssue = await curRes.json();
-            existingState = JSON.parse(curIssue.body || '{}');
+        const readBridge = async () => {
+          const r = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, { cache: 'no-store', headers: ghHeaders });
+          if (!r.ok) {
+            const err = new Error(`Bridge nicht lesbar (HTTP ${r.status})`);
+            err.httpStatus = r.status;
+            throw err;
           }
-        } catch {}
-
-        const nextState = {
-          ...existingState,
-          requestId: reqId,
-          status: 'requested',
-          stepMessage: `☁️ Starte 24/7 Cloud-Auto-Pilot für ${ym} (dauert ca. 10–15s)...`,
-          ym,
-          targetDate,
-          resultBlobSha: '',
-          error: '',
-          requestedAt: Date.now(),
-          updatedAt: Date.now()
+          const iss = await r.json();
+          try { return JSON.parse(iss.body || '{}'); } catch { return {}; }
         };
-        // Credentials never belong into the bridge issue
-        delete nextState.credsPass;
-        delete nextState.credsUser;
 
-        const patchRes = await fetch(bridgeIssueUrl, {
-          method: 'PATCH',
-          headers: ghHeaders,
-          body: JSON.stringify({ body: JSON.stringify(nextState, null, 2) })
-        });
-        if (!patchRes.ok) throw new Error('Cloud-Bridge Request fehlgeschlagen');
+        // Starts one cloud run; returns 'done' | 'retry' | 'fatal'
+        const runAttempt = async (attemptNo) => {
+          const attemptReqId = attemptNo === 1 ? reqId : `${reqId}_r${attemptNo}`;
+          const label = attemptNo > 1 ? ` (Versuch ${attemptNo}/${MAX_ATTEMPTS})` : '';
 
-        if (msgEl) {
-          msgEl.textContent = nextState.stepMessage;
-        }
-
-        // Starte sofort den 24/7 GitHub Cloud-Auto-Pilot-Server (unabhängig vom Mac!)
-        fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/careman-cloud.yml/dispatches', {
-          method: 'POST',
-          headers: ghHeaders,
-          body: JSON.stringify({ ref: 'main' })
-        }).catch(() => {});
-
-        for (let tick = 0; tick < 180 && !stopped; tick++) {
-          await new Promise(r => setTimeout(r, 1200));
-          if (stopped) break;
-
-          const pollRes = await fetch(`${bridgeIssueUrl}?t=${Date.now()}`, {
-            cache: 'no-store',
-            headers: ghHeaders
-          });
-          if (!pollRes.ok) continue;
-          const issueData = await pollRes.json();
-          let f = {};
-          try {
-            f = JSON.parse(issueData.body || '{}');
-          } catch {
-            continue;
+          let existingState = {};
+          try { existingState = await readBridge(); } catch (err) {
+            if (err.httpStatus === 401 || err.httpStatus === 403 || err.httpStatus === 404) {
+              finalFailure(`⚠️ GitHub-Token ungültig oder abgelaufen (HTTP ${err.httpStatus}). Bitte in den Einstellungen ein neues Token „CareMan-App“ hinterlegen.`);
+              return 'fatal';
+            }
           }
 
-          const curReqId = f.requestId || '';
-          const curStatus = f.status || '';
-          const stepMsg = f.stepMessage || '';
-          const resultBlobSha = f.resultBlobSha || '';
+          const nextState = {
+            ...existingState,
+            requestId: attemptReqId,
+            status: 'requested',
+            stepMessage: `☁️ Cloud-Autopilot wird gestartet${label} – das dauert meist 30–60 Sekunden …`,
+            ym,
+            targetDate,
+            resultBlobSha: '',
+            resultJson: '',
+            error: '',
+            noRetry: false,
+            requestedAt: Date.now(),
+            updatedAt: Date.now()
+          };
+          // Credentials never belong into the bridge issue
+          delete nextState.credsPass;
+          delete nextState.credsUser;
 
-          if (curReqId === reqId && stepMsg && msgEl) {
-            msgEl.textContent = stepMsg;
+          const patchRes = await fetch(bridgeIssueUrl, {
+            method: 'PATCH',
+            headers: ghHeaders,
+            body: JSON.stringify({ body: JSON.stringify(nextState, null, 2) })
+          }).catch(() => null);
+          if (!patchRes || !patchRes.ok) {
+            if (patchRes && (patchRes.status === 401 || patchRes.status === 403)) {
+              finalFailure('⚠️ GitHub-Token hat keine Schreibrechte für die Bridge. Bitte Token „CareMan-App“ prüfen (Issues: Lesen und Schreiben).');
+              return 'fatal';
+            }
+            showMsg(`⚠️ Verbindung zur Cloud gestört${label} – neuer Versuch …`, 'warn');
+            return 'retry';
+          }
+          showMsg(nextState.stepMessage);
+
+          // Start the GitHub Cloud-Autopilot (independent of the Mac)
+          const dispatch = async () => {
+            const r = await fetch('https://api.github.com/repos/Jobacke/Schichttagebuch/actions/workflows/careman-cloud.yml/dispatches', {
+              method: 'POST',
+              headers: ghHeaders,
+              body: JSON.stringify({ ref: 'main' })
+            }).catch(() => null);
+            return r ? r.status : 0;
+          };
+          const dispatchStatus = await dispatch();
+          if (dispatchStatus === 401 || dispatchStatus === 403 || dispatchStatus === 404) {
+            finalFailure(`⚠️ Cloud-Autopilot konnte nicht gestartet werden (HTTP ${dispatchStatus}). Token „CareMan-App“ braucht für Schichttagebuch das Recht „Actions: Lesen und Schreiben“.`);
+            return 'fatal';
           }
 
-          if (curReqId === reqId && curStatus === 'done' && (resultBlobSha || (f.resultJson && f.resultJson.length > 20))) {
-            let resJson = f.resultJson || '';
-            if (resultBlobSha && !resJson) {
-              const blobRes = await fetch(`${bridgeBlobsUrl}/${resultBlobSha}`, {
-                cache: 'no-store',
-                headers: ghHeaders
-              });
-              if (blobRes.ok) {
-                const blobData = await blobRes.json();
-                const b64 = (blobData.content || '').replace(/\s+/g, '');
-                const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-                resJson = new TextDecoder('utf-8').decode(bytes);
+          // Poll up to ~9 minutes (login + Airlock confirmation can take a while)
+          const startedAt = Date.now();
+          let redispatched = false;
+          while (!stopped && Date.now() - startedAt < 9 * 60 * 1000) {
+            await new Promise(r => setTimeout(r, 1000));
+            if (stopped) break;
+
+            let f;
+            try { f = await readBridge(); } catch { continue; }
+            if (f.requestId !== attemptReqId) continue;
+
+            const curStatus = f.status || '';
+            const stepMsg = f.stepMessage || '';
+            if (stepMsg && curStatus === 'running') showMsg(stepMsg + label);
+
+            // Nobody picked up the job after 3 minutes: start the workflow once more
+            if (curStatus === 'requested' && !redispatched && Date.now() - startedAt > 3 * 60 * 1000) {
+              redispatched = true;
+              showMsg(`⏳ GitHub startet den Cloud-Autopilot verzögert – ich stoße ihn erneut an${label} …`, 'warn');
+              await dispatch();
+            }
+
+            if (curStatus === 'done' && (f.resultBlobSha || (f.resultJson && f.resultJson.length > 20))) {
+              let resJson = f.resultJson || '';
+              if (f.resultBlobSha && !resJson) {
+                for (let i = 0; i < 3 && !resJson; i++) {
+                  const blobRes = await fetch(`${bridgeBlobsUrl}/${f.resultBlobSha}`, { cache: 'no-store', headers: ghHeaders }).catch(() => null);
+                  if (blobRes && blobRes.ok) {
+                    const blobData = await blobRes.json();
+                    const b64 = (blobData.content || '').replace(/\s+/g, '');
+                    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                    resJson = new TextDecoder('utf-8').decode(bytes);
+                  } else {
+                    await new Promise(r => setTimeout(r, 1500));
+                  }
+                }
+              }
+              if (resJson && resJson.length > 20) {
+                stopped = true;
+                if (msgEl) {
+                  msgEl.style.borderColor = '#10b981';
+                  msgEl.style.color = '#34d399';
+                  msgEl.textContent = `✅ Alle 3 Wachen (${ym}) geladen – trage Dienste & PartnerInnen ins Journal ein...`;
+                }
+                window.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload: resJson }, '*');
+                setTimeout(() => overlay.remove(), 900);
+                return 'done';
               }
             }
-            if (resJson && resJson.length > 20) {
-              stopped = true;
-              if (msgEl) {
-                msgEl.style.borderColor = '#10b981';
-                msgEl.style.color = '#34d399';
-                msgEl.textContent = `✅ Alle 3 Wachen (${ym}) geladen – trage Dienste & PartnerInnen ins Journal ein...`;
+
+            if (curStatus === 'error') {
+              if (f.noRetry) {
+                // Login was rejected – retrying could lock the account
+                finalFailure(stepMsg || '⛔ Anmeldung abgelehnt.');
+                return 'fatal';
               }
-              window.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload: resJson }, '*');
-              setTimeout(() => overlay.remove(), 900);
-              return;
+              showMsg((stepMsg || '⚠️ Fehler beim Cloud-Abruf.') + label, 'warn');
+              return 'retry';
             }
           }
+          if (stopped) return 'fatal';
+          showMsg(`⚠️ Keine Rückmeldung vom Cloud-Autopilot${label}.`, 'warn');
+          return 'retry';
+        };
 
-          if (curReqId === reqId && curStatus === 'error') {
-            if (spinEl) spinEl.style.display = 'none';
-            if (msgEl) {
-              msgEl.style.borderColor = '#ef4444';
-              msgEl.style.color = '#f87171';
-              msgEl.textContent = stepMsg || '⚠️ Fehler beim Abruf.';
-            }
-            return;
+        for (let attemptNo = 1; attemptNo <= MAX_ATTEMPTS && !stopped; attemptNo++) {
+          const result = await runAttempt(attemptNo);
+          if (result === 'done' || result === 'fatal') return;
+          if (attemptNo < MAX_ATTEMPTS && !stopped) {
+            await new Promise(r => setTimeout(r, 4000));
           }
         }
-      } catch {
         if (!stopped) {
-          overlay.remove();
-          window.location.href = targetCareManUrl;
+          finalFailure(`⚠️ Der Cloud-Abruf hat nach ${MAX_ATTEMPTS} Versuchen nicht geklappt. Du kannst es gleich noch einmal versuchen oder den Plan direkt per Lesezeichen abrufen.`);
+        }
+      } catch (err) {
+        if (!stopped) {
+          finalFailure('⚠️ Unerwarteter Fehler beim Cloud-Abruf: ' + (err?.message || err));
         }
       }
     })();
@@ -1688,6 +1823,353 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       return stepped;
     };
 
+    // Ergebnis an das Schichttagebuch übergeben (gemeinsam für Schnellweg und Klick-Weg)
+    const deliverPayload = async (payload, rosters, yearMonth, monthLabel) => {
+      const json = JSON.stringify(payload);
+      try { window.name = 'CAREMAN_SYNC:' + json; } catch (e) {}
+      if (window.__CAREMAN_DAEMON_MODE) {
+        window.__CAREMAN_DAEMON_RESULT = json;
+        banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+        setStatus(\`✅ \${Math.max(1, rosters.length)} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – kehre zum Schichttagebuch zurück...\`);
+        return;
+      }
+      copySync(json);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try { await navigator.clipboard.writeText(json); } catch (e) {}
+      }
+
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload }, '*');
+        } catch (e) {}
+      }
+
+      // WICHTIG: #careman= IMMER an die Ziel-URL anhängen und direkt /journal?month=YYYY-MM öffnen
+      // (verhindert auf dem iPhone jeden Redirect-Verlust durch <Navigate to="/analysis" replace />)!
+      const encodedHash = encodeURIComponent(json);
+      const targetUrl = 'https://schicht.vjbackhaus.de/journal?month=' + encodeURIComponent(yearMonth) + '&sync=' + Date.now() + '#careman=' + encodedHash;
+
+      banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+      setStatus(\`✅ \${Math.max(1, rosters.length)} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – öffne Schichttagebuch...\`);
+
+      const navLink = document.createElement('a');
+      navLink.href = targetUrl;
+      navLink.target = '_top';
+      navLink.style.display = 'none';
+      document.body.appendChild(navLink);
+      navLink.click();
+      await sleep(150);
+      window.top.location.href = targetUrl;
+      window.location.href = targetUrl;
+    };
+
+    // ============================================================================
+    // SCHNELLWEG: Dienstpläne direkt über die CareMan-Schnittstelle laden (alle 3 Wachen gleichzeitig).
+    // Ergebnis identisch mit dem Auslesen über die Oberfläche. Bei jedem Problem -> klassischer Klick-Weg.
+    // ============================================================================
+    const tryFastApiExtract = async () => {
+      if (!/dienstplan-bayern\\.secure\\.johanniter\\.de$/i.test(location.hostname)) return null;
+      let token = '';
+      try { token = localStorage.getItem('myPlanToken') || ''; } catch (e) {}
+      if (!token) return null;
+
+      // Zielmonat: Auftrag aus der App, sonst Monat aus der Adresse, sonst der sichtbar angezeigte Monat
+      let fastYm = (isFreshAutoPilot && autoPilot.targetYearMonth) || urlYearMonth || '';
+      if (!fastYm) {
+        const vis = getVisibleMonthHeaderInfo();
+        fastYm = (vis && vis.yearMonth) || '';
+      }
+      if (!/^20\\d{2}-\\d{2}$/.test(fastYm)) return null;
+      const fy = parseInt(fastYm.slice(0, 4), 10);
+      const fm = parseInt(fastYm.slice(5, 7), 10);
+      const fastLabel = monthNames[fm - 1] + ' ' + fy;
+      setStatus('⚡ Lade Dienstplan ' + fastLabel + ' direkt aus CareMan (3 Wachen gleichzeitig)...');
+
+      const apiBase = location.origin + '/api/-';
+      const callApi = async (method, path, body, timeoutMs) => {
+        const doCall = async () => {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), timeoutMs || 25000);
+          try {
+            return await fetch(apiBase + path, {
+              method,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'Authorization': 'Bearer ' + token
+              },
+              body: body === undefined ? undefined : JSON.stringify(body),
+              signal: ctrl.signal
+            });
+          } finally {
+            clearTimeout(timer);
+          }
+        };
+        let res = await doCall();
+        if (res.status === 401) {
+          // Sitzung auffrischen (wie die CareMan-App selbst) und einmal wiederholen
+          try {
+            const rr = await fetch(apiBase + '/auth/refreshToken', { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' } });
+            if (rr.ok) {
+              const rj = await rr.json();
+              if (rj && rj.isSuccess && rj.data) {
+                token = rj.data;
+                try { localStorage.setItem('myPlanToken', token); } catch (e) {}
+                res = await doCall();
+              }
+            }
+          } catch (e) {}
+        }
+        if (!res.ok) throw new Error('CareMan-API ' + path + ' HTTP ' + res.status);
+        return res.json();
+      };
+
+      // Mitarbeiter-ID: eigener Vertrag laut CareMan. Eine gespeicherte Auswahl wird schon parallel genutzt
+      // und nur verworfen, wenn CareMan eine andere ID meldet.
+      let storedEmployeeId = 0;
+      try {
+        Object.keys(localStorage).forEach(k => {
+          if (/selectedEmployeeId$/.test(k)) {
+            const v = parseInt(localStorage.getItem(k), 10);
+            if (v > 0) storedEmployeeId = v;
+          }
+        });
+      } catch (e) {}
+      const contractIdPromise = callApi('POST', '/app/initial-preload', undefined, 15000)
+        .then(pre => {
+          const ct = pre && pre.contracts && pre.contracts.data;
+          return (Array.isArray(ct) && ct[0] && ct[0].dbId) ? ct[0].dbId : 0;
+        })
+        .catch(() => 0);
+
+      // Datumsumrechnung (CareMan liefert UTC, Tage gelten in deutscher Zeit)
+      const berlinFmt = new Intl.DateTimeFormat('de-DE', {
+        timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      });
+      const berlinParts = (iso) => {
+        const parts = berlinFmt.formatToParts(new Date(iso));
+        const g = t => (parts.find(p => p.type === t) || {}).value || '';
+        return { y: parseInt(g('year'), 10), m: parseInt(g('month'), 10), d: parseInt(g('day'), 10), hm: g('hour') + ':' + g('minute') };
+      };
+      const berlinMidnightIso = (y, m, d) => {
+        for (const off of [1, 2]) {
+          const iso = new Date(Date.UTC(y, m - 1, d) - off * 3600000).toISOString();
+          const p = berlinParts(iso);
+          if (p.y === y && p.m === m && p.d === d && p.hm === '00:00') return iso;
+        }
+        return new Date(Date.UTC(y, m - 1, d) - 3600000).toISOString();
+      };
+      const lastDay = new Date(fy, fm, 0).getDate();
+      const fromIso = berlinMidnightIso(fy, fm, 1);
+      const toIso = berlinMidnightIso(fy, fm, lastDay);
+      const pad2 = n => String(n).padStart(2, '0');
+
+      const FAST_STATIONS = [
+        { id: 149, name: '61000 Rettungswache München', pattern: /61000.*Rettungswache\\s+M[üu]nchen/i, station: 'Sendling' },
+        { id: 1669, name: '61010 Rettungswache Obersendling', pattern: /61010.*Obersendling/i, station: 'Obersendling' },
+        { id: 151, name: '61300 Rettungswache Hohenbrunn', pattern: /61300.*Hohenbrunn/i, station: 'Hohenbrunn' }
+      ];
+
+      // Dienst-Kürzel genauso aufbereiten wie beim Auslesen der Tabelle
+      const stdPatFast = '(?:RF[MHO]|RS\\\\d?[MHO]|RN[MHO]|RT[1-4]?[MHO]|RC[MHO]|RH[MHO]|KS\\\\d?[MHO]|KF\\\\d?[MHO]|KT\\\\d?[MHO]|KN\\\\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|LGI|BDR)';
+      const preRx = new RegExp('^(RD|RDÜ|ÜB)(' + stdPatFast + ')(\\\\*?)$');
+      const postRx = new RegExp('^(' + stdPatFast + ')(RD|RDÜ|ÜB)(\\\\*?)$');
+      const normCodes = (rawText) => {
+        const raw = String(rawText || '').trim();
+        if (!raw) return [];
+        const cellHasAsterisk = raw.includes('*');
+        const parts = raw.toUpperCase().split(/[,/;\\n\\r\\t]+/).map(p => p.trim()).filter(Boolean);
+        const out = [];
+        parts.forEach(part => {
+          const hasAsterisk = part.includes('*') || cellHasAsterisk;
+          let baseCode = part.replace(/[^A-ZÄÖÜ0-9\\-]/g, '');
+          if (!baseCode || baseCode.length < 2 || baseCode.length > 10 || !/[A-ZÄÖÜ]/i.test(baseCode) || /^KW\\d*$/i.test(baseCode) || baseCode === 'FREI' || baseCode === '00' || baseCode === 'WKS') return;
+          const pm = baseCode.match(preRx);
+          if (pm) {
+            out.push(pm[1] === 'RD' ? 'RDÜ' : pm[1], pm[2] + (pm[3] || (hasAsterisk ? '*' : '')));
+            return;
+          }
+          const sm = baseCode.match(postRx);
+          if (sm) {
+            out.push(sm[1] + (hasAsterisk ? '*' : ''), sm[2] === 'RD' ? 'RDÜ' : sm[2]);
+            return;
+          }
+          if (baseCode.length > 6) return;
+          if (baseCode === 'RD') baseCode = 'RDÜ';
+          out.push(hasAsterisk ? (baseCode + '*') : baseCode);
+        });
+        return out;
+      };
+
+      const toColleagues = (resp) => {
+        const d = resp && resp.data;
+        if (!resp || resp.isSuccess === false || !d || !Array.isArray(d.data)) throw new Error('Unerwartete Antwort');
+        const colleagues = [];
+        d.data.forEach(row => {
+          const name = String((row.item1 && row.item1.name) || '').trim().replace(/\\s+/g, ' ');
+          if (!name.includes(',') || /\\d{2,}/.test(name)) return;
+          if (/^M-J/i.test(name) || /\\b(KTW|RTW|NEF|Ak\\.)\\b/i.test(name)) return;
+          const byDay = {};
+          ((row.item2 && row.item2.data) || []).forEach(e => {
+            if (!e || !e.day || !e.day.date) return;
+            const p = berlinParts(e.day.date);
+            if (p.y !== fy || p.m !== fm) return;
+            (byDay[p.d] = byDay[p.d] || []).push(e.shortName || '');
+          });
+          const shifts = {};
+          Object.keys(byDay).map(Number).sort((a, b) => a - b).forEach(day => {
+            const codes = normCodes(byDay[day].join(','));
+            if (codes.length > 0) shifts[String(day)] = codes.join(',');
+          });
+          if (Object.keys(shifts).length > 0) colleagues.push({ name, shifts });
+        });
+        return colleagues;
+      };
+
+      const loadStation = async (st, employeeId) => {
+        const resp = await callApi('POST', '/team-duty/roster/' + employeeId, {
+          teamDuty: { idPlanninggroup: st.id, namePlanninggroup: st.name, from: fromIso, to: toIso },
+          filterEmployee: 0
+        }, 30000);
+        return toColleagues(resp);
+      };
+
+      // Falls sich die Planungsgruppen-IDs bei CareMan ändern: einmal neu ermitteln
+      let groupsRefreshed = null;
+      const refreshGroups = async (employeeId) => {
+        if (!groupsRefreshed) {
+          groupsRefreshed = callApi('POST', '/team-duty/preload', { employeeId, planningGroup: null, filterEmployee: 0, month: fromIso }, 30000)
+            .then(pre => {
+              const list = (pre && pre.teamDuties && pre.teamDuties.data && pre.teamDuties.data.data) || [];
+              FAST_STATIONS.forEach(st => {
+                const hit = list.find(t => st.pattern.test(t.namePlanninggroup || ''));
+                if (hit) { st.id = hit.idPlanninggroup; st.name = hit.namePlanninggroup; }
+              });
+            })
+            .catch(e => { groupsRefreshed = null; throw e; });
+        }
+        return groupsRefreshed;
+      };
+      const loadStationRobust = async (st, employeeId) => {
+        try {
+          return await loadStation(st, employeeId);
+        } catch (e) {
+          await refreshGroups(employeeId);
+          return loadStation(st, employeeId);
+        }
+      };
+
+      const lastDayIso = fy + '-' + pad2(fm) + '-' + pad2(lastDay) + 'T00:00:00.000Z';
+      const loadAll = async (employeeId) => {
+        const personalPromise = callApi('POST', '/rosters/preload', [
+          { employeeId, begin: fy + '-' + pad2(fm) + '-01T00:00:00.000Z', end: lastDayIso, rosterViewMode: 4 }
+        ], 30000).catch(() => null);
+        const stationResults = await Promise.all(FAST_STATIONS.map(st => loadStationRobust(st, employeeId)));
+        const personalResp = await personalPromise;
+        return { stationResults, personalResp };
+      };
+
+      const t0 = Date.now();
+      let loaded = null;
+      if (storedEmployeeId) {
+        let earlyErr = null;
+        loaded = await loadAll(storedEmployeeId).catch(e => { earlyErr = e; return null; });
+        const contractId = await contractIdPromise;
+        if (contractId && contractId !== storedEmployeeId) loaded = await loadAll(contractId);
+        else if (!loaded) throw earlyErr || new Error('Direktabruf fehlgeschlagen');
+      } else {
+        const contractId = await contractIdPromise;
+        if (!contractId) return null;
+        loaded = await loadAll(contractId);
+      }
+      const stationResults = loaded.stationResults;
+      const personalResp = loaded.personalResp;
+
+      const rosters = FAST_STATIONS.map((st, idx) => ({
+        extractedAt: Date.now(),
+        yearMonth: fastYm,
+        monthLabel: fastLabel,
+        station: st.station,
+        detectedStation: st.station,
+        colleagues: stationResults[idx]
+      }));
+      if (!rosters.some(r => r.colleagues.length > 0)) return null;
+
+      // Eigene Dienstzeiten (wie im Istplan) und reine Istplan-Einträge (z.B. Lehrgänge)
+      const fastPersonalTimes = {};
+      const fastIstShifts = {};
+      let selfName = '';
+      try {
+        const monthEntry = Array.isArray(personalResp)
+          ? (personalResp.find(x => x && x.key && String(x.key.begin || '').startsWith(fastYm)) || personalResp[0])
+          : null;
+        const ru = monthEntry && monthEntry.rosterUrlaubEinsatzwunsch && monthEntry.rosterUrlaubEinsatzwunsch.data;
+        if (ru && Array.isArray(ru.data) && ru.data[0] && ru.data[0].item1) selfName = ru.data[0].item1.name || '';
+        const istValid = /^(RF[MHO]|RS\\d?[MHO]|RN[MHO]|RT\\d?[MHO]|RC[MHO]|RH[MHO]|KS\\d?[MHO]|KF\\d?[MHO]|KT\\d?[MHO]|KN\\d?[MHO]|FFO|NFO|DDM|T[1-4][MHO]|RDÜ?|BDR|LGI|ACLS|PALS|SMT|RAJ|SW\\d?|RZF|R-SAN)\\*?$/i;
+        ((monthEntry && monthEntry.rosterDetails) || []).forEach(rdw => {
+          const rd = rdw && rdw.data && rdw.data.rosterDetails;
+          const key = rdw && rdw.data && rdw.data.key;
+          if (!rd || !key || !key.day) return;
+          const kp = berlinParts(key.day);
+          if (kp.y !== fy || kp.m !== fm) return;
+          const entries = (rd.entries || []).filter(en => en && en.shortName && !['-', '--', '/'].includes(en.shortName) && en.nameShiftType !== 'Fehlzeit Tag');
+          if (entries.length === 0) return;
+          const fp = berlinParts(entries[0].from);
+          const tp = berlinParts(entries[entries.length - 1].to);
+          const dStr = fastYm + '-' + pad2(kp.d);
+          if (!(fp.hm === '00:00' && tp.hm === '00:00')) {
+            fastPersonalTimes[dStr] = { startTime: fp.hm, endTime: tp.hm };
+          }
+          const codes = entries
+            .map(en => String(en.shortName).toUpperCase().replace(/[^A-ZÄÖÜ0-9\\-*]/g, ''))
+            .filter(c => istValid.test(c))
+            .map(c => c.replace(/^RD(\\*?)$/, 'RDÜ$1'));
+          if (codes.length > 0) fastIstShifts[String(kp.d)] = codes.join(',');
+        });
+      } catch (e) {}
+
+      // Reine Istplan-Einträge beim eigenen Namen ergänzen (gleiches Verhalten wie der Klick-Weg)
+      if (Object.keys(fastIstShifts).length > 0) {
+        const selfRx = selfName ? null : /backhaus/i;
+        const isSelf = c => c && c.name && (selfRx ? selfRx.test(c.name) : c.name === selfName);
+        let selfEntry = null;
+        for (const r of rosters) {
+          const found = r.colleagues.find(isSelf);
+          if (found) { selfEntry = found; break; }
+        }
+        if (!selfEntry) {
+          selfEntry = { name: selfName || 'Backhaus, Johannes', shifts: {} };
+          rosters[0].colleagues.unshift(selfEntry);
+        }
+        Object.keys(fastIstShifts).forEach(dayKey => {
+          const already = rosters.some(r => r.colleagues.some(c => isSelf(c) && c.shifts && c.shifts[dayKey]));
+          if (!already) selfEntry.shifts[dayKey] = fastIstShifts[dayKey];
+        });
+      }
+
+      const total = rosters.reduce((n, r) => n + r.colleagues.length, 0);
+      setStatus('⚡ ' + total + ' Einträge aus 3 Wachen in ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s geladen...');
+      return {
+        payload: { multiStation: true, extractedAt: Date.now(), yearMonth: fastYm, monthLabel: fastLabel, rosters, personalTimes: fastPersonalTimes },
+        rosters,
+        yearMonth: fastYm,
+        monthLabel: fastLabel
+      };
+    };
+
+    let fastResult = null;
+    try {
+      fastResult = await tryFastApiExtract();
+    } catch (e) {
+      fastResult = null;
+      setStatus('⚡ Direktabruf nicht möglich (' + (e && e.message ? e.message : e) + ') – lese über die Oberfläche...');
+    }
+    if (fastResult) {
+      await deliverPayload(fastResult.payload, fastResult.rosters, fastResult.yearMonth, fastResult.monthLabel);
+      return;
+    }
+
     // Falls CareMan direkt nach dem Login/Redirect noch lädt, warte kurz bis Kalender oder Planungsgruppe sichtbar sind
     for (let w = 0; w < 36; w++) {
       if (getVisibleMonthHeaderInfo() || findPlanungsgruppeTrigger() || document.querySelectorAll('table tr').length > 2) break;
@@ -2376,42 +2858,7 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
       ? { multiStation: true, extractedAt: Date.now(), yearMonth, monthLabel, rosters, personalTimes }
       : { ...(rosters[0] || { yearMonth, monthLabel, station: 'Sendling', colleagues: [] }), personalTimes, extractedAt: Date.now() };
 
-    const json = JSON.stringify(payload);
-    try { window.name = 'CAREMAN_SYNC:' + json; } catch (e) {}
-    if (window.__CAREMAN_DAEMON_MODE) {
-      window.__CAREMAN_DAEMON_RESULT = json;
-      banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-      setStatus(\`✅ \${Math.max(1, rosters.length)} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – kehre zum Schichttagebuch zurück...\`);
-      return;
-    }
-    copySync(json);
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      try { await navigator.clipboard.writeText(json); } catch (e) {}
-    }
-
-    if (window.opener && !window.opener.closed) {
-      try {
-        window.opener.postMessage({ type: 'CAREMAN_LIVE_SYNC_RESULT', payload }, '*');
-      } catch (e) {}
-    }
-
-    // WICHTIG: #careman= IMMER an die Ziel-URL anhängen und direkt /journal?month=YYYY-MM öffnen
-    // (verhindert auf dem iPhone jeden Redirect-Verlust durch <Navigate to="/analysis" replace />)!
-    const encodedHash = encodeURIComponent(json);
-    const targetUrl = 'https://schicht.vjbackhaus.de/journal?month=' + encodeURIComponent(yearMonth) + '&sync=' + Date.now() + '#careman=' + encodedHash;
-
-    banner.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-    setStatus(\`✅ \${Math.max(1, rosters.length)} \${rosters.length === 1 ? 'Wache' : 'Wachen'} (\${monthLabel}) übertragen – öffne Schichttagebuch...\`);
-
-    const navLink = document.createElement('a');
-    navLink.href = targetUrl;
-    navLink.target = '_top';
-    navLink.style.display = 'none';
-    document.body.appendChild(navLink);
-    navLink.click();
-    await sleep(150);
-    window.top.location.href = targetUrl;
-    window.location.href = targetUrl;
+    await deliverPayload(payload, rosters, yearMonth, monthLabel);
   } catch (err) {
     banner.style.background = '#dc2626';
     setStatus('⚠️ Fehler: ' + err.message);

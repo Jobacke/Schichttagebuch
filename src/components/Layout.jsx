@@ -8,8 +8,13 @@ import { useStore } from '../context/StoreContext';
 import {
     runOneClickCareManSync,
     importCareManPayloadAndSync,
-    looksLikeCareManData
+    looksLikeCareManData,
+    openCareManLiveWindow,
+    consumeSiriAbruf
 } from '../utils/oneClickCareManSync';
+
+// Sprachbefehl / Kurzbefehl („Hey Siri, aktueller Plan“): https://schicht.vjbackhaus.de/?abruf=1
+// Erfasst wird er schon in index.html (vor jeder Weiterleitung); gestartet wird unten, sobald angemeldet.
 
 // Capture #careman=... hash or window.name payload early before any route redirects
 if (typeof window !== 'undefined') {
@@ -69,6 +74,17 @@ export default function Layout() {
     useEffect(() => {
         latestRef.current = { currentUser, store, addShifts, deleteShifts, ensureCodesAndTypes, location, navigate };
     });
+
+    // Abruf per Sprachbefehl: sobald angemeldet, Journal des aktuellen Monats öffnen und denselben
+    // Abruf starten wie „⚡ DP mit neuestem Stand laden“ (danach nur noch Airlock bestätigen).
+    useEffect(() => {
+        if (!currentUser) return;
+        if (!consumeSiriAbruf()) return;
+        const now = new Date();
+        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        latestRef.current.navigate(`/journal?month=${ym}`, { replace: true });
+        openCareManLiveWindow(ym);
+    }, [currentUser]);
 
     const isImportingRef = useRef(false);
     const hasLeftTabRef = useRef(false);

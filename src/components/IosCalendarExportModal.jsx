@@ -25,6 +25,7 @@ import {
   syncMonthToGoogle
 } from '../utils/googleCalendarSync';
 import GoogleCalendarSyncSetup from './GoogleCalendarSyncSetup';
+import { withCurrentPartners } from '../utils/calendarPartners';
 import { createFirestoreCalendarRemote } from '../utils/calendarExportRemote';
 import { getShiftColor } from '../utils/shiftColors';
 import { useAuth } from '../context/AuthContext';
@@ -55,7 +56,7 @@ function readUrlParam(name) {
 
 function IosCalendarExportDialog({
   onClose,
-  shifts = [],
+  shifts: rawShifts = [],
   currentMonthLabel = '',
   yearMonth = '',
   storeSettings = {},
@@ -64,6 +65,8 @@ function IosCalendarExportDialog({
 }) {
   const { currentUser } = useAuth() || {};
   const uid = currentUser?.uid || null;
+  // Always transfer the current PartnerIn from the team roster (short-term changes in CareMan)
+  const shifts = useMemo(() => withCurrentPartners(rawShifts, storeSettings), [rawShifts, storeSettings]);
 
   const [titleFormat, setTitleFormat] = useState(() => getLastExportOptions(yearMonth).titleFormat); // 'codeAndType', 'codeOnly', 'typeAndTimes'
   const [alarmOption, setAlarmOption] = useState(() => getLastExportOptions(yearMonth).alarmOption);
@@ -316,7 +319,7 @@ function IosCalendarExportDialog({
       const result = await syncMonthToGoogle({
         config: syncConfig,
         yearMonth,
-        shifts,
+        shifts: withCurrentPartners(rawShifts, storeSettings),
         storeSettings,
         titleFormat,
         alarmOption

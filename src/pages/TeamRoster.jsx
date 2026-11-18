@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Users, ChevronLeft, ChevronRight, Search,
   UploadCloud, X, CheckCircle2, Sparkles, AlertCircle, AlertTriangle, FileText, FileCode, Clipboard, Copy, Bookmark,
   Calendar, Trash2, FolderOpen, Check, Cloud, RefreshCw, SlidersHorizontal
 } from 'lucide-react';
-import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import ShiftRhythmCalendar from '../components/ShiftRhythmCalendar';
 import {
   getActiveTeamRoster,
@@ -40,15 +39,16 @@ import {
   BOOKMARKLET_CODE
 } from '../utils/oneClickCareManSync';
 import { APP_VERSION } from '../version';
+import useCareManPrewarm from '../hooks/useCareManPrewarm';
 
 export default function TeamRoster() {
+  useCareManPrewarm();
   const { currentUser } = useAuth();
   const { store, addShifts, deleteShifts, ensureCodesAndTypes } = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [cloudSyncing, setCloudSyncing] = useState(false);
   const [isSyncingPersonal, setIsSyncingPersonal] = useState(false);
-  const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(() => searchParams.get('openCalendarExport') === '1');
-  const [calendarJustCleared, setCalendarJustCleared] = useState(() => searchParams.get('cleared') || false);
 
   // Stored rosters list
   const [savedRosters, setSavedRosters] = useState(() => getSavedRosterSummaries());
@@ -593,11 +593,9 @@ export default function TeamRoster() {
       localStorage.setItem('schichten_selected_year_month', paramMonth);
       setRoster(getActiveTeamRoster(paramMonth));
     }
+    // Die Kalender-Übertragung liegt jetzt in „Mein Plan“ und „Journal“: ältere Rücksprung-Links dorthin weiterleiten
     if (searchParams.get('openCalendarExport') === '1') {
-      setIsCalendarExportModalOpen(true);
-      if (searchParams.get('cleared')) {
-        setCalendarJustCleared(searchParams.get('cleared'));
-      }
+      navigate(`/journal?${searchParams.toString()}`, { replace: true });
     }
   }, [searchParams]);
 
@@ -605,39 +603,6 @@ export default function TeamRoster() {
   const myRosterShifts = useMemo(() => {
     return extractPersonalShiftsFromRoster(yearMonth, roster);
   }, [yearMonth, roster]);
-
-  // Shifts prepared for the iOS Calendar Export Modal (uses Journal shifts if already transferred, or builds from Team Roster)
-  const calendarExportShifts = useMemo(() => {
-    const journalMonthShifts = (store?.shifts || []).filter(s => s.date && s.date.startsWith(yearMonth));
-    if (journalMonthShifts.length > 0) {
-      return journalMonthShifts.map(s => {
-        const codeObj = (store?.settings?.shiftCodes || []).find(c => c.id === s.codeId || c.code === s.code);
-        const codeStr = s.code || codeObj?.code || '';
-        const detectedPartner = codeStr ? getPartnersForShiftFromRoster(s.date, codeStr, roster) : '';
-        return {
-          ...s,
-          partner: s.partner || detectedPartner || ''
-        };
-      });
-    }
-
-    return myRosterShifts.map(s => {
-      const partnerStr = s.partner || getPartnersForShiftFromRoster(s.date, s.code, roster) || '';
-      const base = buildShiftFromPreset({
-        dateStr: s.date,
-        code: s.code,
-        partner: partnerStr,
-        storeSettings: store?.settings
-      });
-      return {
-        ...base,
-        id: `shift_${s.date}_${s.code}`,
-        startTime: s.startTime || base.startTime,
-        endTime: s.endTime || base.endTime,
-        partner: partnerStr
-      };
-    });
-  }, [store?.shifts, store?.settings, yearMonth, myRosterShifts, roster]);
 
   // Automatically update partner field ("mit ...") on existing shifts in Journal for a given month
   const autoSyncExistingJournalPartners = async (targetYearMonth, activeRoster) => {
@@ -1691,56 +1656,6 @@ export default function TeamRoster() {
           )}
         </div>
       )}
-
-      {/* Calendar Export Bar */}
-      {calendarExportShifts.length > 0 && (() => {
-        const count = myRosterShifts.length || calendarExportShifts.length;
-        const countText = `${count} ${count === 1 ? 'Dienst' : 'Dienste'}`;
-        return (
-          <div style={{
-            background: 'linear-gradient(135deg, rgb(var(--rgb-info) / 0.14), rgb(var(--rgb-bg) / 0.85))',
-            border: '1px solid rgb(var(--rgb-info) / 0.35)',
-            borderRadius: '14px',
-            padding: '10px 14px',
-            marginBottom: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '10px',
-            flexWrap: 'wrap'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={16} style={{ color: 'var(--c-info)', flexShrink: 0 }} />
-              <div style={{ fontSize: '13px', color: 'var(--color-text-main)', fontWeight: 600 }}>
-                Dein Dienstplan ({countText}, {roster.monthLabel})
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsCalendarExportModalOpen(true)}
-              style={{
-                justifyContent: 'center',
-                background: 'rgb(var(--rgb-warning) / 0.14)',
-                color: 'var(--c-warning)',
-                border: '1px solid rgb(var(--rgb-warning) / 0.38)',
-                borderRadius: '9px',
-                padding: '7px 14px',
-                fontSize: '12.5px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                whiteSpace: 'nowrap'
-              }}
-              title="Persönliche Dienste dieses Monats als .ics-Datei in den Kalender übertragen"
-            >
-              <Calendar size={14} />
-              <span>In Kalender übertragen</span>
-            </button>
-          </div>
-        );
-      })()}
 
       {/* Shifts List: Grouped & Sorted */}
       <div>
@@ -2879,23 +2794,6 @@ export default function TeamRoster() {
         </div>
       )}
 
-      {/* iOS Calendar Export Modal */}
-      <IosCalendarExportModal
-        isOpen={isCalendarExportModalOpen}
-        onClose={() => {
-          setIsCalendarExportModalOpen(false);
-          setCalendarJustCleared(false);
-          if (searchParams.get('openCalendarExport') || searchParams.get('cleared') || searchParams.get('clearFailed')) {
-            setSearchParams({ month: yearMonth });
-          }
-        }}
-        shifts={calendarExportShifts}
-        currentMonthLabel={roster.monthLabel || yearMonth}
-        yearMonth={yearMonth}
-        storeSettings={store?.settings}
-        initialCleared={calendarJustCleared}
-        shiftsReady={Boolean(store?.shiftsSynced) && !store?.loading}
-      />
     </div>
   );
 }

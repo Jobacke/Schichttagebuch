@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Flame, ArrowRight, Lock, Mail } from 'lucide-react';
+import { hasPendingSiriAbruf } from '../utils/oneClickCareManSync';
 
 export default function Login() {
     const { login, register, currentUser, skipLogin } = useAuth();
@@ -75,6 +76,11 @@ export default function Login() {
                     <p style={{ color: 'var(--c-text-subtle)', fontSize: '14px', margin: 0 }}>
                         {isLogin ? 'Melde dich an, um fortzufahren' : 'Starte jetzt mit deiner Planung'}
                     </p>
+                    {hasPendingSiriAbruf() && (
+                        <p style={{ color: 'var(--c-success-strong)', fontSize: '13px', fontWeight: 700, margin: '10px 0 0 0' }}>
+                            🎙️ Sprachbefehl erkannt – nach der Anmeldung startet der Dienstplan-Abruf automatisch.
+                        </p>
+                    )}
                 </div>
 
                 {error && (

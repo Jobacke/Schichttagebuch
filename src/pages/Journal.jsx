@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
+import CalendarTransferButton from '../components/CalendarTransferButton';
 import { getShiftColor } from '../utils/shiftColors';
 import { getPartnersForShiftFromRoster, getIncomingNightShiftForDate } from '../utils/teamRosterParser';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +16,7 @@ import { runOneClickCareManSync, openCareManLiveWindow } from '../utils/oneClick
 import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
 import ShiftRhythmCalendar from '../components/ShiftRhythmCalendar';
 import PeriodStats from '../components/PeriodStats';
+import useCareManPrewarm from '../hooks/useCareManPrewarm';
 
 const JOURNAL_MONTH_STORAGE_KEY = 'schichttagebuch_journal_month';
 
@@ -26,6 +28,7 @@ function parseYearMonthToDate(ymStr) {
 }
 
 export default function Journal() {
+    useCareManPrewarm();
     const { currentUser } = useAuth();
     const { store, addShifts, ensureCodesAndTypes, deleteShifts, toggleShiftBonus } = useStore();
     const navigate = useNavigate();
@@ -475,7 +478,7 @@ export default function Journal() {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <div className="header-actions">
                     <button
                         type="button"
                         onClick={() => openCareManLiveWindow(currentYearMonthStr)}
@@ -500,6 +503,11 @@ export default function Journal() {
                         <ExternalLink size={15} />
                         <span>⚡ DP mit neuestem Stand laden</span>
                     </button>
+                    <CalendarTransferButton
+                        onClick={() => setIsCalendarExportModalOpen(true)}
+                        count={monthShifts.length}
+                        monthLabel={currentMonthLabel}
+                    />
                 </div>
             </div>
 

@@ -894,7 +894,7 @@ function getRosterTimestamp(obj) {
  * Saves a station roster directly to Cloud Firestore under users/{uid}/team_rosters/{yearMonth}_{station}
  */
 export async function saveStationTeamRosterToCloud(rosterData, stationOverride, currentUser) {
-  if (!currentUser || !currentUser.uid || !db || !rosterData || !rosterData.yearMonth) return;
+  if (!currentUser || !currentUser.uid || currentUser.isDefaultUser || !db || !rosterData || !rosterData.yearMonth) return;
   if (isCorruptedIstplanHourRoster(rosterData)) return;
   const station = stationOverride || rosterData.station || detectRosterStation(rosterData);
   const docId = `${rosterData.yearMonth}_${station}`;
@@ -931,7 +931,7 @@ export async function saveStationTeamRosterToCloud(rosterData, stationOverride, 
  * Deletes a specific station's roster from Cloud Firestore
  */
 export async function deleteStationTeamRosterFromCloud(yearMonth, station, currentUser) {
-  if (!currentUser || !currentUser.uid || !db || !yearMonth || !station) return;
+  if (!currentUser || !currentUser.uid || currentUser.isDefaultUser || !db || !yearMonth || !station) return;
   try {
     const docRef = doc(db, 'users', currentUser.uid, 'team_rosters', `${yearMonth}_${station}`);
     await deleteDoc(docRef);
@@ -944,7 +944,7 @@ export async function deleteStationTeamRosterFromCloud(yearMonth, station, curre
  * Deletes all 3 stations' rosters for a month from Cloud Firestore
  */
 export async function deleteTeamRosterFromCloud(yearMonth, currentUser) {
-  if (!currentUser || !currentUser.uid || !db || !yearMonth) return;
+  if (!currentUser || !currentUser.uid || currentUser.isDefaultUser || !db || !yearMonth) return;
   try {
     await Promise.all(
       ROSTER_STATIONS.map(st =>
@@ -962,7 +962,7 @@ export async function deleteTeamRosterFromCloud(yearMonth, currentUser) {
  * - Downloads all newer Firestore rosters into localStorage
  */
 export async function syncTeamRostersWithCloud(currentUser) {
-  if (!currentUser || !currentUser.uid || !db) return { uploaded: 0, downloaded: 0, totalCloud: 0 };
+  if (!currentUser || !currentUser.uid || currentUser.isDefaultUser || !db) return { uploaded: 0, downloaded: 0, totalCloud: 0 };
 
   try {
     const colRef = collection(db, 'users', currentUser.uid, 'team_rosters');
@@ -1098,7 +1098,7 @@ export async function syncTeamRostersWithCloud(currentUser) {
  * Subscribes to real-time changes in Firestore team_rosters collection
  */
 export function subscribeToCloudTeamRosters(currentUser, onChange) {
-  if (!currentUser || !currentUser.uid || !db) return () => {};
+  if (!currentUser || !currentUser.uid || currentUser.isDefaultUser || !db) return () => {};
 
   const colRef = collection(db, 'users', currentUser.uid, 'team_rosters');
   return onSnapshot(colRef, (snapshot) => {

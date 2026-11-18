@@ -8,7 +8,9 @@ export default function Login() {
     const { login, register, currentUser, skipLogin } = useAuth();
     const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
-    const [email, setEmail] = useState('');
+    const [email, setEmail] = useState(() => {
+        try { return localStorage.getItem('schichttagebuch_last_email') || 'johannes@vjbackhaus.com'; } catch { return 'johannes@vjbackhaus.com'; }
+    });
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);

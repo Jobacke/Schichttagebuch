@@ -5,12 +5,53 @@ import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndP
 const AuthContext = createContext();
 
 const REQUIRE_PASSWORD_KEY = 'schichttagebuch_require_password';
+const AUTO_AUTH_KEY = 'schichttagebuch_auto_auth_v1';
 const DEFAULT_JOHANNES_USER = {
     uid: 'johannes_default',
-    email: 'backhaus.johannes@gmail.com',
+    email: 'johannes@vjbackhaus.com',
     displayName: 'Johannes',
     isDefaultUser: true
 };
+
+// Synchronously absorb #board_schicht_auth=... from Board parent window if present
+(function absorbBoardHashAuth() {
+    if (typeof window === 'undefined') return;
+    try {
+        const hash = window.location.hash || '';
+        const m = hash.match(/[#&]board_schicht_auth=([^&]+)/);
+        if (m) {
+            const raw = decodeURIComponent(m[1]);
+            if (raw) {
+                localStorage.setItem(AUTO_AUTH_KEY, raw);
+            }
+            const cleaned = hash
+                .replace(/([#&])board_schicht_auth=[^&]+&?/, '$1')
+                .replace(/[?&]+$/, '');
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search + (cleaned === '#' ? '' : cleaned));
+        }
+    } catch {}
+})();
+
+function saveAutoAuth(email, password) {
+    if (!email || !password) return;
+    try {
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify({ e: email.trim(), p: password }))));
+        localStorage.setItem(AUTO_AUTH_KEY, encoded);
+        if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'board-storage-set', key: AUTO_AUTH_KEY, value: encoded }, '*');
+        }
+    } catch {}
+}
+
+function getSavedAutoAuth() {
+    try {
+        const raw = localStorage.getItem(AUTO_AUTH_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(decodeURIComponent(escape(atob(raw))));
+        if (parsed && parsed.e && parsed.p) return parsed;
+    } catch {}
+    return null;
+}
 
 export function isPasswordRequired() {
     try { return localStorage.getItem(REQUIRE_PASSWORD_KEY) === 'true'; } catch { return false; }
@@ -34,15 +75,58 @@ export function AuthProvider({ children }) {
             setLoading(false);
             return;
         }
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setFirebaseUser(user);
+        let autoLoginAttempted = false;
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
+                setFirebaseUser(user);
                 setForceLogin(false);
-                try { localStorage.setItem('schichttagebuch_last_uid', user.uid); } catch {}
+                try {
+                    localStorage.setItem('schichttagebuch_last_uid', user.uid);
+                    if (user.email) localStorage.setItem('schichttagebuch_last_email', user.email);
+                } catch {}
+                setLoading(false);
+                return;
             }
+            if (!autoLoginAttempted && !isPasswordRequired()) {
+                autoLoginAttempted = true;
+                const saved = getSavedAutoAuth();
+                if (saved) {
+                    try {
+                        await signInWithEmailAndPassword(auth, saved.e, saved.p);
+                        return;
+                    } catch {
+                        // Fall through to default user if background sign-in fails
+                    }
+                }
+            }
+            setFirebaseUser(null);
             setLoading(false);
         });
         return unsubscribe;
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.parent || window.parent === window) return;
+        const onMessage = async (event) => {
+            const data = event.data;
+            if (!data || typeof data !== 'object') return;
+            if (data.type === 'board-storage-value' && data.key === AUTO_AUTH_KEY && data.value) {
+                try {
+                    localStorage.setItem(AUTO_AUTH_KEY, data.value);
+                    if (!auth?.currentUser && !isPasswordRequired()) {
+                        const saved = getSavedAutoAuth();
+                        if (saved) {
+                            await signInWithEmailAndPassword(auth, saved.e, saved.p);
+                        }
+                    }
+                } catch {}
+            }
+        };
+        window.addEventListener('message', onMessage);
+        try {
+            window.parent.postMessage({ type: 'board-storage-get', key: AUTO_AUTH_KEY }, '*');
+        } catch {}
+        return () => window.removeEventListener('message', onMessage);
     }, []);
 
     const setRequirePassword = (val) => {
@@ -50,14 +134,18 @@ export function AuthProvider({ children }) {
         setRequirePasswordState(Boolean(val));
     };
 
-    const login = (email, password) => {
+    const login = async (email, password) => {
         setForceLogin(false);
-        return signInWithEmailAndPassword(auth, email, password);
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        saveAutoAuth(email, password);
+        return cred;
     };
 
-    const register = (email, password) => {
+    const register = async (email, password) => {
         setForceLogin(false);
-        return createUserWithEmailAndPassword(auth, email, password);
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        saveAutoAuth(email, password);
+        return cred;
     };
 
     const logout = async () => {

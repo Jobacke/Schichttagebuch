@@ -1,5 +1,5 @@
 /**
- * Direct sync of the personal shifts into a Google Calendar (e.g. "Familie").
+ * Direct sync of the personal shifts into a Google Calendar (e.g. "Veronika und Johannes").
  *
  * The app talks to a small Google Apps Script web app that runs in the user's own Google
  * account (no server, no OAuth popups in the app). The script creates, updates and deletes
@@ -15,7 +15,25 @@ import { db } from '../firebase';
 import { buildCalendarEvents } from './calendarExport';
 
 const CONFIG_CACHE_KEY = 'schichttagebuch_calendar_sync_config_v1';
+const RENAMED_CALENDAR_NAMES = {
+  'family00451237827764880286@group.calendar.google.com': {
+    oldName: 'familie',
+    newName: 'Veronika und Johannes'
+  }
+};
 export const APPS_SCRIPT_VERSION = 2;
+
+function normalizeRenamedCalendar(cfg) {
+  if (!cfg || !cfg.calendarId) return { cfg, changed: false };
+  const rule = RENAMED_CALENDAR_NAMES[cfg.calendarId];
+  if (rule && String(cfg.calendarName || '').trim().toLowerCase() === rule.oldName) {
+    return {
+      cfg: { ...cfg, calendarName: rule.newName, updatedAt: Date.now() },
+      changed: true
+    };
+  }
+  return { cfg, changed: false };
+}
 
 function configRef(uid) {
   return doc(db, `users/${uid}/data`, 'calendarSync');
@@ -39,11 +57,13 @@ function writeCache(cfg) {
 }
 
 export function getCachedSyncConfig() {
-  return readCache();
+  const { cfg, changed } = normalizeRenamedCalendar(readCache());
+  if (changed) writeCache(cfg);
+  return cfg;
 }
 
 export async function loadSyncConfig(uid) {
-  if (!uid) return readCache();
+  if (!uid) return getCachedSyncConfig();
   try {
     const snap = await getDoc(configRef(uid));
     const remote = snap.exists() ? snap.data() : null;
@@ -51,14 +71,20 @@ export async function loadSyncConfig(uid) {
     // Never lose a locally created key: if the account has nothing (yet) or an older state,
     // keep the local one and upload it
     if (cached && (!remote || Number(cached.updatedAt || 0) > Number(remote.updatedAt || 0))) {
-      setDoc(configRef(uid), cached).catch(() => {});
-      return cached;
+      const { cfg: normalized } = normalizeRenamedCalendar(cached);
+      writeCache(normalized);
+      setDoc(configRef(uid), normalized).catch(() => {});
+      return normalized;
     }
-    writeCache(remote);
-    return remote;
+    const { cfg: normalized, changed } = normalizeRenamedCalendar(remote);
+    writeCache(normalized);
+    if (changed && normalized) {
+      setDoc(configRef(uid), normalized).catch(() => {});
+    }
+    return normalized;
   } catch (err) {
     console.warn('[Kalender-Sync] Einstellungen konnten nicht geladen werden:', err);
-    return readCache();
+    return getCachedSyncConfig();
   }
 }
 
@@ -237,7 +263,7 @@ function syncMonth_(req) {
     }
   });
 
-  var result = { ok: true, created: 0, updated: 0, deleted: 0, unchanged: 0, legacyRemoved: legacy };
+  var result = { ok: true, calendarName: cal.getName(), created: 0, updated: 0, deleted: 0, unchanged: 0, legacyRemoved: legacy };
   var wanted = {};
 
   (req.events || []).forEach(function (d) {

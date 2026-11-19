@@ -54,6 +54,7 @@ export default function GoogleCalendarSyncSetup({ uid, config, onSaved, onClose 
       setCalendars(list);
       const preferred =
         list.find(c => c.id === calendarId) ||
+        list.find(c => (c.name || '').toLowerCase() === 'veronika und johannes') ||
         list.find(c => (c.name || '').toLowerCase() === 'familie') ||
         list[0];
       setCalendarId(preferred?.id || '');

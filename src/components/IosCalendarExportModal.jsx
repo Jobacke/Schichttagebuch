@@ -21,6 +21,7 @@ import {
 import {
   getCachedSyncConfig,
   loadSyncConfig,
+  saveSyncConfig,
   isSyncConfigured,
   syncMonthToGoogle
 } from '../utils/googleCalendarSync';
@@ -324,6 +325,11 @@ function IosCalendarExportDialog({
         titleFormat,
         alarmOption
       });
+      if (result?.calendarName && result.calendarName !== syncConfig?.calendarName) {
+        saveSyncConfig(uid, { calendarName: result.calendarName })
+          .then(updated => setSyncConfig(updated))
+          .catch(() => {});
+      }
       rememberExportOptions(titleFormat, alarmOption);
       setGoogleSync({ status: 'done', result });
     } catch (err) {

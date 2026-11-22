@@ -30,7 +30,8 @@ const CLEAR_TOKEN_MAX_AGE_MS = 30 * 60 * 1000;
 const HISTORY_SCHEMA = 2;
 
 export const DEFAULT_TITLE_FORMAT = 'codeAndType';
-export const DEFAULT_ALARM_OPTION = '1440';
+export const DEFAULT_ALARM_OPTION = '1440_60';
+const DEFAULT_ALARM_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -350,6 +351,7 @@ export function resetMonthExportHistory(yearMonth, extraMeta = {}) {
     resetVersion: nextVersion,
     titleFormat: prev.titleFormat || null,
     alarmOption: prev.alarmOption || null,
+    defaultAlarmVersion: prev.defaultAlarmVersion || null,
     lastClearToken: prev.lastClearToken || null,
     lastClearAt: prev.lastClearAt || null,
     ...extraMeta,
@@ -360,21 +362,38 @@ export function resetMonthExportHistory(yearMonth, extraMeta = {}) {
   return nextVersion;
 }
 
+function resolveSavedAlarm(source) {
+  if (!source || source.alarmOption == null || source.alarmOption === '') return null;
+  const val = String(source.alarmOption);
+  // Migrate legacy default '1440' saved before the default changed to '1440_60'
+  if (val === '1440' && Number(source.defaultAlarmVersion || 0) < DEFAULT_ALARM_VERSION) {
+    return null;
+  }
+  return val;
+}
+
 /** Last used title/alarm settings (per month history first, then global preference). */
 export function getLastExportOptions(yearMonth) {
   const history = yearMonth ? getCalendarExportHistory(yearMonth) : null;
   const prefs = readJson(EXPORT_PREFS_STORAGE_KEY, {}) || {};
+  const prefAlarm = resolveSavedAlarm(prefs);
+  const histAlarm = resolveSavedAlarm(history);
   if (prefs.titleFormat && Number(prefs.savedAt || 0) > entryStamp(history)) {
-    return { titleFormat: prefs.titleFormat, alarmOption: String(prefs.alarmOption ?? DEFAULT_ALARM_OPTION) };
+    return { titleFormat: prefs.titleFormat, alarmOption: prefAlarm ?? DEFAULT_ALARM_OPTION };
   }
   return {
     titleFormat: history?.titleFormat || prefs.titleFormat || DEFAULT_TITLE_FORMAT,
-    alarmOption: String(history?.alarmOption || prefs.alarmOption || DEFAULT_ALARM_OPTION)
+    alarmOption: histAlarm ?? prefAlarm ?? DEFAULT_ALARM_OPTION
   };
 }
 
 function saveExportPrefs(titleFormat, alarmOption) {
-  writeJson(EXPORT_PREFS_STORAGE_KEY, { titleFormat, alarmOption: String(alarmOption), savedAt: Date.now() });
+  writeJson(EXPORT_PREFS_STORAGE_KEY, {
+    titleFormat,
+    alarmOption: String(alarmOption),
+    defaultAlarmVersion: DEFAULT_ALARM_VERSION,
+    savedAt: Date.now()
+  });
 }
 
 /** Remembers title/alarm settings (used by the direct Google sync). */
@@ -642,7 +661,8 @@ export function generateIcsCalendar(shifts, options = {}) {
     saveCalendarExportHistory(yearMonth, nextHistoryItems, {
       resetVersion,
       titleFormat,
-      alarmOption
+      alarmOption,
+      defaultAlarmVersion: DEFAULT_ALARM_VERSION
     });
   }
   saveExportPrefs(titleFormat, alarmOption);

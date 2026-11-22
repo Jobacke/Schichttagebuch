@@ -931,8 +931,8 @@ function IosCalendarExportDialog({
                     outline: 'none'
                   }}
                 >
-                  <option value="1440">1 Tag vorher (Standard)</option>
-                  <option value="1440_60">1 Tag vorher + 1 Std. vorher</option>
+                  <option value="1440_60">1 Tag vorher + 1 Std. vorher (Standard)</option>
+                  <option value="1440">1 Tag vorher</option>
                   <option value="2880">2 Tage vorher</option>
                   <option value="720">12 Stunden vorher</option>
                   <option value="120">2 Stunden vorher</option>

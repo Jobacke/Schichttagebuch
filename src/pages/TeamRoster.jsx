@@ -996,112 +996,45 @@ export default function TeamRoster() {
         </button>
       </div>
 
-      {/* Single-Row Date Stepper (Click on Date = Jump Modal, Filter Button integrated) */}
+      {/* Datumsleiste: Tag blättern · Datum (öffnet Kalender) · Filter. Aktive Filter stehen in einer eigenen Zeile darunter,
+          damit sich in der Leiste nichts überlagert – auch nicht auf schmalen Displays. */}
       {(() => {
         const hasSearch = Boolean(searchQuery.trim());
         const hasTeamFilter = selectedStations.length > 0 || selectedShiftGroup !== 'ALL' || hasSearch;
         const activeCount = (selectedStations.length > 0 ? 1 : 0) + (selectedShiftGroup !== 'ALL' ? 1 : 0) + (hasSearch ? 1 : 0);
+        const isToday = selectedDate === currentTodayStr;
+        const stationNames = { Sendling: 'München', Hohenbrunn: 'Hohenbrunn', Obersendling: 'Obersendling' };
+        const activeFilterParts = [
+          ...(selectedStations.length > 0 ? [selectedStations.map(s => stationNames[s] || s).join(' + ')] : []),
+          ...(selectedShiftGroup !== 'ALL' ? [selectedShiftGroup] : []),
+          ...(hasSearch ? [`„${searchQuery.trim()}“`] : [])
+        ];
 
         return (
           <div className="team-roster-stepper">
-            <button
-              type="button"
-              onClick={handlePrevDay}
-              className="team-roster-stepper-btn"
-              title="Vorheriger Tag"
-            >
-              <ChevronLeft size={20} />
-            </button>
-
-            <button
-              type="button"
-              onClick={openJumpModal}
-              className="team-roster-date-pill"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                minWidth: 0,
-                cursor: 'pointer',
-                borderRadius: '10px',
-                background: 'rgb(var(--rgb-primary) / 0.08)',
-                border: '1px solid rgb(var(--rgb-primary) / 0.3)',
-                color: 'var(--color-text-main)',
-                fontFamily: 'inherit',
-                transition: 'background 0.15s ease'
-              }}
-              title="Tag wählen – Kalender öffnen (auch andere Monate)"
-            >
-              <Calendar size={15} style={{ color: 'var(--c-primary-text)', flexShrink: 0 }} />
-              <span className="team-roster-date-label" style={{ fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap' }}>
-                {formattedSelectedDate}
-              </span>
-              {selectedDate === currentTodayStr && (
-                <span style={{
-                  background: 'rgb(var(--rgb-primary) / 0.2)',
-                  color: 'var(--c-primary)',
-                  border: '1px solid rgb(var(--rgb-primary) / 0.45)',
-                  padding: '1px 5px',
-                  borderRadius: '5px',
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  lineHeight: 1
-                }}>
-                  Heute
-                </span>
-              )}
-            </button>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <div className="team-roster-stepper-row">
               <button
                 type="button"
-                onClick={() => setShowFilterModal(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: hasTeamFilter ? 'rgb(var(--rgb-info) / 0.18)' : 'rgb(var(--rgb-overlay) / 0.05)',
-                  border: hasTeamFilter ? '1px solid rgb(var(--rgb-info) / 0.5)' : '1px solid var(--color-border)',
-                  color: hasTeamFilter ? 'var(--c-info)' : 'var(--color-text-main)',
-                  fontSize: '12px',
-                  fontWeight: hasTeamFilter ? 700 : 600,
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-                title="Nach Kollege, Kürzel, Wache oder Schichtgruppe filtern"
+                onClick={handlePrevDay}
+                className="team-roster-stepper-btn"
+                title="Vorheriger Tag"
+                aria-label="Vorheriger Tag"
               >
-                <SlidersHorizontal size={13} />
-                <span className="team-roster-filter-label">Filter</span>{hasTeamFilter && <span>({activeCount})</span>}
+                <ChevronLeft size={20} />
               </button>
 
-              {hasTeamFilter && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedStations([]);
-                    setSelectedShiftGroup('ALL');
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgb(var(--rgb-danger) / 0.14)',
-                    border: '1px solid rgb(var(--rgb-danger) / 0.35)',
-                    color: 'var(--c-danger)',
-                    padding: '6px 7px',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                  title="Alle Filter & Suche zurücksetzen"
-                >
-                  <X size={13} />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={openJumpModal}
+                className={`team-roster-date-pill${isToday ? ' is-today' : ''}`}
+                title="Tag wählen – Kalender öffnen (auch andere Monate)"
+              >
+                <Calendar size={15} className="team-roster-date-icon" />
+                <span className="team-roster-date-label">{formattedSelectedDate}</span>
+                {isToday && <span className="team-roster-today-badge">Heute</span>}
+              </button>
 
-              {selectedDate !== currentTodayStr && (
+              {!isToday && (
                 <button
                   type="button"
                   onClick={handleToday}
@@ -1111,15 +1044,58 @@ export default function TeamRoster() {
                   Heute
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => setShowFilterModal(true)}
+                className={`team-roster-filter-btn${hasTeamFilter ? ' is-active' : ''}`}
+                title="Nach Kollege, Kürzel, Wache oder Schichtgruppe filtern"
+                aria-label={hasTeamFilter ? `Filter (${activeCount} aktiv)` : 'Filter'}
+              >
+                <SlidersHorizontal size={17} />
+                {hasTeamFilter && <span className="team-roster-filter-count">{activeCount}</span>}
+              </button>
+
               <button
                 type="button"
                 onClick={handleNextDay}
                 className="team-roster-stepper-btn"
                 title="Nächster Tag"
+                aria-label="Nächster Tag"
               >
                 <ChevronRight size={20} />
               </button>
             </div>
+
+            {hasTeamFilter && (
+              <div className="team-roster-active-filter">
+                <button
+                  type="button"
+                  onClick={() => setShowFilterModal(true)}
+                  className="team-roster-active-filter-text"
+                  title="Filter bearbeiten"
+                >
+                  <SlidersHorizontal size={12} style={{ flexShrink: 0 }} />
+                  <span className="team-roster-active-filter-values">
+                    <span className="team-roster-active-filter-prefix">Filter: </span>
+                    {activeFilterParts.join(' · ')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedStations([]);
+                    setSelectedShiftGroup('ALL');
+                  }}
+                  className="team-roster-active-filter-reset"
+                  title="Alle Filter & Suche zurücksetzen"
+                >
+                  <X size={13} />
+                  <span>Zurücksetzen</span>
+                </button>
+              </div>
+            )}
           </div>
         );
       })()}

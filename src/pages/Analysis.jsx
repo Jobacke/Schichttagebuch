@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAnalysisLogic } from '../hooks/useAnalysisLogic';
 import { useStore, getShiftBonusAmount } from '../context/StoreContext';
-import { exportToPDF } from '../utils/pdfExport';
+import { createRosterPDF } from '../utils/pdfExport';
+import PdfPreviewModal from '../components/PdfPreviewModal';
 import { getShiftColor, STATION_THEMES } from '../utils/shiftColors';
 import { resolveShiftDetails } from '../utils/shiftDisplay';
 import { openCareManLiveWindow } from '../utils/oneClickCareManSync';
@@ -46,8 +47,19 @@ export default function Analysis() {
         return baseDate.getFullYear() === now.getFullYear();
     }, [baseDate]);
 
+    const [pdfPreview, setPdfPreview] = useState(null);
+
+    useEffect(() => {
+        const urlToRevoke = pdfPreview?.blobUrl;
+        return () => {
+            if (urlToRevoke) {
+                URL.revokeObjectURL(urlToRevoke);
+            }
+        };
+    }, [pdfPreview]);
+
     const handleExportPDF = () => {
-        exportToPDF({
+        const result = createRosterPDF({
             label,
             stats,
             delta,
@@ -60,6 +72,7 @@ export default function Analysis() {
             shiftCodes: store.settings?.shiftCodes || [],
             allShifts: store.shifts || []
         });
+        setPdfPreview(result);
     };
 
     const [showFilterModal, setShowFilterModal] = useState(false);
@@ -147,7 +160,7 @@ export default function Analysis() {
                         boxShadow: '0 3px 12px rgb(var(--rgb-info) / 0.15)',
                         transition: 'all 0.15s ease'
                     }}
-                    title="Dienstplan als PDF exportieren"
+                    title="Dienstplan als PDF öffnen"
                 >
                     <span style={{ fontSize: '15px', lineHeight: 1 }}>📄</span>
                     <span>Dienstplan PDF</span>
@@ -854,6 +867,12 @@ export default function Analysis() {
                 storeSettings={store.settings}
                 initialCleared={calendarJustCleared}
                 shiftsReady={Boolean(store?.shiftsSynced) && !store?.loading}
+            />
+
+            {/* PDF-Vorschau & Teilen (funktioniert direkt auf iPhone/PWA & Desktop) */}
+            <PdfPreviewModal
+                pdfData={pdfPreview}
+                onClose={() => setPdfPreview(null)}
             />
         </div>
     );

@@ -1,8 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { OCTOBER_2026_TEAM_ROSTER } from './teamRosterData.js';
 
-// Setup worker
-if (typeof window !== 'undefined' && 'Worker' in window) {
+// Setup worker (preserve local Vite-bundled worker if already configured)
+if (typeof window !== 'undefined' && 'Worker' in window && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   try {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
   } catch (e) {

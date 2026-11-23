@@ -71,7 +71,37 @@ function isSpätschichtEnd(incoming) {
     return false;
 }
 
-export function exportToPDF(data) {
+export function isIOSDevice() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const isClassicIOS = /iPad|iPhone|iPod/.test(ua);
+    const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+    return isClassicIOS || isIPadOS;
+}
+
+export function isStandalonePWA() {
+    if (typeof window === 'undefined') return false;
+    return (
+        window.navigator?.standalone === true ||
+        window.matchMedia?.('(display-mode: standalone)').matches === true
+    );
+}
+
+export function canSharePdfFile(file) {
+    if (!file || typeof navigator === 'undefined' || typeof navigator.share !== 'function') {
+        return false;
+    }
+    if (typeof navigator.canShare === 'function') {
+        try {
+            return navigator.canShare({ files: [file] });
+        } catch {
+            return false;
+        }
+    }
+    return false;
+}
+
+export function createRosterPDF(data) {
     const {
         label,
         stats,
@@ -481,7 +511,59 @@ export function exportToPDF(data) {
     const footerInfo = `Erstellt am ${new Date().toLocaleDateString('de-DE')} • Schichttagebuch`;
     doc.text(footerInfo, pageWidth - margin, footerY, { align: 'right' });
 
-    // Download PDF
-    const fileName = `Dienstplan_${label.replace(/\s+/g, '_')}.pdf`;
-    doc.save(fileName);
+    const safeLabel = String(label || 'Dienstplan').replace(/\s+/g, '_').replace(/[^\wäöüÄÖÜß_-]+/g, '');
+    const fileName = `Dienstplan_${safeLabel || 'Monat'}.pdf`;
+
+    doc.setProperties({
+        title: `Dienstplan ${label || ''}`.trim(),
+        subject: 'Monatsdienstplan',
+        creator: 'Schichttagebuch'
+    });
+
+    const arrayBuffer = doc.output('arraybuffer');
+    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+    const blobUrl = URL.createObjectURL(blob);
+    const file = typeof File !== 'undefined'
+        ? new File([blob], fileName, { type: 'application/pdf' })
+        : null;
+
+    return {
+        doc,
+        blob,
+        blobUrl,
+        arrayBuffer,
+        fileName,
+        file,
+        sizeBytes: blob.size
+    };
+}
+
+export async function exportToPDF(data) {
+    const result = createRosterPDF(data);
+
+    if (isIOSDevice() && canSharePdfFile(result.file)) {
+        try {
+            await navigator.share({
+                files: [result.file],
+                title: result.fileName
+            });
+            return result;
+        } catch (err) {
+            if (err?.name === 'AbortError') return result;
+        }
+    }
+
+    // Open PDF inline in a new tab (without download attribute so browsers show the PDF directly)
+    const opened = window.open(result.blobUrl, '_blank', 'noopener');
+    if (!opened) {
+        const link = document.createElement('a');
+        link.href = result.blobUrl;
+        link.download = result.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    setTimeout(() => URL.revokeObjectURL(result.blobUrl), 60000);
+    return result;
 }

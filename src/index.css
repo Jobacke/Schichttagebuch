@@ -1614,6 +1614,229 @@ h2 {
 }
 
 /* Kompakte Monatsleiste im Reiter „Journal“ */
+.journal-header-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.journal-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.journal-top-count {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--c-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+
+.journal-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: var(--c-surface);
+  color: var(--color-danger);
+  border: 1px solid rgb(var(--rgb-danger) / 0.35);
+  box-shadow: 0 1px 3px rgba(20, 24, 31, 0.05);
+}
+
+.journal-clear-btn:hover {
+  background: rgb(var(--rgb-danger) / 0.08);
+}
+
+.journal-bonus-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--c-success);
+  background: rgb(var(--rgb-success) / 0.14);
+  border: 1px solid rgb(var(--rgb-success) / 0.35);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+@media (max-width: 360px) {
+  .journal-top-count {
+    font-size: 13px;
+  }
+  .journal-clear-btn,
+  .journal-bonus-pill {
+    font-size: 10.5px;
+    padding: 3px 6px;
+  }
+}
+
+/* TeampartnerInnen-Übersicht direkt unter dem Kalender im Reiter „Journal“ */
+.journal-partners-card {
+  padding: 14px 14px;
+}
+
+.journal-partners-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.journal-partners-month {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--c-text-subtle);
+  white-space: nowrap;
+}
+
+.journal-partners-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.journal-partner-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgb(var(--rgb-overlay) / 0.06);
+  text-align: left;
+  cursor: pointer;
+  color: var(--c-text);
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.journal-partner-row:last-child {
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+
+.journal-partner-row:hover {
+  background: rgb(var(--rgb-overlay) / 0.03);
+}
+
+.journal-partner-row:active {
+  transform: none !important;
+  background: rgb(var(--rgb-overlay) / 0.06);
+}
+
+.journal-partner-row.is-today {
+  background: rgb(var(--rgb-primary) / 0.06);
+}
+
+.journal-partner-date {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 58px;
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-partner-row.is-today .journal-partner-date {
+  color: var(--c-primary);
+}
+
+.journal-partner-wd {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-subtle);
+  min-width: 17px;
+}
+
+.journal-partner-row.is-today .journal-partner-wd {
+  color: var(--c-primary);
+}
+
+.journal-partner-code {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 5px;
+  line-height: 1.3;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 38px;
+  text-align: center;
+}
+
+.journal-partner-names {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-info);
+  line-height: 1.3;
+  min-width: 0;
+  flex: 1;
+  word-break: break-word;
+}
+
+.journal-partner-empty {
+  font-size: 12px;
+  color: var(--c-text-subtle);
+  flex: 1;
+}
+
+@media (max-width: 480px) {
+  .journal-partners-card {
+    padding: 12px 10px;
+  }
+
+  .journal-partner-row {
+    gap: 6px;
+    padding: 5px 3px;
+  }
+
+  .journal-partner-date {
+    font-size: 11.5px;
+    min-width: 54px;
+    gap: 3px;
+  }
+
+  .journal-partner-wd {
+    font-size: 10.5px;
+    min-width: 16px;
+  }
+
+  .journal-partner-code {
+    font-size: 10px;
+    padding: 1px 4px;
+    min-width: 35px;
+  }
+
+  .journal-partner-names,
+  .journal-partner-empty {
+    font-size: 11.5px;
+  }
+}
+
 .journal-month-bar {
   display: flex;
   align-items: center;

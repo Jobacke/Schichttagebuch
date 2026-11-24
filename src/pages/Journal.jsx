@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { isSameDay, parseISO } from 'date-fns';
 import {
     ChevronLeft, ChevronRight, PenSquare, MapPin,
-    CheckCircle2, Trash2, X, AlertTriangle, RefreshCw, ArrowLeft
+    CheckCircle2, Trash2, X, AlertTriangle, RefreshCw, ArrowLeft, Users
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
@@ -417,6 +417,58 @@ export default function Journal() {
         );
     };
 
+    const bonusShiftsCount = useMemo(
+        () => monthShifts.filter(s => s.hasBonus).length,
+        [monthShifts]
+    );
+    const bonusTotalAmount = useMemo(
+        () => monthShifts.reduce((acc, s) => acc + getShiftBonusAmount(s, store.settings), 0),
+        [monthShifts, store.settings]
+    );
+
+    const todayStr = (() => {
+        const n = new Date();
+        return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    })();
+
+    // Chronologische Monatsliste mit TeampartnerInnen direkt unter dem Kalender
+    const monthlyPartnerRows = useMemo(() => {
+        const shiftCodes = store.settings?.shiftCodes || [];
+        return [...monthShifts]
+            .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.startTime || '').localeCompare(b.startTime || ''))
+            .map((shift) => {
+                const codeObj = shiftCodes.find(c => c.id === shift.codeId || c.code === shift.code);
+                const displayCode = codeObj ? codeObj.code : (shift.code || 'Schicht');
+                const autoPartner = getPartnersForShiftFromRoster(shift.date, displayCode);
+                const rawPartner = (autoPartner && (!shift.partner || shift.partner.startsWith('mit ')))
+                    ? autoPartner
+                    : (shift.partner || autoPartner || '');
+                const trimmed = String(rawPartner || '').trim();
+                const partnerText = trimmed
+                    ? (trimmed.toLowerCase().startsWith('mit ') ? trimmed : `mit ${trimmed}`)
+                    : '';
+                const shiftCol = getShiftColor(shift.shiftTypeName || '', displayCode, shift.station, shift.vehicle);
+                const dObj = shift.date ? new Date(`${shift.date}T12:00:00`) : null;
+                const weekdayShort = dObj
+                    ? dObj.toLocaleDateString('de-DE', { weekday: 'short' }).replace(/\.$/, '')
+                    : '';
+                const dateShort = dObj
+                    ? `${String(dObj.getDate()).padStart(2, '0')}.${String(dObj.getMonth() + 1).padStart(2, '0')}.`
+                    : (shift.date || '');
+
+                return {
+                    id: shift.id || `${shift.date}-${displayCode}`,
+                    date: shift.date,
+                    isToday: shift.date === todayStr,
+                    weekdayShort,
+                    dateShort,
+                    displayCode,
+                    shiftCol,
+                    partnerText
+                };
+            });
+    }, [monthShifts, store.settings?.shiftCodes, store.rosterVersion, todayStr]);
+
     const dayHeader = (() => {
         if (!selectedDate) return '';
         const todaySuffix = isSameDay(selectedDate, new Date()) ? ' (Heute)' : '';
@@ -452,30 +504,33 @@ export default function Journal() {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="calendar-header" style={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div>
-                        <h1 style={{ margin: 0, fontSize: '23px', lineHeight: 1.15 }}>Übersicht</h1>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                                {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'} im Monat
-                            </span>
-                            {monthShifts.some(s => s.hasBonus) && (
-                                <span style={{
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    color: 'var(--c-success)',
-                                    background: 'rgb(var(--rgb-success) / 0.15)',
-                                    border: '1px solid rgb(var(--rgb-success) / 0.35)',
-                                    padding: '1px 7px',
-                                    borderRadius: '6px'
-                                }}>
-                                    💰 {monthShifts.filter(s => s.hasBonus).length}x Bonus ({monthShifts.reduce((acc, s) => acc + getShiftBonusAmount(s, store.settings), 0)} €)
-                                </span>
-                            )}
-                        </div>
-                    </div>
+            {/* Header: Erste Reihe (Anzahl Dienste · Monat leeren · Bonus), darunter Aktionsbuttons */}
+            <div className="journal-header-stack">
+                <div className="journal-top-bar">
+                    <span className="journal-top-count">
+                        {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'}
+                    </span>
+
+                    {monthShifts.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={requestDeleteMonth}
+                            className="journal-clear-btn"
+                            title="Alle Dienste dieses Monats auf einmal löschen"
+                        >
+                            <Trash2 size={13} style={{ flexShrink: 0 }} />
+                            <span>Monat leeren</span>
+                        </button>
+                    )}
+
+                    {bonusShiftsCount > 0 && (
+                        <span
+                            className="journal-bonus-pill"
+                            title={`${bonusShiftsCount}x Bonus (${bonusTotalAmount} €)`}
+                        >
+                            💰 {bonusShiftsCount}x Bonus ({bonusTotalAmount} €)
+                        </span>
+                    )}
                 </div>
 
                 <div className="header-actions">
@@ -642,25 +697,46 @@ export default function Journal() {
                         />
                     </div>
 
-                    {monthShifts.length > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-6px', marginBottom: '16px' }}>
-                            <button
-                                type="button"
-                                onClick={requestDeleteMonth}
-                                className="filter-chip"
-                                style={{
-                                    fontSize: '12px',
-                                    padding: '6px 10px',
-                                    borderRadius: '8px',
-                                    gap: '4px',
-                                    color: 'var(--color-danger)',
-                                    borderColor: 'rgb(var(--rgb-danger) / 0.3)'
-                                }}
-                                title="Alle Dienste dieses Monats auf einmal löschen"
-                            >
-                                <Trash2 size={14} />
-                                Monat leeren
-                            </button>
+                    {/* TeampartnerInnen-Übersicht für den aktuellen Monat */}
+                    {monthlyPartnerRows.length > 0 && (
+                        <div className="card-premium journal-partners-card">
+                            <div className="journal-partners-header">
+                                <h3 className="text-label" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                    <Users size={14} style={{ color: 'var(--c-info)' }} />
+                                    <span>TeampartnerInnen</span>
+                                </h3>
+                                <span className="journal-partners-month">{currentMonthLabel}</span>
+                            </div>
+
+                            <div className="journal-partners-list">
+                                {monthlyPartnerRows.map((row) => (
+                                    <button
+                                        key={row.id}
+                                        type="button"
+                                        className={`journal-partner-row${row.isToday ? ' is-today' : ''}`}
+                                        onClick={() => row.date && handleSelectCalendarDay(row.date)}
+                                        title={row.partnerText ? `${row.weekdayShort} ${row.dateShort} (${row.displayCode}) ${row.partnerText}` : `${row.weekdayShort} ${row.dateShort} (${row.displayCode})`}
+                                    >
+                                        <span className="journal-partner-date">
+                                            <span className="journal-partner-wd">{row.weekdayShort}</span>
+                                            <span>{row.dateShort}</span>
+                                        </span>
+                                        <span
+                                            className="journal-partner-code"
+                                            style={{
+                                                background: row.shiftCol.bg,
+                                                color: row.shiftCol.color,
+                                                border: `1px solid ${row.shiftCol.border}`
+                                            }}
+                                        >
+                                            {row.displayCode}
+                                        </span>
+                                        <span className={row.partnerText ? 'journal-partner-names' : 'journal-partner-empty'}>
+                                            {row.partnerText || '–'}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
 

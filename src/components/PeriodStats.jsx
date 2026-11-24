@@ -46,88 +46,85 @@ export default function PeriodStats({
 
     return (
         <>
-            {/* KPI Cards Grid (Row 1: Geleistet | Schichten | Bonus, Row 2: Saldo) – unterhalb der Dienste */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-                <div className="stat-card" style={{ padding: '14px 12px' }}>
-                    <span className="text-label">Geleistet</span>
-                    <span className="text-value" style={{ fontSize: '22px' }}>{stats.actual.toFixed(1)} h</span>
+            {/* Kompakter Auswertungsblock: Zeile 1 Geleistet | Schichten | Bonus (einzeilig), Zeile 2 Saldo (einzeilig) */}
+            <div className="period-stats-wrap">
+                <div className="period-kpi-row">
+                    <div className="stat-card period-kpi-card">
+                        <span className="period-kpi-label">Geleistet</span>
+                        <span className="period-kpi-value">{stats.actual.toFixed(1)}h</span>
+                    </div>
+
+                    <div className="stat-card period-kpi-card">
+                        <span className="period-kpi-label">Schichten</span>
+                        <span className="period-kpi-value">{stats.count}</span>
+                    </div>
+
+                    <button
+                        type="button"
+                        className={`stat-card period-kpi-card period-kpi-bonus${stats.bonusCount > 0 ? ' has-bonus' : ''}${onlyBonus ? ' is-filtered' : ''}`}
+                        onClick={() => setShowBonusModal(true)}
+                        title="Klicken für detaillierte Bonus-Auswertung"
+                    >
+                        <span className="period-kpi-label period-kpi-bonus-label">
+                            <span>💰</span>
+                            <span>Bonus</span>
+                            {stats.bonusCount > 0 && (
+                                <span className="period-kpi-bonus-count">({stats.bonusCount}x)</span>
+                            )}
+                        </span>
+                        <span className="period-kpi-value period-kpi-bonus-val">
+                            {stats.bonusTotalAmount.toFixed(0)}€
+                        </span>
+                        <span className="period-kpi-arrow" aria-hidden="true">↗</span>
+                    </button>
                 </div>
-                <div className="stat-card" style={{ padding: '14px 12px' }}>
-                    <span className="text-label">Schichten</span>
-                    <span className="text-value" style={{ fontSize: '22px' }}>{stats.count}</span>
-                </div>
+
+                {/* Zeile 2 (volle Breite, einzeilig): Saldo */}
                 <div
-                    className="stat-card"
-                    onClick={() => setShowBonusModal(true)}
-                    style={{
-                        padding: '14px 12px',
-                        cursor: 'pointer',
-                        border: stats.bonusCount > 0 || onlyBonus ? '1px solid rgb(var(--rgb-warning) / 0.45)' : undefined,
-                        background: onlyBonus ? 'rgb(var(--rgb-warning) / 0.12)' : undefined,
-                        position: 'relative',
-                        transition: 'all 0.15s ease'
-                    }}
-                    title="Klicken für detaillierte Bonus-Auswertung"
+                    className="stat-card period-saldo-card"
+                    style={{ borderLeft: `4px solid ${colorClass}` }}
                 >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                        <span className="text-label" style={{ color: stats.bonusCount > 0 ? 'var(--c-warning)' : undefined, marginBottom: '4px' }}>
-                            💰 Bonus ({stats.bonusCount}x)
-                        </span>
-                        <span style={{
-                            fontSize: '10px',
-                            color: 'var(--c-warning)',
-                            background: 'rgb(var(--rgb-warning) / 0.14)',
-                            padding: '1px 5px',
-                            borderRadius: '4px',
-                            fontWeight: 700
-                        }}>
-                            Details ↗
+                    <div className="period-saldo-left">
+                        <span className="period-saldo-title">Saldo</span>
+                        <span className="period-saldo-meta">
+                            Soll {target.toFixed(1)}h{filterMode === 'month' ? ` · ${weeklyRate}h/Wo` : ''}
                         </span>
                     </div>
-                    <span className="text-value" style={{ fontSize: '22px', color: stats.bonusCount > 0 ? 'var(--c-warning)' : 'var(--c-text-subtle)' }}>
-                        {stats.bonusTotalAmount.toFixed(0)} €
-                    </span>
-                </div>
-
-                {/* Row 2 (volle Breite): Saldo */}
-                <div className="stat-card" style={{ gridColumn: 'span 3', borderLeft: `4px solid ${colorClass}`, padding: '14px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <span className="text-label">Saldo (Soll: {target.toFixed(1)}h{filterMode === 'month' ? ` • ${weeklyRate}h/Woche` : ''})</span>
-                        <div className="text-value" style={{ fontSize: '22px', color: colorClass }}>
+                    <div className="period-saldo-right">
+                        <span className="period-saldo-value" style={{ color: colorClass }}>
                             {delta > 0 ? '+' : ''}{delta.toFixed(1)} h
-                        </div>
+                        </span>
+                        <span className="period-saldo-icon" aria-hidden="true">{isPositive ? '📈' : '📉'}</span>
                     </div>
-                    <div style={{ fontSize: '22px' }}>{isPositive ? "📈" : "📉"}</div>
                 </div>
-
             </div>
 
             {/* Verteilung */}
             {stats.count > 0 && (
-                <div className="card-premium">
-                    <h3 className="text-label" style={{ margin: '0 0 12px 0' }}>🍰 Verteilung</h3>
+                <div className="card-premium period-dist-card">
+                    <h3 className="text-label" style={{ margin: '0 0 10px 0' }}>🍰 Verteilung</h3>
 
                     {/* Wachen-Verteilung (Eigenständige Farbstruktur) */}
                     {stationDistribution.length > 0 && (
-                        <div style={{ marginBottom: '16px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                        <div style={{ marginBottom: '12px' }}>
+                            <span style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
                                 Einsätze nach Wachen:
                             </span>
                             {stationDistribution.map((st) => (
-                                <div key={st.station} style={{ marginBottom: '8px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                                <div key={st.station} style={{ marginBottom: '6px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', alignItems: 'center' }}>
                                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: st.theme.primaryHex }} />
+                                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: st.theme.primaryHex }} />
                                             <span style={{ fontWeight: 600 }}>{st.theme.name}</span>
                                         </span>
-                                        <span style={{ fontSize: '12px', color: 'var(--c-text-muted)' }}>
-                                            <strong style={{ color: st.theme.primaryHex, fontSize: '13px', marginRight: '4px' }}>
+                                        <span style={{ fontSize: '11.5px', color: 'var(--c-text-muted)' }}>
+                                            <strong style={{ color: st.theme.primaryHex, fontSize: '12.5px', marginRight: '4px' }}>
                                                 {st.count} {st.count === 1 ? 'Schicht' : 'Schichten'}
                                             </strong>
                                             ({st.hours.toFixed(1)} h)
                                         </span>
                                     </div>
-                                    <div style={{ height: '6px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                    <div style={{ height: '5px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '3px', overflow: 'hidden' }}>
                                         <div style={{
                                             width: `${(st.count / stats.count) * 100}%`,
                                             height: '100%',
@@ -142,21 +139,21 @@ export default function PeriodStats({
 
                     {/* Schichtarten-Verteilung */}
                     <div>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
                             Schichtarten:
                         </span>
                         {stats.distributionData.map((d, i) => {
                             const shiftCol = getShiftColor(d.name, '');
                             return (
-                                <div key={i} style={{ marginBottom: '10px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                                <div key={i} style={{ marginBottom: '7px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', alignItems: 'center' }}>
                                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: shiftCol.color }} />
+                                            <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: shiftCol.color }} />
                                             <span>{d.name}</span>
                                         </span>
                                         <strong style={{ color: shiftCol.color }}>{d.value}</strong>
                                     </div>
-                                    <div style={{ height: '6px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                    <div style={{ height: '5px', background: 'var(--c-surface-3)', borderRadius: '3px', marginTop: '3px', overflow: 'hidden' }}>
                                         <div style={{
                                             width: `${(d.value / stats.count) * 100}%`,
                                             height: '100%',

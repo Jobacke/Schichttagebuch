@@ -1920,6 +1920,234 @@ h2 {
 }
 
 /* =====================================================================
+   Kompakter Auswertungsblock (PeriodStats: Geleistet · Schichten · Bonus · Saldo)
+   Auf iPhone und Desktop schlank und einzeilig
+   ===================================================================== */
+.period-stats-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.period-kpi-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.period-kpi-card {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.period-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-text-muted);
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.period-kpi-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--c-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.period-kpi-bonus {
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+}
+
+.period-kpi-bonus.has-bonus,
+.period-kpi-bonus.is-filtered {
+  border-color: rgb(var(--rgb-warning) / 0.45);
+}
+
+.period-kpi-bonus.is-filtered {
+  background: rgb(var(--rgb-warning) / 0.12);
+}
+
+.period-kpi-bonus.has-bonus .period-kpi-bonus-label,
+.period-kpi-bonus.has-bonus .period-kpi-bonus-val {
+  color: var(--c-warning);
+}
+
+.period-kpi-bonus:not(.has-bonus) .period-kpi-bonus-val {
+  color: var(--c-text-subtle);
+}
+
+.period-kpi-bonus-count {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.period-kpi-arrow {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--c-warning);
+  background: rgb(var(--rgb-warning) / 0.14);
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1.15;
+  flex-shrink: 0;
+}
+
+.period-saldo-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.period-saldo-left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.period-saldo-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.period-saldo-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.period-saldo-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.period-saldo-value {
+  font-size: 15.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.period-saldo-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.period-dist-card {
+  padding: 14px;
+}
+
+@media (max-width: 480px) {
+  .period-stats-wrap {
+    gap: 6px;
+  }
+
+  .period-kpi-row {
+    gap: 5px;
+  }
+
+  .period-kpi-card {
+    padding: 7px 6px;
+    gap: 3px;
+    border-radius: 10px;
+  }
+
+  .period-kpi-label {
+    font-size: 10px;
+    gap: 2px;
+  }
+
+  .period-kpi-value {
+    font-size: 12.5px;
+  }
+
+  .period-kpi-bonus-count {
+    font-size: 9.5px;
+  }
+
+  .period-kpi-arrow {
+    font-size: 9px;
+    padding: 1px 3px;
+  }
+
+  .period-saldo-card {
+    padding: 7px 10px;
+    border-radius: 10px;
+  }
+
+  .period-saldo-title,
+  .period-saldo-meta {
+    font-size: 10.5px;
+  }
+
+  .period-saldo-value {
+    font-size: 14px;
+  }
+
+  .period-saldo-icon {
+    font-size: 13px;
+  }
+
+  .period-dist-card {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .period-kpi-card {
+    padding: 6px 4px;
+    gap: 2px;
+  }
+
+  .period-kpi-label {
+    font-size: 9.5px;
+  }
+
+  .period-kpi-value {
+    font-size: 11.5px;
+  }
+
+  .period-kpi-bonus-count {
+    display: none;
+  }
+}
+
+/* =====================================================================
    Schicht-Rhythmus Monatskalender (mein Plan, Journal, Team-Auswahl)
    7 Spalten immer exakt in den verfügbaren Bereich eingepasst (iPhone-Fix)
    ===================================================================== */

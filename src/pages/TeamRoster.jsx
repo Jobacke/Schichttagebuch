@@ -927,10 +927,10 @@ export default function TeamRoster() {
         </div>
       )}
 
-      {/* Top Header: Title & 1-Click + Upload Buttons */}
-      <div className="team-roster-header" style={{ marginBottom: '8px', paddingBottom: '0', gap: '8px', flexWrap: 'wrap' }}>
-        <h1 className="team-roster-title" style={{ whiteSpace: 'nowrap' }}>
-          <Users style={{ color: 'var(--c-info)' }} size={24} />
+      {/* Top Header: Title & Upload Button */}
+      <div className="team-roster-header" style={{ marginBottom: '6px', paddingBottom: '0', gap: '8px', flexWrap: 'wrap' }}>
+        <h1 className="team-roster-title" style={{ whiteSpace: 'nowrap', fontSize: '22px' }}>
+          <Users style={{ color: 'var(--c-info)' }} size={22} />
           <span>Wer hat Dienst?</span>
         </h1>
 
@@ -943,28 +943,28 @@ export default function TeamRoster() {
               color: 'var(--c-info)',
               border: '1px solid rgb(var(--rgb-info) / 0.45)',
               fontWeight: 700,
-              padding: '7px 11px',
-              borderRadius: '12px',
+              padding: '6px 11px',
+              borderRadius: '10px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
               cursor: 'pointer',
-              fontSize: '12.5px',
+              fontSize: '12px',
               whiteSpace: 'nowrap',
               flexShrink: 0,
-              boxShadow: '0 2px 8px rgb(var(--rgb-info) / 0.2)',
+              boxShadow: '0 2px 8px rgb(var(--rgb-info) / 0.18)',
               transition: 'all 0.15s ease'
             }}
             title="Dienstplan importieren (SIEDA einfügen oder Datei)"
           >
-            <UploadCloud size={15} />
+            <UploadCloud size={14} />
             <span>Plan laden</span>
           </button>
         </div>
       </div>
 
-      {/* Month Stepper Bar (Full width, spacious & thumb-friendly in portrait) */}
-      <div className="team-roster-month-stepper" style={{ marginBottom: '10px', padding: '6px 10px', borderRadius: '14px', justifyContent: 'space-between', width: '100%' }}>
+      {/* Month Stepper Bar (kompakt in der Höhe) */}
+      <div className="team-roster-month-stepper" style={{ marginBottom: '8px', padding: '3px 8px', borderRadius: '11px', justifyContent: 'space-between', width: '100%' }}>
         <button
           type="button"
           onClick={handlePrevMonth}
@@ -1703,7 +1703,7 @@ export default function TeamRoster() {
                   Noch kein Dienstplan für {roster.monthLabel || yearMonth} geladen
                 </p>
                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-                  Lade die 3 Wachen über den Reiter Journal oder „mein Plan“ („⚡ DP mit neuestem Stand laden“) oder manuell:
+                  Lade die 3 Wachen über den Reiter Journal oder „mein Plan“ („DP aktualisieren“) oder manuell:
                 </p>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <button

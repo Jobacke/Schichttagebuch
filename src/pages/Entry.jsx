@@ -181,12 +181,12 @@ export default function Entry() {
     return (
         <div className="page-content">
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div>
-                    <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '23px', lineHeight: 1.15 }}>
                         {editId ? 'Eintrag bearbeiten' : 'Neue Schicht'}
                     </h1>
-                    <div className="subtitle" style={{ margin: '4px 0 0 0' }}>
+                    <div className="subtitle" style={{ margin: '2px 0 0 0', fontSize: '12.5px' }}>
                         {editId ? 'Änderungen vornehmen' : 'Dienst erfassen'}
                     </div>
                 </div>
@@ -194,13 +194,13 @@ export default function Entry() {
                     <button
                         onClick={handleDelete}
                         style={{
-                            padding: '10px',
+                            padding: '8px 10px',
                             background: 'rgb(var(--rgb-danger) / 0.1)',
                             color: 'var(--color-danger)',
                             border: 'none',
-                            borderRadius: '12px',
+                            borderRadius: '11px',
                             cursor: 'pointer',
-                            fontSize: '24px'
+                            fontSize: '20px'
                         }}
                     >
                         🗑️
@@ -208,7 +208,7 @@ export default function Entry() {
                 )}
             </div>
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleSubmit} className="entry-form" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
                 {/* Date & Time Card */}
                 <div className="card-premium">

@@ -1518,41 +1518,68 @@ h2 {
   }
 }
 
-/* Kopfzeile „mein Plan“: Titel links | DP laden · In Kalender übertragen · Dienstplan PDF rechts */
+/* Kopfzeile „mein Plan“: Titel links | DP aktualisieren · Kalenderübertrag · Dienstplan PDF rechts */
 .plan-header {
   display: grid;
   grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .plan-header > :nth-child(1) { justify-self: start; margin-right: 4px; }
 
-/* Schmale Displays: Titel oben, darunter DP laden (volle Breite), darunter Kalender + PDF nebeneinander */
+/* Schmale Displays: Zeile 1 Titel + Dienstplan PDF, Zeile 2 DP aktualisieren + Kalenderübertrag einzeilig nebeneinander */
 @media (max-width: 640px) {
   .plan-header {
     grid-template-columns: 1fr 1fr;
-    row-gap: 10px;
+    column-gap: 8px;
+    row-gap: 8px;
+    margin-bottom: 10px;
   }
-  .plan-header > :nth-child(1),
-  .plan-header > :nth-child(2) { grid-column: 1 / -1; }
-  .plan-header > :nth-child(n+2) {
+  .plan-header > :nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    margin-right: 0;
+  }
+  .plan-header > :nth-child(4) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    width: auto;
+    white-space: nowrap !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+  .plan-header > :nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .plan-header > :nth-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .plan-header > :nth-child(2),
+  .plan-header > :nth-child(3) {
     justify-self: stretch;
     align-self: stretch;
     justify-content: center;
     min-width: 0;
-    white-space: normal !important;
+    white-space: nowrap !important;
+    padding: 8px 8px !important;
+    font-size: 12px !important;
+    gap: 5px !important;
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.15;
   }
 }
 
-/* Aktionsbuttons in der Kopfzeile „Journal“ (DP laden + In Kalender übertragen) */
+/* Aktionsbuttons in der Kopfzeile „Journal“ (DP aktualisieren + Kalenderübertrag) */
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -1561,14 +1588,111 @@ h2 {
     width: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
   .header-actions > button {
     align-self: stretch;
     justify-content: center;
     min-width: 0;
-    white-space: normal !important;
+    white-space: nowrap !important;
+    padding: 8px 8px !important;
+    font-size: 12px !important;
+    gap: 5px !important;
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.15;
+  }
+}
+
+@media (max-width: 360px) {
+  .header-actions > button,
+  .plan-header > :nth-child(2),
+  .plan-header > :nth-child(3) {
+    padding: 7px 5px !important;
+    font-size: 11.5px !important;
+    gap: 4px !important;
+  }
+}
+
+/* Kompakte Monatsleiste im Reiter „Journal“ */
+.journal-month-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-surface);
+  border-radius: 11px;
+  padding: 3px 8px;
+  margin-bottom: 10px;
+  border: var(--glass-border);
+  box-shadow: var(--shadow-card);
+  min-height: 36px;
+}
+
+.journal-month-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-main);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.journal-month-btn:hover {
+  background: var(--c-surface-3);
+}
+
+.journal-month-label {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+/* Kompaktere Darstellung über alle Reiter auf Smartphones */
+@media (max-width: 480px) {
+  .page-content {
+    padding: 12px 14px;
+  }
+
+  .card-premium {
+    margin-bottom: 12px;
+  }
+
+  .calendar-header {
+    margin-bottom: 10px;
+  }
+
+  .team-roster-container {
+    padding: 6px 14px 110px 14px;
+  }
+
+  .team-roster-header {
+    padding: 4px 0 4px 0;
+  }
+
+  .team-roster-stepper {
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    border-radius: 14px;
+  }
+
+  .entry-form .card-premium {
+    padding: 14px;
+    margin-bottom: 0;
+  }
+
+  .settings-item {
+    min-height: 50px;
+    padding: 11px 14px;
+    font-size: 14.5px;
+  }
+
+  .settings-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    margin-right: 12px;
   }
 }
 

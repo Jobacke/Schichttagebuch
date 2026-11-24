@@ -851,7 +851,7 @@ function IosCalendarExportDialog({
             }}>
               <Sparkles size={17} style={{ flexShrink: 0 }} />
               <div>
-                <strong>Kurzbefehl „Schichttagebuch-Kalender“ geladen!</strong> Öffne die geladene Datei in Safari und tippe auf <strong>„Kurzbefehl hinzufügen“</strong> (nur 1× nötig). Danach aktualisiert <strong>„In Kalender übertragen“</strong> den Kalender in einem Schritt.
+                <strong>Kurzbefehl „Schichttagebuch-Kalender“ geladen!</strong> Öffne die geladene Datei in Safari und tippe auf <strong>„Kurzbefehl hinzufügen“</strong> (nur 1× nötig). Danach aktualisiert <strong>„Kalenderübertrag“</strong> den Kalender in einem Schritt.
               </div>
             </div>
           )}

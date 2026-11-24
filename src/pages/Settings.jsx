@@ -91,10 +91,10 @@ export default function Settings() {
     }
 
     return (
-        <div className="page-content">
-            <h1>Einstellungen</h1>
+        <div className="page-content settings-page">
+            <h1 style={{ margin: '0 0 12px 0', fontSize: '23px', lineHeight: 1.15 }}>Einstellungen</h1>
 
-            <h2>Dienstplan</h2>
+            <h2 style={{ margin: '0 0 8px 0' }}>Dienstplan</h2>
             <div className="settings-list">
                 <SettingsItem
                     icon={CalendarDays} color="var(--c-warning-strong)" label="Sollstunden & Arbeitszeit"
@@ -114,7 +114,7 @@ export default function Settings() {
                 />
             </div>
 
-            <h2 style={{ marginTop: '32px' }}>Ressourcen</h2>
+            <h2 style={{ margin: '20px 0 8px 0' }}>Ressourcen</h2>
             <div className="settings-list">
                 <SettingsItem
                     icon={MapPin} color="var(--c-danger)" label="Wachen"
@@ -130,7 +130,7 @@ export default function Settings() {
                 />
             </div>
 
-            <h2 style={{ marginTop: '32px' }}>Verbindungen &amp; Sicherheit</h2>
+            <h2 style={{ margin: '20px 0 8px 0' }}>Verbindungen &amp; Sicherheit</h2>
             <div className="settings-list">
                 <SettingsItem
                     icon={Lock}

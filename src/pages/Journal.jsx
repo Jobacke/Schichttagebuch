@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { isSameDay, parseISO } from 'date-fns';
 import {
     ChevronLeft, ChevronRight, PenSquare, MapPin,
-    CheckCircle2, Trash2, X, AlertTriangle, ExternalLink, ArrowLeft
+    CheckCircle2, Trash2, X, AlertTriangle, RefreshCw, ArrowLeft
 } from 'lucide-react';
 import CareManImportModal from '../components/CareManImportModal';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
@@ -453,10 +453,10 @@ export default function Journal() {
             )}
 
             {/* Header */}
-            <div className="calendar-header" style={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="calendar-header" style={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div>
-                        <h1 style={{ margin: 0, fontSize: '24px', lineHeight: 1.15 }}>Übersicht</h1>
+                        <h1 style={{ margin: 0, fontSize: '23px', lineHeight: 1.15 }}>Übersicht</h1>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
                             <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                                 {monthShifts.length} {monthShifts.length === 1 ? 'Dienst' : 'Dienste'} im Monat
@@ -481,27 +481,30 @@ export default function Journal() {
                 <div className="header-actions">
                     <button
                         type="button"
+                        className="action-btn-compact action-btn-dp"
                         onClick={() => openCareManLiveWindow(currentYearMonthStr)}
                         style={{
                             background: 'linear-gradient(135deg, var(--c-success-deep), var(--c-success-strong))',
                             color: '#ffffff',
                             border: '1px solid rgb(var(--rgb-success) / 0.55)',
                             fontWeight: 800,
-                            padding: '8px 13px',
-                            borderRadius: '12px',
+                            padding: '8px 12px',
+                            borderRadius: '11px',
                             display: 'inline-flex',
                             alignItems: 'center',
+                            justifyContent: 'center',
                             gap: '6px',
                             cursor: 'pointer',
                             fontSize: '12.5px',
+                            lineHeight: 1.15,
                             whiteSpace: 'nowrap',
-                            boxShadow: '0 3px 12px rgb(var(--rgb-success) / 0.3)',
+                            boxShadow: '0 2px 10px rgb(var(--rgb-success) / 0.28)',
                             transition: 'all 0.15s ease'
                         }}
                         title={`Neueste Dienstpläne für "Rettungswache München", "Rettungswache Obersendling" & "Rettungswache Hohenbrunn" (${currentMonthLabel}) laden`}
                     >
-                        <ExternalLink size={15} />
-                        <span>⚡ DP mit neuestem Stand laden</span>
+                        <RefreshCw size={14} style={{ flexShrink: 0 }} />
+                        <span>DP aktualisieren</span>
                     </button>
                     <CalendarTransferButton
                         onClick={() => setIsCalendarExportModalOpen(true)}
@@ -583,22 +586,13 @@ export default function Journal() {
             ) : (
                 /* ===== Monatsansicht ===== */
                 <>
-                {/* Month Switcher Bar */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    background: 'var(--color-surface)',
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    marginBottom: '16px',
-                    border: 'var(--glass-border)'
-                }}>
-                    <button className="btn-icon" onClick={() => changeMonth(-1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
-                        <ChevronLeft size={20} />
+                {/* Month Switcher Bar – schmal & kompakt */}
+                <div className="journal-month-bar">
+                    <button className="journal-month-btn" type="button" onClick={() => changeMonth(-1)} aria-label="Vorheriger Monat">
+                        <ChevronLeft size={18} />
                     </button>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'center' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '15px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'center', minWidth: 0 }}>
+                        <span className="journal-month-label">
                             {currentMonthLabel}
                         </span>
                         {!isCurrentMonth && (
@@ -617,7 +611,7 @@ export default function Journal() {
                                     border: '1px solid rgb(var(--rgb-primary) / 0.35)',
                                     color: 'var(--color-primary)',
                                     borderRadius: '6px',
-                                    padding: '2px 8px',
+                                    padding: '2px 7px',
                                     fontSize: '11px',
                                     fontWeight: 700,
                                     whiteSpace: 'nowrap',
@@ -625,12 +619,12 @@ export default function Journal() {
                                 }}
                                 title="Zum aktuellen Monat springen"
                             >
-                                Aktueller Monat
+                                Heute
                             </button>
                         )}
                     </div>
-                    <button className="btn-icon" onClick={() => changeMonth(1)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', cursor: 'pointer', padding: '6px' }}>
-                        <ChevronRight size={20} />
+                    <button className="journal-month-btn" type="button" onClick={() => changeMonth(1)} aria-label="Nächster Monat">
+                        <ChevronRight size={18} />
                     </button>
                 </div>
 

@@ -10,7 +10,7 @@ import ShiftRhythmCalendar from '../components/ShiftRhythmCalendar';
 import IosCalendarExportModal from '../components/IosCalendarExportModal';
 import CalendarTransferButton from '../components/CalendarTransferButton';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, X, SlidersHorizontal, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, SlidersHorizontal, RefreshCw, FileText } from 'lucide-react';
 import useCareManPrewarm from '../hooks/useCareManPrewarm';
 
 // Helper for CSS Date controls
@@ -130,9 +130,9 @@ export default function Analysis() {
     return (
         <div className="page-content">
             {/* Header */}
-            {/* Kopfzeile: Titel links | DP laden · In Kalender übertragen · Dienstplan PDF */}
+            {/* Kopfzeile: Titel links | DP aktualisieren · Kalenderübertrag · Dienstplan PDF */}
             <div className="plan-header">
-                <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '23px', lineHeight: 1.15 }}>
                     Mein Plan
                 </h1>
                 <DpLoadButton yearMonth={currentYearMonthStr} monthLabel={currentMonthLabel} />
@@ -143,38 +143,41 @@ export default function Analysis() {
                 />
                 <button
                     type="button"
+                    className="action-btn-compact action-btn-pdf"
                     onClick={handleExportPDF}
                     style={{
                         background: 'rgb(var(--rgb-info) / 0.12)',
                         color: 'var(--c-info)',
                         border: '1px solid rgb(var(--rgb-info) / 0.4)',
                         fontWeight: 800,
-                        padding: '8px 13px',
-                        borderRadius: '12px',
+                        padding: '7px 11px',
+                        borderRadius: '11px',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
+                        justifyContent: 'center',
+                        gap: '5px',
                         cursor: 'pointer',
-                        fontSize: '12.5px',
+                        fontSize: '12px',
+                        lineHeight: 1.15,
                         whiteSpace: 'nowrap',
-                        boxShadow: '0 3px 12px rgb(var(--rgb-info) / 0.15)',
+                        boxShadow: '0 2px 10px rgb(var(--rgb-info) / 0.14)',
                         transition: 'all 0.15s ease'
                     }}
                     title="Dienstplan als PDF öffnen"
                 >
-                    <span style={{ fontSize: '15px', lineHeight: 1 }}>📄</span>
+                    <FileText size={14} style={{ flexShrink: 0 }} />
                     <span>Dienstplan PDF</span>
                 </button>
             </div>
 
             {/* Compact Period & Filter Command Bar */}
-            <div className="card-premium" style={{ padding: '8px 10px', marginBottom: '16px' }}>
+            <div className="card-premium" style={{ padding: '6px 8px', marginBottom: '10px' }}>
                 <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: '8px',
-                    rowGap: '8px',
+                    gap: '6px',
+                    rowGap: '6px',
                     flexWrap: 'wrap'
                 }}>
                     
@@ -878,33 +881,36 @@ export default function Analysis() {
     );
 }
 
-// Button „DP mit neuestem Stand laden“ – identisch zum Reiter Journal
+// Button „DP aktualisieren“ – identisch zum Reiter Journal
 function DpLoadButton({ yearMonth, monthLabel }) {
     return (
         <button
             type="button"
+            className="action-btn-compact action-btn-dp"
             onClick={() => openCareManLiveWindow(yearMonth)}
             style={{
                 background: 'linear-gradient(135deg, var(--c-success-deep), var(--c-success-strong))',
                 color: '#ffffff',
                 border: '1px solid rgb(var(--rgb-success) / 0.55)',
                 fontWeight: 800,
-                padding: '8px 13px',
-                borderRadius: '12px',
+                padding: '8px 12px',
+                borderRadius: '11px',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
                 cursor: 'pointer',
                 fontSize: '12.5px',
+                lineHeight: 1.15,
                 whiteSpace: 'nowrap',
-                boxShadow: '0 3px 12px rgb(var(--rgb-success) / 0.3)',
+                boxShadow: '0 2px 10px rgb(var(--rgb-success) / 0.28)',
                 transition: 'all 0.15s ease',
                 flexShrink: 0
             }}
             title={`Neueste Dienstpläne für "Rettungswache München", "Rettungswache Obersendling" & "Rettungswache Hohenbrunn" (${monthLabel}) laden`}
         >
-            <ExternalLink size={15} />
-            <span>⚡ DP mit neuestem Stand laden</span>
+            <RefreshCw size={14} style={{ flexShrink: 0 }} />
+            <span>DP aktualisieren</span>
         </button>
     );
 }

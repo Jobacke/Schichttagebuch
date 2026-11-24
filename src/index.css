@@ -1745,7 +1745,9 @@ h2 {
 }
 
 .journal-partner-row.is-today {
-  background: rgb(var(--rgb-primary) / 0.06);
+  background: rgb(var(--rgb-info) / 0.09);
+  box-shadow: inset 3px 0 0 var(--c-info);
+  padding-left: 8px;
 }
 
 .journal-partner-date {
@@ -1762,7 +1764,7 @@ h2 {
 }
 
 .journal-partner-row.is-today .journal-partner-date {
-  color: var(--c-primary);
+  color: var(--c-info);
 }
 
 .journal-partner-wd {
@@ -1773,7 +1775,7 @@ h2 {
 }
 
 .journal-partner-row.is-today .journal-partner-wd {
-  color: var(--c-primary);
+  color: var(--c-info);
 }
 
 .journal-partner-code {
@@ -1812,6 +1814,10 @@ h2 {
   .journal-partner-row {
     gap: 6px;
     padding: 5px 3px;
+  }
+
+  .journal-partner-row.is-today {
+    padding-left: 7px;
   }
 
   .journal-partner-date {

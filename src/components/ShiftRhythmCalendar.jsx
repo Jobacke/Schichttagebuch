@@ -165,58 +165,55 @@ export default function ShiftRhythmCalendar({
     }
 
     return (
-        <div>
+        <div className="src-calendar">
             {/* Header: Title & Counter Pills */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+            <div className="src-header">
                 <h3 className="text-label" style={{ margin: 0 }}>📅 Schicht-Rhythmus</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{
-                        background: 'rgb(var(--rgb-primary) / 0.15)',
-                        color: 'var(--c-primary)',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 700
-                    }}>
+                <div className="src-header-pills">
+                    <span
+                        className="src-header-pill"
+                        style={{
+                            background: 'rgb(var(--rgb-primary) / 0.15)',
+                            color: 'var(--c-primary)',
+                            fontWeight: 700
+                        }}
+                    >
                         {filteredData.length} {filteredData.length === 1 ? 'Schicht' : 'Schichten'}
                     </span>
                     {nightShiftEndDaysCount > 0 && (
-                        <span style={{
-                            background: 'rgb(var(--rgb-violet) / 0.15)',
-                            color: 'var(--c-violet)',
-                            border: '1px solid rgb(var(--rgb-violet) / 0.35)',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: 700
-                        }}>
+                        <span
+                            className="src-header-pill"
+                            style={{
+                                background: 'rgb(var(--rgb-violet) / 0.15)',
+                                color: 'var(--c-violet)',
+                                border: '1px solid rgb(var(--rgb-violet) / 0.35)',
+                                fontWeight: 700
+                            }}
+                        >
                             🌙 {nightShiftEndDaysCount}x Nacht-Ende
                         </span>
                     )}
-                    <span style={{
-                        background: 'rgb(var(--rgb-muted) / 0.12)',
-                        color: 'var(--c-text-muted)',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 600
-                    }}>
+                    <span
+                        className="src-header-pill"
+                        style={{
+                            background: 'rgb(var(--rgb-muted) / 0.12)',
+                            color: 'var(--c-text-muted)',
+                            fontWeight: 600
+                        }}
+                    >
                         {Math.max(0, freeDaysCount - nightShiftEndDaysCount)} Tage frei
                     </span>
                 </div>
             </div>
 
             {/* Weekday Labels Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '6px' }}>
+            <div className="src-weekdays">
                 {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((wd, i) => (
                     <div
                         key={wd}
+                        className="src-weekday"
                         style={{
-                            textAlign: 'center',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            color: i >= 5 ? 'var(--c-primary)' : 'var(--c-text-subtle)',
-                            padding: '2px 0'
+                            color: i >= 5 ? 'var(--c-primary)' : 'var(--c-text-subtle)'
                         }}
                     >
                         {wd}
@@ -225,10 +222,10 @@ export default function ShiftRhythmCalendar({
             </div>
 
             {/* Calendar Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+            <div className="src-grid">
                 {days.map(item => {
                     if (item.empty) {
-                        return <div key={item.key} style={{ minHeight: '46px', opacity: 0 }} />;
+                        return <div key={item.key} className="src-cell-empty" />;
                     }
 
                     const hasShift = item.shifts && item.shifts.length > 0;
@@ -243,17 +240,9 @@ export default function ShiftRhythmCalendar({
                     return (
                         <div
                             key={item.key}
+                            className="src-cell"
                             onClick={() => setSelectedDateStr(isSelected ? null : item.dateStr)}
                             style={{
-                                minHeight: '46px',
-                                padding: '4px 2px',
-                                borderRadius: '8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
                                 background: hasShift
                                     ? shiftColor.bg
                                     : (incomingNightShift ? 'rgb(var(--rgb-violet-deep) / 0.22)' : (item.isWeekend ? 'rgb(var(--rgb-surface) / 0.4)' : 'var(--c-bg)')),
@@ -279,57 +268,35 @@ export default function ShiftRhythmCalendar({
                                     : `Tag ${item.dayNum}: Frei${isToday ? ' • Heute' : ''}`)}
                         >
                             {/* Day Number & Station Badge */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 2px' }}>
+                            <div className="src-cell-top">
                                 {isToday ? (
-                                    <span style={{
-                                        background: 'var(--c-primary)',
-                                        color: '#ffffff',
-                                        borderRadius: '50%',
-                                        width: '18px',
-                                        height: '18px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10.5px',
-                                        fontWeight: 800,
-                                        lineHeight: 1,
-                                        boxShadow: '0 2px 5px rgb(var(--rgb-primary) / 0.6)'
-                                    }}>
+                                    <span className="src-day-today">
                                         {item.dayNum}
                                     </span>
                                 ) : (
-                                    <span style={{
-                                        fontSize: '11px',
-                                        fontWeight: hasShift ? 800 : (item.isWeekend ? 600 : 500),
-                                        color: hasShift ? 'var(--c-text)' : (item.isWeekend ? 'var(--c-text-muted)' : 'var(--c-border-strong)'),
-                                        lineHeight: 1
-                                    }}>
+                                    <span
+                                        className="src-day-num"
+                                        style={{
+                                            fontWeight: hasShift ? 800 : (item.isWeekend ? 600 : 500),
+                                            color: hasShift ? 'var(--c-text)' : (item.isWeekend ? 'var(--c-text-muted)' : 'var(--c-border-strong)')
+                                        }}
+                                    >
                                         {item.dayNum}
                                     </span>
                                 )}
                                 {hasShift && (
-                                    <span style={{
-                                        fontSize: '8px',
-                                        fontWeight: 800,
-                                        color: shiftColor.stationColor,
-                                        background: shiftColor.stationBg,
-                                        padding: '1px 3px',
-                                        borderRadius: '3px',
-                                        lineHeight: 1
-                                    }}>
+                                    <span
+                                        className="src-station-badge"
+                                        style={{
+                                            color: shiftColor.stationColor,
+                                            background: shiftColor.stationBg
+                                        }}
+                                    >
                                         {resolved.stationShort}
                                     </span>
                                 )}
                                 {!hasShift && incomingNightShift && (
-                                    <span style={{
-                                        fontSize: '7.5px',
-                                        fontWeight: 800,
-                                        color: 'var(--c-violet)',
-                                        background: 'rgb(var(--rgb-violet) / 0.2)',
-                                        padding: '1px 3px',
-                                        borderRadius: '3px',
-                                        lineHeight: 1
-                                    }}>
+                                    <span className="src-end-badge">
                                         ENDE
                                     </span>
                                 )}
@@ -337,53 +304,24 @@ export default function ShiftRhythmCalendar({
 
                             {/* Shift Badge or Free Dot / Heute */}
                             {hasShift ? (
-                                <div style={{
-                                    fontSize: '10px',
-                                    fontWeight: 800,
-                                    color: shiftColor.color,
-                                    lineHeight: 1,
-                                    marginTop: '2px',
-                                    maxWidth: '100%',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    textAlign: 'center'
-                                }}>
-                                    {resolved.code}{hasBonusDay ? '💰' : ''}
+                                <div
+                                    className="src-shift-code"
+                                    style={{ color: shiftColor.color }}
+                                >
+                                    <span>{resolved.code}</span>
+                                    {hasBonusDay && <span className="src-bonus-icon">💰</span>}
                                 </div>
                             ) : incomingNightShift ? (
-                                <div style={{
-                                    fontSize: '8.5px',
-                                    fontWeight: 700,
-                                    color: 'var(--c-violet)',
-                                    lineHeight: 1,
-                                    marginTop: '2px',
-                                    textAlign: 'center',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    maxWidth: '100%'
-                                }}>
-                                    🌙 {incomingNightShift.endTime}
+                                <div className="src-night-end-time">
+                                    <span className="src-night-end-moon">🌙</span>
+                                    <span>{incomingNightShift.endTime}</span>
                                 </div>
                             ) : isToday ? (
-                                <div style={{
-                                    fontSize: '9px',
-                                    fontWeight: 800,
-                                    color: 'var(--c-primary)',
-                                    lineHeight: 1,
-                                    letterSpacing: '0.2px'
-                                }}>
+                                <div className="src-today-label">
                                     Heute
                                 </div>
                             ) : (
-                                <div style={{
-                                    width: '4px',
-                                    height: '4px',
-                                    borderRadius: '50%',
-                                    background: 'var(--c-surface)',
-                                    marginBottom: '2px'
-                                }} />
+                                <div className="src-free-dot" />
                             )}
                         </div>
                     );
@@ -554,18 +492,7 @@ export default function ShiftRhythmCalendar({
             )}
 
             {/* Legend: Wachen Farbstruktur */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '14px',
-                flexWrap: 'wrap',
-                marginTop: '14px',
-                paddingTop: '10px',
-                borderTop: '1px solid rgb(var(--rgb-overlay) / 0.05)',
-                fontSize: '11px',
-                color: 'var(--c-text-muted)'
-            }}>
+            <div className="src-legend">
                 <span style={{ fontWeight: 700, color: 'var(--c-text-subtle)' }}>Wachen:</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATION_THEMES.Sendling.primaryHex }} />

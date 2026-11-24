@@ -635,7 +635,7 @@ export default function Journal() {
                 </div>
 
                     {/* Monatskalender (gleiche Übersicht wie im Reiter „mein Plan“) */}
-                    <div className="card-premium">
+                    <div className="card-premium shift-rhythm-card">
                         <ShiftRhythmCalendar
                             baseDate={monthStartDate}
                             filterMode="month"

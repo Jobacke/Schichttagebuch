@@ -442,7 +442,7 @@ export default function Analysis() {
             </div>
 
             {/* Kalender / Schicht-Rhythmus */}
-            <div className="card-premium">
+            <div className="card-premium shift-rhythm-card">
                 <ShiftRhythmCalendar
                     baseDate={baseDate}
                     filterMode={filterMode}

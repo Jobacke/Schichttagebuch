@@ -1571,3 +1571,324 @@ h2 {
     line-height: 1.2;
   }
 }
+
+/* =====================================================================
+   Schicht-Rhythmus Monatskalender (mein Plan, Journal, Team-Auswahl)
+   7 Spalten immer exakt in den verfügbaren Bereich eingepasst (iPhone-Fix)
+   ===================================================================== */
+.src-calendar {
+  width: 100%;
+  min-width: 0;
+}
+
+.src-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.src-header-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.src-header-pill {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.src-weekdays,
+.src-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+}
+
+.src-weekdays {
+  margin-bottom: 6px;
+}
+
+.src-weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 0;
+  min-width: 0;
+}
+
+.src-cell-empty {
+  min-height: 46px;
+  opacity: 0;
+}
+
+.src-cell {
+  min-width: 0;
+  width: 100%;
+  min-height: 46px;
+  padding: 4px 2px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.src-cell-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 2px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.src-day-num {
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.src-day-today {
+  background: var(--c-primary);
+  color: #ffffff;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  flex-shrink: 0;
+  box-shadow: 0 2px 5px rgb(var(--rgb-primary) / 0.6);
+}
+
+.src-station-badge {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 3px;
+  border-radius: 3px;
+  line-height: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.src-end-badge {
+  font-size: 7.5px;
+  font-weight: 800;
+  color: var(--c-violet);
+  background: rgb(var(--rgb-violet) / 0.2);
+  padding: 1px 3px;
+  border-radius: 3px;
+  line-height: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.src-shift-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.src-bonus-icon {
+  font-size: 0.85em;
+  margin-left: 1px;
+  flex-shrink: 0;
+}
+
+.src-night-end-time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--c-violet);
+  line-height: 1;
+  margin-top: 2px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.src-night-end-moon {
+  font-size: 0.9em;
+  flex-shrink: 0;
+}
+
+.src-today-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--c-primary);
+  line-height: 1;
+  letter-spacing: 0.2px;
+}
+
+.src-free-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--c-surface);
+  margin-bottom: 2px;
+}
+
+.src-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(var(--rgb-overlay) / 0.05);
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+/* iPhone & schmale Smartphones: alle 7 Spalten sauber innerhalb der Karte */
+@media (max-width: 480px) {
+  .card-premium.shift-rhythm-card {
+    padding: 14px 10px;
+  }
+
+  .src-header {
+    margin-bottom: 10px;
+    gap: 6px;
+  }
+
+  .src-header-pills {
+    gap: 5px;
+  }
+
+  .src-header-pill {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+
+  .src-weekdays,
+  .src-grid {
+    gap: 3px;
+  }
+
+  .src-cell-empty,
+  .src-cell {
+    min-height: 44px;
+  }
+
+  .src-cell {
+    padding: 3px 2px;
+    border-radius: 7px;
+  }
+
+  .src-cell-top {
+    padding: 0 1px;
+    gap: 1px;
+  }
+
+  .src-day-num {
+    font-size: 10px;
+  }
+
+  .src-day-today {
+    width: 15px;
+    height: 15px;
+    font-size: 9px;
+  }
+
+  .src-station-badge {
+    font-size: 6.5px;
+    padding: 1px 2px;
+    letter-spacing: -0.02em;
+  }
+
+  .src-end-badge {
+    font-size: 6px;
+    padding: 1px 2px;
+    letter-spacing: -0.03em;
+  }
+
+  .src-shift-code {
+    font-size: 8.5px;
+    letter-spacing: -0.02em;
+  }
+
+  .src-night-end-time {
+    gap: 1px;
+    font-size: 7.5px;
+    letter-spacing: -0.02em;
+  }
+
+  .src-today-label {
+    font-size: 8px;
+  }
+
+  .src-legend {
+    gap: 6px 10px;
+    font-size: 10.5px;
+  }
+}
+
+/* Sehr schmale Displays (z. B. iPhone SE / Mini / schmales Modal) */
+@media (max-width: 360px) {
+  .card-premium.shift-rhythm-card {
+    padding: 12px 8px;
+  }
+
+  .src-weekdays,
+  .src-grid {
+    gap: 2px;
+  }
+
+  .src-cell {
+    padding: 3px 1px;
+    border-radius: 6px;
+  }
+
+  .src-station-badge {
+    font-size: 6px;
+    padding: 1px 1.5px;
+  }
+
+  .src-end-badge {
+    font-size: 5.5px;
+    padding: 1px 1.5px;
+  }
+
+  .src-shift-code {
+    font-size: 8px;
+  }
+
+  .src-night-end-time {
+    font-size: 7px;
+  }
+}

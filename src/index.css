@@ -2364,15 +2364,27 @@ h2 {
 
   .src-header {
     margin-bottom: 10px;
-    gap: 6px;
+    gap: 0;
+  }
+
+  .src-title {
+    display: none;
   }
 
   .src-header-pills {
-    gap: 5px;
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 6px;
   }
 
   .src-header-pill {
-    padding: 3px 7px;
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4px 6px;
     font-size: 11px;
   }
 
@@ -2443,6 +2455,15 @@ h2 {
 @media (max-width: 360px) {
   .card-premium.shift-rhythm-card {
     padding: 12px 8px;
+  }
+
+  .src-header-pills {
+    gap: 4px;
+  }
+
+  .src-header-pill {
+    padding: 3px 4px;
+    font-size: 10.5px;
   }
 
   .src-weekdays,

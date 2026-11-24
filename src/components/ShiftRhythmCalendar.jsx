@@ -168,7 +168,7 @@ export default function ShiftRhythmCalendar({
         <div className="src-calendar">
             {/* Header: Title & Counter Pills */}
             <div className="src-header">
-                <h3 className="text-label" style={{ margin: 0 }}>📅 Schicht-Rhythmus</h3>
+                <h3 className="text-label src-title" style={{ margin: 0 }}>📅 Schicht-Rhythmus</h3>
                 <div className="src-header-pills">
                     <span
                         className="src-header-pill"

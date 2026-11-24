@@ -44,6 +44,21 @@ export default function PeriodStats({
             .sort((a, b) => b.count - a.count);
     }, [filteredData]);
 
+    const freeDaysCount = useMemo(() => {
+        if (!baseDate) return null;
+        const year = baseDate.getFullYear();
+        let totalDays = null;
+        if (filterMode === 'month') {
+            totalDays = new Date(year, baseDate.getMonth() + 1, 0).getDate();
+        } else if (filterMode === 'year') {
+            const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+            totalDays = isLeap ? 366 : 365;
+        }
+        if (totalDays === null) return null;
+        const shiftDates = new Set((filteredData || []).map(s => s?.date).filter(Boolean));
+        return Math.max(0, totalDays - shiftDates.size);
+    }, [baseDate, filterMode, filteredData]);
+
     return (
         <>
             {/* Kompakter Auswertungsblock: Zeile 1 Geleistet | Schichten | Bonus (einzeilig), Zeile 2 Saldo (einzeilig) */}
@@ -102,7 +117,19 @@ export default function PeriodStats({
             {/* Verteilung */}
             {stats.count > 0 && (
                 <div className="card-premium period-dist-card">
-                    <h3 className="text-label" style={{ margin: '0 0 10px 0' }}>🍰 Verteilung</h3>
+                    <div className="period-dist-header">
+                        <h3 className="text-label" style={{ margin: 0 }}>🍰 Verteilung</h3>
+                        <div className="period-dist-pills">
+                            <span className="period-dist-pill period-dist-pill-shifts">
+                                {stats.count} {stats.count === 1 ? 'Schicht' : 'Schichten'}
+                            </span>
+                            {freeDaysCount !== null && (
+                                <span className="period-dist-pill period-dist-pill-free">
+                                    {freeDaysCount} {freeDaysCount === 1 ? 'Tag' : 'Tage'} frei
+                                </span>
+                            )}
+                        </div>
+                    </div>
 
                     {/* Wachen-Verteilung (Eigenständige Farbstruktur) */}
                     {stationDistribution.length > 0 && (

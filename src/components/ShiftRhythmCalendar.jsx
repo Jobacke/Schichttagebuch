@@ -148,10 +148,6 @@ export default function ShiftRhythmCalendar({
         });
     }
 
-    const shiftDaysCount = Object.keys(shiftsByDate).length;
-    const freeDaysCount = Math.max(0, daysInMonth - shiftDaysCount);
-    const nightShiftEndDaysCount = days.filter(d => !d.empty && d.incomingNightShift && (!d.shifts || d.shifts.length === 0)).length;
-
     const selectedDayData = selectedDateStr ? days.find(d => !d.empty && d.dateStr === selectedDateStr) : null;
     let selectedDayInfo = null;
     if (selectedDayData) {
@@ -166,46 +162,6 @@ export default function ShiftRhythmCalendar({
 
     return (
         <div className="src-calendar">
-            {/* Header: Title & Counter Pills */}
-            <div className="src-header">
-                <h3 className="text-label src-title" style={{ margin: 0 }}>📅 Schicht-Rhythmus</h3>
-                <div className="src-header-pills">
-                    <span
-                        className="src-header-pill"
-                        style={{
-                            background: 'rgb(var(--rgb-primary) / 0.15)',
-                            color: 'var(--c-primary)',
-                            fontWeight: 700
-                        }}
-                    >
-                        {filteredData.length} {filteredData.length === 1 ? 'Schicht' : 'Schichten'}
-                    </span>
-                    {nightShiftEndDaysCount > 0 && (
-                        <span
-                            className="src-header-pill"
-                            style={{
-                                background: 'rgb(var(--rgb-violet) / 0.15)',
-                                color: 'var(--c-violet)',
-                                border: '1px solid rgb(var(--rgb-violet) / 0.35)',
-                                fontWeight: 700
-                            }}
-                        >
-                            🌙 {nightShiftEndDaysCount}x Nacht-Ende
-                        </span>
-                    )}
-                    <span
-                        className="src-header-pill"
-                        style={{
-                            background: 'rgb(var(--rgb-muted) / 0.12)',
-                            color: 'var(--c-text-muted)',
-                            fontWeight: 600
-                        }}
-                    >
-                        {Math.max(0, freeDaysCount - nightShiftEndDaysCount)} Tage frei
-                    </span>
-                </div>
-            </div>
-
             {/* Weekday Labels Header */}
             <div className="src-weekdays">
                 {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((wd, i) => (

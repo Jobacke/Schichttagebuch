@@ -2078,6 +2078,42 @@ h2 {
   padding: 14px;
 }
 
+.period-dist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: nowrap;
+}
+
+.period-dist-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.period-dist-pill {
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 3px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.period-dist-pill-shifts {
+  background: rgb(var(--rgb-primary) / 0.14);
+  color: var(--c-primary);
+  font-weight: 700;
+}
+
+.period-dist-pill-free {
+  background: rgb(var(--rgb-muted) / 0.12);
+  color: var(--c-text-muted);
+  font-weight: 600;
+}
+
 @media (max-width: 480px) {
   .period-stats-wrap {
     gap: 6px;

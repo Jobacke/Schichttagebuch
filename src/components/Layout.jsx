@@ -315,7 +315,7 @@ export default function Layout() {
                             <span className="app-brand-sub">Rettungsdienst · Dienstplan</span>
                         </div>
                     </div>
-                    <span className="app-version-chip">v{APP_VERSION}</span>
+                    <span className="app-version-chip">Version {APP_VERSION}</span>
                     <button
                         type="button"
                         className="icon-btn"

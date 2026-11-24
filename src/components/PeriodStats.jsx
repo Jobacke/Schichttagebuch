@@ -166,9 +166,6 @@ export default function PeriodStats({
 
                     {/* Schichtarten-Verteilung */}
                     <div>
-                        <span style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--c-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
-                            Schichtarten:
-                        </span>
                         {stats.distributionData.map((d, i) => {
                             const shiftCol = getShiftColor(d.name, '');
                             return (

@@ -158,7 +158,7 @@ export default function Settings() {
 
             <div style={{ textAlign: 'center', marginTop: '40px', opacity: 0.4 }}>
                 <Database size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
-                <small>Cloud Sync Aktiv • v{APP_VERSION}</small>
+                <small>Cloud Sync Aktiv • Version {APP_VERSION}</small>
             </div>
         </div>
     );

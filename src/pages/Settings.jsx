@@ -10,6 +10,8 @@ import { getBridgeToken, saveBridgeToken } from '../utils/integrationSecrets';
 import {
     getAirlockReturnConfig,
     saveAirlockReturnConfig,
+    syncAirlockReturnConfigFromCloud,
+    resolveAirlockReturnTarget,
     buildAirlockShortcutUrl,
     downloadAirlockReturnShortcut
 } from '../utils/oneClickCareManSync';
@@ -31,6 +33,10 @@ export default function Settings() {
     const { currentUser, requirePassword, setRequirePassword, logout } = useAuth();
     const [activeScreen, setActiveScreen] = useState(null);
     const [airlockConfig, setAirlockConfig] = useState(() => getAirlockReturnConfig());
+
+    useEffect(() => {
+        syncAirlockReturnConfigFromCloud().then(cfg => setAirlockConfig(cfg));
+    }, []);
 
     const goBack = () => {
         setAirlockConfig(getAirlockReturnConfig());
@@ -92,7 +98,7 @@ export default function Settings() {
                 {activeScreen === 'airlockReturn' && (
                     <AirlockReturnManager
                         config={airlockConfig}
-                        onChange={(next) => setAirlockConfig(next)}
+                        onChange={setAirlockConfig}
                     />
                 )}
                 {['stations', 'vehicles', 'callSigns'].includes(activeScreen) && (
@@ -171,7 +177,9 @@ export default function Settings() {
                     icon={Smartphone}
                     color={airlockConfig.useShortcut ? 'var(--c-success-strong)' : 'var(--c-info)'}
                     label="Airlock 2FA Rücksprung (iPhone)"
-                    value={airlockConfig.useShortcut ? `Aktiv (${airlockConfig.returnSeconds} s)` : 'Direkt'}
+                    value={airlockConfig.useShortcut
+                        ? `${resolveAirlockReturnTarget(airlockConfig.returnTarget).label} · ${airlockConfig.returnSeconds} s`
+                        : 'Direkt'}
                     onClick={() => setActiveScreen('airlockReturn')}
                 />
                 <SettingsItem
@@ -194,6 +202,10 @@ export default function Settings() {
 function AirlockReturnManager({ config, onChange }) {
     const [status, setStatus] = useState('');
 
+    useEffect(() => {
+        syncAirlockReturnConfigFromCloud().then(cfg => onChange(cfg));
+    }, [onChange]);
+
     const update = (patch) => {
         const next = saveAirlockReturnConfig(patch);
         onChange(next);
@@ -203,18 +215,24 @@ function AirlockReturnManager({ config, onChange }) {
     const handleDownload = () => {
         downloadAirlockReturnShortcut();
         update({ useShortcut: true });
-        setStatus('Kurzbefehl „Schichttagebuch-Airlock“ geladen und aktiviert! Tippe in Safari auf das Download-Symbol → Datei öffnen → „Kurzbefehl hinzufügen“ (nur 1× nötig).');
+        setStatus('Kurzbefehl „Schichttagebuch-Airlock“ (v2 mit Board- & Safari-Rücksprung) geladen und aktiviert! Datei öffnen → „Kurzbefehl hinzufügen“ (bei bestehendem Kurzbefehl „Ersetzen“ wählen).');
     };
 
     const presets = [4, 6, 8, 10];
-    const testUrl = buildAirlockShortcutUrl(config.returnSeconds);
+    const resolvedTarget = resolveAirlockReturnTarget(config.returnTarget);
+    const testUrl = buildAirlockShortcutUrl(config.returnSeconds, config.returnTarget);
+    const targetOptions = [
+        { id: 'auto', label: `Automatisch (${resolveAirlockReturnTarget('auto').label})` },
+        { id: 'board', label: 'Board' },
+        { id: 'safari', label: 'Safari' }
+    ];
 
     return (
         <div className="card-premium" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: 'var(--color-text-muted)' }}>
                 Öffnet beim Dienstplan-Abruf auf dem iPhone automatisch <strong>Airlock 2FA</strong> und springt
-                nach der eingestellten Wartezeit von selbst zurück ins <strong>Schichttagebuch</strong> (Safari) –
-                ohne den Abruf neu zu laden.
+                nach der eingestellten Wartezeit von selbst zurück in <strong>{resolvedTarget.label}</strong>.
+                Die Einstellung wird über dein Konto zwischen Board und Safari synchronisiert.
             </p>
 
             <div style={{
@@ -233,7 +251,7 @@ function AirlockReturnManager({ config, onChange }) {
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                         {config.useShortcut
-                            ? `Aktiv – Rücksprung nach ${config.returnSeconds} Sekunden`
+                            ? `Aktiv – zurück zu ${resolvedTarget.label} nach ${config.returnSeconds} Sekunden`
                             : 'Aus – öffnet Airlock 2FA direkt ohne Rücksprung'}
                     </div>
                 </div>
@@ -244,12 +262,56 @@ function AirlockReturnManager({ config, onChange }) {
                     onClick={() => {
                         const next = update({ useShortcut: !config.useShortcut });
                         setStatus(next.useShortcut
-                            ? 'Rücksprung per Kurzbefehl aktiviert.'
+                            ? `Rücksprung zu ${resolveAirlockReturnTarget(next.returnTarget).label} aktiviert.`
                             : 'Deaktiviert – Airlock 2FA wird wieder direkt geöffnet.');
                     }}
                 >
                     {config.useShortcut ? 'Aktiv' : 'Einschalten'}
                 </button>
+            </div>
+
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                padding: '12px 14px',
+                borderRadius: '12px',
+                background: 'var(--c-bg)',
+                border: '1px solid rgb(var(--rgb-muted) / 0.2)'
+            }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-main)' }}>
+                    Rücksprung-Ziel
+                </span>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {targetOptions.map((opt) => {
+                        const active = config.returnTarget === opt.id;
+                        return (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => update({ returnTarget: opt.id })}
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '999px',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    border: active
+                                        ? '1px solid var(--c-primary)'
+                                        : '1px solid rgb(var(--rgb-muted) / 0.25)',
+                                    background: active ? 'rgb(var(--rgb-primary) / 0.14)' : 'transparent',
+                                    color: active ? 'var(--c-primary)' : 'var(--color-text-muted)'
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        );
+                    })}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                    Wenn du das Schichttagebuch aus der Home-Screen-App <strong>Board</strong> startest, wähle
+                    <strong> Board</strong> (oder <strong>Automatisch</strong>).
+                </div>
             </div>
 
             <div style={{
@@ -343,7 +405,7 @@ function AirlockReturnManager({ config, onChange }) {
                     style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
                     <Download size={16} />
-                    <span>Kurzbefehl „Schichttagebuch-Airlock“ laden (1×)</span>
+                    <span>Kurzbefehl „Schichttagebuch-Airlock“ laden (v2)</span>
                 </button>
                 <a
                     href={testUrl}
@@ -357,7 +419,7 @@ function AirlockReturnManager({ config, onChange }) {
                     }}
                 >
                     <Play size={15} />
-                    <span>Kurzbefehl jetzt testen ({config.returnSeconds} s)</span>
+                    <span>Kurzbefehl jetzt testen (→ {resolvedTarget.label}, {config.returnSeconds} s)</span>
                 </a>
             </div>
 

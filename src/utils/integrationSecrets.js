@@ -91,3 +91,31 @@ export async function saveBridgeToken(token) {
     );
   }
 }
+
+export async function getCloudAirlockReturnConfig() {
+  try {
+    const docRef = ref();
+    if (!docRef) return null;
+    const snap = await getDoc(docRef);
+    if (snap.exists() && snap.data()?.airlockReturnConfig) {
+      return snap.data().airlockReturnConfig;
+    }
+  } catch {
+    // ignore offline/permission errors
+  }
+  return null;
+}
+
+export async function saveCloudAirlockReturnConfig(config) {
+  try {
+    const docRef = ref();
+    if (!docRef || !config) return;
+    await setDoc(
+      docRef,
+      { airlockReturnConfig: { ...config, updatedAt: Date.now() }, updatedAt: Date.now() },
+      { merge: true }
+    );
+  } catch {
+    // ignore offline/permission errors
+  }
+}

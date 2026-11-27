@@ -215,7 +215,7 @@ function AirlockReturnManager({ config, onChange }) {
     const handleDownload = () => {
         downloadAirlockReturnShortcut();
         update({ useShortcut: true });
-        setStatus('Kurzbefehl „Schichttagebuch-Airlock“ (v2 mit Board- & Safari-Rücksprung) geladen und aktiviert! Datei öffnen → „Kurzbefehl hinzufügen“ (bei bestehendem Kurzbefehl „Ersetzen“ wählen).');
+        setStatus('Kurzbefehl „Schichttagebuch-Airlock“ (v3 – ohne Link-Meldung, mit Board- & Safari-Rücksprung) geladen! Falls bereits vorhanden, vorher den alten „Schichttagebuch-Airlock“ in der Kurzbefehle-App löschen oder beim Hinzufügen „Ersetzen“ wählen.');
     };
 
     const presets = [4, 6, 8, 10];
@@ -405,7 +405,7 @@ function AirlockReturnManager({ config, onChange }) {
                     style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
                     <Download size={16} />
-                    <span>Kurzbefehl „Schichttagebuch-Airlock“ laden (v2)</span>
+                    <span>Kurzbefehl „Schichttagebuch-Airlock“ laden (v3)</span>
                 </button>
                 <a
                     href={testUrl}

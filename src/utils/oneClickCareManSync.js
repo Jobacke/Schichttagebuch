@@ -638,6 +638,10 @@ export function openCareManLiveWindow(targetYearMonth) {
     const existingOverlay = document.getElementById('careman-iphone-autopilot-modal');
     if (existingOverlay) existingOverlay.remove();
 
+    const isIosDevice = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && isTouchDevice);
+    const isAndroidDevice = /Android/i.test(ua);
+    const isMobileDevice = isIosDevice || isAndroidDevice;
+
     const overlay = document.createElement('div');
     overlay.id = 'careman-iphone-autopilot-modal';
     overlay.style.cssText =
@@ -653,6 +657,9 @@ export function openCareManLiveWindow(targetYearMonth) {
           🚀 Starte automatische Anmeldung & 3-Wachen-Abruf für ${ym}...
         </div>
         <div style="display:flex;flex-direction:column;gap:10px;">
+          <a id="cm-ip-airlock" href="airlock2fa://" style="display:none;text-decoration:none;background:linear-gradient(135deg,#0284c7,#0369a1);color:#ffffff;border:1px solid rgba(56,189,248,0.6);padding:12px 16px;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(2,132,199,0.4);">
+            🔓 Airlock 2FA öffnen (Face ID)
+          </a>
           <button id="cm-ip-fallback" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);padding:10px 14px;border-radius:11px;font-size:12.5px;font-weight:700;cursor:pointer;">
             Alternativ: Direkt im Browser mit Lesezeichen öffnen
           </button>
@@ -665,6 +672,57 @@ export function openCareManLiveWindow(targetYearMonth) {
     document.body.appendChild(overlay);
 
     let stopped = false;
+    let wakePollResolver = null;
+    let airlockHintTimer = null;
+    let appSwitchedFor2fa = false;
+
+    const wakePoll = () => {
+      if (wakePollResolver) {
+        const fn = wakePollResolver;
+        wakePollResolver = null;
+        fn();
+      }
+    };
+
+    const waitOrWake = (ms) => new Promise((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(t);
+        if (wakePollResolver === done) wakePollResolver = null;
+        resolve();
+      };
+      const t = setTimeout(done, ms);
+      wakePollResolver = done;
+    });
+
+    const onVisChange = () => {
+      if (document.visibilityState === 'hidden') {
+        appSwitchedFor2fa = true;
+        if (airlockHintTimer) {
+          clearTimeout(airlockHintTimer);
+          airlockHintTimer = null;
+        }
+      } else if (document.visibilityState === 'visible') {
+        // Returning from Airlock 2FA -> check bridge immediately without waiting 1s
+        wakePoll();
+      }
+    };
+    const onWinFocus = () => wakePoll();
+    document.addEventListener('visibilitychange', onVisChange);
+    window.addEventListener('focus', onWinFocus);
+
+    const cleanup = () => {
+      if (airlockHintTimer) {
+        clearTimeout(airlockHintTimer);
+        airlockHintTimer = null;
+      }
+      document.removeEventListener('visibilitychange', onVisChange);
+      window.removeEventListener('focus', onWinFocus);
+      wakePoll();
+    };
+
     const reqId = `ip_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     try { localStorage.setItem(LAST_CLOUD_SYNC_KEY, String(Date.now())); } catch { /* ignore */ }
     const bridgeIssueUrl = 'https://api.github.com/repos/Jobacke/careman-autopilot-bridge/issues/1';
@@ -672,6 +730,7 @@ export function openCareManLiveWindow(targetYearMonth) {
 
     const msgEl = overlay.querySelector('#cm-ip-msg');
     const spinEl = overlay.querySelector('#cm-ip-spin');
+    const airlockBtn = overlay.querySelector('#cm-ip-airlock');
     const cancelBtn = overlay.querySelector('#cm-ip-cancel');
     const fallbackBtn = overlay.querySelector('#cm-ip-fallback');
 
@@ -680,6 +739,7 @@ export function openCareManLiveWindow(targetYearMonth) {
     if (fallbackBtn) {
       fallbackBtn.onclick = () => {
         stopped = true;
+        cleanup();
         overlay.remove();
         window.location.href = targetCareManUrl;
       };
@@ -688,6 +748,7 @@ export function openCareManLiveWindow(targetYearMonth) {
     if (cancelBtn) {
       cancelBtn.onclick = async () => {
         stopped = true;
+        cleanup();
         overlay.remove();
         if (ghToken) {
           try {
@@ -699,6 +760,8 @@ export function openCareManLiveWindow(targetYearMonth) {
               const iss = await getR.json();
               const st = JSON.parse(iss.body || '{}');
               st.status = 'cancelled';
+              st.awaiting2fa = false;
+              st.airlockUrl = '';
               await fetch(bridgeIssueUrl, {
                 method: 'PATCH',
                 headers: {
@@ -716,6 +779,19 @@ export function openCareManLiveWindow(targetYearMonth) {
 
     (async () => {
       const MAX_ATTEMPTS = 3;
+      const setAirlockButtonVisible = (visible, url = 'airlock2fa://') => {
+        if (!airlockBtn) return;
+        if (visible && isMobileDevice) {
+          airlockBtn.setAttribute('href', url);
+          airlockBtn.style.display = 'block';
+        } else {
+          airlockBtn.style.display = 'none';
+          if (airlockHintTimer) {
+            clearTimeout(airlockHintTimer);
+            airlockHintTimer = null;
+          }
+        }
+      };
       const showMsg = (text, tone = 'info') => {
         if (!msgEl) return;
         msgEl.textContent = text;
@@ -731,6 +807,7 @@ export function openCareManLiveWindow(targetYearMonth) {
         }
       };
       const finalFailure = (text) => {
+        setAirlockButtonVisible(false);
         if (spinEl) spinEl.style.display = 'none';
         showMsg(text, 'error');
         if (fallbackBtn) {
@@ -782,6 +859,8 @@ export function openCareManLiveWindow(targetYearMonth) {
             ...existingState,
             requestId: attemptReqId,
             status: 'requested',
+            awaiting2fa: false,
+            airlockUrl: '',
             stepMessage: `☁️ Cloud-Autopilot wird gestartet${label} – das dauert meist 30–60 Sekunden …`,
             ym,
             targetDate,
@@ -809,6 +888,7 @@ export function openCareManLiveWindow(targetYearMonth) {
             showMsg(`⚠️ Verbindung zur Cloud gestört${label} – neuer Versuch …`, 'warn');
             return 'retry';
           }
+          setAirlockButtonVisible(false);
           showMsg(nextState.stepMessage);
 
           // Start the GitHub Cloud-Autopilot (independent of the Mac)
@@ -829,8 +909,9 @@ export function openCareManLiveWindow(targetYearMonth) {
           // Poll up to ~9 minutes (login + Airlock confirmation can take a while)
           const startedAt = Date.now();
           let redispatched = false;
+          let airlockOpened = false;
           while (!stopped && Date.now() - startedAt < 9 * 60 * 1000) {
-            await new Promise(r => setTimeout(r, 1000));
+            await waitOrWake(1000);
             if (stopped) break;
 
             let f;
@@ -840,6 +921,35 @@ export function openCareManLiveWindow(targetYearMonth) {
             const curStatus = f.status || '';
             const stepMsg = f.stepMessage || '';
             if (stepMsg && curStatus === 'running') showMsg(stepMsg + label);
+
+            // Automatically open Airlock 2FA on iPhone/mobile as soon as the 2FA push is waiting
+            const isAwaiting2fa = curStatus === 'running' && (
+              Boolean(f.awaiting2fa) ||
+              /Airlock\s*2FA.*best[äa]tigen|in\s+Airlock\s+2FA|Öffne\s+Airlock\s+2FA/i.test(stepMsg)
+            );
+            if (isAwaiting2fa) {
+              const airlockTargetUrl =
+                (typeof f.airlockUrl === 'string' && /^airlock2fa:\/\//i.test(f.airlockUrl))
+                  ? f.airlockUrl
+                  : 'airlock2fa://';
+              setAirlockButtonVisible(true, airlockTargetUrl);
+              if (!airlockOpened && isMobileDevice) {
+                airlockOpened = true;
+                appSwitchedFor2fa = false;
+                if (airlockBtn) airlockBtn.textContent = '🔓 Airlock 2FA öffnen (Face ID)';
+                try {
+                  window.location.href = airlockTargetUrl;
+                } catch { /* ignore */ }
+                // If Safari requires a direct tap (no automatic switch after 1.8s), highlight the button clearly
+                airlockHintTimer = setTimeout(() => {
+                  if (!stopped && !appSwitchedFor2fa && document.visibilityState === 'visible' && airlockBtn && airlockBtn.style.display !== 'none') {
+                    airlockBtn.textContent = '🔓 Airlock 2FA jetzt öffnen (Tippen)';
+                  }
+                }, 1800);
+              }
+            } else {
+              setAirlockButtonVisible(false);
+            }
 
             // Nobody picked up the job after 3 minutes: start the workflow once more
             if (curStatus === 'requested' && !redispatched && Date.now() - startedAt > 3 * 60 * 1000) {
@@ -859,12 +969,14 @@ export function openCareManLiveWindow(targetYearMonth) {
                     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
                     resJson = new TextDecoder('utf-8').decode(bytes);
                   } else {
-                    await new Promise(r => setTimeout(r, 1500));
+                    await waitOrWake(1500);
                   }
                 }
               }
               if (resJson && resJson.length > 20) {
                 stopped = true;
+                setAirlockButtonVisible(false);
+                cleanup();
                 if (msgEl) {
                   msgEl.style.borderColor = '#10b981';
                   msgEl.style.color = '#34d399';
@@ -877,6 +989,7 @@ export function openCareManLiveWindow(targetYearMonth) {
             }
 
             if (curStatus === 'error') {
+              setAirlockButtonVisible(false);
               if (f.noRetry) {
                 // Login was rejected – retrying could lock the account
                 finalFailure(stepMsg || '⛔ Anmeldung abgelehnt.');
@@ -886,6 +999,7 @@ export function openCareManLiveWindow(targetYearMonth) {
               return 'retry';
             }
           }
+          setAirlockButtonVisible(false);
           if (stopped) return 'fatal';
           showMsg(`⚠️ Keine Rückmeldung vom Cloud-Autopilot${label}.`, 'warn');
           return 'retry';
@@ -895,7 +1009,7 @@ export function openCareManLiveWindow(targetYearMonth) {
           const result = await runAttempt(attemptNo);
           if (result === 'done' || result === 'fatal') return;
           if (attemptNo < MAX_ATTEMPTS && !stopped) {
-            await new Promise(r => setTimeout(r, 4000));
+            await waitOrWake(4000);
           }
         }
         if (!stopped) {
@@ -905,6 +1019,8 @@ export function openCareManLiveWindow(targetYearMonth) {
         if (!stopped) {
           finalFailure('⚠️ Unerwarteter Fehler beim Cloud-Abruf: ' + (err?.message || err));
         }
+      } finally {
+        cleanup();
       }
     })();
     return;
@@ -1191,6 +1307,8 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
 
       let lastPasswordSubmitAt = 0;
       let last2faSelectAt = 0;
+      let airlockAutoOpened = false;
+      const isMobileUa = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '') || (/Macintosh/i.test(navigator.userAgent || '') && Number(navigator.maxTouchPoints) > 1);
 
       // Warte bis zu 180 Sekunden auf Login + manuelle Bestätigung in Airlock 2FA
       for (let tick = 0; tick < 450; tick++) {
@@ -1217,7 +1335,13 @@ export const SIEDA_EXTRACTOR_SCRIPT = `(async () => {
         // 2. Prüfen auf "Anmeldung mit Airlock 2FA" (manuelle Smartphone-Bestätigung)
         if (/Anmeldung\\s+mit\\s+Airlock\\s+2FA|Nachricht\\s+auf\\s+Ihrem\\s+Smartphone|Offline-Modus/i.test(bodyText)) {
           banner.style.background = 'linear-gradient(135deg,#0284c7,#0369a1)';
-          setStatus(\`📱 Bitte jetzt in Airlock 2FA bestätigen – öffne danach automatisch Dienstplan Bayern (\${targetYm})...\`);
+          setStatus(\`📱 Öffne Airlock 2FA – bitte mit Face ID bestätigen. Dienstplan Bayern (\${targetYm}) lädt danach automatisch...\`);
+          if (isMobileUa && !window.__CAREMAN_DAEMON_MODE && !airlockAutoOpened) {
+            airlockAutoOpened = true;
+            const airlockEl = document.querySelector('a[href^="airlock2fa:"]');
+            const airlockHref = (airlockEl && airlockEl.getAttribute('href')) || 'airlock2fa://';
+            try { window.location.href = airlockHref; } catch (e) {}
+          }
           await sleep(400);
           continue;
         }

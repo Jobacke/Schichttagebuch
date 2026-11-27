@@ -111,6 +111,8 @@
 
       let lastPasswordSubmitAt = 0;
       let last2faSelectAt = 0;
+      let airlockAutoOpened = false;
+      const isMobileUa = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '') || (/Macintosh/i.test(navigator.userAgent || '') && Number(navigator.maxTouchPoints) > 1);
 
       // Warte bis zu 180 Sekunden auf Login + manuelle Bestätigung in Airlock 2FA
       for (let tick = 0; tick < 450; tick++) {
@@ -137,7 +139,13 @@
         // 2. Prüfen auf "Anmeldung mit Airlock 2FA" (manuelle Smartphone-Bestätigung)
         if (/Anmeldung\s+mit\s+Airlock\s+2FA|Nachricht\s+auf\s+Ihrem\s+Smartphone|Offline-Modus/i.test(bodyText)) {
           banner.style.background = 'linear-gradient(135deg,#0284c7,#0369a1)';
-          setStatus(`📱 Bitte jetzt in Airlock 2FA bestätigen – öffne danach automatisch Dienstplan Bayern (${targetYm})...`);
+          setStatus(`📱 Öffne Airlock 2FA – bitte mit Face ID bestätigen. Dienstplan Bayern (${targetYm}) lädt danach automatisch...`);
+          if (isMobileUa && !window.__CAREMAN_DAEMON_MODE && !airlockAutoOpened) {
+            airlockAutoOpened = true;
+            const airlockEl = document.querySelector('a[href^="airlock2fa:"]');
+            const airlockHref = (airlockEl && airlockEl.getAttribute('href')) || 'airlock2fa://';
+            try { window.location.href = airlockHref; } catch (e) {}
+          }
           await sleep(400);
           continue;
         }

@@ -709,6 +709,8 @@ async function main() {
     resultJson: '',
     resultBlobSha: '',
     status: 'running',
+    awaiting2fa: false,
+    airlockUrl: '',
     stepMessage: `☁️ Cloud-Auto-Pilot verbunden – öffne Johanniter-Anmeldung für ${ym}...`,
     updatedAt: Date.now()
   });
@@ -754,22 +756,30 @@ async function main() {
   const siedaConfigured = Boolean(String(process.env.CAREMAN_SIEDA_PASS || ''));
   const abortRun = async (msg) => {
     console.error('⛔ ' + msg);
-    await patchBridge({ status: 'error', noRetry: true, stepMessage: msg, updatedAt: Date.now() });
+    await patchBridge({ status: 'error', noRetry: true, awaiting2fa: false, airlockUrl: '', stepMessage: msg, updatedAt: Date.now() });
     process.exitCode = 1;
     aborted = true;
   };
   let last2faSelectAt = 0;
   let lastStepMsg = '';
+  let lastAwaiting2fa = false;
+  let lastAirlockUrl = '';
   let seedAttempts = 0;
   let monthFixed = false;
 
-  const updateStep = async (msg) => {
-    if (!msg || msg === lastStepMsg) return;
+  const updateStep = async (msg, extra = {}) => {
+    const nextAwaiting2fa = Boolean(extra.awaiting2fa);
+    const nextAirlockUrl = nextAwaiting2fa ? String(extra.airlockUrl || '') : '';
+    if (!msg || (msg === lastStepMsg && nextAwaiting2fa === lastAwaiting2fa && nextAirlockUrl === lastAirlockUrl)) return;
     lastStepMsg = msg;
+    lastAwaiting2fa = nextAwaiting2fa;
+    lastAirlockUrl = nextAirlockUrl;
     console.log('[Cloud Auto-Pilot]', msg);
     patchBridge({
       status: 'running',
       stepMessage: msg,
+      awaiting2fa: nextAwaiting2fa,
+      airlockUrl: nextAirlockUrl,
       updatedAt: Date.now()
     });
   };
@@ -820,9 +830,11 @@ async function main() {
         } catch (e) {}
         const extractorRunning = Boolean(window.__CAREMAN_EXTRACTOR_RUNNING);
         const bannerText = document.querySelector('[data-careman-sync-banner]')?.textContent || '';
+        const airlockLinkEl = document.querySelector('a[href^="airlock2fa:"]');
+        const airlockUrl = airlockLinkEl ? (airlockLinkEl.getAttribute('href') || '') : '';
         const daemonResult = window.__CAREMAN_DAEMON_RESULT ||
           (window.name && window.name.startsWith('CAREMAN_SYNC:') ? window.name.slice('CAREMAN_SYNC:'.length) : null);
-        return { href, host, readyState, bodyText: bodyText.slice(0, 1500), hasPassInput, freshMyPlanToken, extractorRunning, bannerText, daemonResult };
+        return { href, host, readyState, bodyText: bodyText.slice(0, 1500), hasPassInput, freshMyPlanToken, extractorRunning, bannerText, airlockUrl, daemonResult };
       })()`).catch(() => null);
 
       if (!pageState) {
@@ -846,6 +858,8 @@ async function main() {
         }
         const doneFields = {
           status: 'done',
+          awaiting2fa: false,
+          airlockUrl: '',
           stepMessage: `✅ Alle 3 Wachen (${ym}) über Cloud geladen – übertrage ins Journal...`,
           ...(captureBlobSha ? { captureBlobSha, captureAt: Date.now() } : {}),
           ...(pageState.freshMyPlanToken ? { myPlanToken: pageState.freshMyPlanToken } : {}),
@@ -894,7 +908,10 @@ async function main() {
         }
 
         if (/Anmeldung\s+mit\s+Airlock\s+2FA|Login\s+with\s+Airlock\s+2FA|Nachricht\s+auf\s+Ihrem\s+Smartphone|message\s+on\s+your\s+smartphone|Offline-Modus|Offline\s+mode/i.test(pageState.bodyText)) {
-          await updateStep(`📱 Bitte jetzt in Airlock 2FA auf deinem iPhone bestätigen – Dienstplan (${ym}) lädt danach automatisch!`);
+          await updateStep(
+            `📱 Öffne Airlock 2FA – bitte mit Face ID bestätigen. Dienstplan (${ym}) lädt danach automatisch!`,
+            { awaiting2fa: true, airlockUrl: pageState.airlockUrl || '' }
+          );
           await sleep(500);
           continue;
         }
@@ -1088,6 +1105,8 @@ async function main() {
       console.error('❌ Zeitüberschreitung – Dienstplan wurde nicht ausgelesen. Letzter Schritt: ' + lastStepMsg);
       await patchBridge({
         status: 'error',
+        awaiting2fa: false,
+        airlockUrl: '',
         stepMessage: '⚠️ Zeitüberschreitung beim CareMan-Abruf (letzter Schritt: ' + (lastStepMsg || 'unbekannt') + '). Bitte erneut versuchen.',
         updatedAt: Date.now()
       });
@@ -1097,6 +1116,8 @@ async function main() {
     console.error('Cloud runner loop error:', err);
     await patchBridge({
       status: 'error',
+      awaiting2fa: false,
+      airlockUrl: '',
       stepMessage: '⚠️ Cloud-Fehler: ' + (err.message || String(err)),
       updatedAt: Date.now()
     });

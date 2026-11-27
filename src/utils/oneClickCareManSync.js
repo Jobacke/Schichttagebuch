@@ -519,127 +519,7 @@ export function consumeSiriAbruf() {
 
 const PREWARM_KEY = 'careman_cloud_prewarm_at';
 const LAST_CLOUD_SYNC_KEY = 'careman_cloud_last_sync_at';
-const AIRLOCK_SHORTCUT_NAME = 'Schichttagebuch-Airlock';
-const AIRLOCK_SHORTCUT_ENABLED_KEY = 'schichttagebuch_airlock_shortcut_enabled_v1';
-const AIRLOCK_RETURN_SECONDS_KEY = 'schichttagebuch_airlock_return_seconds_v1';
-const AIRLOCK_RETURN_TARGET_KEY = 'schichttagebuch_airlock_return_target_v1';
-const BOARD_WEBAPP_RETURN_URL = 'webapp://board.vjbackhaus.de/';
-const DEFAULT_AIRLOCK_RETURN_SECONDS = 6;
 let prewarmInFlight = false;
-
-function normalizeReturnTarget(raw) {
-  return (raw === 'board' || raw === 'safari' || raw === 'auto') ? raw : 'auto';
-}
-
-export function isRunningInsideBoard() {
-  if (typeof window === 'undefined') return false;
-  try {
-    if (window.parent && window.parent !== window) return true;
-    const ref = (typeof document !== 'undefined' && document.referrer) ? document.referrer : '';
-    if (/board\.vjbackhaus\.de/i.test(ref)) return true;
-    if (typeof navigator !== 'undefined' && navigator.standalone === true) return true;
-    if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
-  } catch { /* ignore */ }
-  return false;
-}
-
-export function resolveAirlockReturnTarget(returnTarget = 'auto') {
-  const pref = normalizeReturnTarget(returnTarget);
-  const effective = pref === 'auto' ? (isRunningInsideBoard() ? 'board' : 'safari') : pref;
-  if (effective === 'board') {
-    return { target: 'board', label: 'Board', returnUrl: BOARD_WEBAPP_RETURN_URL };
-  }
-  return { target: 'safari', label: 'Safari', returnUrl: '' };
-}
-
-export function getAirlockReturnConfig() {
-  let useShortcut = false;
-  let returnSeconds = DEFAULT_AIRLOCK_RETURN_SECONDS;
-  let returnTarget = 'auto';
-  try {
-    useShortcut = localStorage.getItem(AIRLOCK_SHORTCUT_ENABLED_KEY) === '1';
-    const rawSec = parseInt(localStorage.getItem(AIRLOCK_RETURN_SECONDS_KEY) || '', 10);
-    if (Number.isFinite(rawSec) && rawSec >= 2 && rawSec <= 30) {
-      returnSeconds = rawSec;
-    }
-    returnTarget = normalizeReturnTarget(localStorage.getItem(AIRLOCK_RETURN_TARGET_KEY));
-  } catch { /* ignore */ }
-  return { useShortcut, returnSeconds, returnTarget };
-}
-
-function writeLocalAirlockReturnConfig({ useShortcut, returnSeconds, returnTarget }) {
-  try {
-    localStorage.setItem(AIRLOCK_SHORTCUT_ENABLED_KEY, useShortcut ? '1' : '0');
-    localStorage.setItem(AIRLOCK_RETURN_SECONDS_KEY, String(returnSeconds));
-    localStorage.setItem(AIRLOCK_RETURN_TARGET_KEY, returnTarget);
-  } catch { /* ignore */ }
-  try {
-    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'board-storage-set', key: AIRLOCK_SHORTCUT_ENABLED_KEY, value: useShortcut ? '1' : '0' }, '*');
-      window.parent.postMessage({ type: 'board-storage-set', key: AIRLOCK_RETURN_SECONDS_KEY, value: String(returnSeconds) }, '*');
-      window.parent.postMessage({ type: 'board-storage-set', key: AIRLOCK_RETURN_TARGET_KEY, value: returnTarget }, '*');
-    }
-  } catch { /* ignore */ }
-}
-
-export function saveAirlockReturnConfig({ useShortcut, returnSeconds, returnTarget } = {}, { skipCloud = false } = {}) {
-  const current = getAirlockReturnConfig();
-  const nextUse = typeof useShortcut === 'boolean' ? useShortcut : current.useShortcut;
-  const parsedSec = parseInt(returnSeconds, 10);
-  const nextSec = Number.isFinite(parsedSec)
-    ? Math.min(30, Math.max(2, parsedSec))
-    : current.returnSeconds;
-  const nextTarget = returnTarget !== undefined ? normalizeReturnTarget(returnTarget) : current.returnTarget;
-  const next = { useShortcut: nextUse, returnSeconds: nextSec, returnTarget: nextTarget };
-  writeLocalAirlockReturnConfig(next);
-  if (!skipCloud) {
-    import('./integrationSecrets.js')
-      .then(m => m.saveCloudAirlockReturnConfig?.(next))
-      .catch(() => {});
-  }
-  return next;
-}
-
-export async function syncAirlockReturnConfigFromCloud() {
-  try {
-    const { getCloudAirlockReturnConfig } = await import('./integrationSecrets.js');
-    const cloud = await getCloudAirlockReturnConfig?.();
-    if (cloud && typeof cloud === 'object') {
-      return saveAirlockReturnConfig(
-        {
-          useShortcut: typeof cloud.useShortcut === 'boolean' ? cloud.useShortcut : undefined,
-          returnSeconds: cloud.returnSeconds,
-          returnTarget: cloud.returnTarget
-        },
-        { skipCloud: true }
-      );
-    }
-  } catch { /* ignore */ }
-  return getAirlockReturnConfig();
-}
-
-export function buildAirlockShortcutUrl(seconds, returnTarget = 'auto') {
-  const parsed = parseInt(seconds, 10);
-  const secs = Number.isFinite(parsed) ? Math.min(30, Math.max(2, parsed)) : DEFAULT_AIRLOCK_RETURN_SECONDS;
-  const resolved = resolveAirlockReturnTarget(returnTarget);
-  const payload = resolved.returnUrl ? `${secs}\n${resolved.returnUrl}` : String(secs);
-  return (
-    `shortcuts://run-shortcut?name=${encodeURIComponent(AIRLOCK_SHORTCUT_NAME)}` +
-    `&input=text&text=${encodeURIComponent(payload)}`
-  );
-}
-
-export function downloadAirlockReturnShortcut() {
-  if (typeof document === 'undefined') return false;
-  const link = document.createElement('a');
-  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
-  link.href = `${base}${AIRLOCK_SHORTCUT_NAME}.shortcut`;
-  link.setAttribute('download', `${AIRLOCK_SHORTCUT_NAME}.shortcut`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  return true;
-}
 
 function isMacDesktopBrowser() {
   if (typeof navigator === 'undefined') return false;
@@ -937,10 +817,6 @@ export function openCareManLiveWindow(targetYearMonth) {
       };
 
       try {
-        // Sync Airlock return config from Firestore in parallel (keeps Board & Safari in sync!)
-        if (isMobileDevice) {
-          syncAirlockReturnConfigFromCloud().catch(() => {});
-        }
         // GitHub token comes from the user's private Firestore area (Settings), never from the source code
         const { getBridgeToken } = await import('./integrationSecrets.js');
         ghToken = await getBridgeToken();
@@ -1052,34 +928,22 @@ export function openCareManLiveWindow(targetYearMonth) {
               /Airlock\s*2FA.*best[äa]tigen|in\s+Airlock\s+2FA|Öffne\s+Airlock\s+2FA/i.test(stepMsg)
             );
             if (isAwaiting2fa) {
-              const airlockCfg = getAirlockReturnConfig();
-              const useReturnShortcut = isIosDevice && airlockCfg.useShortcut;
-              const resolvedTarget = resolveAirlockReturnTarget(airlockCfg.returnTarget);
-              const directAirlockUrl =
+              const airlockTargetUrl =
                 (typeof f.airlockUrl === 'string' && /^airlock2fa:\/\//i.test(f.airlockUrl))
                   ? f.airlockUrl
                   : 'airlock2fa://';
-              const airlockTargetUrl = useReturnShortcut
-                ? buildAirlockShortcutUrl(airlockCfg.returnSeconds, airlockCfg.returnTarget)
-                : directAirlockUrl;
-              const defaultBtnLabel = useReturnShortcut
-                ? `🔓 Airlock 2FA öffnen (→ ${resolvedTarget.label} nach ${airlockCfg.returnSeconds} s)`
-                : '🔓 Airlock 2FA öffnen (Face ID)';
-              const tapHintBtnLabel = useReturnShortcut
-                ? `🔓 Airlock 2FA jetzt öffnen (→ ${resolvedTarget.label}, ${airlockCfg.returnSeconds} s) – Tippen`
-                : '🔓 Airlock 2FA jetzt öffnen (Tippen)';
               setAirlockButtonVisible(true, airlockTargetUrl);
               if (!airlockOpened && isMobileDevice) {
                 airlockOpened = true;
                 appSwitchedFor2fa = false;
-                if (airlockBtn) airlockBtn.textContent = defaultBtnLabel;
+                if (airlockBtn) airlockBtn.textContent = '🔓 Airlock 2FA öffnen (Face ID)';
                 try {
                   window.location.href = airlockTargetUrl;
                 } catch { /* ignore */ }
                 // If Safari requires a direct tap (no automatic switch after 1.8s), highlight the button clearly
                 airlockHintTimer = setTimeout(() => {
                   if (!stopped && !appSwitchedFor2fa && document.visibilityState === 'visible' && airlockBtn && airlockBtn.style.display !== 'none') {
-                    airlockBtn.textContent = tapHintBtnLabel;
+                    airlockBtn.textContent = '🔓 Airlock 2FA jetzt öffnen (Tippen)';
                   }
                 }, 1800);
               }

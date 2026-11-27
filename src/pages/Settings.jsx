@@ -4,17 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import {
     Plus, Clock, Tag, Truck, Hash, MapPin,
     Database, ChevronLeft, ChevronRight, Trash2, RotateCcw, Check, CalendarDays,
-    PenSquare, X, Coins, KeyRound, Lock, Smartphone, Download, Play
+    PenSquare, X, Coins, KeyRound, Lock
 } from 'lucide-react';
 import { getBridgeToken, saveBridgeToken } from '../utils/integrationSecrets';
-import {
-    getAirlockReturnConfig,
-    saveAirlockReturnConfig,
-    syncAirlockReturnConfigFromCloud,
-    resolveAirlockReturnTarget,
-    buildAirlockShortcutUrl,
-    downloadAirlockReturnShortcut
-} from '../utils/oneClickCareManSync';
 import { SHIFT_PRESETS } from '../utils/shiftPresets';
 import { APP_VERSION } from '../version';
 
@@ -32,16 +24,8 @@ export default function Settings() {
     } = useStore();
     const { currentUser, requirePassword, setRequirePassword, logout } = useAuth();
     const [activeScreen, setActiveScreen] = useState(null);
-    const [airlockConfig, setAirlockConfig] = useState(() => getAirlockReturnConfig());
 
-    useEffect(() => {
-        syncAirlockReturnConfigFromCloud().then(cfg => setAirlockConfig(cfg));
-    }, []);
-
-    const goBack = () => {
-        setAirlockConfig(getAirlockReturnConfig());
-        setActiveScreen(null);
-    };
+    const goBack = () => setActiveScreen(null);
 
     if (activeScreen) {
         return (
@@ -54,8 +38,7 @@ export default function Settings() {
                                     activeScreen === 'stations' ? 'Wachen' :
                                         activeScreen === 'vehicles' ? 'Fahrzeuge' :
                                             activeScreen === 'cloudToken' ? 'CareMan Cloud-Autopilot' :
-                                                activeScreen === 'caremanLogin' ? 'CareMan-Anmeldung (dieses Gerät)' :
-                                                    activeScreen === 'airlockReturn' ? 'Airlock 2FA Rücksprung' : 'Funkrufnamen'
+                                                activeScreen === 'caremanLogin' ? 'CareMan-Anmeldung (dieses Gerät)' : 'Funkrufnamen'
                 }
                 onBack={goBack}
             >
@@ -95,12 +78,6 @@ export default function Settings() {
                 )}
                 {activeScreen === 'cloudToken' && <CloudTokenManager />}
                 {activeScreen === 'caremanLogin' && <CareManLoginManager />}
-                {activeScreen === 'airlockReturn' && (
-                    <AirlockReturnManager
-                        config={airlockConfig}
-                        onChange={setAirlockConfig}
-                    />
-                )}
                 {['stations', 'vehicles', 'callSigns'].includes(activeScreen) && (
                     <SimpleManager
                         data={store.settings[activeScreen]}
@@ -174,15 +151,6 @@ export default function Settings() {
                     value="" onClick={() => setActiveScreen('cloudToken')}
                 />
                 <SettingsItem
-                    icon={Smartphone}
-                    color={airlockConfig.useShortcut ? 'var(--c-success-strong)' : 'var(--c-info)'}
-                    label="Airlock 2FA Rücksprung (iPhone)"
-                    value={airlockConfig.useShortcut
-                        ? `${resolveAirlockReturnTarget(airlockConfig.returnTarget).label} · ${airlockConfig.returnSeconds} s`
-                        : 'Direkt'}
-                    onClick={() => setActiveScreen('airlockReturn')}
-                />
-                <SettingsItem
                     icon={KeyRound} color="var(--c-warning-strong)" label="CareMan-Anmeldung (dieses Gerät)"
                     value="" onClick={() => setActiveScreen('caremanLogin')}
                 />
@@ -197,248 +165,6 @@ export default function Settings() {
 }
 
 // --- Sub-Components ---
-
-// Airlock 2FA auto-return via iOS Shortcut ("Schichttagebuch-Airlock")
-function AirlockReturnManager({ config, onChange }) {
-    const [status, setStatus] = useState('');
-
-    useEffect(() => {
-        syncAirlockReturnConfigFromCloud().then(cfg => onChange(cfg));
-    }, [onChange]);
-
-    const update = (patch) => {
-        const next = saveAirlockReturnConfig(patch);
-        onChange(next);
-        return next;
-    };
-
-    const handleDownload = () => {
-        downloadAirlockReturnShortcut();
-        update({ useShortcut: true });
-        setStatus('Kurzbefehl „Schichttagebuch-Airlock“ (v3 – ohne Link-Meldung, mit Board- & Safari-Rücksprung) geladen! Falls bereits vorhanden, vorher den alten „Schichttagebuch-Airlock“ in der Kurzbefehle-App löschen oder beim Hinzufügen „Ersetzen“ wählen.');
-    };
-
-    const presets = [4, 6, 8, 10];
-    const resolvedTarget = resolveAirlockReturnTarget(config.returnTarget);
-    const testUrl = buildAirlockShortcutUrl(config.returnSeconds, config.returnTarget);
-    const targetOptions = [
-        { id: 'auto', label: `Automatisch (${resolveAirlockReturnTarget('auto').label})` },
-        { id: 'board', label: 'Board' },
-        { id: 'safari', label: 'Safari' }
-    ];
-
-    return (
-        <div className="card-premium" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5, color: 'var(--color-text-muted)' }}>
-                Öffnet beim Dienstplan-Abruf auf dem iPhone automatisch <strong>Airlock 2FA</strong> und springt
-                nach der eingestellten Wartezeit von selbst zurück in <strong>{resolvedTarget.label}</strong>.
-                Die Einstellung wird über dein Konto zwischen Board und Safari synchronisiert.
-            </p>
-
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                padding: '12px 14px',
-                borderRadius: '12px',
-                background: 'var(--c-bg)',
-                border: '1px solid rgb(var(--rgb-muted) / 0.2)'
-            }}>
-                <div>
-                    <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--color-text-main)' }}>
-                        Automatischer Rücksprung
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {config.useShortcut
-                            ? `Aktiv – zurück zu ${resolvedTarget.label} nach ${config.returnSeconds} Sekunden`
-                            : 'Aus – öffnet Airlock 2FA direkt ohne Rücksprung'}
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    className={config.useShortcut ? 'btn-primary' : 'btn-secondary'}
-                    style={{ width: 'auto', padding: '8px 14px', fontSize: '12.5px', flexShrink: 0 }}
-                    onClick={() => {
-                        const next = update({ useShortcut: !config.useShortcut });
-                        setStatus(next.useShortcut
-                            ? `Rücksprung zu ${resolveAirlockReturnTarget(next.returnTarget).label} aktiviert.`
-                            : 'Deaktiviert – Airlock 2FA wird wieder direkt geöffnet.');
-                    }}
-                >
-                    {config.useShortcut ? 'Aktiv' : 'Einschalten'}
-                </button>
-            </div>
-
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                padding: '12px 14px',
-                borderRadius: '12px',
-                background: 'var(--c-bg)',
-                border: '1px solid rgb(var(--rgb-muted) / 0.2)'
-            }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-main)' }}>
-                    Rücksprung-Ziel
-                </span>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {targetOptions.map((opt) => {
-                        const active = config.returnTarget === opt.id;
-                        return (
-                            <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => update({ returnTarget: opt.id })}
-                                style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '999px',
-                                    fontSize: '12px',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    border: active
-                                        ? '1px solid var(--c-primary)'
-                                        : '1px solid rgb(var(--rgb-muted) / 0.25)',
-                                    background: active ? 'rgb(var(--rgb-primary) / 0.14)' : 'transparent',
-                                    color: active ? 'var(--c-primary)' : 'var(--color-text-muted)'
-                                }}
-                            >
-                                {opt.label}
-                            </button>
-                        );
-                    })}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
-                    Wenn du das Schichttagebuch aus der Home-Screen-App <strong>Board</strong> startest, wähle
-                    <strong> Board</strong> (oder <strong>Automatisch</strong>).
-                </div>
-            </div>
-
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                padding: '12px 14px',
-                borderRadius: '12px',
-                background: 'var(--c-bg)',
-                border: '1px solid rgb(var(--rgb-muted) / 0.2)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-main)' }}>
-                        Wartezeit für Face ID
-                    </span>
-                    <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--c-primary)' }}>
-                        {config.returnSeconds} Sekunden
-                    </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ width: '38px', height: '36px', padding: 0, fontSize: '18px', fontWeight: 700, flexShrink: 0 }}
-                        disabled={config.returnSeconds <= 2}
-                        onClick={() => update({ returnSeconds: config.returnSeconds - 1 })}
-                        aria-label="1 Sekunde weniger"
-                    >
-                        −
-                    </button>
-                    <input
-                        type="range"
-                        min={2}
-                        max={20}
-                        step={1}
-                        value={Math.min(20, config.returnSeconds)}
-                        onChange={(e) => update({ returnSeconds: Number(e.target.value) })}
-                        style={{ flex: 1, accentColor: 'var(--c-primary)' }}
-                    />
-                    <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ width: '38px', height: '36px', padding: 0, fontSize: '18px', fontWeight: 700, flexShrink: 0 }}
-                        disabled={config.returnSeconds >= 30}
-                        onClick={() => update({ returnSeconds: config.returnSeconds + 1 })}
-                        aria-label="1 Sekunde mehr"
-                    >
-                        +
-                    </button>
-                </div>
-
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {presets.map((sec) => {
-                        const active = config.returnSeconds === sec;
-                        return (
-                            <button
-                                key={sec}
-                                type="button"
-                                onClick={() => update({ returnSeconds: sec })}
-                                style={{
-                                    padding: '5px 11px',
-                                    borderRadius: '999px',
-                                    fontSize: '12px',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    border: active
-                                        ? '1px solid var(--c-primary)'
-                                        : '1px solid rgb(var(--rgb-muted) / 0.25)',
-                                    background: active ? 'rgb(var(--rgb-primary) / 0.14)' : 'transparent',
-                                    color: active ? 'var(--c-primary)' : 'var(--color-text-muted)'
-                                }}
-                            >
-                                {sec} s
-                            </button>
-                        );
-                    })}
-                </div>
-
-                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: 1.45 }}>
-                    Die Wartezeit wird bei jedem Abruf direkt an den Kurzbefehl übergeben – du kannst sie hier
-                    jederzeit anpassen, ohne den Kurzbefehl neu zu installieren.
-                </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={handleDownload}
-                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                >
-                    <Download size={16} />
-                    <span>Kurzbefehl „Schichttagebuch-Airlock“ laden (v3)</span>
-                </button>
-                <a
-                    href={testUrl}
-                    className="btn-secondary"
-                    style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        textDecoration: 'none'
-                    }}
-                >
-                    <Play size={15} />
-                    <span>Kurzbefehl jetzt testen (→ {resolvedTarget.label}, {config.returnSeconds} s)</span>
-                </a>
-            </div>
-
-            {status && (
-                <div style={{
-                    fontSize: '12.5px',
-                    lineHeight: 1.45,
-                    color: 'var(--color-text-main)',
-                    background: 'rgb(var(--rgb-info) / 0.1)',
-                    border: '1px solid rgb(var(--rgb-info) / 0.3)',
-                    borderRadius: '10px',
-                    padding: '10px 12px'
-                }}>
-                    {status}
-                </div>
-            )}
-        </div>
-    );
-}
 
 // CareMan login used by the Mac Auto-Pilot on THIS device (localStorage only, never synced)
 function CareManLoginManager() {

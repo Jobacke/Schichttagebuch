@@ -7,6 +7,7 @@
  */
 import { doc, getDoc, setDoc, deleteField } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { postToBoard } from './boardBridge';
 
 const LOCAL_TOKEN_KEY = 'schichttagebuch_bridge_token_v1';
 
@@ -27,16 +28,11 @@ function setLocalCachedToken(val) {
       localStorage.removeItem(LOCAL_TOKEN_KEY);
     }
   } catch {}
-  try {
-    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-      window.parent.postMessage(
-        clean
-          ? { type: 'board-storage-set', key: LOCAL_TOKEN_KEY, value: clean }
-          : { type: 'board-storage-remove', key: LOCAL_TOKEN_KEY },
-        '*'
-      );
-    }
-  } catch {}
+  postToBoard(
+    clean
+      ? { type: 'board-storage-set', key: LOCAL_TOKEN_KEY, value: clean }
+      : { type: 'board-storage-remove', key: LOCAL_TOKEN_KEY }
+  );
 }
 
 function ref() {

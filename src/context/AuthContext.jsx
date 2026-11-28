@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth } from '../firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { postToBoard, isEmbedded, isFromBoard } from '../utils/boardBridge';
 
 const AuthContext = createContext();
 
@@ -37,9 +38,7 @@ function saveAutoAuth(email, password) {
     try {
         const encoded = btoa(unescape(encodeURIComponent(JSON.stringify({ e: email.trim(), p: password }))));
         localStorage.setItem(AUTO_AUTH_KEY, encoded);
-        if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-            window.parent.postMessage({ type: 'board-storage-set', key: AUTO_AUTH_KEY, value: encoded }, '*');
-        }
+        postToBoard({ type: 'board-storage-set', key: AUTO_AUTH_KEY, value: encoded });
     } catch {}
 }
 
@@ -106,8 +105,9 @@ export function AuthProvider({ children }) {
     }, []);
 
     useEffect(() => {
-        if (typeof window === 'undefined' || !window.parent || window.parent === window) return;
+        if (!isEmbedded()) return;
         const onMessage = async (event) => {
+            if (!isFromBoard(event)) return;
             const data = event.data;
             if (!data || typeof data !== 'object') return;
             if (data.type === 'board-storage-value' && data.key === AUTO_AUTH_KEY && data.value) {
@@ -123,9 +123,7 @@ export function AuthProvider({ children }) {
             }
         };
         window.addEventListener('message', onMessage);
-        try {
-            window.parent.postMessage({ type: 'board-storage-get', key: AUTO_AUTH_KEY }, '*');
-        } catch {}
+        postToBoard({ type: 'board-storage-get', key: AUTO_AUTH_KEY });
         return () => window.removeEventListener('message', onMessage);
     }, []);
 
